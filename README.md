@@ -1,12 +1,13 @@
 # Sarcopenia Analysis Pipeline
 
-Automated pipeline for L3 sarcopenia assessment from CT scans.
+Automated pipeline for L3 sarcopenia assessment and organ volumetry from CT scans.
 
 ## Architecture
 
-1.  **Ingestion Service** (`ingest.py`): FastAPI service that accepts ZIP uploads containing DICOM files.
-2.  **Preparation** (`prepare.py`): Extracts DICOMs, selects the best series, and converts to NIfTI (`input/` folder).
-3.  **Analysis** (`run.py`): Batch processes NIfTI files from `input/`, generates segmentations + metrics in `output/`, and archives inputs to `nii/`.
+1.  **Ingestion Service** (`ingest.py`): FastAPI service that accepts ZIP uploads containing DICOM files. It prepares the data and places it in `input/` queue.
+2.  **Execution Daemon** (`run.py`): Continuous monitoring service. Watch `input/` for new files, processes them (TotalSegmentator + Metrics), and moves result to `output/`.
+3.  **Metrics Module** (`metrics.py`): Encapsulates logic for Muscle Area, HU, and Organ Volumes.
+4.  **Uploader Client** (`uploader.py`): CLI tool for easy uploading of folders/files.
 
 ## Setup
 
@@ -14,7 +15,7 @@ Automated pipeline for L3 sarcopenia assessment from CT scans.
     ```bash
     python3 -m venv venv
     source venv/bin/activate
-    pip install -r requirements.txt # (ensure you have dependencies installed)
+    pip install -r requirements.txt
     ```
 
 2.  External Tools:
@@ -22,34 +23,46 @@ Automated pipeline for L3 sarcopenia assessment from CT scans.
 
 ## Usage
 
-### 1. Start Ingestion Service
+You must run **two separate terminals** to keep the pipeline active.
+
+### Terminal 1: Ingestion Service
+Starts the web server to receive files.
 ```bash
-./venv/bin/uvicorn ingest:app --host 0.0.0.0 --port 8000
+source venv/bin/activate
+python ingest.py
+```
+*Running on http://0.0.0.0:8001*
+
+### Terminal 2: Execution Daemon
+Starts the processor that monitors the `input/` folder.
+```bash
+source venv/bin/activate
+python run.py
 ```
 
-### 2. Upload Data
-Send a ZIP file containing DICOMs:
+### Terminal 3: Upload Client
+Send data to the pipeline.
 ```bash
-curl -X 'POST' \
-  'http://localhost:8000/upload' \
-  -H 'accept: application/json' \
-  -H 'Content-Type: multipart/form-data' \
-  -F 'file=@/path/to/exam.zip'
-```
-The file will be processed and placed in `input/` folder as `PatientName_AccessionNumber.nii.gz`.
+source venv/bin/activate
+# Upload a single zip
+python uploader.py path/to/exam.zip
 
-### 3. Run Analysis
-Process all pending files in `input/`:
-```bash
-./venv/bin/python run.py
+# Upload a folder (auto-zips)
+python uploader.py path/to/dicom_folder/
 ```
-Results will be in `output/{PatientName_AccessionNumber}/resultados.json`.
-Processed inputs are moved to `nii/`.
 
 ## Output Structure
 
 - `output/`
     - `PatientName_AccessionNumber/`
-        - `resultados.json`: Sarcopenia metrics.
-        - `total/`: Organ segmentations.
-        - `tissue_types/`: Muscle/Fat segmentations.
+        - `resultados.json`: Sarcopenia metrics + Organ Volumes.
+        - `total/`: Organ segmentations (nii.gz).
+        - `tissue_types/`: Muscle/Fat segmentations (nii.gz).
+
+### Metrics in JSON
+- `SMA_cm2`: Skeletal Muscle Area at L3.
+- `muscle_HU_mean`: Mean attenuation of muscle.
+- `liver_vol_cm3`: Total liver volume.
+- `liver_HU_mean`: Mean attenuation of liver.
+- `spleen_vol_cm3`: Splen volume.
+- `kidney_right_vol_cm3`, `kidney_left_vol_cm3`: Kidney volumes.
