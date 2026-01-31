@@ -1,9 +1,9 @@
-venv/
-output/
-dcm_extracted/
-tmp_serie/
+.DS_Store
 __pycache__/
+venv/
+input/
+nii/
+uploads/
+output/
 *.nii.gz
 *.dcm
-.DS_Store
-ct_original.json
