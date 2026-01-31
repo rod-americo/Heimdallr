@@ -2,12 +2,8 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
-from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks
+from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
-
-# Import logic from run.py
-# (We need to ensure run.py is in path or same directory, which it is)
-from run import process_case
 
 app = FastAPI(title="Sarcopenia Ingestion Service")
 
@@ -18,7 +14,7 @@ PREPARE_SCRIPT = BASE_DIR / "prepare.py"
 PYTHON_EXE = BASE_DIR / "venv" / "bin" / "python"
 
 @app.post("/upload")
-async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+async def upload_file(file: UploadFile = File(...)):
     if not file.filename.lower().endswith(".zip"):
         raise HTTPException(status_code=400, detail="Only .zip files are allowed.")
 
@@ -49,13 +45,12 @@ async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File
         if not generated_file or not os.path.exists(generated_file):
              raise Exception("Output file validation failed.")
 
-        # Schedule processing in background
+        # Processing is now handled by the decoupled run.py daemon
         nifti_path = Path(generated_file)
-        background_tasks.add_task(process_case, nifti_path)
         
         return {
-            "status": "Processing started",
-            "message": "File prepared and queued for analysis.",
+            "status": "Queued",
+            "message": "File received and ready for processing.",
             "original_file": file.filename,
             "generated_nifti": nifti_path.name
         }
