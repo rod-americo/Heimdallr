@@ -1,0 +1,8 @@
+venv/
+output/
+dcm_extracted/
+tmp_serie/
+__pycache__/
+*.nii.gz
+*.dcm
+.DS_Store

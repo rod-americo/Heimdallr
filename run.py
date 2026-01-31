@@ -2,18 +2,22 @@ import os
 import json
 import subprocess
 from pathlib import Path
+import sys
 import nibabel as nib
 import numpy as np
+
+# Ensure venv/bin is in PATH for subprocess calls (TotalSegmentator, dcm2niix)
+os.environ["PATH"] = str(Path(sys.executable).parent) + os.pathsep + os.environ["PATH"]
 
 # ============================================================
 # CONFIGURAÇÕES
 # ============================================================
 
 LICENSE = "aca_VD42VF39LY0V20"
-INPUT_CT = Path("/kaggle/input/ct-nifti-input/ct_original.nii.gz")
-BASE = Path("/kaggle/working")
-(BASE / "total").mkdir(exist_ok=True)
-(BASE / "tissue_types").mkdir(exist_ok=True)
+INPUT_CT = Path("./ct_original.nii.gz")
+BASE = Path("./output")
+(BASE / "total").mkdir(exist_ok=True, parents=True)
+(BASE / "tissue_types").mkdir(exist_ok=True, parents=True)
 
 # ============================================================
 # SEGMENTAÇÃO — TOTAL + TISSUE_TYPES
@@ -84,4 +88,4 @@ out = {
 with open(BASE / "resultados.json", "w") as f:
     json.dump(out, f, indent=2)
 
-print("Pronto. Arquivo salvo em: /kaggle/working/resultados.json")
+print(f"Pronto. Arquivo salvo em: {BASE / 'resultados.json'}")
