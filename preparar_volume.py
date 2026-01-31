@@ -9,6 +9,9 @@ import subprocess
 from pathlib import Path
 import pydicom
 
+# Ensure venv/bin is in PATH for subprocess calls
+os.environ["PATH"] = str(Path(sys.executable).parent) + os.pathsep + os.environ["PATH"]
+
 # ============================================================
 # CONFIGURAÇÃO
 # ============================================================
