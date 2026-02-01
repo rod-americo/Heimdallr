@@ -45,15 +45,28 @@ Every metric calculated serves one purpose: **improve patient outcomes through e
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   uploader.py   │───▶│   ingest.py     │───▶│   prepare.py    │
-│  (CLI Client)   │    │  (FastAPI)      │    │ (DICOM→NIfTI)   │
-└─────────────────┘    └─────────────────┘    └────────┬────────┘
-                                                       │
-                                                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│    output/      │◀───│    run.py       │◀───│    input/       │
-│   (Results)     │    │  (Processing)   │    │  (Queue)        │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
+│   uploader.py   │───▶│   server.py     │───▶│   prepare.py    │
+│  (CLI Client)   │    │ (FastAPI Server)│    │ (DICOM→NIfTI)   │
+│                 │    │  Port 8001      │    │                 │
+└─────────────────┘    └────────┬────────┘    └────────┬────────┘
+                                │                       │
+                                │                       ▼
+                                │              ┌─────────────────┐
+                                │              │    input/       │
+                                │              │  (Queue)        │
+                                │              └────────┬────────┘
+                                │                       │
+                                │                       ▼
+┌─────────────────┐             │              ┌─────────────────┐
+│  Web Dashboard  │◀────────────┤              │    run.py       │
+│  (Browser UI)   │             │              │  (Processing)   │
+└─────────────────┘             │              └────────┬────────┘
+                                │                       │
+                                │                       ▼
+                                │              ┌─────────────────┐
+                                └─────────────▶│    output/      │
+                                               │   (Results)     │
+                                               └─────────────────┘
 ```
 
 ### Components
@@ -63,9 +76,12 @@ Every metric calculated serves one purpose: **improve patient outcomes through e
    - Supports ZIP files and folders (auto-zipped)
    - Progress bar with transfer speed
 
-2. **Ingestion Service** (`ingest.py`)
-   - FastAPI server receiving uploads on port 8001
-   - Triggers preparation asynchronously
+2. **Unified Server** (`server.py`)
+   - FastAPI server on port 8001
+   - **Upload API**: Receives DICOM ZIP files and triggers preparation
+   - **Dashboard API**: RESTful endpoints for patient data, results, and downloads
+   - **Web UI**: Serves interactive dashboard from `static/` directory
+   - **File Downloads**: NIfTI files, segmentation folders (ZIP), overlay images
 
 3. **Preparation Module** (`prepare.py`)
    - Extracts and scans DICOM files
@@ -87,6 +103,13 @@ Every metric calculated serves one purpose: **improve patient outcomes through e
    - L3 sarcopenia metrics
    - Hemorrhage quantification
    - Overlay image generation
+
+6. **Web Dashboard** (`static/`)
+   - **Real-time patient list** with auto-refresh (30s intervals)
+   - **Quick search** for filtering patients by name
+   - **Interactive results modal** displaying metrics and overlay images
+   - **Download capabilities**: NIfTI files, segmentation folders
+   - **Responsive design** with modern UI/UX
 
 ---
 
@@ -202,16 +225,30 @@ pip install -r requirements.txt
 Run these in **separate terminals**:
 
 ```bash
-# Terminal 1: Ingestion Service (receives uploads)
+# Terminal 1: Unified Server (web dashboard + upload API)
 source venv/bin/activate
-python ingest.py
+python server.py
 # Running on http://0.0.0.0:8001
+# Dashboard: http://localhost:8001
+# API Docs: http://localhost:8001/docs
 
 # Terminal 2: Processing Daemon (processes queue)
 source venv/bin/activate
 python run.py
 # Monitoring input/ folder...
 ```
+
+### Accessing the Dashboard
+
+Open your browser and navigate to:
+- **Dashboard**: `http://localhost:8001`
+- **API Documentation**: `http://localhost:8001/docs`
+
+The dashboard provides:
+- Real-time patient list with auto-refresh
+- Quick search functionality
+- Detailed results viewer with overlay images
+- Direct download of NIfTI files and segmentation masks
 
 ### Uploading Exams
 
@@ -241,7 +278,7 @@ Future enhancements planned for Heimdallr:
 - [ ] **Bone density analysis** — Opportunistic osteoporosis screening
 - [ ] **Incidental findings detection** — AI-powered anomaly detection
 - [ ] **PACS integration** — Direct DICOM receive/send
-- [ ] **Web dashboard** — Real-time monitoring and results visualization
+- [x] **Web dashboard** — Real-time monitoring and results visualization ✅
 - [ ] **HL7/FHIR integration** — EMR interoperability
 
 ---

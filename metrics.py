@@ -1,8 +1,20 @@
+#!/usr/bin/env python3
+"""
+Heimdallr Metrics Calculation Module (metrics.py)
+
+Calculates clinical metrics from segmentation masks:
+- Organ volumes (liver, spleen, kidneys)
+- Hounsfield Unit densities (CT only)
+- L3 sarcopenia metrics (Skeletal Muscle Area, muscle HU)
+- Cerebral hemorrhage quantification
+- Overlay image generation
+"""
+
 import nibabel as nib
 import numpy as np
 import json
 from pathlib import Path
-import sqlite3 # Adicionado para DB
+import sqlite3
 
 def get_volume_cm3(path):
     """Calcula o volume em cm³ de uma máscara NIfTI."""
@@ -22,45 +34,73 @@ def get_volume_cm3(path):
         return 0.0
 
 def get_mean_hu(path, ct_data):
-    """Calcula média e desvio padrão de HU dentro da máscara."""
+    """
+    Calculate mean and standard deviation of Hounsfield Units within a mask.
+    
+    Args:
+        path: Path to NIfTI mask file
+        ct_data: Full CT numpy array
+    
+    Returns:
+        tuple: (mean_HU, std_HU) both rounded to 2 decimal places
+    """
     if not path.exists():
         return 0.0, 0.0
     try:
         nii = nib.load(str(path))
         mask = nii.get_fdata()
         
-        # Ensure mask matches CT shape
+        # Ensure mask and CT have matching dimensions
         if mask.shape != ct_data.shape:
             print(f"Shape mismatch: Mask {mask.shape} vs CT {ct_data.shape}")
             return 0.0, 0.0
         
+        # Extract CT values where mask is positive
         voxels = ct_data[mask > 0]
         if voxels.size == 0:
             return 0.0, 0.0
             
         return round(float(np.mean(voxels)), 2), round(float(np.std(voxels)), 2)
+        
     except Exception as ex:
-        print(f"Erro calculando HU {path.name}: {ex}")
+        print(f"Error calculating HU for {path.name}: {ex}")
         return 0.0, 0.0
 
 def calculate_all_metrics(case_id, nifti_path, case_output_folder):
     """
-    Realiza todos os cálculos de métricas para um caso.
-    Retorna um dicionário com os resultados.
+    Calculate all clinical metrics for a case.
+    
+    Performs:
+    1. Body region detection
+    2. Organ volumetry (liver, spleen, kidneys)
+    3. Hounsfield Unit density analysis (CT only)
+    4. L3 sarcopenia analysis (SMA, muscle HU)
+    5. Cerebral hemorrhage quantification
+    
+    Args:
+        case_id: Patient identifier
+        nifti_path: Path to original NIfTI file
+        case_output_folder: Output directory with segmentation results
+    
+    Returns:
+        dict: All calculated metrics
     """
     total_dir = case_output_folder / "total"
     
-    # 1. Identificar Regiões do Corpo
+    # ============================================================
+    # STEP 1: Detect Body Regions
+    # ============================================================
     detected_regions = detect_body_regions(total_dir)
     
-    # Determinar Modalidade (Lendo id.json ou default CT)
+    # Determine modality from metadata (default to CT)
     id_json_path = case_output_folder / "id.json"
     modality = "CT"
     if id_json_path.exists():
         try:
             with open(id_json_path, 'r') as f:
                 modality = json.load(f).get("Modality", "CT")
-        except: pass
+        except: 
+            pass
 
     results = {
         "case_id": case_id,
@@ -68,13 +108,14 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder):
         "modality": modality
     }
 
-    # Carregar Imagem Original (apenas se necessário para métricas de densidade ou overlay)
-    # Para performance, poderíamos postergar, mas precisamos para HU e Overlay
+    # Load original image for density calculation and overlay generation
     ct = nib.load(str(nifti_path)).get_fdata()
 
-    # 2. Métricas de Órgãos (Se abdome presente)
-    # O usuário pediu especificamente: Fígado, Baço, Rins.
-    # Calcular volumes SEMPRE. Densidade APENAS SE CT.
+    # ============================================================
+    # STEP 2: Abdominal Organ Metrics
+    # ============================================================
+    # Calculate volume for all modalities, density only for CT
+    # Organs: liver, spleen, both kidneys
     
     organs_map = [
         ("liver", "liver.nii.gz"),
@@ -85,45 +126,56 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder):
     
     for organ_name, filename in organs_map:
         fpath = total_dir / filename
+        
+        # Volume is calculated for all modalities (CT and MR)
         vol = get_volume_cm3(fpath)
         results[f"{organ_name}_vol_cm3"] = vol
         
+        # Hounsfield Units only for CT (not applicable to MR)
         if modality == "CT":
             hu_mean, hu_std = get_mean_hu(fpath, ct)
             results[f"{organ_name}_hu_mean"] = hu_mean
             results[f"{organ_name}_hu_std"] = hu_std
         else:
-            # Em MR não calculamos HU (intensidade de sinal é relativa e varia)
+            # MR: signal intensity varies by sequence, not standardized like HU
             results[f"{organ_name}_hu_mean"] = None
             results[f"{organ_name}_hu_std"] = None
 
-    # 3. Análise de L3 (Abdomen/Musculo)
+ # ============================================================
+    # STEP 3: L3 Sarcopenia Analysis
+    # ============================================================
+    # Calculate Skeletal Muscle Area (SMA) and muscle density at L3 vertebra
+    # L3 is a standard landmark for body composition assessment
+    
     vertebra_L3_file = case_output_folder / "total" / "vertebrae_L3.nii.gz"
-    muscle_file = case_output_folder / "tissue_types" / "skeletal_muscle.nii.gz" # Correct filename from TotalSegmentator
+    muscle_file = case_output_folder / "tissue_types" / "skeletal_muscle.nii.gz"
     
     if vertebra_L3_file.exists():
         try:
-            # Identificar fatia L3
+            # Find L3 vertebra slice
             nii_L3 = nib.load(str(vertebra_L3_file))
             mask_L3 = nii_L3.get_fdata()
+            
+            # Find axial slices containing L3
             slice_L3_indices = np.where(mask_L3.sum(axis=(0, 1)) > 0)[0]
             
             if len(slice_L3_indices) > 0:
+                # Use middle slice of L3 vertebra
                 slice_idx = int(slice_L3_indices[len(slice_L3_indices)//2])
                 results["slice_L3"] = slice_idx
                 
-                # Gerar Imagem de Overlay (L3) - APENAS CT
+                # Generate L3 overlay image (CT only)
                 if modality == "CT":
                     try:
                         import matplotlib
-                        matplotlib.use('Agg')
+                        matplotlib.use('Agg')  # Non-interactive backend
                         import matplotlib.pyplot as plt
 
-                        # Prepare data
+                        # Prepare CT slice
                         ct_slice = ct[:, :, slice_idx]
                         ct_slice = np.rot90(ct_slice)
                         
-                        # Tentar Overlay com Músculo SE existir, senão L3
+                        # Overlay with muscle mask if available, otherwise L3 mask
                         overlay_mask = None
                         if muscle_file.exists():
                             nii_muscle = nib.load(str(muscle_file))
@@ -135,9 +187,10 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder):
 
                         plt.figure(figsize=(8, 8))
                         
-                        # Windowing: CT soft tissue
+                        # CT windowing for soft tissue (abdomen)
                         plt.imshow(ct_slice, cmap='gray', vmin=-150, vmax=250)
                         
+                        # Overlay muscle mask
                         if overlay_mask is not None:
                             masked_data = np.ma.masked_where(overlay_mask == 0, overlay_mask)
                             plt.imshow(masked_data, cmap='autumn', alpha=0.5)
@@ -150,19 +203,21 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder):
                         plt.savefig(overlay_path, dpi=150)
                         plt.close()
                     except Exception as e:
-                        print(f"Erro gerando imagem L3: {e}")
+                        print(f"Error generating L3 overlay image: {e}")
 
-                # Métricas Musculares (Se existir segmentação muscular)
+                # Calculate muscle metrics if segmentation exists
                 if muscle_file.exists():
                     nii_muscle = nib.load(str(muscle_file))
-                    muscle_data = nii_muscle.get_fdata() # Reloading full for safety/simplicity
+                    muscle_data = nii_muscle.get_fdata()
                     spacing = nii_muscle.header.get_zooms()
                     
+                    # Calculate Skeletal Muscle Area (SMA) at L3
                     mask_slice = muscle_data[:, :, slice_idx]
                     area_mm2 = np.sum(mask_slice > 0) * spacing[0] * spacing[1]
                     area_cm2 = area_mm2 / 100.0
                     results["SMA_cm2"] = round(area_cm2, 3)
                     
+                    # Calculate muscle Hounsfield Units (CT only)
                     if modality == "CT":
                          muscle_voxels = ct[:, :, slice_idx][mask_slice > 0]
                          if muscle_voxels.size > 0:
@@ -176,17 +231,20 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder):
                         results["muscle_HU_std"] = None
 
             else:
-                print("Aviso: L3 encontrado mas vazio.")
+                print("Warning: L3 vertebra found but mask is empty.")
+                
         except Exception as e:
-            print(f"Erro na análise de L3: {e}")
+            print(f"Error in L3 analysis: {e}")
 
-    # 4. Análise de Hemorragia Cerebral (Se existir)
-    # Output path: bbox output/bleed/intracerebral_hemorrhage.nii.gz
+    # ============================================================
+    # STEP 4: Cerebral Hemorrhage Analysis
+    # ============================================================
+    # Quantify intracranial bleeding if detected
     bleed_file = case_output_folder / "bleed" / "intracerebral_hemorrhage.nii.gz"
     
     if bleed_file.exists():
         try:
-            # Calcular Volume
+            # Calculate hemorrhage volume
             vol_bleed = get_volume_cm3(bleed_file)
             results["hemorrhage_vol_cm3"] = vol_bleed
             
@@ -194,21 +252,18 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder):
                 nii_bleed = nib.load(str(bleed_file))
                 mask_bleed = nii_bleed.get_fdata()
                 
-                # Identificar range Z da lesão (axial cuts)
-                # mask shape (X, Y, Z)
+                # Find axial slices containing hemorrhage
                 z_indices = np.where(mask_bleed.sum(axis=(0, 1)) > 0)[0]
                 
                 if len(z_indices) > 0:
-                    # Usar índices do array de fatias presentes para garantir que a fatia escolhida TEM lesão
-                    # (evita cair em gaps se a segmentação for desconexa ou tiver ruído)
+                    # Select representative slices (inferior 15%, center 50%, superior 85%)
                     n_slices = len(z_indices)
                     
-                    # Ensure indices are within bounds (should be by def)
                     idx_15 = int(n_slices * 0.15)
                     idx_50 = int(n_slices * 0.50)
                     idx_85 = int(n_slices * 0.85)
                     
-                    # Clamp just in case
+                    # Clamp to valid range
                     idx_15 = max(0, min(idx_15, n_slices - 1))
                     idx_50 = max(0, min(idx_50, n_slices - 1))
                     idx_85 = max(0, min(idx_85, n_slices - 1))
@@ -219,39 +274,32 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder):
                         "superior_85": int(z_indices[idx_85])
                     }
                     
+                    # Generate overlay images (CT only)
                     if modality == "CT":
                         try:
                             import matplotlib
                             matplotlib.use('Agg')
                             import matplotlib.pyplot as plt
                             
-                            # Carregar o CT completo se ainda não carregado? Já carregamos 'ct' no início.
-                            # Mas precisamos garantia que o shape bate com o bleed (pode ter crop?)
-                            # TotalSegmentator geralmente mantem espaço original ou resampleado. 
-                            # Se 'ct' original usado para HU bater, ótimo.
-                            
-                            # Check shape consistency
+                            # Verify CT and hemorrhage mask have matching dimensions
                             if ct.shape != mask_bleed.shape:
-                                # Fallback: Tentar carregar o CT resampleado se existir, ou skip overlay
-                                # Melhor: pular overlay se shapes não batem para evitar crash
-                                print(f"Aviso: Shape mismatch Bleed {mask_bleed.shape} vs CT {ct.shape}. Skipping overlay.")
+                                print(f"Warning: Shape mismatch Bleed {mask_bleed.shape} vs CT {ct.shape}. Skipping overlay.")
                             else:
+                                # Generate overlay for each representative slice
                                 for label, slice_idx in slices_to_gen.items():
                                     ct_slice = np.rot90(ct[:, :, slice_idx])
                                     mask_slice = np.rot90(mask_bleed[:, :, slice_idx])
                                     
                                     plt.figure(figsize=(8, 8))
-                                    # Windowing: Brain Soft Tissue (Standard: WL 40, WW 80 -> 0 to 80 HU)
+                                    
+                                    # Brain CT windowing (WL=40, WW=80)
                                     plt.imshow(ct_slice, cmap='gray', vmin=0, vmax=80)
                                     
-                                    # Ensure mask is binary and visible
+                                    # Overlay hemorrhage in red
                                     mask_binary = (mask_slice > 0).astype(np.float32)
                                     
-                                    # Plot Overlay only if something is there
                                     if np.sum(mask_binary) > 0:
                                         masked_data = np.ma.masked_where(mask_binary == 0, mask_binary)
-                                        # Use 'jet' or 'autumn' or pure solid color? 
-                                        # 'Reds' with vmin=0, vmax=1 -> 1.0 is Dark Red.
                                         plt.imshow(masked_data, cmap='Reds', alpha=0.7, vmin=0, vmax=1)
                                     
                                     plt.axis('off')
@@ -265,18 +313,32 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder):
                                 results["hemorrhage_analysis_slices"] = slices_to_gen
                                 
                         except Exception as plot_err:
-                            print(f"Erro gerando overlay de hemorragia: {plot_err}")
+                            print(f"Error generating hemorrhage overlay: {plot_err}")
                             
         except Exception as e:
-            print(f"Erro na análise de hemorragia: {e}")
+            print(f"Error in hemorrhage analysis: {e}")
             
     return results
 
 def detect_body_regions(total_dir):
     """
-    Analisa os arquivos de segmentação para identificar quais regiões do corpo estão presentes.
-    Considera presente se a máscara não estiver vazia.
+    Analyze segmentation files to identify which body regions are present.
+    
+    Regions are detected based on the presence of anatomical structures:
+    - head: skull, brain, face
+    - neck: cervical vertebrae, trachea, thyroid
+    - thorax: lungs, heart, aorta
+    - abdomen: liver, spleen, pancreas, kidneys
+    - pelvis: sacrum, bladder, hips
+    - legs: femurs
+    
+    Args:
+        total_dir: Directory containing TotalSegmentator output masks
+    
+    Returns:
+        list: Detected body region names
     """
+    # Map regions to their characteristic anatomical structures
     regions_map = {
         "head": ["skull.nii.gz", "brain.nii.gz", "face.nii.gz"],
         "neck": ["vertebrae_C1.nii.gz", "vertebrae_C2.nii.gz", "vertebrae_C3.nii.gz", "vertebrae_C4.nii.gz", 
@@ -294,25 +356,20 @@ def detect_body_regions(total_dir):
     
     for region, files in regions_map.items():
         is_present = False
+        
+        # Check if any characteristic structure for this region exists and is non-empty
         for fname in files:
             fpath = total_dir / fname
             if fpath.exists():
                 try:
-                    # Check if file has non-zero voxels without loading full data if possible, 
-                    # but nibabel load is lazy. dataobj is useful.
-                    # For safety, let's just load get_fdata() as we did in other functions.
-                    # To optimize speed, we could assume TotalSegmentator output is clean. 
-                    # But we saw empty files are created.
-                    
-                    # Optimization: check file size? Empty nifti might be small but header is 348 bytes + extensions.
-                    # Best way is to check data.
+                    # Load mask and check if it contains any segmented voxels
+                    # Using dataobj for efficiency (lazy loading)
                     nii = nib.load(str(fpath))
-                    # Check a quick stats or sum
-                    if np.sum(nii.dataobj) > 0: # dataobj access might be faster than get_fdata which casts to float
+                    if np.sum(nii.dataobj) > 0:
                         is_present = True
-                        break
+                        break  # Region confirmed, no need to check other files
                 except:
-                    pass
+                    pass  # Skip files that can't be loaded
         
         if is_present:
             detected.append(region)
