@@ -460,6 +460,7 @@ dcmsend localhost 11112 -aec HEIMDALLR test.dcm
 
 Future enhancements planned for Heimdallr:
 
+- [ ] **Chest X-ray PA analysis & automated preliminary reporting** — AI-powered analysis and pre-reports for radiologist review
 - [ ] **Lung nodule detection** — Automated CAD for pulmonary nodules
 - [ ] **Coronary calcium scoring** — Agatston score calculation
 - [ ] **Liver steatosis quantification** — Fat fraction estimation
