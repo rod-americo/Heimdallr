@@ -25,6 +25,9 @@ from pathlib import Path
 # Import metrics calculation module
 from metrics import calculate_all_metrics
 
+# Import centralized configuration
+import config
+
 # Ensure virtual environment binaries (TotalSegmentator, dcm2niix) are in PATH
 os.environ["PATH"] = str(Path(sys.executable).parent) + os.pathsep + os.environ["PATH"]
 
@@ -32,19 +35,17 @@ os.environ["PATH"] = str(Path(sys.executable).parent) + os.pathsep + os.environ[
 # CONFIGURATION
 # ============================================================
 
-LICENSE = "aca_VD42VF39LY0V20"  # TotalSegmentator license key
-BASE_DIR = Path(__file__).resolve().parent
-INPUT_DIR = BASE_DIR / "input"         # Queue of NIfTI files to process
-OUTPUT_DIR = BASE_DIR / "output"       # Results per patient
-ARCHIVE_DIR = BASE_DIR / "nii"         # Archive of processed NIfTI files
-NII_DIR = ARCHIVE_DIR                  # Alias for compatibility
-ERROR_DIR = BASE_DIR / "errors"        # Failed cases
+# Use centralized configuration
+LICENSE = config.TOTALSEGMENTATOR_LICENSE
+BASE_DIR = config.BASE_DIR
+INPUT_DIR = config.INPUT_DIR
+OUTPUT_DIR = config.OUTPUT_DIR
+ARCHIVE_DIR = config.NII_DIR
+NII_DIR = ARCHIVE_DIR  # Alias for compatibility
+ERROR_DIR = config.ERROR_DIR
 
 # Create directories if they don't exist
-INPUT_DIR.mkdir(exist_ok=True)
-OUTPUT_DIR.mkdir(exist_ok=True)
-ARCHIVE_DIR.mkdir(exist_ok=True)
-ERROR_DIR.mkdir(exist_ok=True)
+config.ensure_directories()
 
 
 def run_task(task_name, input_file, output_folder, extra_args=None):
@@ -296,7 +297,7 @@ def main():
     """
     print("Starting input/ directory monitoring (Parallel - 3 Cases)...")
     
-    max_cases = 3  # Maximum concurrent cases
+    max_cases = config.MAX_PARALLEL_CASES  # Maximum concurrent cases from config
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_cases)
     
     processing_files = set()  # Track files currently being processed

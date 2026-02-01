@@ -20,10 +20,13 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskPr
 from rich.console import Console
 from requests_toolbelt import MultipartEncoder, MultipartEncoderMonitor
 
+# Import centralized configuration
+import config
+
 console = Console()
 
-# Default server URL (change 'thor' to your server hostname)
-SERVER_URL = "http://thor:8001/upload"
+# Default server URL from config
+SERVER_URL = config.UPLOADER_DEFAULT_SERVER
 
 def create_progress_callback(task_id, progress):
     """
