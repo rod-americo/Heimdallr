@@ -27,6 +27,7 @@ from metrics import calculate_all_metrics
 
 # Import centralized configuration
 import config
+import sqlite3  # For database updates
 
 # Ensure virtual environment binaries (TotalSegmentator, dcm2niix) are in PATH
 os.environ["PATH"] = str(Path(sys.executable).parent) + os.pathsep + os.environ["PATH"]
@@ -201,16 +202,49 @@ def process_case(nifti_path):
     # ============================================================
     # STEP 2: Metrics Calculation
     # ============================================================
-    # Calculate all metrics (volumes, densities, sarcopenia, hemorrhage)
     # Results written to resultados.json
+    print("Calculating metrics...")
     try:
-        metrics = calculate_all_metrics(case_id, nifti_path, case_output)
-        
         json_path = case_output / "resultados.json"
+        metrics = calculate_all_metrics(case_id, nifti_path, case_output) # Original call
         with open(json_path, "w") as f:
             json.dump(metrics, f, indent=2)
+        print(f"Metrics saved to {json_path}")
+        
+        # ============================================================
+        # STEP 2.5: Update Database with Calculation Results
+        # ============================================================
+        try:
+            # Read the results JSON
+            with open(json_path, 'r') as f:
+                results_data = json.load(f)
             
-        print(f"Success. Results saved to: {json_path}")
+            # Get StudyInstanceUID from id.json
+            id_json_path = case_output / "id.json"
+            study_uid = None
+            if id_json_path.exists():
+                with open(id_json_path, 'r') as f:
+                    id_data = json.load(f)
+                    study_uid = id_data.get("StudyInstanceUID")
+            
+            if study_uid:
+                # Update database with calculation results
+                db_path = config.DB_PATH
+                conn = sqlite3.connect(db_path)
+                c = conn.cursor()
+                c.execute(
+                    "UPDATE dicom_metadata SET CalculationResults = ? WHERE StudyInstanceUID = ?",
+                    (json.dumps(results_data), study_uid)
+                )
+                conn.commit()
+                conn.close()
+                print(f"  [DB] Calculation results updated for {study_uid}")
+            else:
+                print("  [Warning] Could not find StudyInstanceUID to update database")
+                
+        except Exception as e:
+            print(f"  [Warning] Failed to update database with results: {e}")
+            # Don't fail the entire process if DB update fails
         
     except Exception as e:
         print(f"Error calculating metrics for {case_id}: {e}")
@@ -231,11 +265,12 @@ def process_case(nifti_path):
 
 
     # ============================================================
-    # STEP 3: Update Processing Timestamps
+    # STEP 3: Update Pipeline Timing
     # ============================================================
-    # Add end_time and elapsed_time to id.json Pipeline metadata
-    if id_json_path.exists():
-        try:
+    # Record end time and elapsed time in id.json
+    try:
+        id_json_path = case_output / "id.json"
+        if id_json_path.exists():
             with open(id_json_path, 'r') as f:
                 meta = json.load(f)
             
@@ -260,9 +295,30 @@ def process_case(nifti_path):
             
             with open(id_json_path, 'w') as f:
                 json.dump(meta, f, indent=2)
+            
+            # ============================================================
+            # STEP 3.5: Update Database with Complete id.json
+            # ============================================================
+            try:
+                study_uid = meta.get("StudyInstanceUID")
+                if study_uid:
+                    db_path = config.DB_PATH
+                    conn = sqlite3.connect(db_path)
+                    c = conn.cursor()
+                    c.execute(
+                        "UPDATE dicom_metadata SET IdJson = ? WHERE StudyInstanceUID = ?",
+                        (json.dumps(meta), study_uid)
+                    )
+                    conn.commit()
+                    conn.close()
+                    print(f"  [DB] id.json updated for {study_uid}")
                 
-        except Exception as e:
-            print(f"Error updating pipeline time: {e}")
+            except Exception as e:
+                print(f"  [Warning] Failed to update database with id.json: {e}")
+                # Don't fail the entire process if DB update fails
+                
+    except Exception as e:
+        print(f"Error updating pipeline time: {e}")
 
     # ============================================================
     # STEP 4: Archive NIfTI File
