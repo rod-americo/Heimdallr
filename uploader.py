@@ -108,6 +108,19 @@ def main():
             result = response.json()
             console.print(f"[green]Sucesso! Arquivo processado: {result.get('generated_nifti')}[/green]")
             console.print(f"[green]Status: {result.get('status')}[/green]")
+
+            # Delete original source
+            try:
+                if os.path.exists(args.file_path):
+                    if os.path.isdir(args.file_path):
+                        import shutil
+                        shutil.rmtree(args.file_path)
+                        console.print(f"[yellow]Pasta original excluída: {args.file_path}[/yellow]")
+                    else:
+                        os.remove(args.file_path)
+                        console.print(f"[yellow]Arquivo original excluído: {args.file_path}[/yellow]")
+            except Exception as e:
+                console.print(f"[red]Erro ao excluir original: {e}[/red]")
         elif response:
             console.print(f"[bold red]Erro no servidor: {response.status_code}[/bold red]")
             console.print(f"Detalhes: {response.text}")
