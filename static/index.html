@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heimdallr - Dashboard</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <img src="/static/favicon.png" alt="Heimdallr" class="logo-icon">
+                <h1>Heimdallr</h1>
+            </div>
+            <p class="tagline">Radiology AI Pipeline</p>
+        </header>
+
+        <main>
+
+
+            <div class="table-container">
+                <table id="patients-table">
+                    <thead>
+                        <tr>
+                            <th>Paciente</th>
+                            <th>Data</th>
+                            <th>Accession</th>
+                            <th>Modalidade</th>
+                            <th>Regiões</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="patients-body">
+                        <tr>
+                            <td colspan="7" class="loading">Carregando...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+
+        <footer>
+            <p>Heimdallr &copy; 2026 | <a href="/docs">API Docs</a> | <a href="/api/tools/uploader">📥 Uploader CLI</a>
+            </p>
+        </footer>
+    </div>
+
+    <!-- Results Modal -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title">Resultados</h2>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                <!-- Content loaded dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+
+</html>
