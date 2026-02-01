@@ -82,7 +82,7 @@ def init_and_insert_db(metadata):
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         
-        # Create Table (Added DicomMetadata and CalculationResults)
+        # Create Table (Added DicomMetadata, CalculationResults, and IdJson)
         c.execute('''
             CREATE TABLE IF NOT EXISTS dicom_metadata (
                 StudyInstanceUID TEXT PRIMARY KEY,
@@ -91,6 +91,7 @@ def init_and_insert_db(metadata):
                 AccessionNumber TEXT,
                 StudyDate TEXT,
                 Modality TEXT,
+                IdJson TEXT,
                 JsonDump TEXT,
                 DicomMetadata TEXT,
                 CalculationResults TEXT,
@@ -99,7 +100,7 @@ def init_and_insert_db(metadata):
         ''')
         
         # Ensure new columns exist if table already exists (Migration Hack)
-        try: c.execute("ALTER TABLE dicom_metadata ADD COLUMN DicomMetadata TEXT")
+        try: c.execute("ALTER TABLE dicom_metadata ADD COLUMN IdJson TEXT")
         except: pass
         try: c.execute("ALTER TABLE dicom_metadata ADD COLUMN CalculationResults TEXT")
         except: pass
