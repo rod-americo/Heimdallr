@@ -50,13 +50,7 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder):
     """
     total_dir = case_output_folder / "total"
     
-    # 1. Identificar Regiões do Corpo FIRST
-    # This function is not provided in the snippet, assuming it exists elsewhere or is a placeholder.
-    # For now, let's mock it to avoid errors.
-    def detect_body_regions(total_dir_path):
-        # Placeholder for actual implementation
-        return ["abdomen", "chest"] 
-    
+    # 1. Identificar Regiões do Corpo
     detected_regions = detect_body_regions(total_dir)
     
     # Determinar Modalidade (Lendo id.json ou default CT)
