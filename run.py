@@ -1,3 +1,16 @@
+#!/usr/bin/env python3
+"""
+Heimdallr Processing Daemon (run.py)
+
+Monitors the input/ directory for new NIfTI files and processes them through:
+1. TotalSegmentator organ and tissue segmentation (parallel)
+2. Conditional specialized analysis (e.g., cerebral hemorrhage if brain detected)
+3. Metrics calculation (volumes, densities, sarcopenia)
+4. Results archival
+
+Supports parallel processing of up to 3 cases simultaneously.
+"""
+
 import os
 import json
 import shutil
@@ -6,27 +19,28 @@ import threading
 import sys
 import time
 import datetime
-import concurrent.futures # Added for parallel case processing
+import concurrent.futures  # For parallel case processing
 from pathlib import Path
 
-# Import Metrics Logic
+# Import metrics calculation module
 from metrics import calculate_all_metrics
 
-# Ensure venv/bin is in PATH for subprocess calls (TotalSegmentator, dcm2niix)
+# Ensure virtual environment binaries (TotalSegmentator, dcm2niix) are in PATH
 os.environ["PATH"] = str(Path(sys.executable).parent) + os.pathsep + os.environ["PATH"]
 
 # ============================================================
-# CONFIGURAÇÕES
+# CONFIGURATION
 # ============================================================
 
-LICENSE = "aca_VD42VF39LY0V20"
+LICENSE = "aca_VD42VF39LY0V20"  # TotalSegmentator license key
 BASE_DIR = Path(__file__).resolve().parent
-INPUT_DIR = BASE_DIR / "input"
-OUTPUT_DIR = BASE_DIR / "output"
-ARCHIVE_DIR = BASE_DIR / "nii"
-NII_DIR = ARCHIVE_DIR # Alias for compatibility
-ERROR_DIR = BASE_DIR / "errors"
+INPUT_DIR = BASE_DIR / "input"         # Queue of NIfTI files to process
+OUTPUT_DIR = BASE_DIR / "output"       # Results per patient
+ARCHIVE_DIR = BASE_DIR / "nii"         # Archive of processed NIfTI files
+NII_DIR = ARCHIVE_DIR                  # Alias for compatibility
+ERROR_DIR = BASE_DIR / "errors"        # Failed cases
 
+# Create directories if they don't exist
 INPUT_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
 ARCHIVE_DIR.mkdir(exist_ok=True)
@@ -34,10 +48,23 @@ ERROR_DIR.mkdir(exist_ok=True)
 
 
 def run_task(task_name, input_file, output_folder, extra_args=None):
+    """
+    Execute a TotalSegmentator task.
+    
+    Args:
+        task_name: TotalSegmentator task (e.g., 'total', 'tissue_types', 'cerebral_bleed')
+        input_file: Path to input NIfTI file
+        output_folder: Directory for output segmentation masks
+        extra_args: Additional command-line arguments (e.g., ['--fast'])
+    
+    Raises:
+        CalledProcessError: If TotalSegmentator exits with non-zero status
+    """
     if extra_args is None:
         extra_args = []
-    print(f"[{task_name}] Iniciando...")
+    print(f"[{task_name}] Starting...")
     
+    # Build TotalSegmentator command
     cmd = [
         "TotalSegmentator",
         "-l", LICENSE,
@@ -46,47 +73,68 @@ def run_task(task_name, input_file, output_folder, extra_args=None):
         "--task", task_name
     ] + extra_args
     
-    # Run with Popen to filter stdout and suppress citation
+    # Run with Popen to capture and filter output
+    # This allows us to suppress citation messages while preserving important logs
     process = subprocess.Popen(
         cmd, 
         stdout=subprocess.PIPE, 
         stderr=subprocess.STDOUT,
         text=True, 
-        bufsize=1
+        bufsize=1  # Line-buffered output
     )
     
+    # Stream output line by line
     for line in process.stdout:
+        # Optionally filter unwanted lines (citation currently enabled)
         # if "If you use this tool please cite" in line:
         #     continue
-        print(line, end="") # Full logging enabled
+        print(line, end="")  # Full logging enabled
     
+    # Wait for process completion
     process.wait()
     if process.returncode != 0:
         raise subprocess.CalledProcessError(process.returncode, cmd)
         
-    print(f"[{task_name}] Finalizado.")
+    print(f"[{task_name}] Finished.")
 
 
 def process_case(nifti_path):
-    # Identificar caso pelo nome do arquivo (ex: Paciente_1234.nii.gz -> Paciente_1234)
+    """
+    Process a single patient case through the complete pipeline.
+    
+    Steps:
+    1. Parallel segmentation (organs + tissues)
+    2. Conditional specialized analysis (e.g., hemorrhage if brain found)
+    3. Metrics calculation and JSON output
+    4. Update processing timestamps
+    5. Archive NIfTI file
+    
+    Args:
+        nifti_path: Path to NIfTI file in input/ directory
+    
+    Returns:
+        bool: True if successful, False on error
+    """
+    # Extract case ID from filename (e.g., "PatientRACS_20260201_5531196.nii.gz" -> "PatientRACS_20260201_5531196")
     case_id = nifti_path.name.replace("".join(nifti_path.suffixes), "")
     case_output = OUTPUT_DIR / case_id
     
-    # Resetar subdiretórios de output do caso
+    # Create output directory structure
     if not case_output.exists():
         case_output.mkdir(parents=True)
     
-    # Limpar apenas as pastas de resultado do TotalSegmentator
+    # Clean and recreate TotalSegmentator output directories
+    # This ensures we don't mix results from multiple runs
     for subdir in ["total", "tissue_types"]:
         p = case_output / subdir
         if p.exists():
             shutil.rmtree(p)
         p.mkdir(exist_ok=True)
 
-    print(f"\n=== Processando Caso: {case_id} ===")
+    print(f"\n=== Processing Case: {case_id} ===")
 
-    # Determinar Modalidade via id.json (Criado pelo prepare.py)
-    # Default para CT se não encontrado (para compatibilidade legada)
+    # Determine modality from metadata (created by prepare.py)
+    # Default to CT if not found (for legacy compatibility)
     modality = "CT"
     id_json_path = case_output / "id.json"
     if id_json_path.exists():
@@ -94,75 +142,97 @@ def process_case(nifti_path):
             with open(id_json_path, 'r') as f:
                 modality = json.load(f).get("Modality", "CT")
         except: 
-            pass
+            pass  # Silently default to CT
             
-    print(f"Modalidade detectada: {modality}")
+    print(f"Detected modality: {modality}")
 
-    # 1. Segmentação Paralela
-    # Thread 1: Anatomia Geral
-    # Se MR -> total_mr, Se CT -> total
-    # Nota: --fast funciona para ambos na versão recente do TotalSegmentator, 
-    # mas total_mr é específico. Usaremos a flag --fast em ambos.
+    # ============================================================
+    # STEP 1: Parallel Segmentation
+    # ============================================================
+    # Thread 1: General Anatomy
+    #   - CT: 'total' task (104 organs)
+    #   - MR: 'total_mr' task (MR-specific segmentation)
+    # Both use --fast flag for improved performance
     
     task_gen = "total"
     if modality == "MR":
         task_gen = "total_mr"
         
-    t1 = threading.Thread(target=run_task, args=(task_gen, nifti_path, case_output / "total", ["--fast"]))
+    # Start general anatomy segmentation in background thread
+    t1 = threading.Thread(
+        target=run_task, 
+        args=(task_gen, nifti_path, case_output / "total", ["--fast"])
+    )
     t1.start()
     
+    # Thread 2: Tissue Segmentation (CT only)
+    #   Segments skeletal muscle, visceral/subcutaneous fat
     t2 = None
-    # Thread 2: Tecidos (Apenas se CT por enquanto)
     if modality == "CT":
-        t2 = threading.Thread(target=run_task, args=("tissue_types", nifti_path, case_output / "tissue_types"))
+        t2 = threading.Thread(
+            target=run_task, 
+            args=("tissue_types", nifti_path, case_output / "tissue_types")
+        )
         t2.start()
 
+    # Wait for both threads to complete
     t1.join()
     if t2:
         t2.join()
 
-    # 1.5 Subtaferas de Especialidade (Condicional)
-    # Se detectamos Crânio (Brain > 0) e é CT -> Rodar Hemorragia
+    # ============================================================
+    # STEP 1.5: Conditional Specialized Analysis
+    # ============================================================
+    # If brain detected and modality is CT -> Run hemorrhage detection
     brain_file = case_output / "total" / "brain.nii.gz"
     if modality == "CT" and brain_file.exists():
         try:
-             # Check if brain non-empty (simple file size check or just run it)
-             # TotalSegmentator creates small empty files sometimes.
-             if brain_file.stat().st_size > 1000: # 1KB arbitrary threshold for "something found"
-                 print("[Condicional] Crânio detectado. Iniciando busca por hemorragia...")
+             # Check if brain mask is non-empty
+             # TotalSegmentator sometimes creates empty placeholder files
+             if brain_file.stat().st_size > 1000:  # 1KB threshold
+                 print("[Conditional] Brain detected. Running hemorrhage detection...")
                  bleed_output = case_output / "bleed"
                  bleed_output.mkdir(exist_ok=True)
                  run_task("cerebral_bleed", nifti_path, bleed_output)
         except Exception as e:
-            print(f"Erro na execução condicional de hemorragia: {e}")
+            print(f"Error during conditional hemorrhage analysis: {e}")
 
-    # 2. Cálculo de Métricas (via metrics.py)
+    # ============================================================
+    # STEP 2: Metrics Calculation
+    # ============================================================
+    # Calculate all metrics (volumes, densities, sarcopenia, hemorrhage)
+    # Results written to resultados.json
     try:
-        out = calculate_all_metrics(case_id, nifti_path, case_output)
+        metrics = calculate_all_metrics(case_id, nifti_path, case_output)
         
         json_path = case_output / "resultados.json"
         with open(json_path, "w") as f:
-            json.dump(out, f, indent=2)
+            json.dump(metrics, f, indent=2)
             
-        print(f"Sucesso. Resultados em: {json_path}")
+        print(f"Success. Results saved to: {json_path}")
         
     except Exception as e:
-        print(f"Erro no cálculo de métricas para {case_id}: {e}")
+        print(f"Error calculating metrics for {case_id}: {e}")
+        
+        # Write error log
         with open(case_output / "error.log", "w") as f:
             f.write(str(e))
         
-        # Mover para pasta de erro para evitar loop infinito
+        # Move NIfTI to error directory to prevent infinite reprocessing
         error_dest = ERROR_DIR / nifti_path.name
         try:
             shutil.move(str(nifti_path), str(error_dest))
-            print(f"Input movido para pasta de erro: {error_dest}")
+            print(f"Input moved to error folder: {error_dest}")
         except Exception as move_err:
-            print(f"Erro crítico: Não foi possível mover arquivo de erro {nifti_path}: {move_err}")
+            print(f"Critical error: Could not move error file {nifti_path}: {move_err}")
             
         return False
 
 
-    # Atualizar id.json com End Time e Duration
+    # ============================================================
+    # STEP 3: Update Processing Timestamps
+    # ============================================================
+    # Add end_time and elapsed_time to id.json Pipeline metadata
     if id_json_path.exists():
         try:
             with open(id_json_path, 'r') as f:
@@ -174,6 +244,7 @@ def process_case(nifti_path):
             end_dt = datetime.datetime.now()
             pipeline_data["end_time"] = end_dt.isoformat()
             
+            # Calculate elapsed time
             if start_str:
                 try:
                     start_dt = datetime.datetime.fromisoformat(start_str)
@@ -190,77 +261,90 @@ def process_case(nifti_path):
                 json.dump(meta, f, indent=2)
                 
         except Exception as e:
-            print(f"Erro atualizando tempo de pipeline: {e}")
+            print(f"Error updating pipeline time: {e}")
 
-    # 4. Mover input para pasta final (nii/)
+    # ============================================================
+    # STEP 4: Archive NIfTI File
+    # ============================================================
+    # Move processed NIfTI from input/ to nii/ archive
+    # Use clinical naming if available
     try:
-        # Tentar ler ClinicalName do id.json
+        # Try to read ClinicalName from id.json for better file organization
         final_name = case_id
         try:
             with open(case_output / "id.json", 'r') as f:
                 idd = json.load(f)
                 if "ClinicalName" in idd and idd["ClinicalName"] and idd["ClinicalName"] != "Unknown":
                     final_name = idd["ClinicalName"]
-        except: pass
+        except: 
+            pass  # Use case_id if clinical name not available
         
         final_nii_path = NII_DIR / f"{final_name}.nii.gz"
         shutil.move(str(nifti_path), str(final_nii_path))
-        print(f"Input movido para: {final_nii_path}")
+        print(f"Input archived to: {final_nii_path}")
     except Exception as e:
-        print(f"Erro ao mover input: {e}")
+        print(f"Error archiving input: {e}")
 
     return True
 
 def main():
-    print("Iniciando monitoramento da pasta input/ (Paralelo - 3 Casos)...")
+    """
+    Main daemon loop.
     
-    max_cases = 3
+    Monitors input/ directory for new NIfTI files and processes them in parallel.
+    Supports up to 3 simultaneous cases for optimal resource utilization.
+    """
+    print("Starting input/ directory monitoring (Parallel - 3 Cases)...")
+    
+    max_cases = 3  # Maximum concurrent cases
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_cases)
     
-    processing_files = set()
-    lock = threading.Lock()
+    processing_files = set()  # Track files currently being processed
+    lock = threading.Lock()    # Thread-safe access to processing_files
     
     def on_complete(fut, f_path):
+        """Callback when a case finishes processing."""
         with lock:
             if f_path in processing_files:
                 processing_files.discard(f_path)
         try:
-            fut.result()
+            fut.result()  # Raise exception if case failed
         except Exception as e:
-            print(f"Erro na thread do caso {f_path.name}: {e}")
+            print(f"Error in case processing thread {f_path.name}: {e}")
 
     try:
         while True:
             try:
-                # Listar arquivos
+                # List all NIfTI files in input directory
                 current_files = sorted(list(INPUT_DIR.glob("*.nii.gz")))
                 
                 for f in current_files:
                     with lock:
-                        # Se já estamos cheios, parar de submeter por agora
+                        # If we're at max capacity, wait until next iteration
                         if len(processing_files) >= max_cases:
                             break
                         
-                        # Se arquivo já está sendo processado, pular
+                        # Skip if file is already being processed
                         if f in processing_files:
                             continue
                             
-                        # Submeter novo caso
-                        print(f"Submetendo novo caso: {f.name}")
+                        # Submit new case for processing
+                        print(f"Submitting new case: {f.name}")
                         processing_files.add(f)
                         future = executor.submit(process_case, f)
                         future.add_done_callback(lambda fut, p=f: on_complete(fut, p))
             
+                # Check for new files every 2 seconds
                 time.sleep(2)
                 
             except Exception as e:
-                print(f"Erro no loop principal: {e}")
+                print(f"Error in main loop: {e}")
                 time.sleep(2)
                 
     except KeyboardInterrupt:
-        print("\nParando monitoramento...")
+        print("\nStopping monitoring...")
         executor.shutdown(wait=False)
-        print("Executor finalizado.")
+        print("Executor shutdown complete.")
 
 if __name__ == "__main__":
     main()

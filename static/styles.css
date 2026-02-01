@@ -110,6 +110,32 @@ header {
     letter-spacing: 0.5px;
 }
 
+/* Controls */
+.controls {
+    display: flex;
+    justify-content: flex-start;
+    margin-bottom: 1.5rem;
+}
+
+.search-input {
+    width: 300px;
+    padding: 0.8rem 1rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    transition: all 0.2s;
+    outline: none;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.search-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(76, 201, 240, 0.2);
+    transform: translateY(-1px);
+}
+
 /* Table */
 .table-container {
     background: var(--bg-secondary);

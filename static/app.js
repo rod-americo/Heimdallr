@@ -6,12 +6,19 @@ const API_BASE = '';
 
 // State
 let patients = [];
+let currentFilter = '';
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     loadPatients();
     // Refresh every 30 seconds
     setInterval(loadPatients, 30000);
+
+    // Filter input
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+        currentFilter = e.target.value.toLowerCase();
+        renderPatients();
+    });
 });
 
 // Load patient list from API
@@ -20,6 +27,14 @@ async function loadPatients() {
         const response = await fetch(`${API_BASE}/api/patients`);
         const data = await response.json();
         patients = data.patients || [];
+
+        // Sort alphabetically by Patient Name
+        patients.sort((a, b) => {
+            const nameA = a.case_id.split('_')[0].toLowerCase();
+            const nameB = b.case_id.split('_')[0].toLowerCase();
+            return nameA.localeCompare(nameB);
+        });
+
         renderPatients();
 
     } catch (error) {
@@ -32,14 +47,29 @@ async function loadPatients() {
 function renderPatients() {
     const tbody = document.getElementById('patients-body');
 
-    if (patients.length === 0) {
+    // Filter list
+    const filtered = patients.filter(p => {
+        if (!currentFilter) return true;
+
+        const name = p.case_id.split('_')[0].toLowerCase();
+        const accession = (p.accession || '').toLowerCase();
+        const date = (p.study_date || '').toLowerCase();
+
+        return name.includes(currentFilter) ||
+            accession.includes(currentFilter) ||
+            date.includes(currentFilter);
+    });
+
+    if (filtered.length === 0) {
+        // Show proper empty state depending on whether it's filter or no-data
+        const message = patients.length === 0 ? "Nenhum paciente encontrado" : "Nenhum resultado para a busca";
         tbody.innerHTML = `
             <tr>
-                <td colspan="7">
+                <td colspan="6">
                     <div class="empty-state">
-                        <div class="empty-state-icon">📭</div>
-                        <h3>Nenhum paciente encontrado</h3>
-                        <p>Arquivos NIfTI aparecerão aqui após processamento</p>
+                        <div class="empty-state-icon">🔍</div>
+                        <h3>${message}</h3>
+                        <p>${patients.length === 0 ? "Arquivos NIfTI aparecerão aqui após processamento" : "Tente ajustar o termo pesquisado"}</p>
                     </div>
                 </td>
             </tr>
@@ -47,7 +77,7 @@ function renderPatients() {
         return;
     }
 
-    tbody.innerHTML = patients.map(p => {
+    tbody.innerHTML = filtered.map(p => {
         // Extract just the name part (before first underscore with date)
         const displayName = p.case_id.split('_')[0];
 
@@ -56,6 +86,7 @@ function renderPatients() {
             <td class="patient-name">${escapeHtml(displayName)}</td>
             <td class="date">${formatDate(p.study_date)}</td>
             <td class="accession">${escapeHtml(p.accession)}</td>
+            <td class="processing-time">${p.elapsed_seconds ? p.elapsed_seconds + 's' : '-'}</td>
             <td><span class="modality ${p.modality}">${p.modality || '-'}</span></td>
             <td class="regions">${p.body_regions.map(r => `<span class="region-tag">${r}</span>`).join('')}</td>
             <td>
@@ -119,8 +150,8 @@ function renderResults(results, caseId) {
         </div>
     `);
 
-    // Hemorrhage (if present)
-    if (results.hemorrhage_vol_cm3 !== undefined && results.hemorrhage_vol_cm3 > 0) {
+    // Hemorrhage (if present and > 0.1)
+    if (results.hemorrhage_vol_cm3 !== undefined && results.hemorrhage_vol_cm3 > 0.1) {
         sections.push(`
             <h3 style="margin: 1.5rem 0 1rem; color: var(--danger);">⚠️ Hemorragia Detectada</h3>
             <div class="results-grid">
