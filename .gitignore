@@ -1,11 +1,60 @@
+# Python
 .DS_Store
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual Environment
 venv/
-database/
+env/
+ENV/
+
+# Data Directories (keep structure, ignore content)
 input/*
+!input/.gitkeep
+
 nii/*
-uploads/*
+!nii/.gitkeep
+
 output/*
+!output/.gitkeep
+
+uploads/*
+!uploads/.gitkeep
+
+errors/*
+!errors/.gitkeep
+
+# DICOM Listener Data
+data/incoming_dicom/*
+data/sent/*
+data/failed/*
+data/state/*
+!data/incoming_dicom/.gitkeep
+!data/sent/.gitkeep
+!data/failed/.gitkeep
+!data/state/.gitkeep
+
+# Database (keep schema and docs, ignore database file)
+database/*.db
+database/*.db-journal
+!database/schema.sql
+!database/README.md
+
+# File Types
 *.nii.gz
 *.dcm
 *.zip
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
