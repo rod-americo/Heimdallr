@@ -1,9 +1,11 @@
 .DS_Store
 __pycache__/
 venv/
-input/
-nii/
-uploads/
-output/
+database/
+input/*
+nii/*
+uploads/*
+output/*
 *.nii.gz
 *.dcm
+*.zip
