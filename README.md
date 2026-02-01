@@ -44,16 +44,16 @@ Every metric calculated serves one purpose: **improve patient outcomes through e
 ## Architecture
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│ Modality/PACS   │───▶│dicom_listener.py│───▶│   server.py     │
-│ (C-STORE)       │    │  (Port 11112)   │    │ (FastAPI Server)│
-└─────────────────┘    │  Auto-upload    │    │  Port 8001      │
-                       └─────────────────┘    └────────┬────────┘
+┌─────────────────┐    ┌─────────────────┐     ┌─────────────────┐
+│ Modality/PACS   │───▶│dicom_listener.py│────▶│   server.py     │
+│ (C-STORE)       │    │  (Port 11112)   │     │ (FastAPI Server)│
+└─────────────────┘    │  Auto-upload    │     │  Port 8001      │
+                       └─────────────────┘     └────────┬────────┘
                                                         │
-┌─────────────────┐                                    │
-│   uploader.py   │───────────────────────────────────▶│
-│  (CLI Client)   │    HTTP POST /upload               │
-└─────────────────┘                                    │
+┌─────────────────┐                                     │
+│   uploader.py   │────────────────────────────────────▶│
+│  (CLI Client)   │    HTTP POST /upload                │
+└─────────────────┘                                     │
                                                         ▼
                                                ┌─────────────────┐
                                                │   prepare.py    │
