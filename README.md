@@ -45,59 +45,82 @@ Every metric calculated serves one purpose: **improve patient outcomes through e
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   uploader.py   │───▶│   server.py     │───▶│   prepare.py    │
-│  (CLI Client)   │    │ (FastAPI Server)│    │ (DICOM→NIfTI)   │
-│                 │    │  Port 8001      │    │                 │
-└─────────────────┘    └────────┬────────┘    └────────┬────────┘
-                                │                       │
-                                │                       ▼
-                                │              ┌─────────────────┐
-                                │              │    input/       │
-                                │              │  (Queue)        │
-                                │              └────────┬────────┘
-                                │                       │
-                                │                       ▼
-┌─────────────────┐             │              ┌─────────────────┐
-│  Web Dashboard  │◀────────────┤              │    run.py       │
-│  (Browser UI)   │             │              │  (Processing)   │
-└─────────────────┘             │              └────────┬────────┘
-                                │                       │
-                                │                       ▼
-                                │              ┌─────────────────┐
-                                └─────────────▶│    output/      │
+│ Modality/PACS   │───▶│dicom_listener.py│───▶│   server.py     │
+│ (C-STORE)       │    │  (Port 11112)   │    │ (FastAPI Server)│
+└─────────────────┘    │  Auto-upload    │    │  Port 8001      │
+                       └─────────────────┘    └────────┬────────┘
+                                                        │
+┌─────────────────┐                                    │
+│   uploader.py   │───────────────────────────────────▶│
+│  (CLI Client)   │    HTTP POST /upload               │
+└─────────────────┘                                    │
+                                                        ▼
+                                               ┌─────────────────┐
+                                               │   prepare.py    │
+                                               │ (DICOM→NIfTI)   │
+                                               └────────┬────────┘
+                                                        │
+                                                        ▼
+                                               ┌─────────────────┐
+                                               │    input/       │
+                                               │  (Queue)        │
+                                               └────────┬────────┘
+                                                        │
+                                                        ▼
+┌─────────────────┐                            ┌─────────────────┐
+│  Web Dashboard  │◀───────────────────────────│    run.py       │
+│  (Browser UI)   │    API Endpoints           │  (Processing)   │
+└─────────────────┘                            └────────┬────────┘
+                                                        │
+                                                        ▼
+                                               ┌─────────────────┐
+                                               │    output/      │
                                                │   (Results)     │
                                                └─────────────────┘
 ```
 
 ### Components
 
-1. **Uploader Client** (`uploader.py`)
-   - CLI tool for sending exams to the pipeline
-   - Supports ZIP files and folders (auto-zipped)
-   - Progress bar with transfer speed
+#### Ingestion Methods
 
-2. **Unified Server** (`server.py`)
+**Option 1: DICOM Listener** (`dicom_listener.py`) — **Recommended for PACS Integration**
+- DICOM C-STORE SCP (Service Class Provider) on port 11112
+- Receives images directly from modalities/PACS
+- Groups images by StudyInstanceUID
+- Auto-detects study completion (30s idle timeout)
+- Automatically zips and uploads to server
+- Production-ready with retry logic and error handling
+
+**Option 2: CLI Uploader** (`uploader.py`) — **Manual Upload**
+- Command-line tool for manual exam submission
+- Supports ZIP files and folders (auto-zipped)
+- Progress bar with transfer speed
+- Useful for batch processing or testing
+
+#### Core Pipeline
+
+1. **Unified Server** (`server.py`)
    - FastAPI server on port 8001
    - **Upload API**: Receives DICOM ZIP files and triggers preparation
    - **Dashboard API**: RESTful endpoints for patient data, results, and downloads
    - **Web UI**: Serves interactive dashboard from `static/` directory
    - **File Downloads**: NIfTI files, segmentation folders (ZIP), overlay images
 
-3. **Preparation Module** (`prepare.py`)
+2. **Preparation Module** (`prepare.py`)
    - Extracts and scans DICOM files
    - Intelligent series selection (CT: phase + kernel priority, MR: slice count)
    - Converts to NIfTI using `dcm2niix`
    - Generates clinical naming: `FirstNameInitials_YYYYMMDD_AccessionNumber`
    - Stores metadata in SQLite database
 
-4. **Processing Daemon** (`run.py`)
+3. **Processing Daemon** (`run.py`)
    - Monitors `input/` for new cases
    - Runs TotalSegmentator for segmentation
    - Executes conditional analyses (e.g., hemorrhage if brain detected)
    - Calculates all metrics via `metrics.py`
    - Parallel processing (up to 3 cases simultaneously)
 
-5. **Metrics Module** (`metrics.py`)
+4. **Metrics Module** (`metrics.py`)
    - Organ volume calculation
    - HU density analysis
    - L3 sarcopenia metrics
@@ -252,6 +275,60 @@ The dashboard provides:
 
 ### Uploading Exams
 
+#### Option 1: DICOM Listener (PACS Integration)
+
+For production environments with PACS/modalities:
+
+```bash
+# Terminal 3: DICOM Listener (receives from PACS)
+source venv/bin/activate
+python dicom_listener.py
+# Heimdallr DICOM Listener started
+#   AE Title: HEIMDALLR
+#   Port: 11112
+#   Upload URL: http://127.0.0.1:8001/upload
+#   Idle timeout: 30s
+# Waiting for DICOM connections...
+```
+
+**Configuration** (via `config.py` or environment variables):
+```bash
+# Override defaults
+export HEIMDALLR_AE_TITLE="MY_AE_TITLE"
+export HEIMDALLR_DICOM_PORT="11113"
+export HEIMDALLR_IDLE_SECONDS="60"
+
+python dicom_listener.py
+```
+
+**PACS Configuration:**
+- Configure your PACS to send studies to Heimdallr
+- Destination AE Title: `HEIMDALLR`
+- Destination IP: Heimdallr server IP
+- Destination Port: `11112`
+- Protocol: DICOM C-STORE
+
+**How it works:**
+1. Receives DICOM images via C-STORE protocol
+2. Groups images by StudyInstanceUID
+3. Waits 30 seconds after last image (idle timeout)
+4. Automatically zips completed study
+5. Uploads to server via HTTP POST
+6. Archives successful uploads, logs failures
+
+**Testing with DCMTK:**
+```bash
+# Send single file
+dcmsend localhost 11112 -aec HEIMDALLR test.dcm
+
+# Send entire directory
+dcmsend localhost 11112 -aec HEIMDALLR +sd /path/to/dicom/folder
+```
+
+#### Option 2: Manual Upload (CLI)
+
+For manual uploads or batch processing:
+
 ```bash
 source venv/bin/activate
 
@@ -267,6 +344,118 @@ python uploader.py /path/to/exam.zip --server http://192.168.1.100:8001/upload
 
 ---
 
+## Production Deployment
+
+### Systemd Services
+
+For production environments, run services as systemd units:
+
+**DICOM Listener Service** (`/etc/systemd/system/heimdallr-dicom.service`):
+```ini
+[Unit]
+Description=Heimdallr DICOM Listener
+After=network.target
+
+[Service]
+Type=simple
+User=heimdallr
+WorkingDirectory=/opt/heimdallr
+ExecStart=/opt/heimdallr/venv/bin/python dicom_listener.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Server Service** (`/etc/systemd/system/heimdallr-server.service`):
+```ini
+[Unit]
+Description=Heimdallr FastAPI Server
+After=network.target
+
+[Service]
+Type=simple
+User=heimdallr
+WorkingDirectory=/opt/heimdallr
+ExecStart=/opt/heimdallr/venv/bin/python server.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Processing Daemon** (`/etc/systemd/system/heimdallr-processor.service`):
+```ini
+[Unit]
+Description=Heimdallr Processing Daemon
+After=network.target
+
+[Service]
+Type=simple
+User=heimdallr
+WorkingDirectory=/opt/heimdallr
+ExecStart=/opt/heimdallr/venv/bin/python run.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Enable and start services:**
+```bash
+sudo systemctl enable heimdallr-dicom heimdallr-server heimdallr-processor
+sudo systemctl start heimdallr-dicom heimdallr-server heimdallr-processor
+sudo systemctl status heimdallr-*
+```
+
+### Configuration Management
+
+All configuration is centralized in `config.py` and can be overridden via environment variables:
+
+```bash
+# View current configuration
+python config.py
+
+# Override via environment (add to systemd service files)
+Environment="HEIMDALLR_DICOM_PORT=11113"
+Environment="HEIMDALLR_MAX_PARALLEL_CASES=5"
+Environment="HEIMDALLR_UPLOAD_URL=http://production-server:8001/upload"
+```
+
+### Troubleshooting
+
+**DICOM Listener Issues:**
+```bash
+# Check if port is in use
+sudo lsof -i :11112
+
+# Kill existing process
+sudo fuser -k 11112/tcp
+
+# Check listener logs
+journalctl -u heimdallr-dicom -f
+
+# Test DICOM connectivity
+dcmsend localhost 11112 -aec HEIMDALLR test.dcm
+```
+
+**Upload Failures:**
+- Check `data/failed/` directory for failed ZIPs
+- Verify server.py is running: `systemctl status heimdallr-server`
+- Check network connectivity between listener and server
+- Review logs: `journalctl -u heimdallr-dicom -n 100`
+
+**Processing Issues:**
+- Check GPU availability: `nvidia-smi`
+- Monitor processing: `journalctl -u heimdallr-processor -f`
+- Check input queue: `ls -lh input/`
+- Review error directory: `ls -lh errors/`
+
+---
+
 ## Roadmap
 
 Future enhancements planned for Heimdallr:
@@ -277,7 +466,7 @@ Future enhancements planned for Heimdallr:
 - [ ] **Aortic measurements** — Diameter and aneurysm detection
 - [ ] **Bone density analysis** — Opportunistic osteoporosis screening
 - [ ] **Incidental findings detection** — AI-powered anomaly detection
-- [ ] **PACS integration** — Direct DICOM receive/send
+- [x] **PACS integration** — Direct DICOM receive/send ✅
 - [x] **Web dashboard** — Real-time monitoring and results visualization ✅
 - [ ] **HL7/FHIR integration** — EMR interoperability
 

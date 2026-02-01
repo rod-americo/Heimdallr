@@ -11,21 +11,24 @@ from fastapi import FastAPI, File, UploadFile, HTTPException, Response
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-# Initialize FastAPI application
-app = FastAPI(title="Heimdallr - Radiology AI Pipeline")
+# Import centralized configuration
+import config
 
-# Directory paths
-BASE_DIR = Path(__file__).resolve().parent
-UPLOAD_DIR = BASE_DIR / "uploads"        # Temporary storage for uploaded ZIP files
-NII_DIR = BASE_DIR / "nii"                # Archive of converted NIfTI files
-OUTPUT_DIR = BASE_DIR / "output"          # Analysis results per patient
-STATIC_DIR = BASE_DIR / "static"          # Web dashboard files (HTML/CSS/JS)
+# Initialize FastAPI application
+app = FastAPI(title=config.SERVER_TITLE)
+
+# Directory paths from config
+BASE_DIR = config.BASE_DIR
+UPLOAD_DIR = config.UPLOAD_DIR
+NII_DIR = config.NII_DIR
+OUTPUT_DIR = config.OUTPUT_DIR
+STATIC_DIR = config.STATIC_DIR
 
 # Ensure required directories exist
-UPLOAD_DIR.mkdir(exist_ok=True)
+config.ensure_directories()
 
 # Scripts and executables
-PREPARE_SCRIPT = BASE_DIR / "prepare.py"  # DICOM preparation script
+PREPARE_SCRIPT = config.PREPARE_SCRIPT
 PYTHON_EXE = BASE_DIR / "venv" / "bin" / "python"  # Virtual environment Python
 
 # ============================================================

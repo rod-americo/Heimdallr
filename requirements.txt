@@ -68,6 +68,7 @@ pydantic==2.12.5
 pydantic_core==2.41.5
 pydicom==3.0.1
 Pygments==2.19.2
+pynetdicom==3.0.4
 pyparsing==3.3.2
 python-dateutil==2.9.0.post0
 python-gdcm==3.2.2
