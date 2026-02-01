@@ -27,45 +27,30 @@ async def upload_file(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
 
-    # Call prepare.py
+    # Call prepare.py in background
     try:
         python_cmd = str(PYTHON_EXE) if PYTHON_EXE.exists() else "python3"
         
-        result = subprocess.run(
+        # Fire and forget - using Popen without waiting
+        subprocess.Popen(
             [python_cmd, str(PREPARE_SCRIPT), str(file_path)],
-            capture_output=True,
-            text=True,
-            check=True
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            close_fds=True,
+            start_new_session=True # Detach from parent
         )
         
-        # Parse output to find the generated file path (last printed line)
-        lines = result.stdout.strip().splitlines()
-        generated_file = lines[-1] if lines else ""
-        
-        if not generated_file or not os.path.exists(generated_file):
-             raise Exception("Output file validation failed.")
-
-        # Processing is now handled by the decoupled run.py daemon
-        nifti_path = Path(generated_file)
-        
         return {
-            "status": "Queued",
-            "message": "File received and ready for processing.",
-            "original_file": file.filename,
-            "generated_nifti": nifti_path.name
+            "status": "Accepted",
+            "message": "File upload accepted. Processing started in background.",
+            "original_file": file.filename
         }
 
-    except subprocess.CalledProcessError as e:
-        if file_path.exists():
-            file_path.unlink()
-        raise HTTPException(status_code=500, detail=f"Preparation failed: {e.stderr}")
     except Exception as e:
+        # Only cleanup if we failed to even launch
         if file_path.exists():
             file_path.unlink()
-        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
-    finally:
-        if file_path.exists():
-            file_path.unlink()
+        raise HTTPException(status_code=500, detail=f"Error launching process: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

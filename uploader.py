@@ -36,9 +36,33 @@ def main():
         sys.exit(1)
 
     try:
-        filename = os.path.basename(args.file_path)
-        file_size = os.path.getsize(args.file_path)
+        file_path = args.file_path
+        delete_after_upload = False
+        temp_dir = None
 
+        if os.path.isdir(file_path):
+            console.print(f"[yellow]O caminho '{file_path}' é uma pasta. Criando arquivo zip...[/yellow]")
+            import shutil
+            import tempfile
+            
+            # Create a temporary zip file
+            temp_dir = tempfile.mkdtemp()
+            # shutil.make_archive needs the base name without extension
+            base_name = os.path.basename(file_path.rstrip(os.sep))
+            zip_base = os.path.join(temp_dir, base_name)
+            
+            zip_path = shutil.make_archive(zip_base, 'zip', file_path)
+            file_path = zip_path
+            delete_after_upload = True
+            
+            filename = os.path.basename(file_path)
+            file_size = os.path.getsize(file_path)
+            console.print(f"[green]Arquivo zip criado: {file_path} ({file_size} bytes)[/green]")
+        else:
+            filename = os.path.basename(file_path)
+            file_size = os.path.getsize(file_path)
+
+        response = None
         with Progress(
             SpinnerColumn(),
             TextColumn("[bold blue]{task.description}"),
@@ -52,34 +76,45 @@ def main():
             task_id = progress.add_task(f"[cyan]Enviando {filename}...", total=file_size)
             
             # Create the encoder
-            encoder = MultipartEncoder(
-                fields={'file': (filename, open(args.file_path, 'rb'), 'application/octet-stream')}
-            )
-            
-            # Create the monitor with the callback
-            monitor = MultipartEncoderMonitor(encoder, create_progress_callback(task_id, progress))
-            
-            headers = {'Content-Type': monitor.content_type}
-            
-            # Send the request
-            try:
+            # We open the file here. Note: we need to ensure it closes.
+            # MultipartEncoder reads from the file object.
+            with open(file_path, 'rb') as f:
+                encoder = MultipartEncoder(
+                    fields={'file': (filename, f, 'application/octet-stream')}
+                )
+                
+                # Create the monitor with the callback
+                monitor = MultipartEncoderMonitor(encoder, create_progress_callback(task_id, progress))
+                
+                headers = {'Content-Type': monitor.content_type}
+                
+                # Send the request
                 response = requests.post(
                     target_url, 
                     data=monitor, 
                     headers=headers, 
                     timeout=300
                 )
-            finally:
-                pass
+        
+        # Cleanup temporary files
+        if delete_after_upload:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            if temp_dir and os.path.exists(temp_dir):
+                import shutil
+                shutil.rmtree(temp_dir)
 
-        if response.status_code == 200:
+        if response and response.status_code == 200:
             result = response.json()
             console.print(f"[green]Sucesso! Arquivo processado: {result.get('generated_nifti')}[/green]")
             console.print(f"[green]Status: {result.get('status')}[/green]")
-        else:
+        elif response:
             console.print(f"[bold red]Erro no servidor: {response.status_code}[/bold red]")
             console.print(f"Detalhes: {response.text}")
             sys.exit(1)
+        else:
+             # Should not happen unless exception occurred before response
+             sys.exit(1)
 
     except ImportError:
         console.print("[bold red]Erro: requests-toolbelt não encontrado.[/bold red]")
