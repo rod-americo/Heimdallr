@@ -475,7 +475,7 @@ Future enhancements planned for Heimdallr:
 
 ## License
 
-Proprietary. TotalSegmentator requires a valid license for commercial use.
+Apache License 2.0. TotalSegmentator requires a valid license for commercial use.
 
 ---
 
