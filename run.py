@@ -63,15 +63,16 @@ ERROR_DIR = config.ERROR_DIR
 config.ensure_directories()
 
 
-def run_task(task_name, input_file, output_folder, extra_args=None):
+def run_task(task_name, input_file, output_folder, extra_args=None, max_retries=3):
     """
-    Execute a TotalSegmentator task.
+    Execute a TotalSegmentator task with retry logic for race condition handling.
     
     Args:
         task_name: TotalSegmentator task (e.g., 'total', 'tissue_types', 'cerebral_bleed')
         input_file: Path to input NIfTI file
         output_folder: Directory for output segmentation masks
         extra_args: Additional command-line arguments (e.g., ['--fast'])
+        max_retries: Maximum number of retry attempts for config.json race conditions
     
     Raises:
         CalledProcessError: If TotalSegmentator exits with non-zero status
@@ -89,29 +90,56 @@ def run_task(task_name, input_file, output_folder, extra_args=None):
         "--task", task_name
     ] + extra_args
     
-    # Run with Popen to capture and filter output
-    # This allows us to suppress citation messages while preserving important logs
-    process = subprocess.Popen(
-        cmd, 
-        stdout=subprocess.PIPE, 
-        stderr=subprocess.STDOUT,
-        text=True, 
-        bufsize=1  # Line-buffered output
-    )
+    # Retry loop to handle transient race conditions on TotalSegmentator config.json
+    # We don't recreate the file as it contains important state (prediction_counter, license, etc.)
+    for attempt in range(max_retries):
+        try:
+            # Run with Popen to capture and filter output
+            # This allows us to suppress citation messages while preserving important logs
+            process = subprocess.Popen(
+                cmd, 
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.STDOUT,
+                text=True, 
+                bufsize=1  # Line-buffered output
+            )
+            
+            # Stream output line by line
+            output_lines = []
+            for line in process.stdout:
+                output_lines.append(line)
+                # Optionally filter unwanted lines (citation currently enabled)
+                # if "If you use this tool please cite" in line:
+                #     continue
+                print(line, end="")  # Full logging enabled
+            
+            # Wait for process completion
+            process.wait()
+            if process.returncode != 0:
+                # Check if error is due to config.json race condition
+                full_output = ''.join(output_lines)
+                if 'JSONDecodeError' in full_output and 'config.json' in full_output and attempt < max_retries - 1:
+                    wait_time = (2 ** attempt) * 0.5  # 0.5s, 1s, 2s
+                    print(f"[{task_name}] ⚠️  Config race condition detected. Retrying in {wait_time}s... (attempt {attempt + 1}/{max_retries})")
+                    time.sleep(wait_time)  # Wait for other process to finish writing
+                    continue
+                else:
+                    raise subprocess.CalledProcessError(process.returncode, cmd)
+                
+            print(f"[{task_name}] Finished.")
+            return  # Success
+            
+        except subprocess.CalledProcessError:
+            raise  # Re-raise if not a config issue
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(f"[{task_name}] Unexpected error: {e}. Retrying... (attempt {attempt + 1}/{max_retries})")
+                time.sleep(2 ** attempt)
+            else:
+                raise
     
-    # Stream output line by line
-    for line in process.stdout:
-        # Optionally filter unwanted lines (citation currently enabled)
-        # if "If you use this tool please cite" in line:
-        #     continue
-        print(line, end="")  # Full logging enabled
-    
-    # Wait for process completion
-    process.wait()
-    if process.returncode != 0:
-        raise subprocess.CalledProcessError(process.returncode, cmd)
-        
-    print(f"[{task_name}] Finished.")
+    # If we exhausted all retries
+    raise RuntimeError(f"[{task_name}] Failed after {max_retries} attempts")
 
 
 def process_case(nifti_path):
