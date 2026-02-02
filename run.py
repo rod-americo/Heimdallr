@@ -63,9 +63,9 @@ ERROR_DIR = config.ERROR_DIR
 config.ensure_directories()
 
 
-def run_task(task_name, input_file, output_folder, extra_args=None, max_retries=3):
+def run_task(task_name, input_file, output_folder, extra_args=None, max_retries=3, log_file=None):
     """
-    Execute a TotalSegmentator task with retry logic for race condition handling.
+    Execute a TotalSegmentator task with retry logic and optional log file redirection.
     
     Args:
         task_name: TotalSegmentator task (e.g., 'total', 'tissue_types', 'cerebral_bleed')
@@ -73,13 +73,13 @@ def run_task(task_name, input_file, output_folder, extra_args=None, max_retries=
         output_folder: Directory for output segmentation masks
         extra_args: Additional command-line arguments (e.g., ['--fast'])
         max_retries: Maximum number of retry attempts for config.json race conditions
+        log_file: Optional path to write detailed logs (if None, prints to console)
     
     Raises:
         CalledProcessError: If TotalSegmentator exits with non-zero status
     """
     if extra_args is None:
         extra_args = []
-    print(f"[{task_name}] Starting...")
     
     # Build TotalSegmentator command
     cmd = [
@@ -90,12 +90,25 @@ def run_task(task_name, input_file, output_folder, extra_args=None, max_retries=
         "--task", task_name
     ] + extra_args
     
+    # Open log file if specified
+    log_handle = None
+    if log_file:
+        log_handle = open(log_file, 'w')
+        log_handle.write(f"=== TotalSegmentator Task: {task_name} ===\n")
+        log_handle.write(f"Started: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        log_handle.write(f"Command: {' '.join(cmd)}\n\n")
+        log_handle.flush()
+        # Console: just show task name
+        print(f"  • {task_name}")
+    else:
+        # Console: show starting message
+        print(f"[{task_name}] Starting...")
+    
     # Retry loop to handle transient race conditions on TotalSegmentator config.json
     # We don't recreate the file as it contains important state (prediction_counter, license, etc.)
     for attempt in range(max_retries):
         try:
             # Run with Popen to capture and filter output
-            # This allows us to suppress citation messages while preserving important logs
             process = subprocess.Popen(
                 cmd, 
                 stdout=subprocess.PIPE, 
@@ -108,10 +121,13 @@ def run_task(task_name, input_file, output_folder, extra_args=None, max_retries=
             output_lines = []
             for line in process.stdout:
                 output_lines.append(line)
-                # Optionally filter unwanted lines (citation currently enabled)
-                # if "If you use this tool please cite" in line:
-                #     continue
-                print(line, end="")  # Full logging enabled
+                if log_handle:
+                    # Write to log file
+                    log_handle.write(line)
+                    log_handle.flush()
+                else:
+                    # Print to console
+                    print(line, end="")
             
             # Wait for process completion
             process.wait()
@@ -120,25 +136,48 @@ def run_task(task_name, input_file, output_folder, extra_args=None, max_retries=
                 full_output = ''.join(output_lines)
                 if 'JSONDecodeError' in full_output and 'config.json' in full_output and attempt < max_retries - 1:
                     wait_time = (2 ** attempt) * 0.5  # 0.5s, 1s, 2s
-                    print(f"[{task_name}] ⚠️  Config race condition detected. Retrying in {wait_time}s... (attempt {attempt + 1}/{max_retries})")
+                    msg = f"[{task_name}] ⚠️  Config race condition detected. Retrying in {wait_time}s... (attempt {attempt + 1}/{max_retries})"
+                    if log_handle:
+                        log_handle.write(f"\n{msg}\n")
+                        log_handle.flush()
+                    print(msg)
                     time.sleep(wait_time)  # Wait for other process to finish writing
                     continue
                 else:
+                    if log_handle:
+                        log_handle.write(f"\nFailed with exit code: {process.returncode}\n")
+                        log_handle.close()
                     raise subprocess.CalledProcessError(process.returncode, cmd)
-                
-            print(f"[{task_name}] Finished.")
-            return  # Success
+            
+            # Success
+            if log_handle:
+                log_handle.write(f"\nFinished: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                log_handle.write(f"Exit code: 0\n")
+                log_handle.close()
+            else:
+                print(f"[{task_name}] Finished.")
+            return
             
         except subprocess.CalledProcessError:
-            raise  # Re-raise if not a config issue
+            if log_handle:
+                log_handle.close()
+            raise
         except Exception as e:
             if attempt < max_retries - 1:
-                print(f"[{task_name}] Unexpected error: {e}. Retrying... (attempt {attempt + 1}/{max_retries})")
+                msg = f"[{task_name}] Unexpected error: {e}. Retrying... (attempt {attempt + 1}/{max_retries})"
+                if log_handle:
+                    log_handle.write(f"\n{msg}\n")
+                    log_handle.flush()
+                print(msg)
                 time.sleep(2 ** attempt)
             else:
+                if log_handle:
+                    log_handle.close()
                 raise
     
     # If we exhausted all retries
+    if log_handle:
+        log_handle.close()
     raise RuntimeError(f"[{task_name}] Failed after {max_retries} attempts")
 
 
@@ -166,6 +205,10 @@ def process_case(nifti_path):
     # Create output directory structure
     if not case_output.exists():
         case_output.mkdir(parents=True)
+    
+    # Create logs directory for detailed TotalSegmentator output
+    log_dir = case_output / "logs"
+    log_dir.mkdir(exist_ok=True)
     
     # Clean and recreate TotalSegmentator output directories
     # This ensures we don't mix results from multiple runs
@@ -201,11 +244,23 @@ def process_case(nifti_path):
     task_gen = "total"
     if modality == "MR":
         task_gen = "total_mr"
+    
+    # Determine log file paths based on VERBOSE_CONSOLE setting
+    log_file_total = None if config.VERBOSE_CONSOLE else log_dir / f"{task_gen}.log"
+    log_file_tissue = None if config.VERBOSE_CONSOLE else log_dir / "tissue_types.log"
+    
+    # Console output for non-verbose mode
+    if not config.VERBOSE_CONSOLE:
+        print(f"\n[Segmentation] Running {2 if modality == 'CT' else 1} task(s) in parallel...")
+    
+    # Record start time for elapsed calculation
+    seg_start_time = time.time()
         
     # Start general anatomy segmentation in background thread
     t1 = threading.Thread(
         target=run_task, 
-        args=(task_gen, nifti_path, case_output / "total", ["--fast"])
+        args=(task_gen, nifti_path, case_output / "total", ["--fast"]),
+        kwargs={"log_file": log_file_total}
     )
     t1.start()
     
@@ -215,7 +270,8 @@ def process_case(nifti_path):
     if modality == "CT":
         t2 = threading.Thread(
             target=run_task, 
-            args=("tissue_types", nifti_path, case_output / "tissue_types")
+            args=("tissue_types", nifti_path, case_output / "tissue_types"),
+            kwargs={"log_file": log_file_tissue}
         )
         t2.start()
 
@@ -223,6 +279,13 @@ def process_case(nifti_path):
     t1.join()
     if t2:
         t2.join()
+    
+    # Console summary for non-verbose mode
+    if not config.VERBOSE_CONSOLE:
+        seg_elapsed = time.time() - seg_start_time
+        print(f"[Segmentation] ✓ Complete ({seg_elapsed:.1f}s)")
+        print(f"  → Logs: {log_dir.relative_to(OUTPUT_DIR)}/")
+
 
     # ============================================================
     # STEP 1.5: Conditional Specialized Analysis
@@ -234,24 +297,34 @@ def process_case(nifti_path):
              # Check if brain mask is non-empty
              # TotalSegmentator sometimes creates empty placeholder files
              if brain_file.stat().st_size > 1000:  # 1KB threshold
-                 print("[Conditional] Brain detected. Running hemorrhage detection...")
+                 if not config.VERBOSE_CONSOLE:
+                     print("\n[Conditional] Brain detected. Running hemorrhage detection...")
                  bleed_output = case_output / "bleed"
                  bleed_output.mkdir(exist_ok=True)
-                 run_task("cerebral_bleed", nifti_path, bleed_output)
+                 log_file_bleed = None if config.VERBOSE_CONSOLE else log_dir / "cerebral_bleed.log"
+                 run_task("cerebral_bleed", nifti_path, bleed_output, log_file=log_file_bleed)
+                 if not config.VERBOSE_CONSOLE:
+                     print("[Conditional] ✓ Hemorrhage detection complete")
         except Exception as e:
-            print(f"Error during conditional hemorrhage analysis: {e}")
+            print(f"[Conditional] Error: {e}")
 
     # ============================================================
     # STEP 2: Metrics Calculation
     # ============================================================
     # Results written to resultados.json
-    print("Calculating metrics...")
+    if not config.VERBOSE_CONSOLE:
+        print("\n[Metrics] Calculating volumes and densities...")
+    else:
+        print("Calculating metrics...")
     try:
         json_path = case_output / "resultados.json"
         metrics = calculate_all_metrics(case_id, nifti_path, case_output) # Original call
         with open(json_path, "w") as f:
             json.dump(metrics, f, indent=2)
-        print(f"Metrics saved to {json_path}")
+        if not config.VERBOSE_CONSOLE:
+            print("[Metrics] ✓ Saved to resultados.json")
+        else:
+            print(f"Metrics saved to {json_path}")
         
         # ============================================================
         # STEP 2.5: Update Database with Calculation Results
@@ -280,9 +353,12 @@ def process_case(nifti_path):
                 )
                 conn.commit()
                 conn.close()
-                print(f"  [DB] Calculation results updated for {study_uid}")
+                if not config.VERBOSE_CONSOLE:
+                    print("[Database] ✓ Updated calculation results")
+                else:
+                    print(f"  [DB] Calculation results updated for {study_uid}")
             else:
-                print("  [Warning] Could not find StudyInstanceUID to update database")
+                print("[Database] ⚠️  Could not find StudyInstanceUID")
                 
         except Exception as e:
             print(f"  [Warning] Failed to update database with results: {e}")
@@ -353,7 +429,10 @@ def process_case(nifti_path):
                     )
                     conn.commit()
                     conn.close()
-                    print(f"  [DB] id.json updated for {study_uid}")
+                    if not config.VERBOSE_CONSOLE:
+                        print("[Database] ✓ Updated id.json")
+                    else:
+                        print(f"  [DB] id.json updated for {study_uid}")
                 
             except Exception as e:
                 print(f"  [Warning] Failed to update database with id.json: {e}")
@@ -380,11 +459,29 @@ def process_case(nifti_path):
         
         final_nii_path = NII_DIR / f"{final_name}.nii.gz"
         shutil.move(str(nifti_path), str(final_nii_path))
-        print(f"Input archived to: {final_nii_path}")
+        if not config.VERBOSE_CONSOLE:
+            print(f"\n[Archive] ✓ Moved to nii/{final_name}.nii.gz")
+        else:
+            print(f"Input archived to: {final_nii_path}")
     except Exception as e:
         print(f"Error archiving input: {e}")
+    
+    # ============================================================
+    # FINAL: Case Completion Summary
+    # ============================================================
+    if not config.VERBOSE_CONSOLE:
+        # Calculate total elapsed time from id.json
+        try:
+            with open(case_output / "id.json", 'r') as f:
+                meta = json.load(f)
+                pipeline_data = meta.get("Pipeline", {})
+                elapsed_str = pipeline_data.get("elapsed_time", "Unknown")
+                print(f"\n✅ Case complete ({elapsed_str})")
+        except:
+            print(f"\n✅ Case complete")
 
     return True
+
 
 def main():
     """

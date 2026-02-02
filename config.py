@@ -95,6 +95,9 @@ if not TOTALSEGMENTATOR_LICENSE:
 MAX_PARALLEL_CASES = int(os.getenv("HEIMDALLR_MAX_PARALLEL_CASES", "3"))
 PROCESSING_SCAN_INTERVAL = int(os.getenv("HEIMDALLR_PROCESSING_SCAN_INTERVAL", "2"))  # Seconds
 
+# Logging configuration
+VERBOSE_CONSOLE = os.getenv("HEIMDALLR_VERBOSE_CONSOLE", "false").lower() == "true"  # False = logs to files, True = logs to console
+
 # ============================================================
 # UPLOADER CLIENT CONFIGURATION (uploader.py)
 # ============================================================
