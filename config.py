@@ -13,6 +13,10 @@ All settings can be overridden via environment variables.
 
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # ============================================================
 # BASE PATHS
@@ -65,8 +69,13 @@ DICOM_UPLOAD_BACKOFF = int(os.getenv("HEIMDALLR_UPLOAD_BACKOFF", "5"))  # Second
 # PROCESSING CONFIGURATION (run.py)
 # ============================================================
 
-# TotalSegmentator license
-TOTALSEGMENTATOR_LICENSE = os.getenv("TOTALSEGMENTATOR_LICENSE", "aca_VD42VF39LY0V20")
+# TotalSegmentator license (required - set in .env file)
+TOTALSEGMENTATOR_LICENSE = os.getenv("TOTALSEGMENTATOR_LICENSE")
+if not TOTALSEGMENTATOR_LICENSE:
+    raise ValueError(
+        "TOTALSEGMENTATOR_LICENSE environment variable is required. "
+        "Please create a .env file with your license key (see .env.example)"
+    )
 
 # Parallel processing
 MAX_PARALLEL_CASES = int(os.getenv("HEIMDALLR_MAX_PARALLEL_CASES", "3"))
