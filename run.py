@@ -63,6 +63,39 @@ ERROR_DIR = config.ERROR_DIR
 config.ensure_directories()
 
 
+# ============================================================
+# PIPELINE LOGGER
+# ============================================================
+
+class PipelineLogger:
+    """
+    Dual logger that writes to both console and a log file.
+    Used to capture the complete pipeline execution flow.
+    """
+    def __init__(self, log_file_path=None):
+        self.log_file = None
+        if log_file_path:
+            self.log_file = open(log_file_path, 'w')
+            self.log_file.write(f"=== Heimdallr Pipeline Log ===\n")
+            self.log_file.write(f"Started: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+            self.log_file.flush()
+    
+    def print(self, message):
+        """Print to console and write to log file if available."""
+        print(message)
+        if self.log_file:
+            self.log_file.write(message + "\n")
+            self.log_file.flush()
+    
+    def close(self):
+        """Close the log file."""
+        if self.log_file:
+            self.log_file.write(f"\nFinished: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            self.log_file.close()
+            self.log_file = None
+
+
+
 def run_task(task_name, input_file, output_folder, extra_args=None, max_retries=3, log_file=None):
     """
     Execute a TotalSegmentator task with retry logic and optional log file redirection.
@@ -210,6 +243,10 @@ def process_case(nifti_path):
     log_dir = case_output / "logs"
     log_dir.mkdir(exist_ok=True)
     
+    # Initialize pipeline logger (captures all stdout to pipeline.log)
+    pipeline_log_path = None if config.VERBOSE_CONSOLE else log_dir / "pipeline.log"
+    logger = PipelineLogger(pipeline_log_path)
+    
     # Clean and recreate TotalSegmentator output directories
     # This ensures we don't mix results from multiple runs
     for subdir in ["total", "tissue_types"]:
@@ -218,7 +255,7 @@ def process_case(nifti_path):
             shutil.rmtree(p)
         p.mkdir(exist_ok=True)
 
-    print(f"\n=== Processing Case: {case_id} ===")
+    logger.print(f"\n=== Processing Case: {case_id} ===")
 
     # Determine modality from metadata (created by prepare.py)
     # Default to CT if not found (for legacy compatibility)
@@ -231,7 +268,7 @@ def process_case(nifti_path):
         except: 
             pass  # Silently default to CT
             
-    print(f"Detected modality: {modality}")
+    logger.print(f"Detected modality: {modality}")
 
     # ============================================================
     # STEP 1: Parallel Segmentation
@@ -251,7 +288,7 @@ def process_case(nifti_path):
     
     # Console output for non-verbose mode
     if not config.VERBOSE_CONSOLE:
-        print(f"\n[Segmentation] Running {2 if modality == 'CT' else 1} task(s) in parallel...")
+        logger.print(f"\n[Segmentation] Running {2 if modality == 'CT' else 1} task(s) in parallel...")
     
     # Record start time for elapsed calculation
     seg_start_time = time.time()
@@ -283,8 +320,8 @@ def process_case(nifti_path):
     # Console summary for non-verbose mode
     if not config.VERBOSE_CONSOLE:
         seg_elapsed = time.time() - seg_start_time
-        print(f"[Segmentation] ✓ Complete ({seg_elapsed:.1f}s)")
-        print(f"  → Logs: {log_dir.relative_to(OUTPUT_DIR)}/")
+        logger.print(f"[Segmentation] ✓ Complete ({seg_elapsed:.1f}s)")
+        logger.print(f"  → Logs: {log_dir.relative_to(OUTPUT_DIR)}/")
 
 
     # ============================================================
@@ -298,33 +335,33 @@ def process_case(nifti_path):
              # TotalSegmentator sometimes creates empty placeholder files
              if brain_file.stat().st_size > 1000:  # 1KB threshold
                  if not config.VERBOSE_CONSOLE:
-                     print("\n[Conditional] Brain detected. Running hemorrhage detection...")
+                     logger.print("\n[Conditional] Brain detected. Running hemorrhage detection...")
                  bleed_output = case_output / "bleed"
                  bleed_output.mkdir(exist_ok=True)
                  log_file_bleed = None if config.VERBOSE_CONSOLE else log_dir / "cerebral_bleed.log"
                  run_task("cerebral_bleed", nifti_path, bleed_output, log_file=log_file_bleed)
                  if not config.VERBOSE_CONSOLE:
-                     print("[Conditional] ✓ Hemorrhage detection complete")
+                     logger.print("[Conditional] ✓ Hemorrhage detection complete")
         except Exception as e:
-            print(f"[Conditional] Error: {e}")
+            logger.print(f"[Conditional] Error: {e}")
 
     # ============================================================
     # STEP 2: Metrics Calculation
     # ============================================================
     # Results written to resultados.json
     if not config.VERBOSE_CONSOLE:
-        print("\n[Metrics] Calculating volumes and densities...")
+        logger.print("\n[Metrics] Calculating volumes and densities...")
     else:
-        print("Calculating metrics...")
+        logger.print("Calculating metrics...")
     try:
         json_path = case_output / "resultados.json"
         metrics = calculate_all_metrics(case_id, nifti_path, case_output) # Original call
         with open(json_path, "w") as f:
             json.dump(metrics, f, indent=2)
         if not config.VERBOSE_CONSOLE:
-            print("[Metrics] ✓ Saved to resultados.json")
+            logger.print("[Metrics] ✓ Saved to resultados.json")
         else:
-            print(f"Metrics saved to {json_path}")
+            logger.print(f"Metrics saved to {json_path}")
         
         # ============================================================
         # STEP 2.5: Update Database with Calculation Results
@@ -354,18 +391,18 @@ def process_case(nifti_path):
                 conn.commit()
                 conn.close()
                 if not config.VERBOSE_CONSOLE:
-                    print("[Database] ✓ Updated calculation results")
+                    logger.print("[Database] ✓ Updated calculation results")
                 else:
-                    print(f"  [DB] Calculation results updated for {study_uid}")
+                    logger.print(f"  [DB] Calculation results updated for {study_uid}")
             else:
-                print("[Database] ⚠️  Could not find StudyInstanceUID")
+                logger.print("[Database] ⚠️  Could not find StudyInstanceUID")
                 
         except Exception as e:
-            print(f"  [Warning] Failed to update database with results: {e}")
+            logger.print(f"  [Warning] Failed to update database with results: {e}")
             # Don't fail the entire process if DB update fails
         
     except Exception as e:
-        print(f"Error calculating metrics for {case_id}: {e}")
+        logger.print(f"Error calculating metrics for {case_id}: {e}")
         
         # Write error log
         with open(case_output / "error.log", "w") as f:
@@ -375,10 +412,11 @@ def process_case(nifti_path):
         error_dest = ERROR_DIR / nifti_path.name
         try:
             shutil.move(str(nifti_path), str(error_dest))
-            print(f"Input moved to error folder: {error_dest}")
+            logger.print(f"Input moved to error folder: {error_dest}")
         except Exception as move_err:
-            print(f"Critical error: Could not move error file {nifti_path}: {move_err}")
+            logger.print(f"Critical error: Could not move error file {nifti_path}: {move_err}")
             
+        logger.close()
         return False
 
 
@@ -430,16 +468,16 @@ def process_case(nifti_path):
                     conn.commit()
                     conn.close()
                     if not config.VERBOSE_CONSOLE:
-                        print("[Database] ✓ Updated id.json")
+                        logger.print("[Database] ✓ Updated id.json")
                     else:
-                        print(f"  [DB] id.json updated for {study_uid}")
+                        logger.print(f"  [DB] id.json updated for {study_uid}")
                 
             except Exception as e:
-                print(f"  [Warning] Failed to update database with id.json: {e}")
+                logger.print(f"  [Warning] Failed to update database with id.json: {e}")
                 # Don't fail the entire process if DB update fails
                 
     except Exception as e:
-        print(f"Error updating pipeline time: {e}")
+        logger.print(f"Error updating pipeline time: {e}")
 
     # ============================================================
     # STEP 4: Archive NIfTI File
@@ -460,11 +498,11 @@ def process_case(nifti_path):
         final_nii_path = NII_DIR / f"{final_name}.nii.gz"
         shutil.move(str(nifti_path), str(final_nii_path))
         if not config.VERBOSE_CONSOLE:
-            print(f"\n[Archive] ✓ Moved to nii/{final_name}.nii.gz")
+            logger.print(f"\n[Archive] ✓ Moved to nii/{final_name}.nii.gz")
         else:
-            print(f"Input archived to: {final_nii_path}")
+            logger.print(f"Input archived to: {final_nii_path}")
     except Exception as e:
-        print(f"Error archiving input: {e}")
+        logger.print(f"Error archiving input: {e}")
     
     # ============================================================
     # FINAL: Case Completion Summary
@@ -476,10 +514,11 @@ def process_case(nifti_path):
                 meta = json.load(f)
                 pipeline_data = meta.get("Pipeline", {})
                 elapsed_str = pipeline_data.get("elapsed_time", "Unknown")
-                print(f"\n✅ Case complete ({elapsed_str})")
+                logger.print(f"\n✅ Case complete ({elapsed_str})")
         except:
-            print(f"\n✅ Case complete")
+            logger.print(f"\n✅ Case complete")
 
+    logger.close()
     return True
 
 
