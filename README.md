@@ -475,10 +475,24 @@ Future enhancements planned for Heimdallr:
 
 ## License
 
-Apache License 2.0. TotalSegmentator requires a valid license for commercial use.
+Heimdallr is licensed under the **Apache License, Version 2.0**.
+
+You may obtain a copy of the License at:
+- [LICENSE](LICENSE) file in this repository
+- http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+
+### Third-Party Dependencies
+
+This software uses **TotalSegmentator**, which requires a valid license for commercial use. Users must ensure compliance with TotalSegmentator's licensing requirements independently.
+
+For complete third-party notices and attributions, see the [NOTICE](NOTICE) file.
 
 ---
 
 ## Contributing
 
-Contributions are welcome. Please open an issue to discuss proposed changes before submitting a pull request.
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+By contributing to Heimdallr, you agree that your contributions will be licensed under the Apache License 2.0.
