@@ -461,9 +461,15 @@ def process_case(nifti_path):
                     db_path = config.DB_PATH
                     conn = sqlite3.connect(db_path)
                     c = conn.cursor()
+                    
+                    # Extract biometric data if available
+                    weight = meta.get("Weight")
+                    height = meta.get("Height")
+                    
+                    # Update IdJson and biometric data
                     c.execute(
-                        "UPDATE dicom_metadata SET IdJson = ? WHERE StudyInstanceUID = ?",
-                        (json.dumps(meta), study_uid)
+                        "UPDATE dicom_metadata SET IdJson = ?, Weight = ?, Height = ? WHERE StudyInstanceUID = ?",
+                        (json.dumps(meta), weight, height, study_uid)
                     )
                     conn.commit()
                     conn.close()

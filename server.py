@@ -24,6 +24,8 @@ from pathlib import Path
 from fastapi import FastAPI, File, UploadFile, HTTPException, Response
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
+import sqlite3
 
 # Import centralized configuration
 import config
@@ -278,6 +280,7 @@ async def get_metadata(case_id: str):
     - Modality, StudyDate
     - Pipeline processing times
     - Selected DICOM series information
+    - Weight and Height (if available)
     """
     meta_path = OUTPUT_DIR / case_id / "id.json"
     
@@ -287,9 +290,167 @@ async def get_metadata(case_id: str):
     try:
         with open(meta_path, 'r') as f:
             metadata = json.load(f)
+        
+        # Try to get weight and height from database
+        try:
+            db_path = config.DB_PATH
+            study_uid = metadata.get("StudyInstanceUID")
+            if study_uid and db_path.exists():
+                conn = sqlite3.connect(db_path)
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT Weight, Height FROM dicom_metadata WHERE StudyInstanceUID = ?",
+                    (study_uid,)
+                )
+                row = cursor.fetchone()
+                conn.close()
+                
+                if row:
+                    if row[0] is not None:
+                        metadata["Weight"] = row[0]
+                    if row[1] is not None:
+                        metadata["Height"] = row[1]
+        except Exception as db_err:
+            # Don't fail if database lookup fails, just log and continue
+            print(f"Warning: Could not fetch biometric data from database: {db_err}")
+        
         return metadata
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading metadata: {str(e)}")
+
+
+# Pydantic model for biometric data
+class BiometricData(BaseModel):
+    weight: float = Field(gt=0, le=500, description="Patient weight in kilograms")
+    height: float = Field(gt=0, le=3.0, description="Patient height in meters")
+
+
+@app.patch("/api/patients/{case_id}/biometrics")
+async def update_biometrics(case_id: str, data: BiometricData):
+    """
+    Update patient biometric data (weight and height).
+    
+    Args:
+        case_id: Patient identifier
+        data: BiometricData with weight (kg) and height (m)
+    
+    Returns:
+        Updated metadata including calculated BMI
+    """
+    case_folder = OUTPUT_DIR / case_id
+    id_json_path = case_folder / "id.json"
+    
+    if not id_json_path.exists():
+        raise HTTPException(status_code=404, detail="Patient not found")
+    
+    try:
+        # Load existing metadata
+        with open(id_json_path, 'r') as f:
+            metadata = json.load(f)
+        
+        # Update biometric data
+        metadata["Weight"] = data.weight
+        metadata["Height"] = data.height
+        
+        # Save updated metadata to id.json
+        with open(id_json_path, 'w') as f:
+            json.dump(metadata, f, indent=2)
+        
+        # Update database
+        study_uid = metadata.get("StudyInstanceUID")
+        if study_uid:
+            db_path = config.DB_PATH
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            
+            # Update both Weight/Height and IdJson in one query
+            cursor.execute(
+                "UPDATE dicom_metadata SET Weight = ?, Height = ?, IdJson = ? WHERE StudyInstanceUID = ?",
+                (data.weight, data.height, json.dumps(metadata), study_uid)
+            )
+            conn.commit()
+            conn.close()
+        
+        # Calculate BMI for response
+        bmi = data.weight / (data.height ** 2)
+        
+        return {
+            "status": "success",
+            "weight": data.weight,
+            "height": data.height,
+            "bmi": round(bmi, 2)
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating biometrics: {str(e)}")
+
+
+# Pydantic model for SMI data
+class SMIData(BaseModel):
+    smi: float = Field(gt=0, le=200, description="Skeletal Muscle Index in cm²/m²")
+
+
+@app.patch("/api/patients/{case_id}/smi")
+async def update_smi(case_id: str, data: SMIData):
+    """
+    Update patient SMI (Skeletal Muscle Index) calculation.
+    
+    This endpoint is called after weight/height are saved and SMI is calculated
+    in the frontend. It saves the SMI to both resultados.json and the database.
+    
+    Args:
+        case_id: Patient identifier
+        data: SMIData with calculated SMI value
+    
+    Returns:
+        Confirmation of saved SMI
+    """
+    case_folder = OUTPUT_DIR / case_id
+    results_json_path = case_folder / "resultados.json"
+    id_json_path = case_folder / "id.json"
+    
+    if not results_json_path.exists():
+        raise HTTPException(status_code=404, detail="Results file not found")
+    
+    try:
+        # Load existing results
+        with open(results_json_path, 'r') as f:
+            results = json.load(f)
+        
+        # Add SMI to results
+        results["SMI_cm2_m2"] = round(data.smi, 2)
+        
+        # Save updated results to resultados.json
+        with open(results_json_path, 'w') as f:
+            json.dump(results, f, indent=2)
+        
+        # Update database
+        if id_json_path.exists():
+            with open(id_json_path, 'r') as f:
+                metadata = json.load(f)
+            
+            study_uid = metadata.get("StudyInstanceUID")
+            if study_uid:
+                db_path = config.DB_PATH
+                conn = sqlite3.connect(db_path)
+                cursor = conn.cursor()
+                
+                # Update SMI and CalculationResults in database
+                cursor.execute(
+                    "UPDATE dicom_metadata SET SMI = ?, CalculationResults = ? WHERE StudyInstanceUID = ?",
+                    (data.smi, json.dumps(results), study_uid)
+                )
+                conn.commit()
+                conn.close()
+        
+        return {
+            "status": "success",
+            "smi": round(data.smi, 2),
+            "saved_to": ["resultados.json", "database"]
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating SMI: {str(e)}")
 
 
 @app.get("/api/tools/uploader")

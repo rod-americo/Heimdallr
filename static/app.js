@@ -137,8 +137,19 @@ async function showResults(caseId) {
 
         const results = await response.json();
 
+        // Also fetch metadata to get biometric data
+        let metadata = {};
+        try {
+            const metaResponse = await fetch(`${API_BASE}/api/patients/${encodeURIComponent(caseId)}/metadata`);
+            if (metaResponse.ok) {
+                metadata = await metaResponse.json();
+            }
+        } catch (err) {
+            console.warn('Could not load metadata:', err);
+        }
+
         document.getElementById('modal-title').textContent = `Resultados: ${caseId}`;
-        document.getElementById('modal-body').innerHTML = renderResults(results, caseId);
+        document.getElementById('modal-body').innerHTML = renderResults(results, caseId, metadata);
         document.getElementById('modal').classList.add('active');
 
     } catch (error) {
@@ -148,8 +159,11 @@ async function showResults(caseId) {
 }
 
 // Render results in modal
-function renderResults(results, caseId) {
+function renderResults(results, caseId, metadata = {}) {
     const sections = [];
+
+    // Biometric Data Section (at the top)
+    sections.push(renderBiometricSection(caseId, metadata, results));
 
     // Basic Info
     sections.push(`
@@ -256,6 +270,223 @@ function renderResults(results, caseId) {
     }
 
     return sections.join('');
+}
+
+// Render biometric data section with BMI and SMI calculations
+function renderBiometricSection(caseId, metadata, results) {
+    const weight = metadata.Weight || null;
+    const height = metadata.Height || null;
+    const sma = results.SMA_cm2 || null;
+
+    // Calculate BMI if both weight and height are available
+    let bmi = null;
+    if (weight && height) {
+        bmi = (weight / (height * height)).toFixed(1);
+    }
+
+    // Calculate SMI if both height and SMA are available
+    let smi = null;
+    if (height && sma) {
+        smi = (sma / (height * height)).toFixed(2);
+    }
+
+    return `
+        <h3 style="margin-bottom: 1rem; color: var(--text-secondary);">📊 Dados Biométricos</h3>
+        <div class="results-grid" id="biometric-section">
+            <div class="result-card">
+                <div class="result-label">Peso</div>
+                <div class="result-value" id="weight-display">${weight ? weight + ' <span class="result-unit">kg</span>' : '<span style="color: var(--text-secondary);">Não informado</span>'}</div>
+                <input type="number" id="weight-input" step="0.1" min="1" max="500" placeholder="Ex: 75.5" style="display: none; margin-top: 0.5rem; padding: 0.5rem; border-radius: 4px; border: 1px solid #333; background: #1a1a2e; color: #eee; width: 100%;" value="${weight || ''}">
+            </div>
+            <div class="result-card">
+                <div class="result-label">Altura</div>
+                <div class="result-value" id="height-display">${height ? height + ' <span class="result-unit">m</span>' : '<span style="color: var(--text-secondary);">Não informado</span>'}</div>
+                <input type="number" id="height-input" step="0.01" min="0.5" max="3.0" placeholder="Ex: 1.75" style="display: none; margin-top: 0.5rem; padding: 0.5rem; border-radius: 4px; border: 1px solid #333; background: #1a1a2e; color: #eee; width: 100%;" value="${height || ''}">
+            </div>
+            ${bmi ? `
+            <div class="result-card">
+                <div class="result-label">IMC</div>
+                <div class="result-value highlight" id="bmi-display">${bmi} <span class="result-unit">kg/m²</span></div>
+            </div>
+            ` : ''}
+            ${smi ? `
+            <div class="result-card">
+                <div class="result-label">SMI (Índice Músculo-Esquelético)</div>
+                <div class="result-value highlight" id="smi-display">${smi} <span class="result-unit">cm²/m²</span></div>
+            </div>
+            ` : ''}
+        </div>
+        <div style="margin-top: 1rem; text-align: right;">
+            <button class="btn btn-secondary" id="edit-biometrics-btn" onclick="toggleBiometricEdit()">✏️ Editar</button>
+            <button class="btn btn-primary" id="save-biometrics-btn" onclick="saveBiometrics('${escapeHtml(caseId)}')", style="display: none;">💾 Salvar</button>
+            <button class="btn btn-secondary" id="cancel-biometrics-btn" onclick="toggleBiometricEdit()", style="display: none;">❌ Cancelar</button>
+        </div>
+        <div id="biometric-message" style="margin-top: 0.5rem; text-align: center; font-size: 0.9rem;"></div>
+    `;
+}
+
+// Toggle biometric edit mode
+function toggleBiometricEdit() {
+    const weightDisplay = document.getElementById('weight-display');
+    const heightDisplay = document.getElementById('height-display');
+    const weightInput = document.getElementById('weight-input');
+    const heightInput = document.getElementById('height-input');
+    const editBtn = document.getElementById('edit-biometrics-btn');
+    const saveBtn = document.getElementById('save-biometrics-btn');
+    const cancelBtn = document.getElementById('cancel-biometrics-btn');
+
+    const isEditing = weightInput.style.display !== 'none';
+
+    if (isEditing) {
+        // Cancel editing - hide inputs, show displays
+        weightInput.style.display = 'none';
+        heightInput.style.display = 'none';
+        weightDisplay.style.display = 'block';
+        heightDisplay.style.display = 'block';
+        editBtn.style.display = 'inline-block';
+        saveBtn.style.display = 'none';
+        cancelBtn.style.display = 'none';
+    } else {
+        // Start editing - show inputs, hide displays
+        weightInput.style.display = 'block';
+        heightInput.style.display = 'block';
+        weightDisplay.style.display = 'none';
+        heightDisplay.style.display = 'none';
+        editBtn.style.display = 'none';
+        saveBtn.style.display = 'inline-block';
+        cancelBtn.style.display = 'inline-block';
+
+        // Focus on first empty field
+        if (!weightInput.value) {
+            weightInput.focus();
+        } else if (!heightInput.value) {
+            heightInput.focus();
+        }
+    }
+}
+
+// Save biometric data
+async function saveBiometrics(caseId) {
+    const weightInput = document.getElementById('weight-input');
+    const heightInput = document.getElementById('height-input');
+    const messageDiv = document.getElementById('biometric-message');
+
+    const weight = parseFloat(weightInput.value);
+    const height = parseFloat(heightInput.value);
+
+    // Validation
+    if (!weight || weight <= 0 || weight > 500) {
+        messageDiv.innerHTML = '<span style="color: var(--danger);">❌ Peso inválido (deve estar entre 1 e 500 kg)</span>';
+        return;
+    }
+
+    if (!height || height <= 0 || height > 3.0) {
+        messageDiv.innerHTML = '<span style="color: var(--danger);">❌ Altura inválida (deve estar entre 0.5 e 3.0 m)</span>';
+        return;
+    }
+
+    try {
+        messageDiv.innerHTML = '<span style="color: var(--text-secondary);">⏳ Salvando...</span>';
+
+        const response = await fetch(`${API_BASE}/api/patients/${encodeURIComponent(caseId)}/biometrics`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ weight, height })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Erro ao salvar');
+        }
+
+        const result = await response.json();
+
+        // Update displays
+        const weightDisplay = document.getElementById('weight-display');
+        const heightDisplay = document.getElementById('height-display');
+        const bmiDisplay = document.getElementById('bmi-display');
+
+        weightDisplay.innerHTML = `${weight} <span class="result-unit">kg</span>`;
+        heightDisplay.innerHTML = `${height} <span class="result-unit">m</span>`;
+
+        // Update or create BMI display
+        if (bmiDisplay) {
+            bmiDisplay.innerHTML = `${result.bmi} <span class="result-unit">kg/m²</span>`;
+        } else {
+            // Add BMI card if it didn't exist
+            const biometricSection = document.getElementById('biometric-section');
+            const bmiCard = document.createElement('div');
+            bmiCard.className = 'result-card';
+            bmiCard.innerHTML = `
+                <div class="result-label">IMC</div>
+                <div class="result-value highlight" id="bmi-display">${result.bmi} <span class="result-unit">kg/m²</span></div>
+            `;
+            biometricSection.appendChild(bmiCard);
+        }
+
+        // Update SMI if SMA is available
+        const smiDisplay = document.getElementById('smi-display');
+        // Get SMA from the page if it exists
+        const smaElements = document.querySelectorAll('.result-value');
+        let smaValue = null;
+        smaElements.forEach(el => {
+            const text = el.textContent;
+            if (text.includes('cm²') && el.closest('.result-card')?.querySelector('.result-label')?.textContent.includes('SMA')) {
+                smaValue = parseFloat(text);
+            }
+        });
+
+        if (smaValue && height) {
+            const smi = (smaValue / (height * height)).toFixed(2);
+            if (smiDisplay) {
+                smiDisplay.innerHTML = `${smi} <span class="result-unit">cm²/m²</span>`;
+            } else {
+                // Add SMI card if it didn't exist
+                const biometricSection = document.getElementById('biometric-section');
+                const smiCard = document.createElement('div');
+                smiCard.className = 'result-card';
+                smiCard.innerHTML = `
+                    <div class="result-label">SMI (Índice Músculo-Esquelético)</div>
+                    <div class="result-value highlight" id="smi-display">${smi} <span class="result-unit">cm²/m²</span></div>
+                `;
+                biometricSection.appendChild(smiCard);
+            }
+
+            // Save SMI to resultados.json and database
+            try {
+                const smiResponse = await fetch(`${API_BASE}/api/patients/${encodeURIComponent(caseId)}/smi`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ smi: parseFloat(smi) })
+                });
+
+                if (smiResponse.ok) {
+                    console.log('SMI saved successfully to resultados.json and database');
+                } else {
+                    console.warn('Failed to save SMI:', await smiResponse.text());
+                }
+            } catch (smiError) {
+                console.error('Error saving SMI:', smiError);
+                // Don't fail the entire operation if SMI save fails
+            }
+        }
+
+        // Exit edit mode
+        toggleBiometricEdit();
+
+        messageDiv.innerHTML = '<span style="color: var(--success);">✅ Dados salvos com sucesso!</span>';
+        setTimeout(() => {
+            messageDiv.innerHTML = '';
+        }, 3000);
+
+    } catch (error) {
+        console.error('Error saving biometrics:', error);
+        messageDiv.innerHTML = `<span style="color: var(--danger);">❌ Erro: ${escapeHtml(error.message)}</span>`;
+    }
 }
 
 // Close modal
