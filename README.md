@@ -460,6 +460,7 @@ dcmsend localhost 11112 -aec HEIMDALLR test.dcm
 
 Future enhancements planned for Heimdallr:
 
+- [ ] **Hippocampal Volumetry (HippoDeep)** — Automated segmentation and volume calculation for neurodegenerative disease monitoring
 - [ ] **Chest X-ray PA analysis & automated preliminary reporting** — AI-powered analysis and pre-reports for radiologist review
 - [ ] **Lung nodule detection** — Automated CAD for pulmonary nodules
 - [ ] **Coronary calcium scoring** — Agatston score calculation
@@ -470,6 +471,27 @@ Future enhancements planned for Heimdallr:
 - [x] **PACS integration** — Direct DICOM receive/send ✅
 - [x] **Web dashboard** — Real-time monitoring and results visualization ✅
 - [ ] **HL7/FHIR integration** — EMR interoperability
+
+---
+
+## Upcoming Feature: Hippocampal Volumetry (HippoDeep)
+
+Heimdallr is expanding its MR capabilities with automated hippocampal volumetry using the HippoDeep project. This will provide critical biomarkers for Alzheimer's disease and other neurodegenerative conditions.
+
+### Execution Plan
+
+1.  **Environment Setup**:
+    - Integrate the HippoDeep PyTorch implementation.
+    - Pathological brain T1-weighted MRI model weights integration.
+2.  **Processing Logic (run.py)**:
+    - Auto-detect brain T1 series.
+    - Trigger HippoDeep inference after TotalSegmentator (if required) or as a standalone MR module.
+3.  **Metrics Extraction (metrics.py)**:
+    - Extract left/right hippocampal volumes from probability masks.
+    - Calculate intracranial volume (ICV) for normalization.
+4.  **UI Integration**:
+    - Add hippocampal volume metrics to the patient dashboard.
+    - Implement interactive 2D/3D segmentation overlays for visual verification.
 
 ---
 
