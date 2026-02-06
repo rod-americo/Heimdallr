@@ -37,7 +37,9 @@ Every metric calculated serves one purpose: **improve patient outcomes through e
 | **Organ Volumetry** | Liver, spleen, kidney volumes | Volume (cm³) |
 | **Organ Density** | Mean and standard deviation of Hounsfield Units (CT only) | HU mean ± std |
 | **Body Region Detection** | Automatic identification of scanned body regions | List of regions |
+| **Body Region Detection** | Automatic identification of scanned body regions | List of regions |
 | **Contrast Phase Detection** | Classification of CT phase (native, arterial, venous, delayed) | Phase + probability |
+| **Chest X-Ray Analysis** | Automated findings and impression generation (MedGemma + OpenAI) | Findings text |
 
 ---
 
@@ -73,10 +75,15 @@ Every metric calculated serves one purpose: **improve patient outcomes through e
 └─────────────────┘                            └────────┬────────┘
                                                         │
                                                         ▼
-                                               ┌─────────────────┐
                                                │    output/      │
                                                │   (Results)     │
                                                └─────────────────┘
+                                                       ▲
+                                                       │
+                                              ┌─────────────────┐
+                                              │ medgemma_api.py │
+                                              │   (Port 8002)   │
+                                              └─────────────────┘
 ```
 
 ### Components
@@ -125,7 +132,14 @@ Every metric calculated serves one purpose: **improve patient outcomes through e
    - HU density analysis
    - L3 sarcopenia metrics
    - Hemorrhage quantification
+   - Hemorrhage quantification
    - Overlay image generation
+
+5. **MedGemma Microservice** (`medgemma_api.py`)
+   - **Dedicated Environment**: Runs in isolated venv to manage GPU/Torch dependencies
+   - **Port**: 8002
+   - **Function**: Loads MedGemma 4B model for Chest X-Ray analysis
+   - **Integration**: Accessed via `server.py` proxy endpoint
 
 6. **Web Dashboard** (`static/`)
    - **Real-time patient list** with auto-refresh (30s intervals)
@@ -342,6 +356,17 @@ python uploader.py /path/to/dicom_folder/
 python uploader.py /path/to/exam.zip --server http://192.168.1.100:8001/upload
 ```
 
+#### Option 3: X-Ray Analysis (API)
+
+```bash
+curl -X POST http://localhost:8001/api/ap-thorax-xray \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Describe findings in Portuguese",
+    "image": "BASE64_STRING..."
+  }'
+```
+
 ---
 
 ## Production Deployment
@@ -461,7 +486,8 @@ dcmsend localhost 11112 -aec HEIMDALLR test.dcm
 Future enhancements planned for Heimdallr:
 
 - [ ] **Hippocampal Volumetry (HippoDeep)** — Automated segmentation and volume calculation for neurodegenerative disease monitoring
-- [ ] **Chest X-ray PA analysis & automated preliminary reporting** — AI-powered analysis and pre-reports for radiologist review
+- [ ] **Hippocampal Volumetry (HippoDeep)** — Automated segmentation and volume calculation for neurodegenerative disease monitoring
+- [x] **Chest X-ray PA analysis & automated preliminary reporting** — AI-powered analysis and pre-reports for radiologist review ✅
 - [ ] **Lung nodule detection** — Automated CAD for pulmonary nodules
 - [ ] **Coronary calcium scoring** — Agatston score calculation
 - [ ] **Liver steatosis quantification** — Fat fraction estimation
