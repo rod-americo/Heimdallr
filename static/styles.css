@@ -86,57 +86,18 @@ body::before {
     padding: 2rem;
 }
 
-/* Hero Header with Banner */
-.hero-header {
-    text-align: center;
-    margin-bottom: 2rem;
-    padding: 0;
-    position: relative;
-    overflow: hidden;
+/* Header */
+header {
+    text-align: left;
+    margin-bottom: 1.5rem;
+    padding: 0.5rem 0;
 }
 
-.hero-banner {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 100%;
-    position: relative;
-}
-
-.hero-image {
-    width: 75%;
-    max-width: 1050px;
-    height: auto;
-    border-radius: var(--radius);
-    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5),
-        0 0 60px rgba(0, 217, 255, 0.15);
-    mask-image: linear-gradient(to right,
-            transparent 0%,
-            black 8%,
-            black 92%,
-            transparent 100%);
-    -webkit-mask-image: linear-gradient(to right,
-            transparent 0%,
-            black 8%,
-            black 92%,
-            transparent 100%);
-    transition: all 0.4s ease;
-}
-
-.hero-image:hover {
-    box-shadow: 0 12px 50px rgba(0, 0, 0, 0.6),
-        0 0 80px rgba(0, 217, 255, 0.25),
-        var(--shadow-glow);
-    transform: scale(1.01);
-}
-
-/* Hide old logo elements if present */
-.logo {
-    display: none;
-}
-
-.tagline {
-    display: none;
+.brand {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    font-weight: 500;
+    letter-spacing: 0.3px;
 }
 
 /* Stats Bar */
