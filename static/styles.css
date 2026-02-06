@@ -92,6 +92,7 @@ body::before {
     font-weight: 500;
     letter-spacing: 0.3px;
     white-space: nowrap;
+    margin-left: auto;
 }
 
 /* Stats Bar */
@@ -164,6 +165,7 @@ body::before {
     align-items: center;
     gap: 1rem;
     margin-bottom: 1.5rem;
+    width: 100%;
 }
 
 .search-input {
