@@ -11,6 +11,7 @@ import numpy as np
 import pydicom
 from PIL import Image
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from pydantic import BaseModel, Field
 from transformers import pipeline
 import openai
 from dotenv import load_dotenv
@@ -145,7 +146,11 @@ async def analyze(
     # Read file content
     try:
         content = await file.read()
+        
+        start_conversion = time.time()
         image = load_image_file(content)
+        timings["dcm_conversion"] = round(time.time() - start_conversion, 3)
+        
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to load file: {e}")
 
