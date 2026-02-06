@@ -25,7 +25,9 @@ from fastapi import FastAPI, File, UploadFile, HTTPException, Response
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field
 import sqlite3
+import httpx  # For microservice communication
 
 # Import centralized configuration
 import config
@@ -465,6 +467,60 @@ async def download_uploader():
         filename="uploader.py",
         media_type="text/x-python"
     )
+
+
+
+# ============================================================
+# MEDGEMMA MICROSERVICE (Proxy)
+# ============================================================
+
+class MedGemmaRequest(BaseModel):
+    image: str = Field(..., description="Base64 encoded image")
+    prompt: str = Field(..., description="User prompt for synthesis")
+
+@app.post("/api/ap-thorax-xray")
+async def analyze_xray(data: MedGemmaRequest):
+    """
+    Proxy request to the MedGemma Analysis Service.
+    
+    Architecture:
+    Main Server (8001) -> [HTTP] -> MedGemma Service (8002)
+    
+    This keeps the heavy model (4B params) isolated in its own process/environment.
+    """
+    service_url = config.MEDGEMMA_SERVICE_URL
+    
+    try:
+        async with httpx.AsyncClient(timeout=180.0) as client:
+            # Forward the request exactly as received
+            response = await client.post(
+                service_url, 
+                json=data.model_dump(),
+                timeout=180.0 # Long timeout for model inference
+            )
+            
+            # Check for errors from the microservice
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=response.status_code, 
+                    detail=f"MedGemma Service Error: {response.text}"
+                )
+                
+            return response.json()
+            
+    except httpx.ConnectError:
+        raise HTTPException(
+            status_code=503, 
+            detail="MedGemma Service is unavailable. Please ensure 'medgemma_api.py' is running on port 8002."
+        )
+    except httpx.ReadTimeout:
+        raise HTTPException(
+            status_code=504, 
+            detail="Model inference timed out."
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Proxy Error: {str(e)}")
+
 
 # ============================================================
 # UPLOAD ENDPOINT - DICOM Ingestion

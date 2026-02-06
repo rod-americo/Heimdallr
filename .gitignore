@@ -61,3 +61,7 @@ database/*.db-journal
 # OS
 .DS_Store
 Thumbs.db
+
+# Future features
+upcoming_features.md
+

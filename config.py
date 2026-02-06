@@ -106,6 +106,14 @@ VERBOSE_CONSOLE = os.getenv("HEIMDALLR_VERBOSE_CONSOLE", "false").lower() == "tr
 UPLOADER_DEFAULT_SERVER = os.getenv("HEIMDALLR_UPLOADER_SERVER", "http://thor:8001/upload")
 
 # ============================================================
+# MICROSERVICES CONFIGURATION
+# ============================================================
+
+# MedGemma Analysis Service
+MEDGEMMA_SERVICE_URL = os.getenv("MEDGEMMA_SERVICE_URL", "http://localhost:8002/analyze")
+
+
+# ============================================================
 # PREPARE SCRIPT CONFIGURATION (prepare.py)
 # ============================================================
 
