@@ -86,15 +86,6 @@ body::before {
     padding: 2rem;
 }
 
-.brand {
-    color: var(--text-secondary);
-    font-size: 0.95rem;
-    font-weight: 500;
-    letter-spacing: 0.3px;
-    white-space: nowrap;
-    margin-left: auto;
-}
-
 /* Stats Bar */
 .stats-bar {
     display: flex;
@@ -160,8 +151,8 @@ body::before {
 
 /* Controls */
 .controls {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     gap: 1rem;
     margin-bottom: 1.5rem;
