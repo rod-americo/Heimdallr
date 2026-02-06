@@ -7,12 +7,14 @@ import time
 from typing import Dict, Any, List
 
 import torch
+import numpy as np
+import pydicom
 from PIL import Image
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from transformers import pipeline
 import openai
 from dotenv import load_dotenv
+import medgemma_prompts
 
 # Load environment variables (expecting .env in the same directory or passed via env)
 load_dotenv()
@@ -58,33 +60,81 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="MedGemma Analysis Service", lifespan=lifespan)
 
-class AnalysisRequest(BaseModel):
-    image: str = Field(..., description="Base64 encoded image (PNG/JPG)")
-    prompt: str = Field(..., description="User prompt for synthesis")
+
 
 class AnalysisResponse(BaseModel):
     medgemma_output: str
     final_report: str
     timings: Dict[str, float] = Field(..., description="Processing times in seconds")
 
-def decode_image(base64_string: str) -> Image.Image:
+
+def dicom_to_pil(file_object) -> Image.Image:
+    """
+    Convert DICOM file object to PIL Image.
+    Logic adapted from medgemma_rx.py (validated).
+    """
     try:
-        # Remove header if present (e.g., "data:image/png;base64,")
-        if "," in base64_string:
-            base64_string = base64_string.split(",")[1]
+        ds = pydicom.dcmread(file_object)
+        arr = ds.pixel_array.astype(np.float32)
+
+        slope = float(getattr(ds, "RescaleSlope", 1.0))
+        intercept = float(getattr(ds, "RescaleIntercept", 0.0))
+        arr = arr * slope + intercept
+
+        wc = getattr(ds, "WindowCenter", None)
+        ww = getattr(ds, "WindowWidth", None)
+        if wc is not None and ww is not None:
+            wc = float(wc[0] if hasattr(wc, "__len__") else wc)
+            ww = float(ww[0] if hasattr(ww, "__len__") else ww)
+            lo, hi = wc - ww/2, wc + ww/2
+            arr = np.clip(arr, lo, hi)
+
+        arr -= arr.min()
+        arr /= (arr.max() + 1e-6)
+        arr = (arr * 255).astype(np.uint8)
+        return Image.fromarray(arr).convert("RGB")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error processing DICOM: {str(e)}")
+
+def load_image_file(file_content: bytes) -> Image.Image:
+    """Load image from bytes (tries DICOM first, then standard formats)"""
+    file_obj = io.BytesIO(file_content)
+    
+    # Try DICOM first
+    try:
+        # Check header (DICM at offset 128)
+        file_obj.seek(128)
+        if file_obj.read(4) == b"DICM":
+            file_obj.seek(0)
+            return dicom_to_pil(file_obj)
+        # Some DICOMs lack preamble, try catch-all pydicom read
+        file_obj.seek(0)
+        try:
+            return dicom_to_pil(file_obj)
+        except:
+            pass # Not a DICOM
+            
+    except Exception:
+        pass
         
-        image_data = base64.b64decode(base64_string)
-        image = Image.open(io.BytesIO(image_data))
+    # Try standard image (JPG, PNG)
+    try:
+        file_obj.seek(0)
+        image = Image.open(file_obj)
         return image.convert("RGB")
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid image data: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid file format (not DICOM or Image): {str(e)}")
+
 
 @app.post("/analyze", response_model=AnalysisResponse)
-async def analyze(request: AnalysisRequest):
+async def analyze(
+    file: UploadFile = File(..., description="Image file (DICOM, JPG, PNG)"),
+    prompt: str = Form(..., description="User prompt for synthesis (e.g. translation)"),
+    age: str = Form("unknown age", description="Patient age (e.g. '45-year-old')")
+):
     """
     Analyze X-ray image using MedGemma + OpenAI.
-    1. MedGemma generates findings/impression.
-    2. OpenAI refines/answers based on User Prompt + MedGemma Output.
+    Accepts DICOM or standard images via Multipart upload.
     """
     if state.pipe is None:
         raise HTTPException(status_code=503, detail="MedGemma model not initialized")
@@ -92,8 +142,12 @@ async def analyze(request: AnalysisRequest):
     start_total = time.time()
     timings = {}
 
-    # Decode image
-    image = decode_image(request.image)
+    # Read file content
+    try:
+        content = await file.read()
+        image = load_image_file(content)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to load file: {e}")
 
     # Acquire lock for GPU inference
     async with state.lock:
@@ -101,20 +155,20 @@ async def analyze(request: AnalysisRequest):
             start_medgemma = time.time()
             
             # 1. Run MedGemma
-            # Fixed prompt for MedGemma to extract findings
-            medgemma_prompt = "Chest X-ray: write findings and impression."
+            # Construct the internal prompt using the template and age
+            internal_user_prompt = medgemma_prompts.MEDGEMMA_USER_TEMPLATE.format(age=age)
+            full_prompt = f"{medgemma_prompts.MEDGEMMA_SYSTEM_PROMPT}\n\n{internal_user_prompt}"
             
             messages = [{
                 "role": "user",
                 "content": [
                     {"type": "image", "image": image},
-                    {"type": "text", "text": medgemma_prompt}
+                    {"type": "text", "text": full_prompt}
                 ]
             }]
 
-            # Run inference in thread pool if needed, but pipeline is usually efficient enough
-            # Blocking call here, but lock protects concurrency
-            out = state.pipe(text=messages, max_new_tokens=600)
+            # Run inference
+            out = state.pipe(text=messages, max_new_tokens=800) # Increased tokens for longer report
             medgemma_output = out[0]["generated_text"][-1]["content"]
             
             timings["medgemma_inference"] = round(time.time() - start_medgemma, 3)
@@ -133,7 +187,7 @@ async def analyze(request: AnalysisRequest):
             model="gpt-4o", 
             messages=[
                 {"role": "system", "content": "You are a radiologist assistant. You will receive raw findings from an AI model (MedGemma) analyzing a Chest X-ray, and a user prompt/question. Answer the user prompt based on the AI findings."},
-                {"role": "user", "content": f"MedGemma Findings:\n{medgemma_output}\n\nUser Request:\n{request.prompt}"}
+                {"role": "user", "content": f"MedGemma Findings:\n{medgemma_output}\n\nUser Request:\n{prompt}"}
             ]
         )
         final_report = response.choices[0].message.content

@@ -21,7 +21,7 @@ import shutil
 import subprocess
 import json
 from pathlib import Path
-from fastapi import FastAPI, File, UploadFile, HTTPException, Response
+from fastapi import FastAPI, File, UploadFile, HTTPException, Response, Form
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -474,29 +474,30 @@ async def download_uploader():
 # MEDGEMMA MICROSERVICE (Proxy)
 # ============================================================
 
-class MedGemmaRequest(BaseModel):
-    image: str = Field(..., description="Base64 encoded image")
-    prompt: str = Field(..., description="User prompt for synthesis")
-
 @app.post("/api/ap-thorax-xray")
-async def analyze_xray(data: MedGemmaRequest):
+async def analyze_xray(
+    file: UploadFile = File(..., description="Image file"),
+    prompt: str = Form(..., description="User prompt"),
+    age: str = Form("unknown age", description="Patient age (e.g. '45-year-old')")
+):
     """
     Proxy request to the MedGemma Analysis Service.
-    
-    Architecture:
-    Main Server (8001) -> [HTTP] -> MedGemma Service (8002)
-    
-    This keeps the heavy model (4B params) isolated in its own process/environment.
+    Supports Multipart Upload (file + fields).
     """
     service_url = config.MEDGEMMA_SERVICE_URL
     
     try:
+        # Read file content to forward
+        file_content = await file.read()
+        files = {'file': (file.filename, file_content, file.content_type)}
+        data = {'prompt': prompt, 'age': age}
+        
         async with httpx.AsyncClient(timeout=180.0) as client:
-            # Forward the request exactly as received
             response = await client.post(
                 service_url, 
-                json=data.model_dump(),
-                timeout=180.0 # Long timeout for model inference
+                files=files,
+                data=data,
+                timeout=180.0
             )
             
             # Check for errors from the microservice
@@ -511,7 +512,7 @@ async def analyze_xray(data: MedGemmaRequest):
     except httpx.ConnectError:
         raise HTTPException(
             status_code=503, 
-            detail="MedGemma Service is unavailable. Please ensure 'medgemma_api.py' is running on port 8002."
+            detail="MedGemma Service is unavailable."
         )
     except httpx.ReadTimeout:
         raise HTTPException(
