@@ -485,14 +485,13 @@ dcmsend localhost 11112 -aec HEIMDALLR test.dcm
 
 Future enhancements planned for Heimdallr:
 
-- [ ] **Hippocampal Volumetry (HippoDeep)** — Automated segmentation and volume calculation for neurodegenerative disease monitoring
-- [ ] **Hippocampal Volumetry (HippoDeep)** — Automated segmentation and volume calculation for neurodegenerative disease monitoring
 - [x] **Chest X-ray PA analysis & automated preliminary reporting** — AI-powered analysis and pre-reports for radiologist review ✅
-- [ ] **Lung nodule detection** — Automated CAD for pulmonary nodules
 - [ ] **Coronary calcium scoring** — Agatston score calculation
+- [ ] **Lung nodule detection** — Automated CAD for pulmonary nodules
 - [ ] **Liver steatosis quantification** — Fat fraction estimation
 - [ ] **Aortic measurements** — Diameter and aneurysm detection
 - [ ] **Bone density analysis** — Opportunistic osteoporosis screening
+- [ ] **Hippocampal Volumetry (HippoDeep)** — Automated segmentation and volume calculation for neurodegenerative disease monitoring
 - [ ] **Incidental findings detection** — AI-powered anomaly detection
 - [x] **PACS integration** — Direct DICOM receive/send ✅
 - [x] **Web dashboard** — Real-time monitoring and results visualization ✅
