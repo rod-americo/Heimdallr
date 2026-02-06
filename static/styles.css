@@ -86,18 +86,12 @@ body::before {
     padding: 2rem;
 }
 
-/* Header */
-header {
-    text-align: left;
-    margin-bottom: 1.5rem;
-    padding: 0.5rem 0;
-}
-
 .brand {
     color: var(--text-secondary);
     font-size: 0.95rem;
     font-weight: 500;
     letter-spacing: 0.3px;
+    white-space: nowrap;
 }
 
 /* Stats Bar */
@@ -166,7 +160,9 @@ header {
 /* Controls */
 .controls {
     display: flex;
-    justify-content: flex-start;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
     margin-bottom: 1.5rem;
 }
 
