@@ -477,12 +477,11 @@ async def download_uploader():
 @app.post("/api/ap-thorax-xray")
 async def analyze_xray(
     file: UploadFile = File(..., description="Image file"),
-    prompt: str = Form(..., description="User prompt"),
     age: str = Form("unknown age", description="Patient age (e.g. '45-year-old')")
 ):
     """
     Proxy request to the MedGemma Analysis Service.
-    Supports Multipart Upload (file + fields).
+    Supports Multipart Upload (file + age).
     """
     service_url = config.MEDGEMMA_SERVICE_URL
     
@@ -490,7 +489,7 @@ async def analyze_xray(
         # Read file content to forward
         file_content = await file.read()
         files = {'file': (file.filename, file_content, file.content_type)}
-        data = {'prompt': prompt, 'age': age}
+        data = {'age': age}
         
         async with httpx.AsyncClient(timeout=180.0) as client:
             response = await client.post(
