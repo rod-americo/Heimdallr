@@ -24,7 +24,7 @@ load_dotenv()
 PORT = int(os.getenv("MEDGEMMA_PORT", "8002"))
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 MODEL_ID = "google/medgemma-1.5-4b-it"
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 # Global state
 class AppState:
@@ -131,12 +131,11 @@ def load_image_file(file_content: bytes) -> Image.Image:
 @app.post("/analyze", response_model=AnalysisResponse)
 async def analyze(
     file: UploadFile = File(..., description="Image file (DICOM, JPG, PNG)"),
-    prompt: str = Form(..., description="User prompt for synthesis (e.g. translation)"),
     age: str = Form("unknown age", description="Patient age (e.g. '45-year-old')")
 ):
     """
     Analyze X-ray image using MedGemma + OpenAI.
-    Accepts DICOM or standard images via Multipart upload.
+    Accepts DICOM or standard images and Age via Multipart upload.
     """
     if state.pipe is None:
         raise HTTPException(status_code=503, detail="MedGemma model not initialized")
@@ -161,9 +160,8 @@ async def analyze(
             start_medgemma = time.time()
             
             # 1. Run MedGemma
-            # Construct the internal prompt using the template and age
-            internal_user_prompt = medgemma_prompts.MEDGEMMA_USER_TEMPLATE.format(age=age)
-            full_prompt = f"{medgemma_prompts.MEDGEMMA_SYSTEM_PROMPT}\n\n{internal_user_prompt}"
+            # Construct the full prompt using the single template
+            full_prompt = medgemma_prompts.MEDGEMMA_PROMPT_TEMPLATE.format(age=age)
             
             messages = [{
                 "role": "user",
@@ -189,11 +187,13 @@ async def analyze(
         
         # Determine strictness of following the user prompt vs using the findings
         # For now, we provide the findings as context.
+        # Prepare the full prompt using the Portuguese template
+        full_openai_prompt = medgemma_prompts.OPENAI_PROMPT_TEMPLATE.format(saida_medgemma=medgemma_output)
+
         response = client.chat.completions.create(
             model=OPENAI_MODEL,
             messages=[
-                {"role": "system", "content": "You are a radiologist assistant. You will receive raw findings from an AI model (MedGemma) analyzing a Chest X-ray, and a user prompt/question. Answer the user prompt based on the AI findings."},
-                {"role": "user", "content": f"MedGemma Findings:\n{medgemma_output}\n\nUser Request:\n{prompt}"}
+                {"role": "user", "content": full_openai_prompt}
             ]
         )
         final_report = response.choices[0].message.content
