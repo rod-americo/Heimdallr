@@ -357,15 +357,37 @@ python uploader.py /path/to/dicom_folder/
 python uploader.py /path/to/exam.zip --server http://192.168.1.100:8001/upload
 ```
 
-#### Option 3: X-Ray Analysis (API)
+### API Reference
 
+#### Patient Data
+
+- **List Patients**: `GET /api/patients`
+- **Get Results**: `GET /api/patients/{case_id}/results`
+- **Get Metadata**: `GET /api/patients/{case_id}/metadata`
+- **Update Biometrics**: `PATCH /api/patients/{case_id}/biometrics`
+  ```json
+  { "weight": 70.5, "height": 1.75 }
+  ```
+- **Update SMI**: `PATCH /api/patients/{case_id}/smi`
+  ```json
+  { "smi": 45.2 }
+  ```
+
+#### X-Ray Analysis
+
+**1. Anthropic (Claude 3.5 Sonnet)** - *Recommended*
 ```bash
-curl -X POST http://localhost:8001/api/ap-thorax-xray \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompt": "Describe findings in Portuguese",
-    "image": "BASE64_STRING..."
-  }'
+curl -X POST http://localhost:8001/api/anthropic/ap-thorax-xray \
+  -F "file=@/path/to/image.dcm" \
+  -F "age=45 year old" \
+  -F "identificador=case_123"
+```
+
+**2. MedGemma (Google)**
+```bash
+curl -X POST http://localhost:8001/api/medgemma/ap-thorax-xray \
+  -F "file=@/path/to/image.png" \
+  -F "age=45 year old"
 ```
 
 ---
