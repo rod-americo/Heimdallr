@@ -33,13 +33,13 @@ Every metric calculated serves one purpose: **improve patient outcomes through e
 | **Organ Segmentation** | Automated segmentation of 100+ anatomical structures using TotalSegmentator | NIfTI masks in `total/` |
 | **Tissue Composition** | Skeletal muscle, subcutaneous/visceral fat segmentation | NIfTI masks in `tissue_types/` |
 | **Cerebral Hemorrhage Detection** | Automatic detection and quantification of intracranial bleeding | Volume + overlay images |
-| **Sarcopenia Analysis (L3)** | Skeletal Muscle Area (SMA) and density at L3 vertebra level | SMA (cm²), muscle HU |
+| **Sarcopenia Analysis (L3)** | Skeletal Muscle Area (SMA), Skeletal Muscle Index (SMI) and density at L3 vertebra level | SMA (cm²), SMI (cm²/m²), muscle HU |
 | **Organ Volumetry** | Liver, spleen, kidney volumes | Volume (cm³) |
 | **Organ Density** | Mean and standard deviation of Hounsfield Units (CT only) | HU mean ± std |
 | **Body Region Detection** | Automatic identification of scanned body regions | List of regions |
 | **Body Region Detection** | Automatic identification of scanned body regions | List of regions |
 | **Contrast Phase Detection** | Classification of CT phase (native, arterial, venous, delayed) | Phase + probability |
-| **Chest X-Ray Analysis** | Automated findings and impression generation (MedGemma + OpenAI) | Findings text |
+| **Chest X-Ray Analysis** | Automated findings and impression generation (MedGemma + gpt-4o-mini) | Findings text |
 
 ---
 
@@ -117,7 +117,7 @@ Every metric calculated serves one purpose: **improve patient outcomes through e
    - Extracts and scans DICOM files
    - Intelligent series selection (CT: phase + kernel priority, MR: slice count)
    - Converts to NIfTI using `dcm2niix`
-   - Generates clinical naming: `FirstNameInitials_YYYYMMDD_AccessionNumber`
+   - Generates clinical naming: `[FirstName][Initials]_[YYYYMMDD]_[AccessionNumber]`
    - Stores metadata in SQLite database
 
 3. **Processing Daemon** (`run.py`)
@@ -139,7 +139,7 @@ Every metric calculated serves one purpose: **improve patient outcomes through e
    - **Dedicated Environment**: Runs in isolated venv to manage GPU/Torch dependencies
    - **Port**: 8002
    - **Function**: Loads MedGemma 4B model for Chest X-Ray analysis
-   - **Integration**: Accessed via `server.py` proxy endpoint
+   - **Integration**: Accessed via `server.py` proxy endpoint. Uses `medgemma_prompts.py` for structured prompts and `gpt-4o-mini` for report generation.
 
 6. **Web Dashboard** (`static/`)
    - **Real-time patient list** with auto-refresh (30s intervals)
@@ -190,6 +190,7 @@ output/
   
   "slice_L3": 127,
   "SMA_cm2": 142.56,
+  "SMI": 52.3,
   "muscle_HU_mean": 38.4,
   "muscle_HU_std": 15.2,
   
