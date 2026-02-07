@@ -1,8 +1,11 @@
 import base64
 import anthropic
+import json
 import os
 import random
 import sys
+import time
+from anthropic_report_builder import extrair_json_do_texto, montar_laudo_a_partir_json
 from img_conversor import otimizar_imagem_para_api
 from dotenv import load_dotenv
 
@@ -16,6 +19,34 @@ if not api_key:
     raise ValueError("A chave da API 'ANTHROPIC_API_KEY' não foi encontrada no arquivo .env ou nas variáveis de ambiente.")
 
 client = anthropic.Anthropic(api_key=api_key)
+
+USD_TO_BRL = 5.50
+USD_PER_MTOK_INPUT = 3.0
+USD_PER_MTOK_OUTPUT = 15.0
+
+
+def _extrair_usage(message):
+    usage = getattr(message, "usage", None)
+    if usage is None:
+        return None, None
+
+    if isinstance(usage, dict):
+        return usage.get("input_tokens"), usage.get("output_tokens")
+
+    return getattr(usage, "input_tokens", None), getattr(usage, "output_tokens", None)
+
+
+def _estimar_tokens_texto(texto):
+    if not texto:
+        return 0
+    # Heurística simples: ~4 caracteres por token.
+    return max(1, int(len(texto) / 4))
+
+
+def _calcular_custo_brl(input_tokens, output_tokens):
+    custo_input_usd = (input_tokens / 1_000_000) * USD_PER_MTOK_INPUT
+    custo_output_usd = (output_tokens / 1_000_000) * USD_PER_MTOK_OUTPUT
+    return (custo_input_usd + custo_output_usd) * USD_TO_BRL
 
 def analisar_rx_leito(caminho_imagem, idade_paciente):
     
@@ -53,7 +84,7 @@ def analisar_rx_leito(caminho_imagem, idade_paciente):
     # claude-3-haiku-20240307
     
     message = client.messages.create(
-        model="claude-opus-4-5-20251101",
+        model="claude-sonnet-4-5-20250929",
         max_tokens=1024,
         temperature=0.0, # Temperatura ZERO para máxima precisão e determinismo
         system=system_instruction,
@@ -78,7 +109,21 @@ def analisar_rx_leito(caminho_imagem, idade_paciente):
         ],
     )
 
-    return message.content[0].text
+    texto = message.content[0].text
+    input_tokens, output_tokens = _extrair_usage(message)
+    usage_from_api = input_tokens is not None and output_tokens is not None
+
+    if not usage_from_api:
+        # Fallback quando usage não vier da API.
+        input_tokens = _estimar_tokens_texto(system_instruction + "\n" + user_message)
+        output_tokens = _estimar_tokens_texto(texto)
+
+    return {
+        "text": texto,
+        "input_tokens": int(input_tokens),
+        "output_tokens": int(output_tokens),
+        "usage_from_api": usage_from_api,
+    }
 
 def extrair_idade(nome_arquivo):
     """Extrai a idade do nome do arquivo no formato NNNY_..."""
@@ -121,12 +166,33 @@ def main():
     print(f"Processando arquivo: {arquivo_escolhido}")
     print(f"Idade do Paciente: {idade_paciente} anos")
     print("-" * 30)
+    inicio = time.perf_counter()
 
     try:
-        laudo = analisar_rx_leito(caminho_completo, idade_paciente)
-        print(laudo)
+        resultado = analisar_rx_leito(caminho_completo, idade_paciente)
+        dados_json = extrair_json_do_texto(resultado["text"])
+        laudo_textual = montar_laudo_a_partir_json(dados_json)
+        fim = time.perf_counter()
+
+        input_tokens = resultado["input_tokens"]
+        output_tokens = resultado["output_tokens"]
+        total_tokens = input_tokens + output_tokens
+        custo_brl = _calcular_custo_brl(input_tokens, output_tokens)
+        origem_tokens = "API" if resultado["usage_from_api"] else "estimado"
+
+        print("LAUDO ESTRUTURADO")
+        print(laudo_textual)
+        print("-" * 30)
+        print("JSON EXTRAÍDO")
+        print(json.dumps(dados_json, ensure_ascii=False, indent=2))
         print("-" * 30)
         print(f"Arquivo usado: {arquivo_escolhido}")
+        print(f"Tempo de processamento: {fim - inicio:.2f} s")
+        print(
+            "Quantidade de tokens: "
+            f"{total_tokens} (input: {input_tokens}, output: {output_tokens}, origem: {origem_tokens})"
+        )
+        print(f"Valor estimado em R$: {custo_brl:.4f}")
     except Exception as e:
         print(f"Ocorreu um erro ao chamar a API: {e}")
 
