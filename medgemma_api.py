@@ -24,6 +24,7 @@ load_dotenv()
 PORT = int(os.getenv("MEDGEMMA_PORT", "8002"))
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 MODEL_ID = "google/medgemma-1.5-4b-it"
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5")
 
 # Global state
 class AppState:
@@ -189,7 +190,7 @@ async def analyze(
         # Determine strictness of following the user prompt vs using the findings
         # For now, we provide the findings as context.
         response = client.chat.completions.create(
-            model="gpt-4o", 
+            model=OPENAI_MODEL,
             messages=[
                 {"role": "system", "content": "You are a radiologist assistant. You will receive raw findings from an AI model (MedGemma) analyzing a Chest X-ray, and a user prompt/question. Answer the user prompt based on the AI findings."},
                 {"role": "user", "content": f"MedGemma Findings:\n{medgemma_output}\n\nUser Request:\n{prompt}"}
