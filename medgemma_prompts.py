@@ -18,7 +18,6 @@ Generate a PRELIMINARY RADIOLOGY REPORT using this exact structure:
 - Lungs and pleura: (consolidation, atelectatic opacity, edema, pleural effusion, pneumothorax, other pulmonary findings; include pulmonary vascular congestion here when present)
 - Heart and mediastinum: (cardiac size/contours with AP limitation noted, mediastinum, hila, aortic knob)
 - Diaphragm and costophrenic angles: (as visible; if both are blunted/obscured, state bilateral involvement explicitly)
-- Bones and soft tissues: (fracture, destructive lesion, soft tissue emphysema, other visible findings)
 - Lines, tubes, and devices: (mention tip/terminal position only when confidently identifiable; otherwise, do not comment on tip position)
 
 Rules:
