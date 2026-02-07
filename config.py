@@ -112,6 +112,9 @@ UPLOADER_DEFAULT_SERVER = os.getenv("HEIMDALLR_UPLOADER_SERVER", "http://thor:80
 # MedGemma Analysis Service
 MEDGEMMA_SERVICE_URL = os.getenv("MEDGEMMA_SERVICE_URL", "http://localhost:8002/analyze")
 
+# Anthropic Analysis Service
+ANTHROPIC_SERVICE_URL = os.getenv("ANTHROPIC_SERVICE_URL", "http://localhost:8003/analyze")
+
 
 # ============================================================
 # PREPARE SCRIPT CONFIGURATION (prepare.py)
