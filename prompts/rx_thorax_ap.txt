@@ -33,7 +33,7 @@ OUTPUT SCHEMA (JSON):
     },
     "central_venous_catheters": [ // LIST of objects. Empty [] if none.
       {
-        "type": "CVC" | "PICC" | "Dialysis_Catheter" | "Port-a-cath",
+        "type": "CVC" | "PICC" | "Dialysis_Catheter" | "Portacath",
         "side": "right" | "left",
         "tip_location": "SVC" | "RA" | "subclavian_vein" | "jugular_vein" | "misplaced" | "unknown"
       }
