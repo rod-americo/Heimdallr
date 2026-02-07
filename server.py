@@ -474,7 +474,7 @@ async def download_uploader():
 # MEDGEMMA MICROSERVICE (Proxy)
 # ============================================================
 
-@app.post("/api/ap-thorax-xray")
+@app.post("/api/medgemma/ap-thorax-xray")
 async def analyze_xray(
     file: UploadFile = File(..., description="Image file"),
     age: str = Form("unknown age", description="Patient age (e.g. '45-year-old')")
