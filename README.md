@@ -24,7 +24,7 @@ Heimdallr currently focuses on three practical layers:
 
 3. **Radiologist assistance interfaces**
    - FastAPI endpoints and interactive web dashboard
-   - Chest X-ray assistance flow (MedGemma + structured prompting)
+   - Chest X-ray assistance flow (Anthropic + MedGemma with structured prompting)
    - Downloadable artifacts for auditability and review
 
 Future-facing capabilities (workflow orchestration, clinical urgency triage, de-identification pipelines, patient navigation, and agentic AI) are tracked in [`UPCOMING.md`](UPCOMING.md).
@@ -43,6 +43,7 @@ Future-facing capabilities (workflow orchestration, clinical urgency triage, de-
 - Segmentation and tissue maps through TotalSegmentator pipeline integration
 
 ### Reporting Assistance
+- `server.py`: report-assist endpoints, including Anthropic chest X-ray flow (`/api/anthropic/ap-thorax-xray`)
 - `medgemma_api.py`: dedicated microservice for AP chest X-ray assistant flow
 - `medgemma_prompts.py`: prompt templates and structured output helpers
 - `anthropic_report_builder.py`: report-building utilities for narrative output
@@ -133,6 +134,12 @@ python dicom_listener.py
 ## Safety, Compliance, and Clinical Use
 
 Heimdallr is intended as **clinical decision support** infrastructure, not an autonomous diagnostic authority. Any AI-generated text, prioritization signal, or quantitative metric must be reviewed by qualified professionals.
+
+### Test Data Handling
+
+- Test datasets are fully anonymized before use.
+- In the image-conversion test flow, DICOM metadata is intentionally not carried forward, reducing PHI exposure risk in derived files.
+- Test radiographs used in this repository do not contain burned-in PHI overlays.
 
 For planned governance controls (de-identification, auditability hardening, model drift controls, and shadow-AI mitigation), see [`UPCOMING.md`](UPCOMING.md).
 
