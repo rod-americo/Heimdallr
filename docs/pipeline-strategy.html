@@ -607,7 +607,7 @@
                 <a href="./index.html">Docs Hub</a>
                 <a href="./pipeline-strategy.html">Strategy Board</a>
                 <a href="./motivation-justification.html">Motivation & Justification</a>
-                <a href="./radiology-preprocessing-ecosystem-report.html">Full Translation Source</a>
+                <a href="./radiology-preprocessing-ecosystem-report.html">Research Report (EN)</a>
                 <a href="https://github.com/rod-americo/Heimdallr/blob/main/README.md">README.md</a>
             </div>
         </section>
@@ -615,7 +615,7 @@
 
     <script>
         const modules = [
-            { id: 1, title: 'DICOM C-STORE Intake Listener', track: 'ops', horizon: 'foundation', status: 'implemented', impact: 8, friction: 3, note: 'Production listener for PACS/modality intake (`HEIMDALLR`, port 11112).' },
+            { id: 1, title: 'DICOM C-STORE Intake Listener', track: 'ops', horizon: 'foundation', status: 'implemented', impact: 8, friction: 3, note: 'Production listener for PACS/modality intake.' },
             { id: 2, title: 'Case Prep and Queue Worker', track: 'ops', horizon: 'foundation', status: 'implemented', impact: 8, friction: 4, note: 'Automated DICOM selection, NIfTI conversion, and queued processing flow.' },
             { id: 3, title: 'Dashboard + API Surface', track: 'ops', horizon: 'foundation', status: 'implemented', impact: 7, friction: 3, note: 'FastAPI endpoints and operational dashboard already serving case workflows.' },
             { id: 4, title: 'HL7-Triggered Smart Prefetch', track: 'ops', horizon: 'foundation', status: 'planned', impact: 8, friction: 4, note: 'Route relevant priors from ADT/ORM events using study similarity scoring.' },
@@ -623,19 +623,24 @@
             { id: 6, title: 'SLA Policy Engine', track: 'ops', horizon: 'foundation', status: 'planned', impact: 6, friction: 4, note: 'Alert and escalate when breach risk increases for urgent studies.' },
 
             { id: 7, title: 'AP Chest X-ray Assist APIs', track: 'clinical', horizon: 'foundation', status: 'implemented', impact: 7, friction: 3, note: 'Anthropic and MedGemma assistant flows integrated through server endpoints.' },
-            { id: 8, title: 'Structured Report Copilot', track: 'clinical', horizon: 'acceleration', status: 'in-progress', impact: 7, friction: 6, note: 'Template-bound drafting from findings and quantitative metrics.' },
-            { id: 9, title: 'Urgency Flagging and Reordering', track: 'clinical', horizon: 'acceleration', status: 'planned', impact: 9, friction: 8, note: 'Reprioritize suspected critical findings with auditable thresholds.' },
-            { id: 10, title: 'Opportunistic Liver Quant', track: 'clinical', horizon: 'acceleration', status: 'planned', impact: 7, friction: 6, note: 'Steatosis risk extraction from routine CT studies.' },
-            { id: 11, title: 'Opportunistic Bone Quant', track: 'clinical', horizon: 'acceleration', status: 'planned', impact: 6, friction: 6, note: 'Vertebral volumetric HU proxy for osteoporosis triage.' },
-            { id: 12, title: 'CAC-DRS Calcium Classification', track: 'clinical', horizon: 'acceleration', status: 'planned', impact: 7, friction: 6, note: 'Structured coronary calcium classification workflow using CAC-DRS in eligible CT studies.' },
-            { id: 13, title: 'Emphysema Longitudinal Quant', track: 'clinical', horizon: 'scaling', status: 'planned', impact: 5, friction: 7, note: 'LAA%-based burden tracking and trend summaries.' },
-            { id: 14, title: 'Agentic Workflow Coordinator', track: 'clinical', horizon: 'innovation', status: 'planned', impact: 8, friction: 9, note: 'Multi-step assistants for triage, reporting, and handoff execution.' },
+            { id: 8, title: 'TotalSegmentator Core Pipeline', track: 'clinical', horizon: 'foundation', status: 'implemented', impact: 8, friction: 4, note: 'Robust segmentation backbone powering multi-structure quantitative workflows.' },
+            { id: 9, title: 'L3 Muscle Area + SMI Calculator', track: 'clinical', horizon: 'foundation', status: 'implemented', impact: 8, friction: 4, note: 'Measures muscle area at L3 and calculates SMI using patient height input.' },
+            { id: 10, title: 'Automated Organ Volumetry', track: 'clinical', horizon: 'foundation', status: 'implemented', impact: 8, friction: 5, note: 'Automatic organ volumetry from segmentation outputs for structured reporting and analytics.' },
+            { id: 11, title: 'Intracranial Hemorrhage Detection', track: 'clinical', horizon: 'acceleration', status: 'implemented', impact: 9, friction: 5, note: 'Operational ICH detection integrated into the preprocessing/triage flow.' },
+            { id: 12, title: 'Structured Report Copilot', track: 'clinical', horizon: 'acceleration', status: 'in-progress', impact: 7, friction: 6, note: 'Template-bound drafting from findings and quantitative metrics.' },
+            { id: 13, title: 'Urgency Flagging and Reordering', track: 'clinical', horizon: 'acceleration', status: 'planned', impact: 9, friction: 8, note: 'Reprioritize suspected critical findings with auditable thresholds.' },
+            { id: 14, title: 'Opportunistic Liver Quant', track: 'clinical', horizon: 'acceleration', status: 'planned', impact: 7, friction: 6, note: 'Steatosis risk extraction from routine CT studies.' },
+            { id: 15, title: 'Opportunistic Bone Quant', track: 'clinical', horizon: 'acceleration', status: 'planned', impact: 6, friction: 6, note: 'Vertebral volumetric HU proxy for osteoporosis triage.' },
+            { id: 16, title: 'CAC-DRS Calcium Classification', track: 'clinical', horizon: 'acceleration', status: 'planned', impact: 7, friction: 6, note: 'Structured coronary calcium classification workflow using CAC-DRS in eligible CT studies.' },
+            { id: 17, title: 'Hippocampal Volumetry Project', track: 'clinical', horizon: 'scaling', status: 'in-progress', impact: 8, friction: 7, note: 'Longitudinal hippocampal volumetry project for neurodegeneration-oriented workflows.' },
+            { id: 18, title: 'Emphysema Longitudinal Quant', track: 'clinical', horizon: 'scaling', status: 'planned', impact: 5, friction: 7, note: 'LAA%-based burden tracking and trend summaries.' },
+            { id: 19, title: 'Agentic Workflow Coordinator', track: 'clinical', horizon: 'innovation', status: 'planned', impact: 8, friction: 9, note: 'Multi-step assistants for triage, reporting, and handoff execution.' },
 
-            { id: 15, title: 'De-identification Gateway', track: 'governance', horizon: 'scaling', status: 'planned', impact: 9, friction: 7, note: 'Pixel + metadata PHI stripping before any external model call.' },
-            { id: 16, title: 'Federated Learning Sandbox', track: 'governance', horizon: 'innovation', status: 'planned', impact: 6, friction: 8, note: 'Cross-site training design without centralizing raw images.' },
+            { id: 20, title: 'De-identification Gateway', track: 'governance', horizon: 'scaling', status: 'planned', impact: 9, friction: 7, note: 'Pixel + metadata PHI stripping before any external model call.' },
+            { id: 21, title: 'Federated Learning Sandbox', track: 'governance', horizon: 'innovation', status: 'planned', impact: 6, friction: 8, note: 'Cross-site training design without centralizing raw images.' },
 
-            { id: 17, title: 'Patient Follow-up Navigator', track: 'continuity', horizon: 'scaling', status: 'planned', impact: 8, friction: 5, note: 'Extract recommendations and orchestrate reminders/escalations.' },
-            { id: 18, title: 'Urology Navigation Module', track: 'continuity', horizon: 'scaling', status: 'planned', impact: 8, friction: 6, note: 'Active service-led tracking for urology navigable findings, with secondary routing to oncology when neoplasm is suspected.' }
+            { id: 22, title: 'Patient Follow-up Navigator', track: 'continuity', horizon: 'scaling', status: 'planned', impact: 8, friction: 5, note: 'Extract recommendations and orchestrate reminders/escalations.' },
+            { id: 23, title: 'Urology Navigation Module', track: 'continuity', horizon: 'scaling', status: 'planned', impact: 8, friction: 6, note: 'Active service-led tracking for urology navigable findings, with secondary routing to oncology when neoplasm is suspected.' }
         ];
 
         const trackName = {
