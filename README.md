@@ -127,10 +127,103 @@ python dicom_listener.py
 - For deployment, run `server.py`, `run.py`, and `dicom_listener.py` as independent services (systemd examples were previously used and can be reintroduced as infrastructure docs if needed).
 - This repository contains active experimentation and production-facing utilities; validate feature toggles before rolling out in clinical environments.
 
+## Licensing and Third-Party Compliance
+
+- Heimdallr is distributed under Apache License 2.0.
+- This project uses **TotalSegmentator**. Commercial usage may require a separate TotalSegmentator license.
+- Each institution and deployer is responsible for validating third-party licensing and regulatory compliance before production use.
+- For attributions and notices, see [`NOTICE`](NOTICE).
+
+## Production Baseline
+
+Minimum production topology:
+
+1. `server.py` (API + dashboard)
+2. `run.py` (processing worker)
+3. `dicom_listener.py` (DICOM intake)
+
+Recommended baseline checks:
+
+1. `http://localhost:8001/docs` responds.
+2. Listener port `11112` is reachable from PACS.
+3. Queue flow `upload -> input/ -> output/` completes for a known study.
+4. GPU capacity is validated for segmentation workloads.
+
+For deployment units, observability, and incident handling runbooks, see [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
+
+## PACS Integration Quick Check
+
+Expected defaults:
+
+- AE Title: `HEIMDALLR`
+- Port: `11112`
+- Protocol: DICOM C-STORE
+
+Connectivity smoke test with DCMTK:
+
+```bash
+dcmsend localhost 11112 -aec HEIMDALLR test.dcm
+```
+
+If tests fail, verify listener process state, firewall rules, and PACS destination configuration.
+
+## API Quick Contracts
+
+Anthropic chest X-ray flow:
+
+```bash
+curl -X POST http://localhost:8001/api/anthropic/ap-thorax-xray \
+  -F "file=@/path/to/image.dcm" \
+  -F "age=45 year old" \
+  -F "identificador=case_123"
+```
+
+MedGemma chest X-ray flow:
+
+```bash
+curl -X POST http://localhost:8001/api/medgemma/ap-thorax-xray \
+  -F "file=@/path/to/image.png" \
+  -F "age=45 year old"
+```
+
+For endpoint coverage and payload conventions, see [`docs/API.md`](docs/API.md).
+
+## Documentation Map
+
+- Strategic roadmap and future architecture: [`UPCOMING.md`](UPCOMING.md)
+- Operations and deployment runbook: [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
+- API contracts and examples: [`docs/API.md`](docs/API.md)
+- Strategic visual board: [`static/pipeline-strategy.html`](static/pipeline-strategy.html)
+- Public docs landing page (GitHub Pages): [https://rod-americo.github.io/Heimdallr/](https://rod-americo.github.io/Heimdallr/)
+- Public strategy board (GitHub Pages): [https://rod-americo.github.io/Heimdallr/pipeline-strategy.html](https://rod-americo.github.io/Heimdallr/pipeline-strategy.html)
+
+## GitHub Pages Publishing
+
+To publish the HTML strategy board as a rendered page:
+
+1. Open repository settings on GitHub.
+2. Go to `Pages`.
+3. Set source to `Deploy from a branch`.
+4. Select branch `main` and folder `/docs`.
+5. Save and wait for the deployment to complete.
+
 ## Strategy and Roadmap
 
 - Strategic backlog and upcoming modules: [`UPCOMING.md`](UPCOMING.md)
 - Dark-mode strategic planning page (based on your concept): [`static/pipeline-strategy.html`](static/pipeline-strategy.html)
+
+### Upcoming Prioritization (Ordered)
+
+1. HL7-triggered smart prefetch orchestration
+2. Unified worklist orchestration and fair assignment
+3. De-identification gateway (metadata + pixel PHI controls)
+4. AI urgency flagging with auditable reprioritization
+5. Structured LLM report drafting with style-safe templates
+6. Opportunistic liver and bone quantification at scale
+7. Follow-up recommendation extraction and navigation workflows
+8. SLA-aware orchestration and escalation policy engine
+9. Enterprise audit hardening for external model gateways
+10. Agentic workflow coordinator for multi-step radiology operations
 
 ## Safety, Compliance, and Clinical Use
 
@@ -147,3 +240,7 @@ For planned governance controls (de-identification, auditability hardening, mode
 ## License
 
 Apache License 2.0. See [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
+
+### Third-Party Dependencies
+
+This software uses **TotalSegmentator**, which may require a separate commercial license depending on usage context. Users are responsible for independent license compliance.
