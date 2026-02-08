@@ -307,6 +307,20 @@
             margin: 0;
         }
 
+        .guide-row {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .guide-label {
+            color: var(--muted);
+            font-size: 0.84rem;
+            font-weight: 600;
+        }
+
         @media (max-width: 1100px) {
             .grid {
                 grid-template-columns: 1fr;
@@ -408,7 +422,12 @@
             <p class="small" style="margin-top: 6px;"><span class="pill acceleration">acceleration</span> modules that increase clinical/operational performance on top of a stable base.</p>
             <p class="small" style="margin-top: 6px;"><span class="pill scaling">scaling</span> expansion of proven workflows to larger volume, services, and operational coverage.</p>
             <p class="small" style="margin-top: 6px;"><span class="pill innovation">innovation</span> long-horizon capabilities with higher uncertainty and strategic upside.</p>
-            <p class="small" style="margin-top: 6px;">Reading guide: 1-3 low friction, 4-6 medium, 7-10 high.</p>
+            <div class="guide-row">
+                <span class="guide-label">Friction bands:</span>
+                <span class="pill foundation">1-3 low</span>
+                <span class="pill acceleration">4-6 medium</span>
+                <span class="pill innovation">7-10 high</span>
+            </div>
         </section>
 
         <section class="panel" style="margin-top: 14px;">
