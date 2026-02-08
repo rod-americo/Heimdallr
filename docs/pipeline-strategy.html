@@ -326,6 +326,39 @@
             margin-bottom: 10px;
         }
 
+        .top-meta {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+            text-transform: uppercase;
+        }
+
+        .top-meta .dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            display: inline-block;
+        }
+
+        .top-meta.horizon.foundation { color: var(--pill-foundation-text); }
+        .top-meta.horizon.foundation .dot { background: var(--pill-foundation-text); }
+        .top-meta.horizon.acceleration { color: var(--pill-acceleration-text); }
+        .top-meta.horizon.acceleration .dot { background: var(--pill-acceleration-text); }
+        .top-meta.horizon.scaling { color: var(--pill-scaling-text); }
+        .top-meta.horizon.scaling .dot { background: var(--pill-scaling-text); }
+        .top-meta.horizon.innovation { color: var(--pill-innovation-text); }
+        .top-meta.horizon.innovation .dot { background: var(--pill-innovation-text); }
+
+        .top-meta.status.status-implemented { color: var(--status-implemented-text); }
+        .top-meta.status.status-implemented .dot { background: var(--status-implemented-text); }
+        .top-meta.status.status-in-progress { color: var(--status-progress-text); }
+        .top-meta.status.status-in-progress .dot { background: var(--status-progress-text); }
+        .top-meta.status.status-planned { color: var(--status-planned-text); }
+        .top-meta.status.status-planned .dot { background: var(--status-planned-text); }
+
         .meta {
             display: flex;
             gap: 8px;
@@ -672,8 +705,8 @@
                 el.className = 'card';
                 el.innerHTML = `
                     <div class="card-top">
-                        <span class="pill ${m.horizon}">${m.horizon}</span>
-                        <span class="pill status-${m.status}">${statusLabel(m.status)}</span>
+                        <span class="top-meta horizon ${m.horizon}"><span class="dot"></span>${m.horizon}</span>
+                        <span class="top-meta status status-${m.status}"><span class="dot"></span>${statusLabel(m.status)}</span>
                     </div>
                     <h3>${m.title}</h3>
                     <div class="track">${trackName[m.track]}</div>
