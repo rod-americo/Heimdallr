@@ -270,6 +270,7 @@
             padding: 10px;
             vertical-align: top;
             text-align: left;
+            overflow-wrap: anywhere;
         }
 
         .table th { color: var(--table-head-text); background: var(--table-head-bg); }
@@ -316,7 +317,40 @@
             .wrap { padding: 16px 12px 40px; }
             .hero, .panel { padding: 14px; }
             .kpis { grid-template-columns: 1fr; }
-            .table { min-width: 760px; }
+            .table-wrap { overflow-x: visible; }
+            .table {
+                min-width: 0;
+                border-collapse: separate;
+                border-spacing: 0 10px;
+            }
+            .table thead {
+                display: none;
+            }
+            .table,
+            .table tbody,
+            .table tr,
+            .table td {
+                display: block;
+                width: 100%;
+            }
+            .table tr {
+                border: 1px solid var(--line);
+                border-radius: 10px;
+                background: var(--bg-card);
+                padding: 4px 0;
+            }
+            .table td {
+                border: 0;
+                padding: 8px 10px;
+            }
+            .table td::before {
+                content: attr(data-label);
+                display: block;
+                color: var(--text);
+                font-weight: 700;
+                margin-bottom: 3px;
+                font-size: 0.82rem;
+            }
         }
     </style>
 </head>
@@ -387,7 +421,7 @@
                 <div class="metric-row">
                     <div class="metric-box">
                         <strong>Delivery Logic</strong>
-                        <p>Prioritize low-friction infrastructure and security foundations before high-friction autonomy.</p>
+                        <p>Build production-grade infrastructure and de-identification first, then scale toward higher-autonomy clinical AI as governance and reliability mature.</p>
                     </div>
                     <div class="metric-box">
                         <strong>Clinical Logic</strong>
@@ -412,64 +446,64 @@
                         </thead>
                         <tbody>
                             <tr>
-                                <td>Logistics Automation</td>
-                                <td>HL7/DICOM triggers, prefetch engines, cloud-native DICOMweb routing.[7][11]</td>
-                                <td>Priors ready at open, lower latency, less manual retrieval.</td>
-                                <td><span class="pill good">Near-term</span></td>
+                                <td data-label="Layer">Logistics Automation</td>
+                                <td data-label="Technical Focus">HL7/DICOM triggers, prefetch engines, cloud-native DICOMweb routing.[7][11]</td>
+                                <td data-label="Primary Outcome">Priors ready at open, lower latency, less manual retrieval.</td>
+                                <td data-label="Maturity"><span class="pill good">Near-term</span></td>
                             </tr>
                             <tr>
-                                <td>Workflow Orchestration</td>
-                                <td>Fair assignment, SLA-aware queues, dynamic reprioritization.[13][14]</td>
-                                <td>Higher throughput and equitable workload.</td>
-                                <td><span class="pill good">Near-term</span></td>
+                                <td data-label="Layer">Workflow Orchestration</td>
+                                <td data-label="Technical Focus">Fair assignment, SLA-aware queues, dynamic reprioritization.[13][14]</td>
+                                <td data-label="Primary Outcome">Higher throughput and equitable workload.</td>
+                                <td data-label="Maturity"><span class="pill good">Near-term</span></td>
                             </tr>
                             <tr>
-                                <td>AI Critical Triage</td>
-                                <td>Critical finding flagging and urgency-first worklist reordering.[16]</td>
-                                <td>Reduced time-to-open for high-acuity cases.</td>
-                                <td><span class="pill mid">Clinical acceleration</span></td>
+                                <td data-label="Layer">AI Critical Triage</td>
+                                <td data-label="Technical Focus">Critical finding flagging and urgency-first worklist reordering.[16]</td>
+                                <td data-label="Primary Outcome">Reduced time-to-open for high-acuity cases.</td>
+                                <td data-label="Maturity"><span class="pill mid">Clinical acceleration</span></td>
                             </tr>
                             <tr>
-                                <td>Opportunistic Quantification</td>
-                                <td>Liver, bone, and emphysema biomarkers from routine CT.[20][25][26]</td>
-                                <td>Population-health value without extra scan burden.</td>
-                                <td><span class="pill mid">Clinical acceleration</span></td>
+                                <td data-label="Layer">Opportunistic Quantification</td>
+                                <td data-label="Technical Focus">Liver, bone, and emphysema biomarkers from routine CT.[20][25][26]</td>
+                                <td data-label="Primary Outcome">Population-health value without extra scan burden.</td>
+                                <td data-label="Maturity"><span class="pill mid">Clinical acceleration</span></td>
                             </tr>
                             <tr>
-                                <td>CAC-DRS Classification</td>
-                                <td>Structured coronary calcium classification for eligible CT studies.</td>
-                                <td>Cardiovascular risk stratification integrated into pre-report flow.</td>
-                                <td><span class="pill mid">Clinical acceleration</span></td>
+                                <td data-label="Layer">CAC-DRS Classification</td>
+                                <td data-label="Technical Focus">Structured coronary calcium classification for eligible CT studies.</td>
+                                <td data-label="Primary Outcome">Cardiovascular risk stratification integrated into pre-report flow.</td>
+                                <td data-label="Maturity"><span class="pill mid">Clinical acceleration</span></td>
                             </tr>
                             <tr>
-                                <td>LLM/VLM Reporting Copilot</td>
-                                <td>Structured drafting, style adaptation, drift controls.[29][30]</td>
-                                <td>Faster reports with controlled quality boundaries.</td>
-                                <td><span class="pill mid">Clinical acceleration</span></td>
+                                <td data-label="Layer">LLM/VLM Reporting Copilot</td>
+                                <td data-label="Technical Focus">Structured drafting, style adaptation, drift controls.[29][30]</td>
+                                <td data-label="Primary Outcome">Faster reports with controlled quality boundaries.</td>
+                                <td data-label="Maturity"><span class="pill mid">Clinical acceleration</span></td>
                             </tr>
                             <tr>
-                                <td>De-Identification Gateway</td>
-                                <td>Metadata redaction + burned-in text removal + pseudonymization.[35][37]</td>
-                                <td>Safe external API usage and compliance readiness.</td>
-                                <td><span class="pill good">Near-term</span></td>
+                                <td data-label="Layer">De-Identification Gateway</td>
+                                <td data-label="Technical Focus">Metadata redaction + burned-in text removal + pseudonymization.[35][37]</td>
+                                <td data-label="Primary Outcome">Safe external API usage and compliance readiness.</td>
+                                <td data-label="Maturity"><span class="pill good">Near-term</span></td>
                             </tr>
                             <tr>
-                                <td>Patient Navigation</td>
-                                <td>NLP extraction of recommendations and follow-up tracking.[41][44]</td>
-                                <td>Closing the loop and reducing lost follow-up risk.</td>
-                                <td><span class="pill mid">Scale-up</span></td>
+                                <td data-label="Layer">Patient Navigation</td>
+                                <td data-label="Technical Focus">NLP extraction of recommendations and follow-up tracking.[41][44]</td>
+                                <td data-label="Primary Outcome">Closing the loop and reducing lost follow-up risk.</td>
+                                <td data-label="Maturity"><span class="pill mid">Scale-up</span></td>
                             </tr>
                             <tr>
-                                <td>Urology Navigation</td>
-                                <td>Active monitoring of urology navigable findings (stones, Bosniak III/IV, solid renal/adrenal/ureter/bladder/prostate/testicular findings).</td>
-                                <td>Timely specialty follow-up; suspected neoplasms are also routed to Oncology Navigation.</td>
-                                <td><span class="pill mid">Scale-up</span></td>
+                                <td data-label="Layer">Urology Navigation</td>
+                                <td data-label="Technical Focus">Active monitoring of urology navigable findings (stones, Bosniak III/IV, solid renal/adrenal/ureter/bladder/prostate/testicular findings).</td>
+                                <td data-label="Primary Outcome">Timely specialty follow-up; suspected neoplasms are also routed to Oncology Navigation.</td>
+                                <td data-label="Maturity"><span class="pill mid">Scale-up</span></td>
                             </tr>
                             <tr>
-                                <td>Agentic Frontier</td>
-                                <td>Multi-agent workflow coordination, digital twins, federated learning.[47][48][49]</td>
-                                <td>Strategic differentiation and next-gen AI operations.</td>
-                                <td><span class="pill hard">Long-term</span></td>
+                                <td data-label="Layer">Agentic Frontier</td>
+                                <td data-label="Technical Focus">Multi-agent workflow coordination, digital twins, federated learning.[47][48][49]</td>
+                                <td data-label="Primary Outcome">Strategic differentiation and next-gen AI operations.</td>
+                                <td data-label="Maturity"><span class="pill hard">Long-term</span></td>
                             </tr>
                         </tbody>
                     </table>
