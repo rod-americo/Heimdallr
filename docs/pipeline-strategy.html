@@ -39,6 +39,30 @@
             --chart-axis: #b8c9e2;
             --chart-grid: rgba(126, 157, 210, 0.18);
             --chart-border: rgba(255, 255, 255, 0.45);
+            --radial-1: rgba(57, 208, 255, 0.15);
+            --radial-2: rgba(138, 164, 255, 0.10);
+            --hero-grad-a: rgba(18, 31, 54, 0.90);
+            --hero-grad-b: rgba(10, 18, 32, 0.95);
+            --link-text: #d6e8ff;
+            --link-bg: #12203a;
+            --ring: rgba(57, 208, 255, 0.2);
+            --button-bg: #13223b;
+            --hover-border: rgba(57, 208, 255, 0.45);
+            --pill-foundation-bg: rgba(41, 201, 138, 0.15);
+            --pill-foundation-text: #8ef0c2;
+            --pill-acceleration-bg: rgba(243, 169, 82, 0.15);
+            --pill-acceleration-text: #ffd39f;
+            --pill-scaling-bg: rgba(138, 164, 255, 0.2);
+            --pill-scaling-text: #c7d4ff;
+            --pill-innovation-bg: rgba(245, 108, 124, 0.18);
+            --pill-innovation-text: #ffc0c7;
+            --bubble-good: rgba(41, 201, 138, 0.7);
+            --bubble-mid: rgba(243, 169, 82, 0.7);
+            --bubble-hard: rgba(245, 108, 124, 0.75);
+            --focus-1: #39d0ff;
+            --focus-2: #8aa4ff;
+            --focus-3: #f3a952;
+            --focus-4: #29c98a;
             --radius: 14px;
             color-scheme: dark light;
         }
@@ -61,6 +85,30 @@
                 --chart-axis: #28446e;
                 --chart-grid: rgba(38, 68, 125, 0.12);
                 --chart-border: rgba(38, 68, 125, 0.35);
+                --radial-1: rgba(15, 135, 201, 0.10);
+                --radial-2: rgba(86, 115, 216, 0.08);
+                --hero-grad-a: rgba(240, 247, 255, 0.95);
+                --hero-grad-b: rgba(233, 242, 255, 0.98);
+                --link-text: #12345f;
+                --link-bg: #eaf2ff;
+                --ring: rgba(15, 135, 201, 0.2);
+                --button-bg: #eaf2ff;
+                --hover-border: rgba(15, 135, 201, 0.35);
+                --pill-foundation-bg: rgba(30, 159, 110, 0.12);
+                --pill-foundation-text: #1f7f5a;
+                --pill-acceleration-bg: rgba(198, 127, 29, 0.14);
+                --pill-acceleration-text: #885400;
+                --pill-scaling-bg: rgba(86, 115, 216, 0.14);
+                --pill-scaling-text: #344ba7;
+                --pill-innovation-bg: rgba(200, 74, 89, 0.14);
+                --pill-innovation-text: #8f2f3a;
+                --bubble-good: rgba(30, 159, 110, 0.75);
+                --bubble-mid: rgba(198, 127, 29, 0.75);
+                --bubble-hard: rgba(200, 74, 89, 0.78);
+                --focus-1: #0f87c9;
+                --focus-2: #5673d8;
+                --focus-3: #c67f1d;
+                --focus-4: #1e9f6e;
             }
         }
 
@@ -73,8 +121,8 @@
             font-family: "Inter", "Segoe UI", sans-serif;
             color: var(--text);
             background:
-                radial-gradient(circle at 15% 20%, rgba(57, 208, 255, 0.15), transparent 30%),
-                radial-gradient(circle at 85% 80%, rgba(138, 164, 255, 0.10), transparent 30%),
+                radial-gradient(circle at 15% 20%, var(--radial-1), transparent 30%),
+                radial-gradient(circle at 85% 80%, var(--radial-2), transparent 30%),
                 var(--bg);
             min-height: 100vh;
             overflow-x: hidden;
@@ -91,7 +139,7 @@
             border: 1px solid var(--line);
             border-radius: var(--radius);
             padding: 22px;
-            background: linear-gradient(140deg, rgba(18, 31, 54, 0.9), rgba(10, 18, 32, 0.95));
+            background: linear-gradient(140deg, var(--hero-grad-a), var(--hero-grad-b));
             margin-bottom: 22px;
         }
 
@@ -103,18 +151,18 @@
         }
 
         .nav-links a {
-            color: #d6e8ff;
+            color: var(--link-text);
             text-decoration: none;
             border: 1px solid var(--line);
             border-radius: 999px;
             padding: 6px 12px;
             font-size: 0.82rem;
-            background: #12203a;
+            background: var(--link-bg);
         }
 
         .nav-links a:hover {
             border-color: var(--accent);
-            box-shadow: 0 0 0 2px rgba(57, 208, 255, 0.2);
+            box-shadow: 0 0 0 2px var(--ring);
         }
 
         h1 {
@@ -191,7 +239,7 @@
         }
 
         button {
-            background: #13223b;
+            background: var(--button-bg);
             color: var(--text);
             border: 1px solid var(--line);
             border-radius: 999px;
@@ -202,7 +250,7 @@
 
         button.active {
             border-color: var(--accent);
-            box-shadow: 0 0 0 2px rgba(57, 208, 255, 0.2);
+            box-shadow: 0 0 0 2px var(--ring);
         }
 
         .cards {
@@ -222,7 +270,7 @@
 
         .card:hover {
             background: var(--bg-hover);
-            border-color: rgba(57, 208, 255, 0.45);
+            border-color: var(--hover-border);
         }
 
         .card h3 {
@@ -248,10 +296,10 @@
             margin-bottom: 8px;
         }
 
-        .pill.foundation { background: rgba(41, 201, 138, 0.15); color: #8ef0c2; }
-        .pill.acceleration { background: rgba(243, 169, 82, 0.15); color: #ffd39f; }
-        .pill.scaling { background: rgba(138, 164, 255, 0.2); color: #c7d4ff; }
-        .pill.innovation { background: rgba(245, 108, 124, 0.18); color: #ffc0c7; }
+        .pill.foundation { background: var(--pill-foundation-bg); color: var(--pill-foundation-text); }
+        .pill.acceleration { background: var(--pill-acceleration-bg); color: var(--pill-acceleration-text); }
+        .pill.scaling { background: var(--pill-scaling-bg); color: var(--pill-scaling-text); }
+        .pill.innovation { background: var(--pill-innovation-bg); color: var(--pill-innovation-text); }
 
         .small {
             color: var(--muted);
@@ -385,6 +433,13 @@
         const chartAxis = css.getPropertyValue('--chart-axis').trim();
         const chartGrid = css.getPropertyValue('--chart-grid').trim();
         const chartBorder = css.getPropertyValue('--chart-border').trim();
+        const bubbleGood = css.getPropertyValue('--bubble-good').trim();
+        const bubbleMid = css.getPropertyValue('--bubble-mid').trim();
+        const bubbleHard = css.getPropertyValue('--bubble-hard').trim();
+        const focus1 = css.getPropertyValue('--focus-1').trim();
+        const focus2 = css.getPropertyValue('--focus-2').trim();
+        const focus3 = css.getPropertyValue('--focus-3').trim();
+        const focus4 = css.getPropertyValue('--focus-4').trim();
 
         function frictionColor(v) {
             if (v <= 4) return 'var(--good)';
@@ -426,9 +481,9 @@
                 datasets: [{
                     data: modules.map((m) => ({ x: m.friction, y: m.impact, r: 10, title: m.title })),
                     backgroundColor: modules.map((m) => {
-                        if (m.friction <= 4) return 'rgba(41, 201, 138, 0.7)';
-                        if (m.friction <= 7) return 'rgba(243, 169, 82, 0.7)';
-                        return 'rgba(245, 108, 124, 0.75)';
+                        if (m.friction <= 4) return bubbleGood;
+                        if (m.friction <= 7) return bubbleMid;
+                        return bubbleHard;
                     }),
                     borderColor: chartBorder,
                     borderWidth: 1
@@ -480,7 +535,7 @@
                 labels: Object.keys(focusBreakdown).map((k) => trackName[k]),
                 datasets: [{
                     data: Object.values(focusBreakdown),
-                    backgroundColor: ['#39d0ff', '#8aa4ff', '#f3a952', '#29c98a'],
+                    backgroundColor: [focus1, focus2, focus3, focus4],
                     borderWidth: 0
                 }]
             },
