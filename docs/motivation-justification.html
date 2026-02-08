@@ -307,6 +307,8 @@
             column-count: 2;
             column-gap: 18px;
             margin-top: 8px;
+            font-size: 0.9rem;
+            line-height: 1.5;
         }
 
         .refs li {
@@ -315,6 +317,14 @@
         }
 
         a { color: var(--link-accent); }
+        .cite {
+            text-decoration: none;
+            font-weight: 600;
+            margin: 0 1px;
+        }
+        .cite:hover {
+            text-decoration: underline;
+        }
 
         .cta {
             border: 1px solid var(--line);
@@ -503,6 +513,12 @@
                                 <td data-label="Maturity"><span class="pill good">Near-term</span></td>
                             </tr>
                             <tr>
+                                <td data-label="Layer">Observability + Model Governance</td>
+                                <td data-label="Technical Focus">Drift monitoring, quality telemetry, audit trail, rollback gates, and prospective trial-mode evaluation.[25][29]</td>
+                                <td data-label="Primary Outcome">Safer scale-up with measurable reliability and publication-grade evidence.</td>
+                                <td data-label="Maturity"><span class="pill good">Near-term</span></td>
+                            </tr>
+                            <tr>
                                 <td data-label="Layer">Patient Navigation</td>
                                 <td data-label="Technical Focus">NLP extraction of recommendations and follow-up tracking.[41][44]</td>
                                 <td data-label="Primary Outcome">Closing the loop and reducing lost follow-up risk.</td>
@@ -512,6 +528,24 @@
                                 <td data-label="Layer">Urology Navigation</td>
                                 <td data-label="Technical Focus">Active monitoring of urology navigable findings (stones, Bosniak III/IV, solid renal/adrenal/ureter/bladder/prostate/testicular findings).</td>
                                 <td data-label="Primary Outcome">Timely specialty follow-up; suspected neoplasms are also routed to Oncology Navigation.</td>
+                                <td data-label="Maturity"><span class="pill mid">Scale-up</span></td>
+                            </tr>
+                            <tr>
+                                <td data-label="Layer">General Surgery Navigation</td>
+                                <td data-label="Technical Focus">Navigation rules for cholelithiasis and abdominal wall hernias with ownership and closure tracking.</td>
+                                <td data-label="Primary Outcome">Service-level follow-up orchestration for high-volume incidental findings.</td>
+                                <td data-label="Maturity"><span class="pill mid">Scale-up</span></td>
+                            </tr>
+                            <tr>
+                                <td data-label="Layer">Oncology High-Suspicion Navigation</td>
+                                <td data-label="Technical Focus">Flags suspicious/potentially neoplastic findings in ER/inpatient populations and routes to oncology workflows.</td>
+                                <td data-label="Primary Outcome">Early escalation for high-risk findings and stronger continuity of care.</td>
+                                <td data-label="Maturity"><span class="pill mid">Scale-up</span></td>
+                            </tr>
+                            <tr>
+                                <td data-label="Layer">Gynecology Navigation</td>
+                                <td data-label="Technical Focus">Structured routing for suspicious ovarian/adnexal, uterine, cervical, and endometriosis-related findings.</td>
+                                <td data-label="Primary Outcome">Consistent specialty follow-up pathways for women’s imaging findings.</td>
                                 <td data-label="Maturity"><span class="pill mid">Scale-up</span></td>
                             </tr>
                             <tr>
@@ -557,17 +591,6 @@
                     <li><a href="./pipeline-strategy.html">Related visual roadmap: pipeline-strategy.html</a></li>
                     <li><a href="https://github.com/rod-americo/Heimdallr/blob/main/README.md">Project entry point: README.md</a></li>
                 </ul>
-            </article>
-
-            <article class="panel">
-                <h2>Where to Go Next</h2>
-                <div class="nav-links">
-                    <a href="./index.html">Docs Hub</a>
-                    <a href="./pipeline-strategy.html">Strategy Board</a>
-                    <a href="./motivation-justification.html">Motivation Guide</a>
-                    <a href="./radiology-preprocessing-ecosystem-report.html">Full Report</a>
-                    <a href="https://github.com/rod-americo/Heimdallr/blob/main/README.md">README.md</a>
-                </div>
             </article>
 
             <article class="panel">
@@ -626,8 +649,35 @@
                     <li><a href="https://www.mdpi.com/2075-4418/15/6/689">AI-Driven Low-Dose Imaging Advances</a></li>
                 </ol>
             </article>
+
+            <article class="panel">
+                <h2>Where to Go Next</h2>
+                <div class="nav-links">
+                    <a href="./index.html">Docs Hub</a>
+                    <a href="./pipeline-strategy.html">Strategy Board</a>
+                    <a href="./motivation-justification.html">Motivation Guide</a>
+                    <a href="./radiology-preprocessing-ecosystem-report.html">Full Report</a>
+                    <a href="https://github.com/rod-americo/Heimdallr/blob/main/README.md">README.md</a>
+                </div>
+            </article>
         </section>
     </main>
+    <script>
+        (function () {
+            const refItems = document.querySelectorAll('.refs li');
+            refItems.forEach((li, idx) => {
+                li.id = `ref-${idx + 1}`;
+            });
+
+            const citationTargets = document.querySelectorAll('p, td, li');
+            citationTargets.forEach((el) => {
+                if (el.closest('.refs')) return;
+                el.innerHTML = el.innerHTML.replace(/\[(\d+)\]/g, (m, n) =>
+                    `<a class="cite" href="#ref-${n}" aria-label="Reference ${n}">[${n}]</a>`
+                );
+            });
+        })();
+    </script>
 </body>
 
 </html>
