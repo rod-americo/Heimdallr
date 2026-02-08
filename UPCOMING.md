@@ -47,6 +47,12 @@ Ordered by strategic sequence (not only by model sophistication).
 | 13 | On-prem AI gateway enforcement | Security | 9 | 7 | Critical for enterprise deployment maturity |
 | 14 | Drift/hallucination control framework | Reporting | 9 | 8 | Needed before broad automation trust |
 | 15 | Agentic workflow coordination | R&D | 8 | 9 | Long-horizon orchestration capability |
+| 16 | Foundation model fine-tuning layer | R&D | 9 | 9 | Institution-adapted model performance with controlled governance |
+| 17 | Temporal imaging intelligence (delta engine) | R&D | 9 | 8 | Longitudinal change tracking for follow-up-heavy workflows |
+| 18 | Causal triage simulator | R&D | 8 | 8 | Safe policy simulation before live queue changes |
+| 19 | Synthetic + federated validation sandbox | R&D | 8 | 8 | Privacy-preserving multi-site validation and benchmarking |
+| 20 | Autonomous follow-up orchestrator (human-gated) | R&D | 9 | 8 | Strong continuity and financial recovery upside with clinical oversight |
+| 21 | Prospective trial mode | R&D | 8 | 7 | Embedded publication-grade evidence generation |
 
 ## Pillar A: Logistics Automation and Smart Prefetch
 
@@ -199,14 +205,29 @@ Exit criteria:
 ### G1. Agentic workflow coordination
 - Multi-step agents for prep, triage, and handoff orchestration.
 
-### G2. Dynamic digital twins
-- Longitudinal imaging + biomarker trajectory modeling.
+### G2. Foundation model fine-tuning layer
+- Governance-controlled adaptation of VLM/LLM models to institutional data.
+- Versioned evaluation packs, safety gates, and rollback paths.
 
-### G3. Federated learning + synthetic data
-- Multi-site model development without raw data centralization.
+### G3. Temporal imaging intelligence (longitudinal delta engine)
+- Structured deltas across prior/current exams (volume, attenuation, growth/atrophy trajectories).
+- Explicit confidence and stability flags for longitudinal interpretation support.
 
-### G4. Sustainability-aligned hardware adaptation
-- Pipelines adapted for low-helium MRI and photon-counting CT outputs.
+### G4. Causal triage simulator
+- Offline simulation of triage/worklist policies before production rollout.
+- Compare SLA, workload fairness, and critical-case latency under multiple assignment strategies.
+
+### G5. Synthetic + federated validation sandbox
+- Privacy-preserving validation across institutions without raw-image centralization.
+- Fused module: combines federated development and synthetic-data benchmarking in a single validation pipeline.
+
+### G6. Autonomous follow-up orchestrator (human-gated)
+- AI proposes follow-up tasks, deadlines, and routing, but requires human approval for activation.
+- Built-in escalation logic for high-risk overdue recommendations.
+
+### G7. Prospective trial mode
+- Native support for trial cohorts, intervention arms, and endpoint capture.
+- Operational logs designed for publication-grade reproducibility.
 
 ## Suggested Delivery Horizons
 
@@ -226,7 +247,7 @@ Horizon legend:
 - F1, F2, F3, F4, C3, D2, E3
 
 ### Horizon 4 - Strategic Innovation
-- D3, G1, G2, G3, G4
+- D3, G1, G2, G3, G4, G5, G6, G7
 
 ## Top Risk Register
 
