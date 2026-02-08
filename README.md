@@ -195,10 +195,12 @@ For endpoint coverage and payload conventions, see [`docs/API.md`](docs/API.md).
 - API contracts and examples: [`docs/API.md`](docs/API.md)
 - Strategic visual board source: [`docs/pipeline-strategy.html`](docs/pipeline-strategy.html)
 - Motivation and justification guide: [`docs/motivation-justification.html`](docs/motivation-justification.html)
+- Full translated research source (HTML): [`docs/radiology-preprocessing-ecosystem-report.html`](docs/radiology-preprocessing-ecosystem-report.html)
 - Full translated research source: [`docs/radiology-preprocessing-ecosystem-report.md`](docs/radiology-preprocessing-ecosystem-report.md)
 - Public docs landing page (GitHub Pages): [https://rod-americo.github.io/Heimdallr/](https://rod-americo.github.io/Heimdallr/)
 - Public strategy board (GitHub Pages): [https://rod-americo.github.io/Heimdallr/pipeline-strategy.html](https://rod-americo.github.io/Heimdallr/pipeline-strategy.html)
 - Public motivation guide (GitHub Pages): [https://rod-americo.github.io/Heimdallr/motivation-justification.html](https://rod-americo.github.io/Heimdallr/motivation-justification.html)
+- Public translated research report (GitHub Pages): [https://rod-americo.github.io/Heimdallr/radiology-preprocessing-ecosystem-report.html](https://rod-americo.github.io/Heimdallr/radiology-preprocessing-ecosystem-report.html)
 
 ## GitHub Pages Publishing
 
@@ -215,6 +217,7 @@ To publish the HTML strategy board as a rendered page:
 - Strategic backlog and upcoming modules: [`UPCOMING.md`](UPCOMING.md)
 - Dark-mode strategic planning page (based on your concept): [`docs/pipeline-strategy.html`](docs/pipeline-strategy.html)
 - Motivation and strategic justification page: [`docs/motivation-justification.html`](docs/motivation-justification.html)
+- Full translated research page: [`docs/radiology-preprocessing-ecosystem-report.html`](docs/radiology-preprocessing-ecosystem-report.html)
 
 ### Upcoming Prioritization (Ordered)
 
