@@ -69,6 +69,28 @@
             margin-bottom: 22px;
         }
 
+        .nav-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .nav-links a {
+            color: #d6e8ff;
+            text-decoration: none;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 6px 12px;
+            font-size: 0.82rem;
+            background: #12203a;
+        }
+
+        .nav-links a:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(57, 208, 255, 0.2);
+        }
+
         h1 {
             margin: 0 0 8px;
             font-size: clamp(1.5rem, 2vw, 2.2rem);
@@ -258,6 +280,11 @@
         <header class="hero">
             <h1>Heimdallr Radiology Pipeline Strategy</h1>
             <p class="sub">Impact vs implementation friction for upcoming modules across logistics, triage, reporting, de-identification, and patient navigation.</p>
+            <div class="nav-links">
+                <a href="./motivation-justification.html">Open Motivation Guide</a>
+                <a href="./index.html">Open Docs Hub</a>
+                <a href="https://github.com/rod-americo/Heimdallr/blob/main/README.md">Open README</a>
+            </div>
         </header>
 
         <section class="grid">
@@ -292,6 +319,16 @@
                 <button data-filter="continuity">Care Continuity</button>
             </div>
             <div id="cards" class="cards"></div>
+        </section>
+
+        <section class="panel" style="margin-top: 14px;">
+            <h2>Where to Go Next</h2>
+            <p class="small">Use these links to continue from strategy design into project context and implementation motivation.</p>
+            <div class="nav-links" style="margin-top: 10px;">
+                <a href="./motivation-justification.html">Motivation & Justification</a>
+                <a href="./radiology-preprocessing-ecosystem-report.md">Full Translation Source</a>
+                <a href="https://github.com/rod-americo/Heimdallr/blob/main/README.md">README.md</a>
+            </div>
         </section>
     </div>
 
