@@ -63,6 +63,12 @@
             --focus-2: #8aa4ff;
             --focus-3: #f3a952;
             --focus-4: #29c98a;
+            --status-implemented-bg: rgba(41, 201, 138, 0.16);
+            --status-implemented-text: #9bf3cb;
+            --status-progress-bg: rgba(57, 208, 255, 0.16);
+            --status-progress-text: #b5ecff;
+            --status-planned-bg: rgba(138, 164, 255, 0.18);
+            --status-planned-text: #cfdbff;
             --radius: 14px;
             color-scheme: dark light;
         }
@@ -109,6 +115,12 @@
                 --focus-2: #5673d8;
                 --focus-3: #c67f1d;
                 --focus-4: #1e9f6e;
+                --status-implemented-bg: rgba(30, 159, 110, 0.12);
+                --status-implemented-text: #1f7f5a;
+                --status-progress-bg: rgba(15, 135, 201, 0.12);
+                --status-progress-text: #0f5f99;
+                --status-planned-bg: rgba(86, 115, 216, 0.14);
+                --status-planned-text: #344ba7;
             }
         }
 
@@ -238,6 +250,20 @@
             margin-bottom: 14px;
         }
 
+        .filter-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        .filter-label {
+            font-size: 0.82rem;
+            color: var(--muted);
+            font-weight: 600;
+        }
+
         button {
             background: var(--button-bg);
             color: var(--text);
@@ -316,6 +342,9 @@
         .pill.friction-low { background: var(--pill-foundation-bg); color: var(--pill-foundation-text); }
         .pill.friction-medium { background: var(--pill-acceleration-bg); color: var(--pill-acceleration-text); }
         .pill.friction-high { background: rgba(245, 108, 124, 0.24); color: #ffc3cb; }
+        .pill.status-implemented { background: var(--status-implemented-bg); color: var(--status-implemented-text); }
+        .pill.status-in-progress { background: var(--status-progress-bg); color: var(--status-progress-text); }
+        .pill.status-planned { background: var(--status-planned-bg); color: var(--status-planned-text); }
 
         .small {
             color: var(--muted);
@@ -380,6 +409,13 @@
             color: var(--muted);
             font-size: 0.84rem;
             font-weight: 600;
+        }
+
+        .live-list {
+            margin: 0;
+            padding-left: 18px;
+            color: var(--muted);
+            line-height: 1.6;
         }
 
         @media (max-width: 1100px) {
@@ -462,13 +498,26 @@
         </section>
 
         <section class="panel">
+            <h2>What Is Live Today</h2>
+            <ul id="liveToday" class="live-list"></ul>
+        </section>
+
+        <section class="panel" style="margin-top: 14px;">
             <h2>Module Explorer</h2>
-            <div class="filters">
-                <button class="active" data-filter="all">All</button>
-                <button data-filter="ops">Operations</button>
-                <button data-filter="clinical">Clinical AI</button>
-                <button data-filter="governance">Governance</button>
-                <button data-filter="continuity">Care Continuity</button>
+            <div class="filter-group">
+                <span class="filter-label">Track:</span>
+                <button class="active" data-group="track" data-filter="all">All</button>
+                <button data-group="track" data-filter="ops">Operations</button>
+                <button data-group="track" data-filter="clinical">Clinical AI</button>
+                <button data-group="track" data-filter="governance">Governance</button>
+                <button data-group="track" data-filter="continuity">Care Continuity</button>
+            </div>
+            <div class="filter-group">
+                <span class="filter-label">Status:</span>
+                <button class="active" data-group="status" data-filter="all">All</button>
+                <button data-group="status" data-filter="implemented">Implemented</button>
+                <button data-group="status" data-filter="in-progress">In Progress</button>
+                <button data-group="status" data-filter="planned">Planned</button>
             </div>
             <div id="cards" class="cards"></div>
         </section>
@@ -478,6 +527,13 @@
             <p class="small"><strong>Impact (1-10)</strong>: expected clinical and operational value if deployed safely.</p>
             <p class="small" style="margin-top: 6px;"><strong>Friction (1-10)</strong>: real-world effort to productionize safely, combining technical integration, data quality, clinical validation, governance/compliance, and change management.</p>
             <p class="small" style="margin-top: 6px;"><strong>Navigation</strong>: active follow-up monitoring by clinical service staff, with owner, due date, status tracking, and escalation until closure.</p>
+            <p class="small" style="margin-top: 6px;"><strong>Status</strong>: implemented modules are already operational; in-progress modules are partially delivered; planned modules are roadmap targets.</p>
+            <div class="guide-row" style="margin-top: 8px;">
+                <span class="guide-label">Status legend:</span>
+                <span class="pill status-implemented">implemented</span>
+                <span class="pill status-in-progress">in progress</span>
+                <span class="pill status-planned">planned</span>
+            </div>
             <p class="small" style="margin-top: 10px;"><strong>Horizon Legend</strong>:</p>
             <p class="small" style="margin-top: 6px;"><span class="pill foundation">foundation</span> baseline safety, interoperability, and throughput foundation for production readiness.</p>
             <p class="small" style="margin-top: 6px;"><span class="pill acceleration">acceleration</span> modules that increase clinical/operational performance on top of a stable base.</p>
@@ -512,25 +568,27 @@
 
     <script>
         const modules = [
-            { id: 1, title: 'HL7-Triggered Smart Prefetch', track: 'ops', horizon: 'foundation', impact: 8, friction: 4, note: 'Route relevant priors from ADT/ORM events using study similarity scoring.' },
-            { id: 2, title: 'Unified Worklist Orchestrator', track: 'ops', horizon: 'foundation', impact: 7, friction: 5, note: 'Fair case assignment by subspecialty, workload, and SLA risk.' },
-            { id: 3, title: 'SLA Policy Engine', track: 'ops', horizon: 'foundation', impact: 6, friction: 4, note: 'Alert and escalate when breach risk increases for urgent studies.' },
-            { id: 4, title: 'DICOMweb Edge Streaming', track: 'ops', horizon: 'acceleration', impact: 7, friction: 5, note: 'Improve first-image latency with web-native retrieval patterns.' },
+            { id: 1, title: 'DICOM C-STORE Intake Listener', track: 'ops', horizon: 'foundation', status: 'implemented', impact: 8, friction: 3, note: 'Production listener for PACS/modality intake (`HEIMDALLR`, port 11112).' },
+            { id: 2, title: 'Case Prep and Queue Worker', track: 'ops', horizon: 'foundation', status: 'implemented', impact: 8, friction: 4, note: 'Automated DICOM selection, NIfTI conversion, and queued processing flow.' },
+            { id: 3, title: 'Dashboard + API Surface', track: 'ops', horizon: 'foundation', status: 'implemented', impact: 7, friction: 3, note: 'FastAPI endpoints and operational dashboard already serving case workflows.' },
+            { id: 4, title: 'HL7-Triggered Smart Prefetch', track: 'ops', horizon: 'foundation', status: 'planned', impact: 8, friction: 4, note: 'Route relevant priors from ADT/ORM events using study similarity scoring.' },
+            { id: 5, title: 'Unified Worklist Orchestrator', track: 'ops', horizon: 'foundation', status: 'planned', impact: 7, friction: 5, note: 'Fair case assignment by subspecialty, workload, and SLA risk.' },
+            { id: 6, title: 'SLA Policy Engine', track: 'ops', horizon: 'foundation', status: 'planned', impact: 6, friction: 4, note: 'Alert and escalate when breach risk increases for urgent studies.' },
 
-            { id: 5, title: 'Urgency Flagging and Reordering', track: 'clinical', horizon: 'acceleration', impact: 9, friction: 8, note: 'Reprioritize suspected critical findings with auditable thresholds.' },
-            { id: 6, title: 'Structured Report Copilot', track: 'clinical', horizon: 'acceleration', impact: 7, friction: 6, note: 'Template-bound drafting from findings and quantitative metrics.' },
-            { id: 7, title: 'Prompt Macro Assistant', track: 'clinical', horizon: 'foundation', impact: 6, friction: 3, note: 'Low-latency report text refinement integrated with hotkeys.' },
-            { id: 8, title: 'Opportunistic Liver Quant', track: 'clinical', horizon: 'acceleration', impact: 7, friction: 6, note: 'Steatosis risk extraction from routine CT studies.' },
-            { id: 9, title: 'Opportunistic Bone Quant', track: 'clinical', horizon: 'acceleration', impact: 6, friction: 6, note: 'Vertebral volumetric HU proxy for osteoporosis triage.' },
-            { id: 10, title: 'CAC-DRS Calcium Classification', track: 'clinical', horizon: 'acceleration', impact: 7, friction: 6, note: 'Structured coronary calcium classification workflow using CAC-DRS in eligible CT studies.' },
-            { id: 11, title: 'Emphysema Longitudinal Quant', track: 'clinical', horizon: 'scaling', impact: 5, friction: 7, note: 'LAA%-based burden tracking and trend summaries.' },
-            { id: 12, title: 'Agentic Workflow Coordinator', track: 'clinical', horizon: 'innovation', impact: 8, friction: 9, note: 'Multi-step assistants for triage, reporting, and handoff execution.' },
+            { id: 7, title: 'AP Chest X-ray Assist APIs', track: 'clinical', horizon: 'foundation', status: 'implemented', impact: 7, friction: 3, note: 'Anthropic and MedGemma assistant flows integrated through server endpoints.' },
+            { id: 8, title: 'Structured Report Copilot', track: 'clinical', horizon: 'acceleration', status: 'in-progress', impact: 7, friction: 6, note: 'Template-bound drafting from findings and quantitative metrics.' },
+            { id: 9, title: 'Urgency Flagging and Reordering', track: 'clinical', horizon: 'acceleration', status: 'planned', impact: 9, friction: 8, note: 'Reprioritize suspected critical findings with auditable thresholds.' },
+            { id: 10, title: 'Opportunistic Liver Quant', track: 'clinical', horizon: 'acceleration', status: 'planned', impact: 7, friction: 6, note: 'Steatosis risk extraction from routine CT studies.' },
+            { id: 11, title: 'Opportunistic Bone Quant', track: 'clinical', horizon: 'acceleration', status: 'planned', impact: 6, friction: 6, note: 'Vertebral volumetric HU proxy for osteoporosis triage.' },
+            { id: 12, title: 'CAC-DRS Calcium Classification', track: 'clinical', horizon: 'acceleration', status: 'planned', impact: 7, friction: 6, note: 'Structured coronary calcium classification workflow using CAC-DRS in eligible CT studies.' },
+            { id: 13, title: 'Emphysema Longitudinal Quant', track: 'clinical', horizon: 'scaling', status: 'planned', impact: 5, friction: 7, note: 'LAA%-based burden tracking and trend summaries.' },
+            { id: 14, title: 'Agentic Workflow Coordinator', track: 'clinical', horizon: 'innovation', status: 'planned', impact: 8, friction: 9, note: 'Multi-step assistants for triage, reporting, and handoff execution.' },
 
-            { id: 13, title: 'De-identification Gateway', track: 'governance', horizon: 'scaling', impact: 9, friction: 7, note: 'Pixel + metadata PHI stripping before any external model call.' },
-            { id: 14, title: 'Federated Learning Sandbox', track: 'governance', horizon: 'innovation', impact: 6, friction: 8, note: 'Cross-site training design without centralizing raw images.' },
+            { id: 15, title: 'De-identification Gateway', track: 'governance', horizon: 'scaling', status: 'planned', impact: 9, friction: 7, note: 'Pixel + metadata PHI stripping before any external model call.' },
+            { id: 16, title: 'Federated Learning Sandbox', track: 'governance', horizon: 'innovation', status: 'planned', impact: 6, friction: 8, note: 'Cross-site training design without centralizing raw images.' },
 
-            { id: 15, title: 'Patient Follow-up Navigator', track: 'continuity', horizon: 'scaling', impact: 8, friction: 5, note: 'Extract recommendations and orchestrate reminders/escalations.' },
-            { id: 16, title: 'Urology Navigation Module', track: 'continuity', horizon: 'scaling', impact: 8, friction: 6, note: 'Active service-led tracking for urology navigable findings, with secondary routing to oncology when neoplasm is suspected.' }
+            { id: 17, title: 'Patient Follow-up Navigator', track: 'continuity', horizon: 'scaling', status: 'planned', impact: 8, friction: 5, note: 'Extract recommendations and orchestrate reminders/escalations.' },
+            { id: 18, title: 'Urology Navigation Module', track: 'continuity', horizon: 'scaling', status: 'planned', impact: 8, friction: 6, note: 'Active service-led tracking for urology navigable findings, with secondary routing to oncology when neoplasm is suspected.' }
         ];
 
         const trackName = {
@@ -541,7 +599,8 @@
         };
 
         const cards = document.getElementById('cards');
-        const filterButtons = [...document.querySelectorAll('button[data-filter]')];
+        const liveToday = document.getElementById('liveToday');
+        const filterButtons = [...document.querySelectorAll('button[data-group][data-filter]')];
         const isMobile = window.matchMedia('(max-width: 760px)').matches;
         const css = getComputedStyle(document.documentElement);
         const chartText = css.getPropertyValue('--chart-text').trim();
@@ -555,6 +614,8 @@
         const focus2 = css.getPropertyValue('--focus-2').trim();
         const focus3 = css.getPropertyValue('--focus-3').trim();
         const focus4 = css.getPropertyValue('--focus-4').trim();
+        let activeTrackFilter = 'all';
+        let activeStatusFilter = 'all';
 
         function frictionBand(v) {
             if (v <= 3) return 'low';
@@ -568,14 +629,40 @@
             return 'high';
         }
 
-        function renderCards(filter = 'all') {
+        function statusLabel(v) {
+            if (v === 'implemented') return 'implemented';
+            if (v === 'in-progress') return 'in progress';
+            return 'planned';
+        }
+
+        function filterModules() {
+            return modules.filter((m) => {
+                const trackMatch = activeTrackFilter === 'all' || m.track === activeTrackFilter;
+                const statusMatch = activeStatusFilter === 'all' || m.status === activeStatusFilter;
+                return trackMatch && statusMatch;
+            });
+        }
+
+        function renderLiveToday() {
+            liveToday.innerHTML = '';
+            modules
+                .filter((m) => m.status === 'implemented')
+                .forEach((m) => {
+                    const li = document.createElement('li');
+                    li.textContent = `${m.title}: ${m.note}`;
+                    liveToday.appendChild(li);
+                });
+        }
+
+        function renderCards() {
             cards.innerHTML = '';
-            const list = filter === 'all' ? modules : modules.filter((m) => m.track === filter);
+            const list = filterModules();
             list.forEach((m) => {
                 const el = document.createElement('article');
                 el.className = 'card';
                 el.innerHTML = `
                     <span class="pill ${m.horizon}">${m.horizon}</span>
+                    <span class="pill status-${m.status}" style="margin-left: 6px;">${statusLabel(m.status)}</span>
                     <h3>${m.title}</h3>
                     <div class="track">${trackName[m.track]}</div>
                     <div class="card-body">
@@ -592,25 +679,56 @@
 
         filterButtons.forEach((btn) => {
             btn.addEventListener('click', () => {
-                filterButtons.forEach((b) => b.classList.remove('active'));
+                const group = btn.dataset.group;
+                const value = btn.dataset.filter;
+                filterButtons
+                    .filter((b) => b.dataset.group === group)
+                    .forEach((b) => b.classList.remove('active'));
                 btn.classList.add('active');
-                renderCards(btn.dataset.filter);
+                if (group === 'track') activeTrackFilter = value;
+                if (group === 'status') activeStatusFilter = value;
+                renderCards();
             });
         });
 
         const priorityChart = new Chart(document.getElementById('priorityChart'), {
             type: 'bubble',
             data: {
-                datasets: [{
-                    data: modules.map((m) => ({ x: m.friction, y: m.impact, r: 10, title: m.title })),
-                    backgroundColor: modules.map((m) => {
-                        if (m.friction <= 4) return bubbleGood;
-                        if (m.friction <= 7) return bubbleMid;
-                        return bubbleHard;
-                    }),
-                    borderColor: chartBorder,
-                    borderWidth: 1
-                }]
+                datasets: [
+                    {
+                        label: 'Implemented',
+                        data: modules.filter((m) => m.status === 'implemented').map((m) => ({ x: m.friction, y: m.impact, r: 10, title: m.title, status: m.status })),
+                        backgroundColor: modules.filter((m) => m.status === 'implemented').map((m) => {
+                            if (m.friction <= 4) return bubbleGood;
+                            if (m.friction <= 7) return bubbleMid;
+                            return bubbleHard;
+                        }),
+                        borderColor: chartBorder,
+                        borderWidth: 2
+                    },
+                    {
+                        label: 'In Progress',
+                        data: modules.filter((m) => m.status === 'in-progress').map((m) => ({ x: m.friction, y: m.impact, r: 10, title: m.title, status: m.status })),
+                        backgroundColor: modules.filter((m) => m.status === 'in-progress').map((m) => {
+                            if (m.friction <= 4) return bubbleGood;
+                            if (m.friction <= 7) return bubbleMid;
+                            return bubbleHard;
+                        }),
+                        borderColor: chartBorder,
+                        borderWidth: 2
+                    },
+                    {
+                        label: 'Planned',
+                        data: modules.filter((m) => m.status === 'planned').map((m) => ({ x: m.friction, y: m.impact, r: 10, title: m.title, status: m.status })),
+                        backgroundColor: modules.filter((m) => m.status === 'planned').map((m) => {
+                            if (m.friction <= 4) return bubbleGood;
+                            if (m.friction <= 7) return bubbleMid;
+                            return bubbleHard;
+                        }),
+                        borderColor: chartBorder,
+                        borderWidth: 1
+                    }
+                ]
             },
             options: {
                 responsive: true,
@@ -619,10 +737,13 @@
                     padding: isMobile ? 6 : 10
                 },
                 plugins: {
-                    legend: { display: false },
+                    legend: {
+                        position: 'top',
+                        labels: { color: chartText, usePointStyle: true, pointStyle: 'circle' }
+                    },
                     tooltip: {
                         callbacks: {
-                            label: (ctx) => `${ctx.raw.title} | Impact ${ctx.raw.y} | Friction ${ctx.raw.x}`
+                            label: (ctx) => `${ctx.raw.title} | ${ctx.raw.status} | Impact ${ctx.raw.y} | Friction ${ctx.raw.x}`
                         }
                     }
                 },
@@ -686,6 +807,7 @@
             }
         });
 
+        renderLiveToday();
         renderCards();
     </script>
 </body>
