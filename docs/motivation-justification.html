@@ -20,6 +20,24 @@
             --hard: #f56c7c;
             --line: rgba(126, 157, 210, 0.25);
             --radius: 14px;
+            color-scheme: dark light;
+        }
+
+        @media (prefers-color-scheme: light) {
+            :root {
+                --bg: #f3f7ff;
+                --bg-soft: #ffffff;
+                --bg-card: #f7faff;
+                --bg-hover: #eef4ff;
+                --text: #0f1b33;
+                --muted: #4d6283;
+                --accent: #0f87c9;
+                --accent-2: #5673d8;
+                --good: #1e9f6e;
+                --mid: #c67f1d;
+                --hard: #c84a59;
+                --line: rgba(38, 68, 125, 0.18);
+            }
         }
 
         * { box-sizing: border-box; }

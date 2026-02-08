@@ -13,6 +13,18 @@
             --text: #e8f0ff;
             --muted: #a9bad8;
             --accent: #46d3ff;
+            color-scheme: dark light;
+        }
+
+        @media (prefers-color-scheme: light) {
+            :root {
+                --bg: #f3f7ff;
+                --card: #ffffff;
+                --line: rgba(38, 68, 125, 0.18);
+                --text: #0f1b33;
+                --muted: #4d6283;
+                --accent: #0f87c9;
+            }
         }
 
         * { box-sizing: border-box; }
