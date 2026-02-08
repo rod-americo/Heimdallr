@@ -259,6 +259,31 @@
             margin-right: 8px;
         }
 
+        .status-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 10px;
+            color: var(--muted);
+            font-size: 0.86rem;
+            align-items: center;
+        }
+
+        .status-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-ring {
+            width: 12px;
+            height: 12px;
+            border-radius: 999px;
+            border: 2px solid;
+            background: transparent;
+            display: inline-block;
+        }
+
         .filters {
             display: flex;
             flex-wrap: wrap;
@@ -532,6 +557,12 @@
                     <div><span style="background: var(--mid);"></span>Medium complexity / phased delivery</div>
                     <div><span style="background: var(--hard);"></span>High complexity / governance-heavy</div>
                 </div>
+                <div class="status-legend">
+                    <span class="guide-label">Status (ring):</span>
+                    <span class="status-item"><span class="status-ring" style="border-color:#4fd5ff;"></span>Implemented</span>
+                    <span class="status-item"><span class="status-ring" style="border-color:#9db4ff;"></span>In Progress</span>
+                    <span class="status-item"><span class="status-ring" style="border-color:#a5b4c7;"></span>Planned</span>
+                </div>
                 <p class="small" style="margin-top: 8px;">Friction is an implementation-in-production score (integration, validation, compliance, and operational change), not just model difficulty.</p>
             </article>
 
@@ -750,44 +781,25 @@
             });
         });
 
+        const statusBorder = {
+            implemented: '#4fd5ff',
+            'in-progress': '#9db4ff',
+            planned: '#a5b4c7'
+        };
+
         const priorityChart = new Chart(document.getElementById('priorityChart'), {
             type: 'bubble',
             data: {
-                datasets: [
-                    {
-                        label: 'Implemented',
-                        data: modules.filter((m) => m.status === 'implemented').map((m) => ({ x: m.friction, y: m.impact, r: 10, title: m.title, status: m.status })),
-                        backgroundColor: modules.filter((m) => m.status === 'implemented').map((m) => {
-                            if (m.friction <= 4) return bubbleGood;
-                            if (m.friction <= 7) return bubbleMid;
-                            return bubbleHard;
-                        }),
-                        borderColor: chartBorder,
-                        borderWidth: 2
-                    },
-                    {
-                        label: 'In Progress',
-                        data: modules.filter((m) => m.status === 'in-progress').map((m) => ({ x: m.friction, y: m.impact, r: 10, title: m.title, status: m.status })),
-                        backgroundColor: modules.filter((m) => m.status === 'in-progress').map((m) => {
-                            if (m.friction <= 4) return bubbleGood;
-                            if (m.friction <= 7) return bubbleMid;
-                            return bubbleHard;
-                        }),
-                        borderColor: chartBorder,
-                        borderWidth: 2
-                    },
-                    {
-                        label: 'Planned',
-                        data: modules.filter((m) => m.status === 'planned').map((m) => ({ x: m.friction, y: m.impact, r: 10, title: m.title, status: m.status })),
-                        backgroundColor: modules.filter((m) => m.status === 'planned').map((m) => {
-                            if (m.friction <= 4) return bubbleGood;
-                            if (m.friction <= 7) return bubbleMid;
-                            return bubbleHard;
-                        }),
-                        borderColor: chartBorder,
-                        borderWidth: 1
-                    }
-                ]
+                datasets: [{
+                    data: modules.map((m) => ({ x: m.friction, y: m.impact, r: 10, title: m.title, status: m.status })),
+                    backgroundColor: modules.map((m) => {
+                        if (m.friction <= 4) return bubbleGood;
+                        if (m.friction <= 7) return bubbleMid;
+                        return bubbleHard;
+                    }),
+                    borderColor: modules.map((m) => statusBorder[m.status] || chartBorder),
+                    borderWidth: 2
+                }]
             },
             options: {
                 responsive: true,
@@ -796,10 +808,7 @@
                     padding: isMobile ? 6 : 10
                 },
                 plugins: {
-                    legend: {
-                        position: 'top',
-                        labels: { color: chartText, usePointStyle: true, pointStyle: 'circle' }
-                    },
+                    legend: { display: false },
                     tooltip: {
                         callbacks: {
                             label: (ctx) => `${ctx.raw.title} | ${ctx.raw.status} | Impact ${ctx.raw.y} | Friction ${ctx.raw.x}`
