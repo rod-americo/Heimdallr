@@ -270,11 +270,20 @@
             padding: 10px;
             vertical-align: top;
             text-align: left;
-            overflow-wrap: anywhere;
         }
 
         .table th { color: var(--table-head-text); background: var(--table-head-bg); }
         .table td { color: var(--muted); }
+        .table th:nth-child(2),
+        .table td:nth-child(2),
+        .table th:nth-child(3),
+        .table td:nth-child(3) { overflow-wrap: anywhere; }
+        .table th:last-child,
+        .table td:last-child {
+            width: 190px;
+            min-width: 190px;
+            white-space: nowrap;
+        }
 
         .pill {
             display: inline-block;
@@ -302,8 +311,8 @@
         a { color: var(--link-accent); }
 
         .cta {
-            border: 1px solid var(--cta-border);
-            background: linear-gradient(130deg, var(--cta-grad-a), var(--cta-grad-b));
+            border: 1px solid var(--line);
+            background: var(--bg-soft);
         }
 
         @media (max-width: 980px) {
