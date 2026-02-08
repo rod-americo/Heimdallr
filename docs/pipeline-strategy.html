@@ -75,6 +75,8 @@
             --impact-medium-text: #d0dcff;
             --impact-high-bg: rgba(168, 121, 255, 0.24);
             --impact-high-text: #ead9ff;
+            --friction-high-bg: rgba(245, 108, 124, 0.24);
+            --friction-high-text: #ffc3cb;
             --radius: 14px;
             color-scheme: dark light;
         }
@@ -133,6 +135,8 @@
                 --impact-medium-text: #2f469f;
                 --impact-high-bg: rgba(131, 92, 220, 0.18);
                 --impact-high-text: #452796;
+                --friction-high-bg: rgba(200, 74, 89, 0.18);
+                --friction-high-text: #8b2431;
             }
         }
 
@@ -398,10 +402,10 @@
         .pill.impact-high { background: var(--impact-high-bg); color: var(--impact-high-text); }
         .pill.friction-low { background: var(--pill-foundation-bg); color: var(--pill-foundation-text); }
         .pill.friction-medium { background: var(--pill-acceleration-bg); color: var(--pill-acceleration-text); }
-        .pill.friction-high { background: rgba(245, 108, 124, 0.24); color: #ffc3cb; }
-        .pill.status-implemented { background: var(--status-implemented-bg); color: var(--status-implemented-text); border: 1px solid rgba(56, 189, 248, 0.35); }
-        .pill.status-in-progress { background: var(--status-progress-bg); color: var(--status-progress-text); border: 1px solid rgba(57, 208, 255, 0.35); }
-        .pill.status-planned { background: var(--status-planned-bg); color: var(--status-planned-text); border: 1px solid rgba(148, 163, 184, 0.35); }
+        .pill.friction-high { background: var(--friction-high-bg); color: var(--friction-high-text); }
+        .pill.status-implemented { background: var(--status-implemented-bg); color: var(--status-implemented-text); border: 1px solid rgba(56, 189, 248, 0.45); }
+        .pill.status-in-progress { background: var(--status-progress-bg); color: var(--status-progress-text); border: 1px solid rgba(57, 208, 255, 0.45); }
+        .pill.status-planned { background: var(--status-planned-bg); color: var(--status-planned-text); border: 1px solid rgba(100, 116, 139, 0.45); }
 
         .small {
             color: var(--muted);
@@ -433,10 +437,7 @@
             color: var(--pill-acceleration-text);
         }
 
-        .metric-pill.friction.high {
-            background: rgba(245, 108, 124, 0.24);
-            color: #ffc3cb;
-        }
+        .metric-pill.friction.high { background: var(--friction-high-bg); color: var(--friction-high-text); }
 
         .card-body {
             flex: 1;
