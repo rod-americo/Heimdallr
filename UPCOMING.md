@@ -34,7 +34,7 @@ Ordered by strategic sequence (not only by model sophistication).
 |---|---|---|---:|---:|---|
 | 1 | HL7-triggered prefetch orchestration | Logistics | 9 | 4 | Immediate throughput win with low clinical risk |
 | 2 | Unified worklist orchestration | Workflow | 9 | 5 | Reduces queue switching and unfair distribution |
-| 3 | Multimodal de-identification pipeline | Security | 10 | 6 | Mandatory foundation for safe AI integration |
+| 3 | De-identification governance hardening | Security | 10 | 6 | Extend an implemented gateway with stronger policy and audit controls |
 | 4 | Deterministic pseudonymization + crosswalk | Security | 10 | 5 | Enables traceable privacy-preserving workflows |
 | 5 | Follow-up recommendation extraction (NLP) | Navigation | 8 | 5 | High value and operationally feasible |
 | 6 | Urology navigation pathway | Navigation | 9 | 6 | Direct care-continuity impact with clear rule set |
@@ -146,16 +146,16 @@ Exit criteria:
 ## Pillar E: De-identification and API Security
 
 ### E1. Multimodal PHI removal pipeline
-- DICOM metadata redaction + pixel-level burned-text removal.
-- OCR-assisted masking for overlays/annotations.
+- **Implemented baseline**: DICOM metadata redaction + pixel-level burned-text removal before external calls.
+- Expand OCR-assisted masking coverage for edge overlay/annotation patterns.
 
 ### E2. Deterministic pseudonymization + secure crosswalk
 - Salted tokenization for stable pseudonyms.
 - Encrypted, access-controlled crosswalk separation.
 
 ### E3. On-prem AI gateway enforcement
-- External inference requests only after de-identification checks.
-- Tamper-evident logs for outbound payloads.
+- **Implemented baseline**: external inference requests pass through de-identification checks.
+- Pending hardening: tamper-evident logs, policy attestations, and stricter outbound controls.
 
 Exit criteria:
 - No direct PHI in external LLM/VLM payloads.
