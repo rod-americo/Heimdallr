@@ -85,6 +85,7 @@
             gap: 18px;
             margin-bottom: 20px;
             width: 100%;
+            align-items: start;
         }
 
         .panel {
@@ -103,6 +104,11 @@
         .chart-box {
             position: relative;
             height: 360px;
+            width: 100%;
+        }
+
+        .chart-box-sm {
+            height: 280px;
         }
 
         .chart-box canvas {
@@ -209,6 +215,40 @@
             .grid {
                 grid-template-columns: 1fr;
             }
+
+            .chart-box {
+                height: 320px;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .wrap {
+                padding: 16px 12px 40px;
+            }
+
+            .panel {
+                padding: 12px;
+            }
+
+            .panel h2 {
+                font-size: 1rem;
+            }
+
+            .chart-box {
+                height: 260px;
+            }
+
+            .cards {
+                grid-template-columns: 1fr;
+            }
+
+            .card {
+                padding: 10px;
+            }
+
+            .small {
+                font-size: 0.82rem;
+            }
         }
     </style>
 </head>
@@ -235,7 +275,7 @@
 
             <article class="panel">
                 <h2>Focus Split</h2>
-                <div class="chart-box" style="height: 280px;">
+                <div class="chart-box chart-box-sm">
                     <canvas id="focusChart"></canvas>
                 </div>
                 <p class="small">Balanced investment keeps operations stable while advancing high-impact clinical AI capabilities.</p>
@@ -276,6 +316,7 @@
 
         const cards = document.getElementById('cards');
         const filterButtons = [...document.querySelectorAll('button[data-filter]')];
+        const isMobile = window.matchMedia('(max-width: 760px)').matches;
 
         function frictionColor(v) {
             if (v <= 4) return 'var(--good)';
@@ -328,6 +369,9 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                layout: {
+                    padding: isMobile ? 6 : 10
+                },
                 plugins: {
                     legend: { display: false },
                     tooltip: {
@@ -341,16 +385,16 @@
                         type: 'linear',
                         min: 0,
                         max: 10,
-                        title: { display: true, text: 'Implementation Friction', color: '#b8c9e2' },
-                        ticks: { color: '#9eb0ca' },
+                        title: { display: !isMobile, text: 'Implementation Friction', color: '#b8c9e2' },
+                        ticks: { color: '#9eb0ca', maxTicksLimit: isMobile ? 6 : 11 },
                         grid: { color: 'rgba(126,157,210,0.18)' }
                     },
                     y: {
                         type: 'linear',
                         min: 0,
                         max: 10,
-                        title: { display: true, text: 'Clinical/Operational Impact', color: '#b8c9e2' },
-                        ticks: { color: '#9eb0ca' },
+                        title: { display: !isMobile, text: 'Clinical/Operational Impact', color: '#b8c9e2' },
+                        ticks: { color: '#9eb0ca', maxTicksLimit: isMobile ? 6 : 11 },
                         grid: { color: 'rgba(126,157,210,0.18)' }
                     }
                 }
@@ -375,6 +419,9 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                layout: {
+                    padding: isMobile ? 2 : 8
+                },
                 plugins: {
                     legend: {
                         position: 'bottom',
@@ -382,8 +429,11 @@
                             color: '#c5d4eb',
                             usePointStyle: true,
                             pointStyle: 'rect',
-                            boxWidth: 12,
-                            padding: 12
+                            boxWidth: isMobile ? 10 : 12,
+                            padding: isMobile ? 8 : 12,
+                            font: {
+                                size: isMobile ? 11 : 13
+                            }
                         }
                     }
                 }
