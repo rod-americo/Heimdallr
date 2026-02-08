@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heimdallr Docs</title>
+    <style>
+        :root {
+            --bg: #0b1220;
+            --card: #101a2e;
+            --line: rgba(143, 172, 224, 0.25);
+            --text: #e8f0ff;
+            --muted: #a9bad8;
+            --accent: #46d3ff;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: "Inter", "Segoe UI", sans-serif;
+            color: var(--text);
+            background: radial-gradient(circle at 20% 10%, rgba(70, 211, 255, 0.15), transparent 30%), var(--bg);
+            min-height: 100vh;
+        }
+
+        .wrap {
+            max-width: 920px;
+            margin: 0 auto;
+            padding: 48px 20px;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 24px;
+        }
+
+        h1 { margin: 0 0 10px; }
+
+        p {
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .links {
+            display: grid;
+            gap: 12px;
+            margin-top: 18px;
+        }
+
+        a {
+            color: var(--text);
+            text-decoration: none;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 12px 14px;
+            background: #12203a;
+            display: block;
+        }
+
+        a:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(70, 211, 255, 0.2);
+        }
+    </style>
+</head>
+
+<body>
+    <main class="wrap">
+        <section class="card">
+            <h1>Heimdallr Documentation Hub</h1>
+            <p>Public project documentation and strategy artifacts.</p>
+            <div class="links">
+                <a href="./pipeline-strategy.html">Open Strategy Board (Interactive)</a>
+                <a href="https://github.com/rod-americo/Heimdallr/blob/main/README.md">Open README (Repository)</a>
+                <a href="https://github.com/rod-americo/Heimdallr/blob/main/UPCOMING.md">Open UPCOMING Roadmap (Repository)</a>
+            </div>
+        </section>
+    </main>
+</body>
+
+</html>
