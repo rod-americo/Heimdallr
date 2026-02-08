@@ -27,7 +27,7 @@ Heimdallr currently focuses on three practical layers:
    - Chest X-ray assistance flow (Anthropic + MedGemma with structured prompting)
    - Downloadable artifacts for auditability and review
 
-Future-facing capabilities (workflow orchestration, clinical urgency triage, de-identification pipelines, patient navigation, and agentic AI) are tracked in [`UPCOMING.md`](UPCOMING.md).
+Future-facing capabilities (workflow orchestration, clinical urgency triage, advanced de-identification hardening, patient navigation, and agentic AI) are tracked in [`UPCOMING.md`](UPCOMING.md).
 
 ## Working Definitions
 
@@ -52,6 +52,7 @@ Future-facing capabilities (workflow orchestration, clinical urgency triage, de-
 - `medgemma_api.py`: dedicated microservice for AP chest X-ray assistant flow
 - `medgemma_prompts.py`: prompt templates and structured output helpers
 - `anthropic_report_builder.py`: report-building utilities for narrative output
+- `deid_gateway.py`: outbound de-identification gateway (pixel masking + metadata scrubbing)
 
 ### Data Layer and Outputs
 - SQLite schema in `database/schema.sql`
@@ -228,7 +229,7 @@ To publish the HTML strategy board as a rendered page:
 
 1. HL7-triggered smart prefetch orchestration
 2. Unified worklist orchestration and fair assignment
-3. De-identification gateway (metadata + pixel PHI controls)
+3. Advanced de-identification hardening (auditability, policy controls, and governance expansion)
 4. AI urgency flagging with auditable reprioritization
 5. Structured LLM report drafting with style-safe templates
 6. CAC-DRS coronary calcium classification workflow
@@ -249,7 +250,8 @@ Heimdallr is intended as **clinical decision support** infrastructure, not an au
 - In the image-conversion test flow, DICOM metadata is intentionally not carried forward, reducing PHI exposure risk in derived files.
 - Test radiographs used in this repository do not contain burned-in PHI overlays.
 
-For planned governance controls (de-identification, auditability hardening, model drift controls, and shadow-AI mitigation), see [`UPCOMING.md`](UPCOMING.md).
+Current external-call flows enforce a de-identification gateway (`pixel masking + metadata scrubbing`) before outbound model requests.
+For additional governance controls (auditability hardening, model drift controls, and shadow-AI mitigation), see [`UPCOMING.md`](UPCOMING.md).
 
 ## License
 
