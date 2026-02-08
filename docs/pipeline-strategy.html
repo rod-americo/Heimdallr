@@ -63,12 +63,18 @@
             --focus-2: #8aa4ff;
             --focus-3: #f3a952;
             --focus-4: #29c98a;
-            --status-implemented-bg: rgba(41, 201, 138, 0.16);
-            --status-implemented-text: #9bf3cb;
-            --status-progress-bg: rgba(57, 208, 255, 0.16);
+            --status-implemented-bg: rgba(56, 189, 248, 0.22);
+            --status-implemented-text: #c2eeff;
+            --status-progress-bg: rgba(57, 208, 255, 0.2);
             --status-progress-text: #b5ecff;
-            --status-planned-bg: rgba(138, 164, 255, 0.18);
-            --status-planned-text: #cfdbff;
+            --status-planned-bg: rgba(148, 163, 184, 0.2);
+            --status-planned-text: #d8e2f2;
+            --impact-low-bg: rgba(57, 208, 255, 0.16);
+            --impact-low-text: #9de7ff;
+            --impact-medium-bg: rgba(138, 164, 255, 0.18);
+            --impact-medium-text: #d0dcff;
+            --impact-high-bg: rgba(168, 121, 255, 0.24);
+            --impact-high-text: #ead9ff;
             --radius: 14px;
             color-scheme: dark light;
         }
@@ -115,12 +121,18 @@
                 --focus-2: #5673d8;
                 --focus-3: #c67f1d;
                 --focus-4: #1e9f6e;
-                --status-implemented-bg: rgba(30, 159, 110, 0.12);
-                --status-implemented-text: #1f7f5a;
+                --status-implemented-bg: rgba(14, 116, 144, 0.12);
+                --status-implemented-text: #0d5d73;
                 --status-progress-bg: rgba(15, 135, 201, 0.12);
                 --status-progress-text: #0f5f99;
-                --status-planned-bg: rgba(86, 115, 216, 0.14);
-                --status-planned-text: #344ba7;
+                --status-planned-bg: rgba(115, 133, 163, 0.2);
+                --status-planned-text: #344862;
+                --impact-low-bg: rgba(15, 135, 201, 0.14);
+                --impact-low-text: #0c597f;
+                --impact-medium-bg: rgba(86, 115, 216, 0.14);
+                --impact-medium-text: #2f469f;
+                --impact-high-bg: rgba(131, 92, 220, 0.18);
+                --impact-high-text: #452796;
             }
         }
 
@@ -306,6 +318,14 @@
             font-size: 1rem;
         }
 
+        .card-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
         .meta {
             display: flex;
             gap: 8px;
@@ -329,22 +349,23 @@
             font-weight: 700;
             padding: 4px 8px;
             border-radius: 999px;
-            margin-bottom: 8px;
+            margin-bottom: 0;
+            white-space: nowrap;
         }
 
         .pill.foundation { background: var(--pill-foundation-bg); color: var(--pill-foundation-text); }
         .pill.acceleration { background: var(--pill-acceleration-bg); color: var(--pill-acceleration-text); }
         .pill.scaling { background: var(--pill-scaling-bg); color: var(--pill-scaling-text); }
         .pill.innovation { background: var(--pill-innovation-bg); color: var(--pill-innovation-text); }
-        .pill.impact-low { background: rgba(57, 208, 255, 0.16); color: #9de7ff; }
-        .pill.impact-medium { background: rgba(138, 164, 255, 0.18); color: #d0dcff; }
-        .pill.impact-high { background: rgba(168, 121, 255, 0.2); color: #e1ceff; }
+        .pill.impact-low { background: var(--impact-low-bg); color: var(--impact-low-text); }
+        .pill.impact-medium { background: var(--impact-medium-bg); color: var(--impact-medium-text); }
+        .pill.impact-high { background: var(--impact-high-bg); color: var(--impact-high-text); }
         .pill.friction-low { background: var(--pill-foundation-bg); color: var(--pill-foundation-text); }
         .pill.friction-medium { background: var(--pill-acceleration-bg); color: var(--pill-acceleration-text); }
         .pill.friction-high { background: rgba(245, 108, 124, 0.24); color: #ffc3cb; }
-        .pill.status-implemented { background: var(--status-implemented-bg); color: var(--status-implemented-text); }
-        .pill.status-in-progress { background: var(--status-progress-bg); color: var(--status-progress-text); }
-        .pill.status-planned { background: var(--status-planned-bg); color: var(--status-planned-text); }
+        .pill.status-implemented { background: var(--status-implemented-bg); color: var(--status-implemented-text); border: 1px solid rgba(56, 189, 248, 0.35); }
+        .pill.status-in-progress { background: var(--status-progress-bg); color: var(--status-progress-text); border: 1px solid rgba(57, 208, 255, 0.35); }
+        .pill.status-planned { background: var(--status-planned-bg); color: var(--status-planned-text); border: 1px solid rgba(148, 163, 184, 0.35); }
 
         .small {
             color: var(--muted);
@@ -362,20 +383,9 @@
             line-height: 1.2;
         }
 
-        .metric-pill.impact.low {
-            background: rgba(57, 208, 255, 0.16);
-            color: #9de7ff;
-        }
-
-        .metric-pill.impact.medium {
-            background: rgba(138, 164, 255, 0.18);
-            color: #d0dcff;
-        }
-
-        .metric-pill.impact.high {
-            background: rgba(168, 121, 255, 0.2);
-            color: #e1ceff;
-        }
+        .metric-pill.impact.low { background: var(--impact-low-bg); color: var(--impact-low-text); }
+        .metric-pill.impact.medium { background: var(--impact-medium-bg); color: var(--impact-medium-text); }
+        .metric-pill.impact.high { background: var(--impact-high-bg); color: var(--impact-high-text); }
 
         .metric-pill.friction.low {
             background: var(--pill-foundation-bg);
@@ -661,8 +671,10 @@
                 const el = document.createElement('article');
                 el.className = 'card';
                 el.innerHTML = `
-                    <span class="pill ${m.horizon}">${m.horizon}</span>
-                    <span class="pill status-${m.status}" style="margin-left: 6px;">${statusLabel(m.status)}</span>
+                    <div class="card-top">
+                        <span class="pill ${m.horizon}">${m.horizon}</span>
+                        <span class="pill status-${m.status}">${statusLabel(m.status)}</span>
+                    </div>
                     <h3>${m.title}</h3>
                     <div class="track">${trackName[m.track]}</div>
                     <div class="card-body">
