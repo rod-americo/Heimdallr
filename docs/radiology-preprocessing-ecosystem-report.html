@@ -232,6 +232,7 @@
                 <a href="./index.html">Open Docs Hub</a>
                 <a href="./pipeline-strategy.html">Open Strategy Board</a>
                 <a href="./motivation-justification.html">Open Motivation Guide</a>
+                <a href="./radiology-preprocessing-ecosystem-report.html">Open Full Report</a>
                 <a href="https://github.com/rod-americo/Heimdallr/blob/main/README.md">Open README</a>
             </div>
             <div class="toc">
@@ -247,6 +248,14 @@
         </section>
 
         <section class="stack">
+            <article class="panel">
+                <h2>Operational Definitions</h2>
+                <ul>
+                    <li><strong>Friction</strong>: implementation-in-production effort combining integration, data quality, clinical validation, governance/compliance, and change management.</li>
+                    <li><strong>Navigation</strong>: active monitoring by service staff, with owner, due date, status tracking, and escalation until the finding is clinically closed.</li>
+                </ul>
+            </article>
+
             <article class="panel" id="logistics">
                 <h2>1. Logistics Automation and Data Acquisition Autonomy</h2>
                 <p>Modern radiology suffers from workflow friction despite major advances in scanner performance. A preprocessing ecosystem starts by eliminating latency in access to prior studies and metadata integration across PACS, RIS, and EHR.[1][5]</p>
@@ -298,6 +307,7 @@
                 <h2>3. Opportunistic Quantification and Precision Screening</h2>
                 <p>A high-value pipeline extracts secondary biomarkers from routine exams, creating population-health value with no extra scan burden.[4]</p>
                 <ul>
+                    <li>Coronary calcium should be structured as CAC-DRS classification in eligible CT workflows.</li>
                     <li>Liver steatosis by volumetric segmentation and HU analysis.[20][24]</li>
                     <li>Osteoporosis triage using vertebral segmentation and volumetric HU proxies.[18][21][25]</li>
                     <li>Emphysema burden quantification via LAA% and lobar segmentation; TotalSegmentator contributes robust anatomical coverage.[26][27]</li>
@@ -333,6 +343,7 @@
                     <li>NLP extraction of recommendations from report text.[43][44]</li>
                     <li>Automated reminder/escalation workflows for requesting teams and patients.[41][45]</li>
                     <li>Navigator dashboards for time-sensitive follow-up operations.[46]</li>
+                    <li>Urology navigation track for configured findings (stones, Bosniak III/IV, solid renal/adrenal/ureter/bladder/prostate/testicular findings), with automatic secondary routing to Oncology Navigation when neoplasm is suspected.</li>
                 </ul>
             </article>
 
@@ -402,9 +413,10 @@
             <article class="panel">
                 <h2>Related Documents</h2>
                 <div class="nav-links">
+                    <a href="./index.html">Docs Hub</a>
                     <a href="./pipeline-strategy.html">Strategy Board</a>
                     <a href="./motivation-justification.html">Motivation Guide</a>
-                    <a href="./index.html">Docs Hub</a>
+                    <a href="./radiology-preprocessing-ecosystem-report.html">Full Report</a>
                     <a href="https://github.com/rod-americo/Heimdallr/blob/main/README.md">README.md</a>
                 </div>
             </article>

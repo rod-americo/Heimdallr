@@ -11,6 +11,11 @@ This document tracks features that are intentionally **not fully implemented yet
 3. **Workflow over single models**: optimize end-to-end turnaround and follow-up closure, not isolated model benchmarks.
 4. **Measurable operations**: every module must expose observable impact (TAT, SLA, escalation latency, follow-up completion).
 
+## Working Definitions
+
+- **Friction (1-10)**: implementation-in-production effort that includes integration complexity, data quality constraints, clinical validation burden, governance/compliance controls, and operational change management.
+- **Navigation**: active case monitoring by service staff, with owner, due date, status transitions, and escalation until clinical closure.
+
 ## Pillar A: Logistics Automation and Smart Prefetch
 
 ### A1. HL7-triggered prefetch orchestration
@@ -79,6 +84,10 @@ Acceptance targets:
 - LAA%-driven pulmonary burden scoring.
 - Optional lobe-level distribution and longitudinal trend markers.
 
+### C4. Coronary calcium classification (CAC-DRS)
+- Structured CAC-DRS-oriented classification for eligible CT studies.
+- Pre-report block generation with severity category and policy-aligned follow-up guidance.
+
 Cross-module acceptance targets:
 - Deterministic reproducibility for repeated runs.
 - Structured output fields suitable for analytics and downstream reporting.
@@ -133,6 +142,11 @@ Acceptance targets:
 - Completion metrics and adherence rates.
 - Support for quality frameworks and reimbursement reporting.
 
+### F4. Urology navigation pathway
+- Detect and route navigable urology findings (e.g., renal stones >= 0.7 cm, Bosniak III/IV, solid renal/adrenal/ureter/bladder/prostate/testicular findings).
+- Secondary route to Oncology Navigation when neoplasm is suspected.
+- Maintain service-owned tracking through closure states (pending, scheduled, completed, overdue, escalated).
+
 Acceptance targets:
 - Improved follow-up completion rates.
 - Reduced lost-to-follow-up incidents.
@@ -160,11 +174,11 @@ Acceptance targets:
 - Baseline governance, observability, and queue fairness controls
 
 ### Horizon 2 (Clinical Acceleration)
-- B2, B3, C1, C2, D1
+- B2, B3, C1, C2, C4, D1
 - Urgency-aware operations and structured draft reporting
 
 ### Horizon 3 (Care Continuity)
-- F1, F2, F3, C3, D2, E3
+- F1, F2, F3, F4, C3, D2, E3
 - Closing-the-loop and enterprise-grade AI gateway hardening
 
 ### Horizon 4 (Strategic Innovation)
