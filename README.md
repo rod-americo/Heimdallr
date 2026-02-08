@@ -80,7 +80,8 @@ PACS / Modality (DICOM C-STORE)
                                               +--> Dashboard/API (server.py)
                                               +--> Report assist endpoints
 
-medgemma_api.py runs as an isolated service, while Anthropic-backed report flows are orchestrated by server endpoints.
+medgemma_api.py runs as an isolated service,
+while Anthropic-backed report flows are orchestrated by server endpoints.
 ```
 
 ## Quick Start
