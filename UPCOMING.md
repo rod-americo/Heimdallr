@@ -53,6 +53,9 @@ Ordered by strategic sequence (not only by model sophistication).
 | 19 | Synthetic + federated validation sandbox | R&D | 8 | 8 | Privacy-preserving multi-site validation and benchmarking |
 | 20 | Autonomous follow-up orchestrator (human-gated) | R&D | 9 | 8 | Strong continuity and financial recovery upside with clinical oversight |
 | 21 | Prospective trial mode | R&D | 8 | 7 | Embedded publication-grade evidence generation |
+| 22 | General surgery navigation pathway | Navigation | 7 | 5 | Low-friction continuity value for common actionable findings |
+| 23 | Oncology high-suspicion navigation router | Navigation | 10 | 7 | High clinical-risk routing for ER/inpatient neoplastic suspicion |
+| 24 | Gynecology navigation pathway | Navigation | 9 | 7 | Structured continuity for adnexal/uterine/cervical suspicious findings |
 
 ## Pillar A: Logistics Automation and Smart Prefetch
 
@@ -211,6 +214,40 @@ Exit criteria:
 - Service ownership assigned for 100% of eligible navigable findings.
 - Reduced lost-to-follow-up for urology-sensitive findings.
 
+### F5. General surgery navigation pathway
+- Route navigable findings to General Surgery Navigation:
+  - Cholelithiasis
+  - Abdominal wall hernias
+- Ensure owner assignment, due dates, and escalation states until closure.
+
+### F6. Oncology high-suspicion navigation router
+- Objective: flag all suspicious or potentially neoplastic findings in ER and inpatient populations.
+- Automatically open Oncology Navigation tasks with urgency-aware routing.
+- Preserve bidirectional linkage with source report and downstream follow-up events.
+
+### F7. Gynecology navigation pathway
+
+Ovary and adnexa:
+- Solid or predominantly solid ovarian masses.
+- Complex cystic lesions with suspicious components (solid tissue, vegetations, thick/irregular septa, papillary projections).
+- Ascites.
+- Peritoneal/omental/retroperitoneal implants.
+- Pelvic or retroperitoneal suspicious adenopathy.
+- Adnexal lesions classified as O-RADS 4.
+
+Uterus:
+- Endometrial masses with suspicious morphology (heterogeneity, irregular margins, myometrial invasion).
+- Endometrial thickening in postmenopausal patients (`> 5 mm` without hormone replacement), especially when heterogeneous.
+- Lesions with serosal, parametrial, or adjacent-structure invasion.
+- Bulky cervical masses or extension to vagina/parametria.
+
+Cervix:
+- Infiltrative or irregular cervical lesions.
+- Suspicious pelvic or retroperitoneal lymphadenopathy.
+
+Additional:
+- Findings suspicious for endometriosis requiring structured gynecology follow-up.
+
 ## Pillar G: Disruptive and Long-Horizon R&D
 
 ### G1. Agentic workflow coordination
@@ -255,7 +292,7 @@ Horizon legend:
 - B2, B3, C1, C2, C4, D1
 
 ### Horizon 3 - Care Continuity at Scale
-- F1, F2, F3, F4, C3, D2, E3
+- F1, F2, F3, F4, F5, F6, F7, C3, D2, E3
 
 ### Horizon 4 - Strategic Innovation
 - D3, G1, G2, G3, G4, G5, G6, G7
