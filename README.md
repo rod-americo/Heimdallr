@@ -193,7 +193,7 @@ For endpoint coverage and payload conventions, see [`docs/API.md`](docs/API.md).
 - Strategic roadmap and future architecture: [`UPCOMING.md`](UPCOMING.md)
 - Operations and deployment runbook: [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 - API contracts and examples: [`docs/API.md`](docs/API.md)
-- Strategic visual board: [`static/pipeline-strategy.html`](static/pipeline-strategy.html)
+- Strategic visual board source: [`docs/pipeline-strategy.html`](docs/pipeline-strategy.html)
 - Public docs landing page (GitHub Pages): [https://rod-americo.github.io/Heimdallr/](https://rod-americo.github.io/Heimdallr/)
 - Public strategy board (GitHub Pages): [https://rod-americo.github.io/Heimdallr/pipeline-strategy.html](https://rod-americo.github.io/Heimdallr/pipeline-strategy.html)
 
@@ -210,7 +210,7 @@ To publish the HTML strategy board as a rendered page:
 ## Strategy and Roadmap
 
 - Strategic backlog and upcoming modules: [`UPCOMING.md`](UPCOMING.md)
-- Dark-mode strategic planning page (based on your concept): [`static/pipeline-strategy.html`](static/pipeline-strategy.html)
+- Dark-mode strategic planning page (based on your concept): [`docs/pipeline-strategy.html`](docs/pipeline-strategy.html)
 
 ### Upcoming Prioritization (Ordered)
 
