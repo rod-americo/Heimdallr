@@ -595,9 +595,9 @@
                 <span class="filter-label row-label">Track:</span>
                 <button class="active" data-group="track" data-filter="all">All</button>
                 <button data-group="track" data-filter="ops">Operations</button>
-                <button data-group="track" data-filter="continuity">Care Continuity</button>
                 <button data-group="track" data-filter="clinical">Clinical Decision Support</button>
                 <button data-group="track" data-filter="governance">Governance and Compliance</button>
+                <button data-group="track" data-filter="continuity">Care Continuity</button>
             </div>
             <div class="filter-group">
                 <span class="filter-label row-label">Status:</span>
@@ -882,7 +882,7 @@
             }
         });
 
-        const trackOrder = ['ops', 'continuity', 'clinical', 'governance'];
+        const trackOrder = ['ops', 'clinical', 'governance', 'continuity'];
         const focusBreakdown = modules.reduce((acc, m) => {
             acc[m.track] = (acc[m.track] || 0) + 1;
             return acc;
