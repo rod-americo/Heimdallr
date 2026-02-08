@@ -38,7 +38,7 @@ Ordered by strategic sequence (not only by model sophistication).
 | 4 | Deterministic pseudonymization + crosswalk | Security | 10 | 5 | Enables traceable privacy-preserving workflows |
 | 5 | Follow-up recommendation extraction (NLP) | Navigation | 8 | 5 | High value and operationally feasible |
 | 6 | Urology navigation pathway | Navigation | 9 | 6 | Direct care-continuity impact with clear rule set |
-| 7 | CAC-DRS coronary calcium classification | Quantification | 8 | 6 | High preventive-care value in routine CT workflows |
+| 7 | Opportunistic coronary calcium (CAC-DRS) | Quantification | 8 | 6 | High preventive-care value from opportunistic CT workflows |
 | 8 | AI-assisted urgency flagging | Workflow | 9 | 7 | Improves time-to-open for high-acuity cases |
 | 9 | Liver steatosis opportunistic pipeline | Quantification | 7 | 6 | Population-health insight from existing scans |
 | 10 | Osteoporosis opportunistic screening | Quantification | 7 | 6 | Scalable DXA-proxy value from routine CT |
@@ -115,14 +115,25 @@ Exit criteria (B1-B3):
 - LAA%-based burden score.
 - Optional lobe-level distribution and longitudinal trend.
 
-### C4. Coronary calcium classification (CAC-DRS)
-- CAC-DRS-oriented structured classification for eligible non-gated chest CT.
+### C4. Opportunistic coronary calcium (CAC-DRS)
+- Opportunistic coronary calcium detection in eligible non-gated chest CT.
+- CAC-DRS-oriented structured classification after opportunistic detection.
 - Pre-report block with category, confidence, and recommendation text.
 - Governance note: this module targets CAC-DRS workflows, not Agatston scoring pipelines.
 
 Exit criteria (C1-C4):
 - Deterministic repeated-run consistency.
 - Structured outputs consumable by reporting and analytics.
+
+## Scaling Modules (Clinical Real-World Workflows)
+
+These modules represent clinically validated workflows already seen in real-world practice, being operationalized into Heimdallr pipeline products:
+
+- **Lung nodule longitudinal tracker**: serial growth analysis and interval-aware follow-up triggers.
+- **Aortic aneurysm surveillance pipeline**: longitudinal diameter monitoring with escalation rules.
+- **Kidney stone burden longitudinal module**: time-series burden tracking integrated with urology navigation.
+- **Incidental findings closure engine**: operational closure from report mention to documented follow-up outcome.
+- **Prostate MRI longitudinal PI-RADS tracker**: temporal PI-RADS and gland-volume trend monitoring.
 
 ## Pillar D: LLM/VLM Reporting Copilot
 
@@ -234,7 +245,7 @@ Exit criteria:
 Horizon legend:
 - **Foundation**: baseline safety, interoperability, and throughput capabilities required before broader automation.
 - **Acceleration**: modules that increase clinical/operational performance on top of a stable foundation.
-- **Scaling**: expansion of validated workflows to higher volume, more services, and wider operational coverage.
+- **Scaling**: clinically validated real-world workflows being operationalized as repeatable pipeline modules.
 - **Innovation**: long-horizon capabilities with higher uncertainty and strategic differentiation potential.
 
 ### Horizon 1 - Foundation (Safety + Throughput)
