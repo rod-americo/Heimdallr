@@ -285,7 +285,8 @@
             gap: 8px;
             font-size: 0.82rem;
             color: var(--muted);
-            margin-bottom: 8px;
+            margin-top: auto;
+            margin-bottom: 0;
             flex-wrap: wrap;
             align-items: center;
         }
@@ -309,6 +310,12 @@
         .pill.acceleration { background: var(--pill-acceleration-bg); color: var(--pill-acceleration-text); }
         .pill.scaling { background: var(--pill-scaling-bg); color: var(--pill-scaling-text); }
         .pill.innovation { background: var(--pill-innovation-bg); color: var(--pill-innovation-text); }
+        .pill.impact-low { background: rgba(57, 208, 255, 0.16); color: #9de7ff; }
+        .pill.impact-medium { background: rgba(138, 164, 255, 0.18); color: #d0dcff; }
+        .pill.impact-high { background: rgba(168, 121, 255, 0.2); color: #e1ceff; }
+        .pill.friction-low { background: var(--pill-foundation-bg); color: var(--pill-foundation-text); }
+        .pill.friction-medium { background: var(--pill-acceleration-bg); color: var(--pill-acceleration-text); }
+        .pill.friction-high { background: rgba(245, 108, 124, 0.24); color: #ffc3cb; }
 
         .small {
             color: var(--muted);
@@ -342,12 +349,13 @@
         }
 
         .metric-pill.friction.high {
-            background: var(--pill-innovation-bg);
-            color: var(--pill-innovation-text);
+            background: rgba(245, 108, 124, 0.24);
+            color: #ffc3cb;
         }
 
         .card-body {
             flex: 1;
+            margin-bottom: 10px;
         }
 
         .guide-row {
@@ -467,15 +475,15 @@
             <p class="small" style="margin-top: 6px;"><span class="pill innovation">innovation</span> long-horizon capabilities with higher uncertainty and strategic upside.</p>
             <div class="guide-row">
                 <span class="guide-label">Impact bands:</span>
-                <span class="pill foundation">1-3 low</span>
-                <span class="pill acceleration">4-6 medium</span>
-                <span class="pill scaling">7-10 high</span>
+                <span class="pill impact-low">1-3 low</span>
+                <span class="pill impact-medium">4-6 medium</span>
+                <span class="pill impact-high">7-10 high</span>
             </div>
             <div class="guide-row">
                 <span class="guide-label">Friction bands:</span>
-                <span class="pill foundation">1-3 low</span>
-                <span class="pill acceleration">4-6 medium</span>
-                <span class="pill innovation">7-10 high</span>
+                <span class="pill friction-low">1-3 low</span>
+                <span class="pill friction-medium">4-6 medium</span>
+                <span class="pill friction-high">7-10 high</span>
             </div>
         </section>
 
