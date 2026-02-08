@@ -7,6 +7,10 @@ Contemporary radiology faces a structural paradox: image acquisition technology 
 
 This document translates and consolidates the research rationale behind Heimdallr into an implementation-oriented architecture. The intent is practical and strategic: build a clinically safe, technically rigorous, and collaboration-ready foundation for an AI-enabled radiology operating layer.
 
+Operational definitions used across project docs:
+- **Friction**: implementation-in-production effort (integration, data quality, validation, compliance, and change management), not model complexity alone.
+- **Navigation**: active follow-up monitoring by service staff with owner, due date, status tracking, and escalation until clinical closure.
+
 ## 1. Logistics Automation and Data Acquisition Autonomy
 
 The first stage of an effective preprocessing pipeline is eliminating data-availability friction. Radiologists still lose time manually searching prior studies and reconciling data across PACS, RIS, and EHR systems.[5]
@@ -49,6 +53,10 @@ This is not autonomous diagnosis. It is queue intelligence: ensuring the most cr
 ## 3. Opportunistic Precision Triage Through Anatomical Segmentation
 
 One of the highest-value preprocessing capabilities is opportunistic screening: extracting population-health biomarkers from studies acquired for unrelated indications.[4]
+
+### 3.0 Coronary Calcium Classification (CAC-DRS)
+
+For coronary calcium in eligible CT workflows, this roadmap prioritizes **CAC-DRS**-oriented classification as the structured reporting target.
 
 ### 3.1 Liver Steatosis (HU-based)
 
@@ -98,6 +106,10 @@ Preprocessing should not stop at report generation. A robust system must close t
 NLP pipelines (e.g., transformer variants such as ClinicalBERT-class approaches) can identify follow-up recommendations and track completion with high precision in published studies.[43][44]
 
 Navigation platforms (e.g., Radloop, RADNAV, Nursenav) can automate reminders, escalation, and navigator dashboards, improving adherence and reducing lost follow-up risk.[41][45][46]
+
+### 6.1 Urology Navigation Track
+
+The navigation roadmap includes a dedicated urology track for configured navigable findings, including large stones, Bosniak III/IV, and solid findings in renal/adrenal/ureter/bladder/prostate/testicular contexts. Findings suspicious for neoplasm should also be routed to Oncology Navigation.
 
 ## 7. Disruptive Frontier Capabilities
 

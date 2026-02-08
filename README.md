@@ -29,6 +29,11 @@ Heimdallr currently focuses on three practical layers:
 
 Future-facing capabilities (workflow orchestration, clinical urgency triage, de-identification pipelines, patient navigation, and agentic AI) are tracked in [`UPCOMING.md`](UPCOMING.md).
 
+## Working Definitions
+
+- **Friction (1-10)**: implementation-in-production effort, combining technical integration, data quality, clinical validation, governance/compliance, and operational change management.
+- **Navigation**: active monitoring by clinical service staff, with owner, due date, status tracking, and escalation until closure.
+
 ## What Is Implemented Today
 
 ### Ingestion and Preparation
@@ -226,11 +231,13 @@ To publish the HTML strategy board as a rendered page:
 3. De-identification gateway (metadata + pixel PHI controls)
 4. AI urgency flagging with auditable reprioritization
 5. Structured LLM report drafting with style-safe templates
-6. Opportunistic liver and bone quantification at scale
-7. Follow-up recommendation extraction and navigation workflows
-8. SLA-aware orchestration and escalation policy engine
-9. Enterprise audit hardening for external model gateways
-10. Agentic workflow coordinator for multi-step radiology operations
+6. CAC-DRS coronary calcium classification workflow
+7. Opportunistic liver and bone quantification at scale
+8. Urology navigation module with oncology secondary routing for suspicious neoplasia
+9. Follow-up recommendation extraction and navigation workflows
+10. SLA-aware orchestration and escalation policy engine
+11. Enterprise audit hardening for external model gateways
+12. Agentic workflow coordinator for multi-step radiology operations
 
 ## Safety, Compliance, and Clinical Use
 

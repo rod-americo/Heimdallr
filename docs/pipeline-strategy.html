@@ -355,8 +355,10 @@
             <h1>Heimdallr Radiology Pipeline Strategy</h1>
             <p class="sub">Impact vs implementation friction for upcoming modules across logistics, triage, reporting, de-identification, and patient navigation.</p>
             <div class="nav-links">
-                <a href="./motivation-justification.html">Open Motivation Guide</a>
                 <a href="./index.html">Open Docs Hub</a>
+                <a href="./pipeline-strategy.html">Open Strategy Board</a>
+                <a href="./motivation-justification.html">Open Motivation Guide</a>
+                <a href="./radiology-preprocessing-ecosystem-report.html">Open Full Report</a>
                 <a href="https://github.com/rod-americo/Heimdallr/blob/main/README.md">Open README</a>
             </div>
         </header>
@@ -372,6 +374,7 @@
                     <div><span style="background: var(--mid);"></span>Medium complexity / phased delivery</div>
                     <div><span style="background: var(--hard);"></span>High complexity / governance-heavy</div>
                 </div>
+                <p class="small" style="margin-top: 8px;">Friction is an implementation-in-production score (integration, validation, compliance, and operational change), not just model difficulty.</p>
             </article>
 
             <article class="panel">
@@ -396,9 +399,19 @@
         </section>
 
         <section class="panel" style="margin-top: 14px;">
+            <h2>Metric Definitions</h2>
+            <p class="small"><strong>Impact (1-10)</strong>: expected clinical and operational value if deployed safely.</p>
+            <p class="small" style="margin-top: 6px;"><strong>Friction (1-10)</strong>: real-world effort to productionize safely, combining technical integration, data quality, clinical validation, governance/compliance, and change management.</p>
+            <p class="small" style="margin-top: 6px;"><strong>Navigation</strong>: active follow-up monitoring by clinical service staff, with owner, due date, status tracking, and escalation until closure.</p>
+            <p class="small" style="margin-top: 6px;">Reading guide: 1-3 low friction, 4-6 medium, 7-10 high.</p>
+        </section>
+
+        <section class="panel" style="margin-top: 14px;">
             <h2>Where to Go Next</h2>
             <p class="small">Use these links to continue from strategy design into project context and implementation motivation.</p>
             <div class="nav-links" style="margin-top: 10px;">
+                <a href="./index.html">Docs Hub</a>
+                <a href="./pipeline-strategy.html">Strategy Board</a>
                 <a href="./motivation-justification.html">Motivation & Justification</a>
                 <a href="./radiology-preprocessing-ecosystem-report.html">Full Translation Source</a>
                 <a href="https://github.com/rod-americo/Heimdallr/blob/main/README.md">README.md</a>
@@ -408,14 +421,25 @@
 
     <script>
         const modules = [
-            { id: 1, title: 'HL7-Triggered Smart Prefetch', track: 'ops', horizon: 'foundation', impact: 9, friction: 4, note: 'Route relevant priors from ADT/ORM events using study similarity scoring.' },
-            { id: 2, title: 'Unified Worklist Orchestrator', track: 'ops', horizon: 'foundation', impact: 9, friction: 5, note: 'Fair case assignment by subspecialty, workload, and SLA risk.' },
-            { id: 3, title: 'Urgency Flagging and Reordering', track: 'clinical', horizon: 'acceleration', impact: 10, friction: 8, note: 'Reprioritize suspected critical findings with auditable confidence thresholds.' },
-            { id: 4, title: 'Opportunistic Liver/Bone Quant', track: 'clinical', horizon: 'acceleration', impact: 8, friction: 6, note: 'Extract steatosis and osteoporosis signals from routine CT scans.' },
-            { id: 5, title: 'Structured Report Copilot', track: 'clinical', horizon: 'acceleration', impact: 8, friction: 6, note: 'Template-bound drafting from findings + quantitative metrics.' },
-            { id: 6, title: 'De-identification Gateway', track: 'governance', horizon: 'scaling', impact: 10, friction: 7, note: 'Pixel + metadata PHI stripping before any external model call.' },
-            { id: 7, title: 'Patient Follow-up Navigator', track: 'continuity', horizon: 'scaling', impact: 9, friction: 5, note: 'Extract follow-up recommendations and orchestrate reminders/escalations.' },
-            { id: 8, title: 'Agentic Workflow Coordinator', track: 'clinical', horizon: 'innovation', impact: 10, friction: 9, note: 'Multi-step assistants for triage, reporting, and handoff execution.' }
+            { id: 1, title: 'HL7-Triggered Smart Prefetch', track: 'ops', horizon: 'foundation', impact: 8, friction: 4, note: 'Route relevant priors from ADT/ORM events using study similarity scoring.' },
+            { id: 2, title: 'Unified Worklist Orchestrator', track: 'ops', horizon: 'foundation', impact: 7, friction: 5, note: 'Fair case assignment by subspecialty, workload, and SLA risk.' },
+            { id: 3, title: 'SLA Policy Engine', track: 'ops', horizon: 'foundation', impact: 6, friction: 4, note: 'Alert and escalate when breach risk increases for urgent studies.' },
+            { id: 4, title: 'DICOMweb Edge Streaming', track: 'ops', horizon: 'acceleration', impact: 7, friction: 5, note: 'Improve first-image latency with web-native retrieval patterns.' },
+
+            { id: 5, title: 'Urgency Flagging and Reordering', track: 'clinical', horizon: 'acceleration', impact: 9, friction: 8, note: 'Reprioritize suspected critical findings with auditable thresholds.' },
+            { id: 6, title: 'Structured Report Copilot', track: 'clinical', horizon: 'acceleration', impact: 7, friction: 6, note: 'Template-bound drafting from findings and quantitative metrics.' },
+            { id: 7, title: 'Prompt Macro Assistant', track: 'clinical', horizon: 'foundation', impact: 6, friction: 3, note: 'Low-latency report text refinement integrated with hotkeys.' },
+            { id: 8, title: 'Opportunistic Liver Quant', track: 'clinical', horizon: 'acceleration', impact: 7, friction: 6, note: 'Steatosis risk extraction from routine CT studies.' },
+            { id: 9, title: 'Opportunistic Bone Quant', track: 'clinical', horizon: 'acceleration', impact: 6, friction: 6, note: 'Vertebral volumetric HU proxy for osteoporosis triage.' },
+            { id: 10, title: 'CAC-DRS Calcium Classification', track: 'clinical', horizon: 'acceleration', impact: 7, friction: 6, note: 'Structured coronary calcium classification workflow using CAC-DRS in eligible CT studies.' },
+            { id: 11, title: 'Emphysema Longitudinal Quant', track: 'clinical', horizon: 'scaling', impact: 5, friction: 7, note: 'LAA%-based burden tracking and trend summaries.' },
+            { id: 12, title: 'Agentic Workflow Coordinator', track: 'clinical', horizon: 'innovation', impact: 8, friction: 9, note: 'Multi-step assistants for triage, reporting, and handoff execution.' },
+
+            { id: 13, title: 'De-identification Gateway', track: 'governance', horizon: 'scaling', impact: 9, friction: 7, note: 'Pixel + metadata PHI stripping before any external model call.' },
+            { id: 14, title: 'Federated Learning Sandbox', track: 'governance', horizon: 'innovation', impact: 6, friction: 8, note: 'Cross-site training design without centralizing raw images.' },
+
+            { id: 15, title: 'Patient Follow-up Navigator', track: 'continuity', horizon: 'scaling', impact: 8, friction: 5, note: 'Extract recommendations and orchestrate reminders/escalations.' },
+            { id: 16, title: 'Urology Navigation Module', track: 'continuity', horizon: 'scaling', impact: 8, friction: 6, note: 'Active service-led tracking for urology navigable findings, with secondary routing to oncology when neoplasm is suspected.' }
         ];
 
         const trackName = {
