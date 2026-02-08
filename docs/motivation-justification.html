@@ -200,6 +200,31 @@
             margin-top: 14px;
         }
 
+        .bullets-tight li {
+            margin-bottom: 8px;
+        }
+
+        .metric-row {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .metric-box {
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 10px;
+            background: var(--bg-card);
+        }
+
+        .metric-box strong {
+            display: block;
+            color: var(--accent);
+            font-size: 1rem;
+            margin-bottom: 4px;
+        }
+
         .panel ul,
         .panel ol {
             margin: 8px 0 0 20px;
@@ -283,6 +308,7 @@
         @media (max-width: 980px) {
             .kpis { grid-template-columns: 1fr 1fr; }
             .grid { grid-template-columns: 1fr; }
+            .metric-row { grid-template-columns: 1fr; }
             .refs { column-count: 1; }
         }
 
@@ -349,11 +375,25 @@
             <article class="panel">
                 <h2>Strategic Positioning</h2>
                 <p>This work intentionally positions the project and its author in the Applied Software Engineering frontier of healthcare AI: execution-focused, clinically aware, and operationally measurable.</p>
-                <ul>
+                <ul class="bullets-tight">
                     <li><strong>Personal brand:</strong> build credibility as an Applied Software Engineer for high-impact medical workflows.</li>
                     <li><strong>Collaboration magnet:</strong> attract engineers, radiologists, data scientists, and compliance partners.</li>
                     <li><strong>Return paths:</strong> enable academic publications, open collaboration, and sustainable commercialization.</li>
                 </ul>
+            </article>
+            <article class="panel">
+                <h2>Execution Lens</h2>
+                <p>The project is positioned as a production-grade radiology operations layer, not a model showcase. Every module is framed by measurable operational value and governance constraints from day one.</p>
+                <div class="metric-row">
+                    <div class="metric-box">
+                        <strong>Delivery Logic</strong>
+                        <p>Prioritize low-friction infrastructure and security foundations before high-friction autonomy.</p>
+                    </div>
+                    <div class="metric-box">
+                        <strong>Clinical Logic</strong>
+                        <p>Expand automation only where human oversight, auditability, and rollback remain explicit.</p>
+                    </div>
+                </div>
             </article>
         </section>
 
