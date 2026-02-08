@@ -306,6 +306,10 @@
             font-weight: 600;
         }
 
+        .row-label {
+            flex: 0 0 auto;
+        }
+
         button {
             background: var(--button-bg);
             color: var(--text);
@@ -529,6 +533,10 @@
             .small {
                 font-size: 0.82rem;
             }
+
+            .row-label {
+                flex-basis: 100%;
+            }
         }
     </style>
 </head>
@@ -559,7 +567,7 @@
                     <div><span style="background: var(--hard);"></span>High complexity / governance-heavy</div>
                 </div>
                 <div class="status-legend">
-                    <span class="guide-label">Status (ring):</span>
+                    <span class="guide-label row-label">Status (ring):</span>
                     <span class="status-item"><span class="status-ring" style="border-color:#6ee7ff;background:rgba(110,231,255,0.16);"></span>Implemented</span>
                     <span class="status-item"><span class="status-ring" style="border-color:#b8c7ff;background:rgba(184,199,255,0.16);"></span>In Progress</span>
                     <span class="status-item"><span class="status-ring" style="border-color:#cbd5e1;background:rgba(203,213,225,0.18);"></span>Planned</span>
@@ -584,7 +592,7 @@
         <section class="panel" style="margin-top: 14px;">
             <h2>Module Explorer</h2>
             <div class="filter-group">
-                <span class="filter-label">Track:</span>
+                <span class="filter-label row-label">Track:</span>
                 <button class="active" data-group="track" data-filter="all">All</button>
                 <button data-group="track" data-filter="ops">Operations</button>
                 <button data-group="track" data-filter="clinical">Clinical AI</button>
@@ -592,7 +600,7 @@
                 <button data-group="track" data-filter="continuity">Care Continuity</button>
             </div>
             <div class="filter-group">
-                <span class="filter-label">Status:</span>
+                <span class="filter-label row-label">Status:</span>
                 <button class="active" data-group="status" data-filter="all">All</button>
                 <button data-group="status" data-filter="implemented">Implemented</button>
                 <button data-group="status" data-filter="in-progress">In Progress</button>
@@ -607,12 +615,6 @@
             <p class="small" style="margin-top: 6px;"><strong>Friction (1-10)</strong>: real-world effort to productionize safely, combining technical integration, data quality, clinical validation, governance/compliance, and change management.</p>
             <p class="small" style="margin-top: 6px;"><strong>Navigation</strong>: active follow-up monitoring by clinical service staff, with owner, due date, status tracking, and escalation until closure.</p>
             <p class="small" style="margin-top: 6px;"><strong>Status</strong>: implemented modules are already operational; in-progress modules are partially delivered; planned modules are roadmap targets.</p>
-            <div class="guide-row" style="margin-top: 8px;">
-                <span class="guide-label">Status legend:</span>
-                <span class="pill status-implemented">implemented</span>
-                <span class="pill status-in-progress">in progress</span>
-                <span class="pill status-planned">planned</span>
-            </div>
             <p class="small" style="margin-top: 10px;"><strong>Horizon Legend</strong>:</p>
             <p class="small" style="margin-top: 6px;"><span class="pill foundation">foundation</span> baseline safety, interoperability, and throughput foundation for production readiness.</p>
             <p class="small" style="margin-top: 6px;"><span class="pill acceleration">acceleration</span> modules that increase clinical/operational performance on top of a stable base.</p>
