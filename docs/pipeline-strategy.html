@@ -264,7 +264,7 @@
             flex-wrap: wrap;
             gap: 12px;
             margin-top: 10px;
-            color: var(--muted);
+            color: var(--chart-text);
             font-size: 0.86rem;
             align-items: center;
         }
@@ -276,11 +276,12 @@
         }
 
         .status-ring {
-            width: 12px;
-            height: 12px;
+            width: 13px;
+            height: 13px;
             border-radius: 999px;
-            border: 2px solid;
-            background: transparent;
+            border: 2.5px solid;
+            background: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 0 0 1px rgba(7, 12, 22, 0.45);
             display: inline-block;
         }
 
@@ -559,9 +560,9 @@
                 </div>
                 <div class="status-legend">
                     <span class="guide-label">Status (ring):</span>
-                    <span class="status-item"><span class="status-ring" style="border-color:#4fd5ff;"></span>Implemented</span>
-                    <span class="status-item"><span class="status-ring" style="border-color:#9db4ff;"></span>In Progress</span>
-                    <span class="status-item"><span class="status-ring" style="border-color:#a5b4c7;"></span>Planned</span>
+                    <span class="status-item"><span class="status-ring" style="border-color:#6ee7ff;background:rgba(110,231,255,0.16);"></span>Implemented</span>
+                    <span class="status-item"><span class="status-ring" style="border-color:#b8c7ff;background:rgba(184,199,255,0.16);"></span>In Progress</span>
+                    <span class="status-item"><span class="status-ring" style="border-color:#cbd5e1;background:rgba(203,213,225,0.18);"></span>Planned</span>
                 </div>
                 <p class="small" style="margin-top: 8px;">Friction is an implementation-in-production score (integration, validation, compliance, and operational change), not just model difficulty.</p>
             </article>
@@ -786,9 +787,9 @@
         });
 
         const statusBorder = {
-            implemented: '#4fd5ff',
-            'in-progress': '#9db4ff',
-            planned: '#a5b4c7'
+            implemented: '#6ee7ff',
+            'in-progress': '#b8c7ff',
+            planned: '#cbd5e1'
         };
 
         const priorityChart = new Chart(document.getElementById('priorityChart'), {
@@ -802,7 +803,7 @@
                         return bubbleHard;
                     }),
                     borderColor: modules.map((m) => statusBorder[m.status] || chartBorder),
-                    borderWidth: 2
+                    borderWidth: 3
                 }]
             },
             options: {
