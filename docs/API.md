@@ -43,11 +43,14 @@ curl -X POST http://localhost:8001/api/medgemma/ap-thorax-xray \
   -F "age=45 year old"
 ```
 
+Both endpoints return a `deid` object with gateway details (for example: `metadata_removed`, `pixel_redaction`, `age_coarsened`, `review_required`, `bounding_boxes`).
+
 ## Contract Notes
 
 1. API outputs are assistive and must not be used as autonomous diagnosis.
 2. Validation, timeout, and retry behavior should be enforced by calling clients.
-3. External model calls should follow institutional de-identification policy.
+3. External model calls are routed through the de-identification gateway before outbound requests.
+4. OCR-based review requires `pytesseract` + system `tesseract` installed on the service host.
 
 ## Live Schema
 
