@@ -285,6 +285,7 @@
             color: var(--muted);
             margin-bottom: 8px;
             flex-wrap: wrap;
+            align-items: center;
         }
 
         .pill {
@@ -305,6 +306,36 @@
             color: var(--muted);
             font-size: 0.86rem;
             margin: 0;
+        }
+
+        .metric-pill {
+            display: inline-block;
+            border-radius: 999px;
+            padding: 3px 8px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            border: 1px solid var(--line);
+            line-height: 1.2;
+        }
+
+        .metric-pill.impact {
+            background: rgba(138, 164, 255, 0.16);
+            color: var(--chart-text);
+        }
+
+        .metric-pill.friction.low {
+            background: var(--pill-foundation-bg);
+            color: var(--pill-foundation-text);
+        }
+
+        .metric-pill.friction.medium {
+            background: var(--pill-acceleration-bg);
+            color: var(--pill-acceleration-text);
+        }
+
+        .metric-pill.friction.high {
+            background: var(--pill-innovation-bg);
+            color: var(--pill-innovation-text);
         }
 
         .guide-row {
@@ -423,6 +454,12 @@
             <p class="small" style="margin-top: 6px;"><span class="pill scaling">scaling</span> expansion of proven workflows to larger volume, services, and operational coverage.</p>
             <p class="small" style="margin-top: 6px;"><span class="pill innovation">innovation</span> long-horizon capabilities with higher uncertainty and strategic upside.</p>
             <div class="guide-row">
+                <span class="guide-label">Impact bands:</span>
+                <span class="pill foundation">1-3 low</span>
+                <span class="pill acceleration">4-6 medium</span>
+                <span class="pill scaling">7-10 high</span>
+            </div>
+            <div class="guide-row">
                 <span class="guide-label">Friction bands:</span>
                 <span class="pill foundation">1-3 low</span>
                 <span class="pill acceleration">4-6 medium</span>
@@ -489,10 +526,10 @@
         const focus3 = css.getPropertyValue('--focus-3').trim();
         const focus4 = css.getPropertyValue('--focus-4').trim();
 
-        function frictionColor(v) {
-            if (v <= 4) return 'var(--good)';
-            if (v <= 7) return 'var(--mid)';
-            return 'var(--hard)';
+        function frictionBand(v) {
+            if (v <= 3) return 'low';
+            if (v <= 6) return 'medium';
+            return 'high';
         }
 
         function renderCards(filter = 'all') {
@@ -506,8 +543,8 @@
                     <h3>${m.title}</h3>
                     <div class="meta">
                         <span>${trackName[m.track]}</span>
-                        <span>Impact ${m.impact}/10</span>
-                        <span style="color:${frictionColor(m.friction)}">Friction ${m.friction}/10</span>
+                        <span class="metric-pill impact">Impact ${m.impact}/10</span>
+                        <span class="metric-pill friction ${frictionBand(m.friction)}">Friction ${m.friction}/10</span>
                     </div>
                     <p class="small">${m.note}</p>
                 `;
