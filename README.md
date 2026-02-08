@@ -96,6 +96,7 @@ while Anthropic-backed report flows are orchestrated by server endpoints.
 - Python `3.10+`
 - `dcm2niix`
 - NVIDIA GPU (recommended for segmentation workloads)
+- Optional for OCR-based de-identification review: `tesseract` binary + `pytesseract` package
 
 ### Install
 
@@ -105,6 +106,18 @@ cd Heimdallr
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+# Optional (only if using OCR review in de-identification gateway)
+pip install pytesseract
+```
+
+Install `tesseract` system binary (examples):
+
+```bash
+# macOS (Homebrew)
+brew install tesseract
+
+# Ubuntu/Debian
+sudo apt-get update && sudo apt-get install -y tesseract-ocr
 ```
 
 ### Run (separate terminals)

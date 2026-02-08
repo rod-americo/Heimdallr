@@ -38,6 +38,16 @@ export HEIMDALLR_DICOM_PORT="11112"
 export HEIMDALLR_IDLE_SECONDS="30"
 ```
 
+## OCR De-identification Dependency
+
+For OCR-driven de-identification review before external model calls:
+
+1. Install Python package: `pip install pytesseract`
+2. Install system binary: `tesseract` (`brew install tesseract` or `apt-get install tesseract-ocr`)
+3. Default behavior: `DEID_OCR_ACTION=block` (external call is blocked when text is detected)
+
+If OCR dependencies are not installed, the gateway reports `ocr_available=false` in `deid` telemetry.
+
 ## PACS Connectivity Checks
 
 Expected defaults:

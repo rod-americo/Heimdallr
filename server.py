@@ -28,6 +28,11 @@ from pydantic import BaseModel, Field
 from pydantic import BaseModel, Field
 import sqlite3
 import httpx  # For microservice communication
+from deid_gateway import (
+    DeidReviewRequiredError,
+    deidentify_image_payload,
+    sanitize_outbound_metadata,
+)
 
 # Import centralized configuration
 import config
@@ -488,8 +493,11 @@ async def analyze_xray(
     try:
         # Read file content to forward
         file_content = await file.read()
-        files = {'file': (file.filename, file_content, file.content_type)}
-        data = {'age': age}
+        deid_image = deidentify_image_payload(file_content)
+        clean_meta, meta_details = sanitize_outbound_metadata({"age": age})
+
+        files = {'file': ("deid_image.jpg", deid_image.data, deid_image.media_type)}
+        data = {'age': clean_meta.get("age", age)}
         
         async with httpx.AsyncClient(timeout=180.0) as client:
             response = await client.post(
@@ -505,13 +513,27 @@ async def analyze_xray(
                     status_code=response.status_code, 
                     detail=f"MedGemma Service Error: {response.text}"
                 )
-                
-            return response.json()
+
+            payload = response.json()
+            if isinstance(payload, dict):
+                payload.setdefault("deid", {}).update(meta_details)
+                payload["deid"].update(deid_image.details)
+            return payload
             
     except httpx.ConnectError:
         raise HTTPException(
             status_code=503, 
             detail="MedGemma Service is unavailable."
+        )
+    except DeidReviewRequiredError as e:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": "De-identification review required before external call.",
+                "review_required": True,
+                "bounding_boxes": e.details.get("bounding_boxes", []),
+                "deid": e.details,
+            },
         )
     except httpx.ReadTimeout:
         raise HTTPException(
@@ -540,8 +562,13 @@ async def analyze_xray_anthropic(
     try:
         # Read file content to forward
         file_content = await file.read()
-        files = {'file': (file.filename, file_content, file.content_type)}
-        data = {'age': age, 'identificador': identificador}
+        deid_image = deidentify_image_payload(file_content)
+        clean_meta, meta_details = sanitize_outbound_metadata({"age": age})
+        files = {'file': ("deid_image.jpg", deid_image.data, deid_image.media_type)}
+        data = {
+            'age': clean_meta.get("age", age),
+            'identificador': identificador,
+        }
         
         async with httpx.AsyncClient(timeout=180.0) as client:
             response = await client.post(
@@ -557,13 +584,27 @@ async def analyze_xray_anthropic(
                     status_code=response.status_code, 
                     detail=f"Anthropic Service Error: {response.text}"
                 )
-                
-            return response.json()
+
+            payload = response.json()
+            if isinstance(payload, dict):
+                payload.setdefault("deid", {}).update(meta_details)
+                payload["deid"].update(deid_image.details)
+            return payload
             
     except httpx.ConnectError:
         raise HTTPException(
             status_code=503, 
             detail="Anthropic Service is unavailable."
+        )
+    except DeidReviewRequiredError as e:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": "De-identification review required before external call.",
+                "review_required": True,
+                "bounding_boxes": e.details.get("bounding_boxes", []),
+                "deid": e.details,
+            },
         )
     except httpx.ReadTimeout:
         raise HTTPException(

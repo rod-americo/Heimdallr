@@ -16,6 +16,12 @@ from transformers import pipeline
 import openai
 from dotenv import load_dotenv
 import medgemma_prompts
+from deid_gateway import (
+    DeidReviewRequiredError,
+    deidentify_image_payload,
+    sanitize_outbound_metadata,
+    sanitize_free_text,
+)
 
 # Load environment variables (expecting .env in the same directory or passed via env)
 load_dotenv()
@@ -68,6 +74,7 @@ class AnalysisResponse(BaseModel):
     medgemma_output: str
     final_report: str
     timings: Dict[str, float] = Field(..., description="Processing times in seconds")
+    deid: Dict[str, Any]
 
 
 def dicom_to_pil(file_object) -> Image.Image:
@@ -142,15 +149,34 @@ async def analyze(
 
     start_total = time.time()
     timings = {}
+    deid_details: Dict[str, Any] = {}
+
+    clean_meta, meta_details = sanitize_outbound_metadata({"age": age})
+    age = clean_meta.get("age", age)
+    deid_details.update(meta_details)
 
     # Read file content
     try:
         content = await file.read()
+
+        start_deid = time.time()
+        deid_image = deidentify_image_payload(content)
+        deid_details.update(deid_image.details)
+        timings["deid"] = round(time.time() - start_deid, 3)
         
         start_conversion = time.time()
-        image = load_image_file(content)
+        image = load_image_file(deid_image.data)
         timings["dcm_conversion"] = round(time.time() - start_conversion, 3)
-        
+    except DeidReviewRequiredError as e:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": "De-identification review required before external call.",
+                "review_required": True,
+                "bounding_boxes": e.details.get("bounding_boxes", []),
+                "deid": e.details,
+            },
+        )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to load file: {e}")
 
@@ -188,7 +214,10 @@ async def analyze(
         # Determine strictness of following the user prompt vs using the findings
         # For now, we provide the findings as context.
         # Prepare the full prompt using the Portuguese template
-        full_openai_prompt = medgemma_prompts.OPENAI_PROMPT_TEMPLATE.format(saida_medgemma=medgemma_output)
+        sanitized_findings = sanitize_free_text(medgemma_output)
+        full_openai_prompt = medgemma_prompts.OPENAI_PROMPT_TEMPLATE.format(
+            saida_medgemma=sanitized_findings
+        )
 
         response = client.chat.completions.create(
             model=OPENAI_MODEL,
@@ -209,7 +238,8 @@ async def analyze(
     return AnalysisResponse(
         medgemma_output=medgemma_output,
         final_report=final_report,
-        timings=timings
+        timings=timings,
+        deid=deid_details
     )
 
 @app.get("/health")

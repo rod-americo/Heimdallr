@@ -16,6 +16,11 @@ from dotenv import load_dotenv
 # Import conversion and parsing logic
 # Assuming these files are in the same directory (Heimdallr)
 from img_conversor import otimizar_imagem_para_api
+from deid_gateway import (
+    DeidReviewRequiredError,
+    deidentify_image_payload,
+    sanitize_outbound_metadata,
+)
 try:
     from anthropic_report_builder import extrair_json_do_texto, montar_laudo_a_partir_json
 except ImportError:
@@ -44,6 +49,7 @@ class AnalysisResponse(BaseModel):
     dados_json: Dict[str, Any]
     timings: Dict[str, float]
     usage: Dict[str, Any]
+    deid: Dict[str, Any]
 
 @app.post("/analyze", response_model=AnalysisResponse)
 async def analyze_xray(
@@ -61,6 +67,11 @@ async def analyze_xray(
     """
     start_time = time.time()
     timings = {}
+    deid_details: Dict[str, Any] = {}
+
+    clean_meta, meta_details = sanitize_outbound_metadata({"age": age})
+    age = clean_meta.get("age", age)
+    deid_details.update(meta_details)
     
     # 1. Prepare Directory
     case_dir = DATA_DIR / identificador
@@ -82,6 +93,13 @@ async def analyze_xray(
         conv_start = time.time()
         binary_data, media_type = otimizar_imagem_para_api(tmp_path)
         timings["conversion"] = round(time.time() - conv_start, 3)
+
+        deid_start = time.time()
+        deid_image = deidentify_image_payload(binary_data)
+        binary_data = deid_image.data
+        media_type = deid_image.media_type
+        timings["deid"] = round(time.time() - deid_start, 3)
+        deid_details.update(deid_image.details)
         
         # Save xray.jpg
         xray_path = case_dir / "xray.jpg"
@@ -90,6 +108,16 @@ async def analyze_xray(
             
         base64_image = base64.b64encode(binary_data).decode("utf-8")
         
+    except DeidReviewRequiredError as e:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": "De-identification review required before external call.",
+                "review_required": True,
+                "bounding_boxes": e.details.get("bounding_boxes", []),
+                "deid": e.details,
+            },
+        )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Image conversion failed: {str(e)}")
     finally:
@@ -175,7 +203,8 @@ async def analyze_xray(
         laudo_estruturado=laudo_estruturado,
         dados_json=dados_json,
         timings=timings,
-        usage=usage
+        usage=usage,
+        deid=deid_details
     )
 
 if __name__ == "__main__":
