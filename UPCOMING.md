@@ -210,6 +210,12 @@ Exit criteria:
 
 ## Suggested Delivery Horizons
 
+Horizon legend:
+- **Foundation**: baseline safety, interoperability, and throughput capabilities required before broader automation.
+- **Acceleration**: modules that increase clinical/operational performance on top of a stable foundation.
+- **Scaling**: expansion of validated workflows to higher volume, more services, and wider operational coverage.
+- **Innovation**: long-horizon capabilities with higher uncertainty and strategic differentiation potential.
+
 ### Horizon 1 - Foundation (Safety + Throughput)
 - A1, A2, B1, E1, E2
 
