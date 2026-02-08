@@ -13,6 +13,8 @@
             --text: #e8f0ff;
             --muted: #a9bad8;
             --accent: #46d3ff;
+            --link-bg: #12203a;
+            --link-text: #e8f0ff;
             color-scheme: dark light;
         }
 
@@ -24,6 +26,8 @@
                 --text: #0f1b33;
                 --muted: #4d6283;
                 --accent: #0f87c9;
+                --link-bg: #eaf2ff;
+                --link-text: #12345f;
             }
         }
 
@@ -64,12 +68,12 @@
         }
 
         a {
-            color: var(--text);
+            color: var(--link-text);
             text-decoration: none;
             border: 1px solid var(--line);
             border-radius: 10px;
             padding: 12px 14px;
-            background: #12203a;
+            background: var(--link-bg);
             display: block;
         }
 
