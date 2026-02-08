@@ -4,7 +4,7 @@
 
 Heimdallr is a production-oriented platform that turns raw imaging intake into structured, actionable clinical intelligence. It connects DICOM ingestion, preprocessing, AI analysis, and report-assist workflows so radiologists can spend less time on logistics and more time on decision-making.
 
-The name references Heimdall, the Norse guardian known for vigilant watchfulness, reflecting the platform's role in continuously monitoring imaging workflows for clinically relevant signals.
+Named after the all-seeing Norse guardian, Heimdallr watches over every scan and every report, standing at the threshold between raw data and clinical action with relentless vigilance.
 
 The project follows a systems approach: instead of a single detection model, Heimdallr is designed as an end-to-end radiology pipeline where each stage contributes to safety, throughput, and continuity of care.
 
