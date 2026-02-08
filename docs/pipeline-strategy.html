@@ -266,6 +266,8 @@
             border-radius: 12px;
             padding: 12px;
             transition: background 0.2s ease, border-color 0.2s ease;
+            display: flex;
+            flex-direction: column;
         }
 
         .card:hover {
@@ -286,6 +288,12 @@
             margin-bottom: 8px;
             flex-wrap: wrap;
             align-items: center;
+        }
+
+        .track {
+            font-size: 0.82rem;
+            color: var(--muted);
+            margin-bottom: 8px;
         }
 
         .pill {
@@ -336,6 +344,10 @@
         .metric-pill.friction.high {
             background: var(--pill-innovation-bg);
             color: var(--pill-innovation-text);
+        }
+
+        .card-body {
+            flex: 1;
         }
 
         .guide-row {
@@ -541,12 +553,14 @@
                 el.innerHTML = `
                     <span class="pill ${m.horizon}">${m.horizon}</span>
                     <h3>${m.title}</h3>
+                    <div class="track">${trackName[m.track]}</div>
+                    <div class="card-body">
+                        <p class="small">${m.note}</p>
+                    </div>
                     <div class="meta">
-                        <span>${trackName[m.track]}</span>
                         <span class="metric-pill impact">Impact ${m.impact}/10</span>
                         <span class="metric-pill friction ${frictionBand(m.friction)}">Friction ${m.friction}/10</span>
                     </div>
-                    <p class="small">${m.note}</p>
                 `;
                 cards.appendChild(el);
             });
