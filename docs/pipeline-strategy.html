@@ -333,9 +333,19 @@
             line-height: 1.2;
         }
 
-        .metric-pill.impact {
-            background: rgba(138, 164, 255, 0.16);
-            color: var(--chart-text);
+        .metric-pill.impact.low {
+            background: rgba(57, 208, 255, 0.16);
+            color: #9de7ff;
+        }
+
+        .metric-pill.impact.medium {
+            background: rgba(138, 164, 255, 0.18);
+            color: #d0dcff;
+        }
+
+        .metric-pill.impact.high {
+            background: rgba(168, 121, 255, 0.2);
+            color: #e1ceff;
         }
 
         .metric-pill.friction.low {
@@ -552,6 +562,12 @@
             return 'high';
         }
 
+        function impactBand(v) {
+            if (v <= 3) return 'low';
+            if (v <= 6) return 'medium';
+            return 'high';
+        }
+
         function renderCards(filter = 'all') {
             cards.innerHTML = '';
             const list = filter === 'all' ? modules : modules.filter((m) => m.track === filter);
@@ -566,7 +582,7 @@
                         <p class="small">${m.note}</p>
                     </div>
                     <div class="meta">
-                        <span class="metric-pill impact">Impact ${m.impact}/10</span>
+                        <span class="metric-pill impact ${impactBand(m.impact)}">Impact ${m.impact}/10</span>
                         <span class="metric-pill friction ${frictionBand(m.friction)}">Friction ${m.friction}/10</span>
                     </div>
                 `;
