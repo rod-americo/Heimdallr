@@ -792,17 +792,53 @@
             planned: '#cbd5e1'
         };
 
+        function buildPriorityPoints(list) {
+            const groups = new Map();
+            list.forEach((m) => {
+                const key = `${m.friction}-${m.impact}`;
+                if (!groups.has(key)) groups.set(key, []);
+                groups.get(key).push(m);
+            });
+
+            const jitterStep = 0.14;
+            const jitterMax = 0.28;
+            const radius = isMobile ? 8 : 9;
+
+            const points = [];
+            for (const [, group] of groups.entries()) {
+                const n = group.length;
+                group.forEach((m, idx) => {
+                    const center = (n - 1) / 2;
+                    let jitter = (idx - center) * jitterStep;
+                    if (jitter > jitterMax) jitter = jitterMax;
+                    if (jitter < -jitterMax) jitter = -jitterMax;
+                    points.push({
+                        x: m.friction,
+                        y: m.impact + jitter,
+                        r: radius,
+                        title: m.title,
+                        status: m.status,
+                        impact: m.impact,
+                        friction: m.friction
+                    });
+                });
+            }
+            return points;
+        }
+
+        const priorityPoints = buildPriorityPoints(modules);
+
         const priorityChart = new Chart(document.getElementById('priorityChart'), {
             type: 'bubble',
             data: {
                 datasets: [{
-                    data: modules.map((m) => ({ x: m.friction, y: m.impact, r: 10, title: m.title, status: m.status })),
-                    backgroundColor: modules.map((m) => {
-                        if (m.friction <= 4) return bubbleGood;
-                        if (m.friction <= 7) return bubbleMid;
+                    data: priorityPoints,
+                    backgroundColor: priorityPoints.map((p) => {
+                        if (p.friction <= 4) return bubbleGood;
+                        if (p.friction <= 7) return bubbleMid;
                         return bubbleHard;
                     }),
-                    borderColor: modules.map((m) => statusBorder[m.status] || chartBorder),
+                    borderColor: priorityPoints.map((p) => statusBorder[p.status] || chartBorder),
                     borderWidth: 3
                 }]
             },
@@ -816,25 +852,25 @@
                     legend: { display: false },
                     tooltip: {
                         callbacks: {
-                            label: (ctx) => `${ctx.raw.title} | ${ctx.raw.status} | Impact ${ctx.raw.y} | Friction ${ctx.raw.x}`
+                            label: (ctx) => `${ctx.raw.title} | ${ctx.raw.status} | Impact ${ctx.raw.impact} | Friction ${ctx.raw.friction}`
                         }
                     }
                 },
                 scales: {
                     x: {
                         type: 'linear',
-                        min: 0,
+                        min: 2,
                         max: 10,
                         title: { display: !isMobile, text: 'Implementation Friction', color: chartAxis },
-                        ticks: { color: chartText, maxTicksLimit: isMobile ? 6 : 11 },
+                        ticks: { color: chartText, maxTicksLimit: isMobile ? 6 : 9, stepSize: 1 },
                         grid: { color: chartGrid }
                     },
                     y: {
                         type: 'linear',
-                        min: 0,
+                        min: 4,
                         max: 10,
                         title: { display: !isMobile, text: 'Clinical/Operational Impact', color: chartAxis },
-                        ticks: { color: chartText, maxTicksLimit: isMobile ? 6 : 11 },
+                        ticks: { color: chartText, maxTicksLimit: isMobile ? 6 : 7, stepSize: 1 },
                         grid: { color: chartGrid }
                     }
                 }
