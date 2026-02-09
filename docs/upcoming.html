@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heimdallr Upcoming Roadmap</title>
+    <style>
+        :root {
+            --bg: #070c16;
+            --bg-soft: #101a2d;
+            --bg-card: #121f36;
+            --text: #e8f0ff;
+            --muted: #9eb0ca;
+            --accent: #39d0ff;
+            --line: rgba(126, 157, 210, 0.25);
+            --radial-1: rgba(57, 208, 255, 0.15);
+            --radial-2: rgba(138, 164, 255, 0.10);
+            --hero-grad-a: rgba(18, 31, 54, 0.95);
+            --hero-grad-b: rgba(10, 18, 32, 0.98);
+            --link-text: #d6e8ff;
+            --link-bg: #12203a;
+            --ring: rgba(57, 208, 255, 0.2);
+            --table-head-text: #d7e5ff;
+            --table-head-bg: rgba(19, 34, 59, 0.8);
+            --pill-foundation-bg: rgba(41, 201, 138, 0.18);
+            --pill-foundation-text: #a8f5d6;
+            --pill-acceleration-bg: rgba(243, 169, 82, 0.20);
+            --pill-acceleration-text: #ffd8aa;
+            --pill-scaling-bg: rgba(138, 164, 255, 0.20);
+            --pill-scaling-text: #d4e0ff;
+            --pill-innovation-bg: rgba(245, 108, 124, 0.2);
+            --pill-innovation-text: #ffc7cf;
+            --radius: 14px;
+            color-scheme: dark light;
+        }
+
+        @media (prefers-color-scheme: light) {
+            :root {
+                --bg: #f3f7ff;
+                --bg-soft: #ffffff;
+                --bg-card: #f7faff;
+                --text: #0f1b33;
+                --muted: #4d6283;
+                --accent: #0f87c9;
+                --line: rgba(38, 68, 125, 0.18);
+                --radial-1: rgba(15, 135, 201, 0.10);
+                --radial-2: rgba(86, 115, 216, 0.08);
+                --hero-grad-a: rgba(240, 247, 255, 0.95);
+                --hero-grad-b: rgba(233, 242, 255, 0.98);
+                --link-text: #12345f;
+                --link-bg: #eaf2ff;
+                --ring: rgba(15, 135, 201, 0.2);
+                --table-head-text: #1f3d67;
+                --table-head-bg: rgba(228, 238, 255, 0.95);
+                --pill-foundation-bg: rgba(30, 159, 110, 0.14);
+                --pill-foundation-text: #1f7f5a;
+                --pill-acceleration-bg: rgba(198, 127, 29, 0.14);
+                --pill-acceleration-text: #885400;
+                --pill-scaling-bg: rgba(86, 115, 216, 0.14);
+                --pill-scaling-text: #344ba7;
+                --pill-innovation-bg: rgba(200, 74, 89, 0.14);
+                --pill-innovation-text: #8f2f3a;
+            }
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: "Inter", "Segoe UI", sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at 15% 20%, var(--radial-1), transparent 30%),
+                radial-gradient(circle at 85% 80%, var(--radial-2), transparent 30%),
+                var(--bg);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .wrap {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 28px 20px 60px;
+        }
+
+        .hero,
+        .panel {
+            background: var(--bg-soft);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            padding: 20px;
+        }
+
+        .hero {
+            margin-bottom: 18px;
+            background: linear-gradient(140deg, var(--hero-grad-a), var(--hero-grad-b));
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: clamp(1.4rem, 2vw, 2.1rem);
+        }
+
+        h2 {
+            margin: 0 0 10px;
+            font-size: 1.2rem;
+        }
+
+        h3 {
+            margin: 0 0 10px;
+            font-size: 1rem;
+        }
+
+        p {
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.65;
+        }
+
+        .lead {
+            color: var(--text);
+            opacity: 0.95;
+        }
+
+        .nav-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .nav-links a {
+            color: var(--link-text);
+            text-decoration: none;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 6px 12px;
+            font-size: 0.82rem;
+            background: var(--link-bg);
+        }
+
+        .nav-links a:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px var(--ring);
+        }
+
+        .stack {
+            display: grid;
+            gap: 14px;
+            margin-top: 14px;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        .panel ul,
+        .panel ol {
+            margin: 8px 0 0 20px;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .panel li { margin-bottom: 6px; }
+
+        .pill {
+            display: inline-block;
+            font-size: 0.78rem;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 999px;
+            margin-right: 6px;
+        }
+
+        .pill.foundation { background: var(--pill-foundation-bg); color: var(--pill-foundation-text); }
+        .pill.acceleration { background: var(--pill-acceleration-bg); color: var(--pill-acceleration-text); }
+        .pill.scaling { background: var(--pill-scaling-bg); color: var(--pill-scaling-text); }
+        .pill.innovation { background: var(--pill-innovation-bg); color: var(--pill-innovation-text); }
+
+        .table-wrap {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 980px;
+            font-size: 0.92rem;
+        }
+
+        th,
+        td {
+            border: 1px solid var(--line);
+            padding: 9px;
+            text-align: left;
+            vertical-align: top;
+            color: var(--muted);
+        }
+
+        th {
+            color: var(--table-head-text);
+            background: var(--table-head-bg);
+        }
+
+        .nav-card {
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            background: var(--bg-card);
+            padding: 12px;
+        }
+
+        .tiny {
+            font-size: 0.86rem;
+            color: var(--muted);
+        }
+
+        @media (max-width: 980px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .wrap {
+                padding: 16px 12px 40px;
+            }
+
+            .hero,
+            .panel {
+                padding: 14px;
+            }
+
+            table {
+                min-width: 760px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main class="wrap">
+        <section class="hero">
+            <h1>Heimdallr Upcoming Roadmap</h1>
+            <p class="lead">Planned capabilities for Heimdallr's radiology preprocessing ecosystem, organized to protect delivery quality, clinical safety, and governance as the platform scales.</p>
+            <div class="nav-links">
+                <a href="./index.html">Open Docs Hub</a>
+                <a href="./pipeline-strategy.html">Open Strategy Board</a>
+                <a href="./motivation-justification.html">Open Motivation Guide</a>
+                <a href="./radiology-preprocessing-ecosystem-report.html">Open Full Report</a>
+                <a href="https://github.com/rod-americo/Heimdallr/blob/main/UPCOMING.md">Open UPCOMING Source (Markdown)</a>
+                <a href="https://github.com/rod-americo/Heimdallr/blob/main/README.md">Open README</a>
+            </div>
+        </section>
+
+        <section class="grid-2">
+            <article class="panel">
+                <h2>Purpose</h2>
+                <ul>
+                    <li>Align engineering, clinical, and governance priorities.</li>
+                    <li>Prevent rushed releases in high-risk clinical workflows.</li>
+                    <li>Keep scope explicit for contributors and partners.</li>
+                    <li>Turn strategy into auditable implementation steps.</li>
+                </ul>
+            </article>
+            <article class="panel">
+                <h2>Working Definitions</h2>
+                <ul>
+                    <li><strong>Friction (1-10):</strong> implementation-in-production effort across integration, data quality, validation, compliance/governance, and operational change.</li>
+                    <li><strong>Impact (1-10):</strong> expected clinical and operational value once adopted in real workflows.</li>
+                    <li><strong>Navigation:</strong> active monitoring by a service team that owns each flagged patient until closure.</li>
+                </ul>
+            </article>
+        </section>
+
+        <section class="panel stack">
+            <h2>Guardrails (Non-Negotiable)</h2>
+            <ol>
+                <li><strong>Human-in-the-loop first:</strong> AI prioritizes and drafts; clinicians decide.</li>
+                <li><strong>Privacy by design:</strong> de-identification and least-privilege are mandatory for any external AI call.</li>
+                <li><strong>Workflow over isolated models:</strong> optimize end-to-end throughput and follow-up completion.</li>
+                <li><strong>Measured delivery:</strong> every module must ship with KPIs, logs, and rollback.</li>
+                <li><strong>Reproducibility:</strong> deterministic outputs for the same input/version set.</li>
+            </ol>
+        </section>
+
+        <section class="panel stack">
+            <h2>Prioritized Module Backlog</h2>
+            <p class="tiny">Ordered by strategic sequence (not only by model sophistication).</p>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Module</th>
+                            <th>Pillar</th>
+                            <th>Impact</th>
+                            <th>Friction</th>
+                            <th>Why now</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>1</td><td>HL7-triggered prefetch orchestration</td><td>Logistics</td><td>9</td><td>4</td><td>Immediate throughput win with low clinical risk</td></tr>
+                        <tr><td>2</td><td>Unified worklist orchestration</td><td>Workflow</td><td>9</td><td>5</td><td>Reduces queue switching and unfair distribution</td></tr>
+                        <tr><td>3</td><td>De-identification governance hardening</td><td>Security</td><td>10</td><td>6</td><td>Extend an implemented gateway with stronger policy and audit controls</td></tr>
+                        <tr><td>4</td><td>Deterministic pseudonymization + crosswalk</td><td>Security</td><td>10</td><td>5</td><td>Enables traceable privacy-preserving workflows</td></tr>
+                        <tr><td>5</td><td>Follow-up recommendation extraction (NLP)</td><td>Navigation</td><td>8</td><td>5</td><td>High value and operationally feasible</td></tr>
+                        <tr><td>6</td><td>Urology navigation pathway</td><td>Navigation</td><td>9</td><td>6</td><td>Direct care-continuity impact with clear rule set</td></tr>
+                        <tr><td>7</td><td>Opportunistic coronary calcium (CAC-DRS)</td><td>Quantification</td><td>8</td><td>6</td><td>High preventive-care value from opportunistic CT workflows</td></tr>
+                        <tr><td>8</td><td>AI-assisted urgency flagging</td><td>Workflow</td><td>9</td><td>7</td><td>Improves time-to-open for high-acuity cases</td></tr>
+                        <tr><td>9</td><td>Liver steatosis opportunistic pipeline</td><td>Quantification</td><td>7</td><td>6</td><td>Population-health insight from existing scans</td></tr>
+                        <tr><td>10</td><td>Osteoporosis opportunistic screening</td><td>Quantification</td><td>7</td><td>6</td><td>Scalable DXA-proxy value from routine CT</td></tr>
+                        <tr><td>11</td><td>Structured report drafting copilot</td><td>Reporting</td><td>8</td><td>7</td><td>Reporting acceleration with strong guardrails</td></tr>
+                        <tr><td>12</td><td>Emphysema quantification at scale</td><td>Quantification</td><td>6</td><td>7</td><td>Valuable but depends on segmentation throughput</td></tr>
+                        <tr><td>13</td><td>On-prem AI gateway enforcement</td><td>Security</td><td>9</td><td>7</td><td>Critical for enterprise deployment maturity</td></tr>
+                        <tr><td>14</td><td>Drift/hallucination control framework</td><td>Reporting</td><td>9</td><td>8</td><td>Needed before broad automation trust</td></tr>
+                        <tr><td>15</td><td>Agentic workflow coordination</td><td>R&amp;D</td><td>8</td><td>9</td><td>Long-horizon orchestration capability</td></tr>
+                        <tr><td>16</td><td>Foundation model fine-tuning layer</td><td>R&amp;D</td><td>9</td><td>9</td><td>Institution-adapted model performance with controlled governance</td></tr>
+                        <tr><td>17</td><td>Temporal imaging intelligence (delta engine)</td><td>R&amp;D</td><td>9</td><td>8</td><td>Longitudinal change tracking for follow-up-heavy workflows</td></tr>
+                        <tr><td>18</td><td>Causal triage simulator</td><td>R&amp;D</td><td>8</td><td>8</td><td>Safe policy simulation before live queue changes</td></tr>
+                        <tr><td>19</td><td>Synthetic + federated validation sandbox</td><td>R&amp;D</td><td>8</td><td>8</td><td>Privacy-preserving multi-site validation and benchmarking</td></tr>
+                        <tr><td>20</td><td>Autonomous follow-up orchestrator (human-gated)</td><td>R&amp;D</td><td>9</td><td>8</td><td>Strong continuity and financial recovery upside with clinical oversight</td></tr>
+                        <tr><td>21</td><td>Prospective trial mode</td><td>R&amp;D</td><td>8</td><td>7</td><td>Embedded publication-grade evidence generation</td></tr>
+                        <tr><td>22</td><td>General surgery navigation pathway</td><td>Navigation</td><td>7</td><td>5</td><td>Low-friction continuity value for common actionable findings</td></tr>
+                        <tr><td>23</td><td>Oncology high-suspicion navigation router</td><td>Navigation</td><td>10</td><td>7</td><td>High clinical-risk routing for ER/inpatient neoplastic suspicion</td></tr>
+                        <tr><td>24</td><td>Gynecology navigation pathway</td><td>Navigation</td><td>9</td><td>7</td><td>Structured continuity for adnexal/uterine/cervical suspicious findings</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="panel stack">
+            <h2>Suggested Delivery Horizons</h2>
+            <p>
+                <span class="pill foundation">Foundation</span>
+                <span class="pill acceleration">Acceleration</span>
+                <span class="pill scaling">Scaling</span>
+                <span class="pill innovation">Innovation</span>
+            </p>
+            <ul>
+                <li><strong>Horizon 1 - Foundation:</strong> A1, A2, B1, E1, E2</li>
+                <li><strong>Horizon 2 - Clinical Acceleration:</strong> B2, B3, C1, C2, C4, D1</li>
+                <li><strong>Horizon 3 - Care Continuity at Scale:</strong> F1, F2, F3, F4, F5, F6, F7, C3, D2, E3</li>
+                <li><strong>Horizon 4 - Strategic Innovation:</strong> D3, G1, G2, G3, G4, G5, G6, G7</li>
+            </ul>
+        </section>
+
+        <section class="panel stack">
+            <h2>Navigation Monitoring Criteria</h2>
+            <div class="grid-2">
+                <article class="nav-card">
+                    <h3>Urology</h3>
+                    <ul>
+                        <li>Renal stones &gt;= 0.7 cm</li>
+                        <li>Simple renal cysts &gt; 10 cm</li>
+                        <li>Bosniak III/IV cysts</li>
+                        <li>Solid renal nodules (any size)</li>
+                        <li>Solid adrenal nodules &gt; 3 cm</li>
+                        <li>Solid ureteral nodules / ureteral stones / UPJ stenosis</li>
+                        <li>Solid or vegetative bladder lesions</li>
+                        <li>Prostate findings: PI-RADS 3-5, or volume &gt; 70 g, or &gt; 40 g with outlet obstruction signs</li>
+                        <li>Solid testicular lesions</li>
+                        <li>If neoplasm is suspected, also route to Oncology Navigation</li>
+                    </ul>
+                </article>
+                <article class="nav-card">
+                    <h3>General Surgery + Oncology</h3>
+                    <ul>
+                        <li><strong>General Surgery:</strong> cholelithiasis and abdominal wall hernias</li>
+                        <li><strong>Oncology:</strong> route all suspicious/potentially neoplastic findings in ER and inpatient populations</li>
+                        <li>Keep owner, due date, status, and escalation until closure</li>
+                    </ul>
+                </article>
+            </div>
+            <article class="nav-card">
+                <h3>Gynecology</h3>
+                <ul>
+                    <li>Solid/predominantly solid ovarian masses</li>
+                    <li>Complex cystic adnexal lesions with suspicious components</li>
+                    <li>Ascites, peritoneal/omental/retroperitoneal implants</li>
+                    <li>Pelvic/retroperitoneal suspicious adenopathy</li>
+                    <li>Adnexal O-RADS 4</li>
+                    <li>Suspicious endometrial/uterine/cervical findings</li>
+                    <li>Findings suspicious for endometriosis requiring structured follow-up</li>
+                </ul>
+            </article>
+        </section>
+
+        <section class="grid-2">
+            <article class="panel">
+                <h2>Top Risk Register</h2>
+                <ol>
+                    <li>Regulatory variance across LGPD/GDPR/HIPAA-like environments.</li>
+                    <li>PACS/RIS/EHR integration heterogeneity and legacy constraints.</li>
+                    <li>Model/API drift and vendor-side behavior changes.</li>
+                    <li>GPU capacity bottlenecks for segmentation-heavy modules.</li>
+                    <li>Clinical adoption risk without explicit governance ownership.</li>
+                </ol>
+            </article>
+            <article class="panel">
+                <h2>Platform Definition of Done</h2>
+                <ul>
+                    <li>Functional implementation with rollback path.</li>
+                    <li>Clinical safety boundaries and reviewer accountability.</li>
+                    <li>Security/privacy controls aligned with data class.</li>
+                    <li>Monitoring dashboards, logs, and runbooks.</li>
+                    <li>Validation datasets and acceptance metrics documented.</li>
+                </ul>
+            </article>
+        </section>
+
+        <section class="panel">
+            <h2>Where to Go Next</h2>
+            <div class="nav-links">
+                <a href="./index.html">Docs Hub</a>
+                <a href="./pipeline-strategy.html">Strategy Board</a>
+                <a href="./motivation-justification.html">Motivation Guide</a>
+                <a href="./radiology-preprocessing-ecosystem-report.html">Full Report</a>
+                <a href="https://github.com/rod-americo/Heimdallr/blob/main/UPCOMING.md">UPCOMING Source (Markdown)</a>
+                <a href="https://github.com/rod-americo/Heimdallr/blob/main/README.md">README.md</a>
+            </div>
+        </section>
+    </main>
+</body>
+
+</html>
