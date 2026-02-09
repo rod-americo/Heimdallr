@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Compile tracked Python files
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import py_compile
+          import subprocess
+          from pathlib import Path
+
+          files = subprocess.check_output(
+              ["git", "ls-files", "*.py"], text=True
+          ).splitlines()
+
+          failed = []
+          for file in files:
+              p = Path(file)
+              if not p.exists():
+                  continue
+              try:
+                  py_compile.compile(str(p), doraise=True)
+              except Exception as exc:
+                  failed.append((file, str(exc)))
+
+          if failed:
+              for file, exc in failed:
+                  print(f"[FAIL] {file}: {exc}")
+              raise SystemExit(1)
+
+          print(f"Compiled {len(files)} Python files successfully.")
+          PY

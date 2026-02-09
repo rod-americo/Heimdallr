@@ -31,8 +31,8 @@ Este documento resume a arquitetura, os fluxos e os pontos de alteracao mais pro
   - `static/index.html`, `static/styles.css`, `static/app.js`
 - Banco:
   - `database/schema.sql` (schema base)
-  - migracoes: `migrate_add_biometrics.py`, `migrate_add_smi.py`
-  - utilitarios: `backfill_database.py`, `backfill_id_json.py`
+  - arquivo de dados: `database/dicom.db`
+  - documentacao: `database/README.md`
 
 ## 3) Fluxo ponta a ponta (mental model)
 
@@ -125,4 +125,3 @@ Docs API: `http://localhost:8001/docs`
 - Verificar compatibilidade CT vs MR.
 - Validar que `id.json` e `resultados.json` permanecem consistentes.
 - Evitar quebrar fluxo de ingestao automatica (DICOM Listener -> upload -> prepare -> run).
-

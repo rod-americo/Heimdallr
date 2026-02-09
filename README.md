@@ -106,9 +106,13 @@ cd Heimdallr
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+cp .env.example .env
+# edit .env and set TOTALSEGMENTATOR_LICENSE
 # Optional (only if using OCR review in de-identification gateway)
 pip install pytesseract
 ```
+
+`TOTALSEGMENTATOR_LICENSE` is required by `config.py` for pipeline services.
 
 Install `tesseract` system binary (examples):
 
@@ -136,6 +140,13 @@ source venv/bin/activate
 python dicom_listener.py
 ```
 
+### Preflight Check (optional, recommended)
+
+```bash
+source venv/bin/activate
+python -m py_compile server.py run.py dicom_listener.py prepare.py
+```
+
 ### Access
 - Dashboard: `http://localhost:8001`
 - API docs: `http://localhost:8001/docs`
@@ -152,6 +163,14 @@ python dicom_listener.py
 - This project uses **TotalSegmentator**. Commercial usage may require a separate TotalSegmentator license.
 - Each institution and deployer is responsible for validating third-party licensing and regulatory compliance before production use.
 - For attributions and notices, see [`NOTICE`](NOTICE).
+
+## Governance Baseline
+
+- Security disclosure policy: [`SECURITY.md`](SECURITY.md)
+- Code ownership map: [`CODEOWNERS`](CODEOWNERS)
+- Change history: [`CHANGELOG.md`](CHANGELOG.md)
+- Architecture reference: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+- Contribution guide: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 
 ## Production Baseline
 
@@ -209,6 +228,7 @@ For endpoint coverage and payload conventions, see [`docs/API.md`](docs/API.md).
 
 ## Documentation Map
 
+- Architecture overview: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - Strategic roadmap source (Markdown): [`UPCOMING.md`](UPCOMING.md)
 - Strategic roadmap viewer (HTML): [`docs/upcoming.html`](docs/upcoming.html)
 - Operations and deployment runbook: [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
