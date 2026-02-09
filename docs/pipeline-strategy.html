@@ -63,12 +63,18 @@
             --focus-2: #8aa4ff;
             --focus-3: #f3a952;
             --focus-4: #29c98a;
-            --status-implemented-bg: rgba(56, 189, 248, 0.22);
-            --status-implemented-text: #c2eeff;
-            --status-progress-bg: rgba(57, 208, 255, 0.2);
-            --status-progress-text: #b5ecff;
             --status-planned-bg: rgba(148, 163, 184, 0.2);
             --status-planned-text: #d8e2f2;
+            --status-poc-bg: rgba(120, 147, 183, 0.24);
+            --status-poc-text: #d4e0f5;
+            --status-mvp-bg: rgba(57, 208, 255, 0.2);
+            --status-mvp-text: #b5ecff;
+            --status-validation-bg: rgba(41, 201, 138, 0.2);
+            --status-validation-text: #a8f5d6;
+            --status-candidate-bg: rgba(243, 169, 82, 0.2);
+            --status-candidate-text: #ffd39f;
+            --status-implemented-bg: rgba(139, 92, 246, 0.22);
+            --status-implemented-text: #e2d5ff;
             --impact-low-bg: rgba(57, 208, 255, 0.16);
             --impact-low-text: #9de7ff;
             --impact-medium-bg: rgba(138, 164, 255, 0.18);
@@ -123,12 +129,18 @@
                 --focus-2: #5673d8;
                 --focus-3: #c67f1d;
                 --focus-4: #1e9f6e;
-                --status-implemented-bg: rgba(14, 116, 144, 0.12);
-                --status-implemented-text: #0d5d73;
-                --status-progress-bg: rgba(15, 135, 201, 0.12);
-                --status-progress-text: #0f5f99;
                 --status-planned-bg: rgba(115, 133, 163, 0.2);
                 --status-planned-text: #344862;
+                --status-poc-bg: rgba(87, 110, 148, 0.18);
+                --status-poc-text: #355172;
+                --status-mvp-bg: rgba(15, 135, 201, 0.12);
+                --status-mvp-text: #0f5f99;
+                --status-validation-bg: rgba(30, 159, 110, 0.14);
+                --status-validation-text: #1f7f5a;
+                --status-candidate-bg: rgba(198, 127, 29, 0.14);
+                --status-candidate-text: #885400;
+                --status-implemented-bg: rgba(131, 92, 220, 0.18);
+                --status-implemented-text: #452796;
                 --impact-low-bg: rgba(15, 135, 201, 0.14);
                 --impact-low-text: #0c597f;
                 --impact-medium-bg: rgba(86, 115, 216, 0.14);
@@ -386,12 +398,18 @@
         .top-meta.horizon.innovation { color: var(--pill-innovation-text); }
         .top-meta.horizon.innovation .dot { background: var(--pill-innovation-text); }
 
-        .top-meta.status.status-implemented { color: var(--status-implemented-text); }
-        .top-meta.status.status-implemented .dot { background: var(--status-implemented-text); }
-        .top-meta.status.status-in-progress { color: var(--status-progress-text); }
-        .top-meta.status.status-in-progress .dot { background: var(--status-progress-text); }
         .top-meta.status.status-planned { color: var(--status-planned-text); }
         .top-meta.status.status-planned .dot { background: var(--status-planned-text); }
+        .top-meta.status.status-poc { color: var(--status-poc-text); }
+        .top-meta.status.status-poc .dot { background: var(--status-poc-text); }
+        .top-meta.status.status-mvp-internal { color: var(--status-mvp-text); }
+        .top-meta.status.status-mvp-internal .dot { background: var(--status-mvp-text); }
+        .top-meta.status.status-validation-ready { color: var(--status-validation-text); }
+        .top-meta.status.status-validation-ready .dot { background: var(--status-validation-text); }
+        .top-meta.status.status-production-candidate { color: var(--status-candidate-text); }
+        .top-meta.status.status-production-candidate .dot { background: var(--status-candidate-text); }
+        .top-meta.status.status-implemented { color: var(--status-implemented-text); }
+        .top-meta.status.status-implemented .dot { background: var(--status-implemented-text); }
         .top-meta.status {
             flex-direction: row-reverse;
         }
@@ -433,9 +451,12 @@
         .pill.friction-low { background: var(--pill-foundation-bg); color: var(--pill-foundation-text); }
         .pill.friction-medium { background: var(--pill-acceleration-bg); color: var(--pill-acceleration-text); }
         .pill.friction-high { background: var(--friction-high-bg); color: var(--friction-high-text); }
-        .pill.status-implemented { background: var(--status-implemented-bg); color: var(--status-implemented-text); border: 1px solid rgba(56, 189, 248, 0.45); }
-        .pill.status-in-progress { background: var(--status-progress-bg); color: var(--status-progress-text); border: 1px solid rgba(57, 208, 255, 0.45); }
         .pill.status-planned { background: var(--status-planned-bg); color: var(--status-planned-text); border: 1px solid rgba(100, 116, 139, 0.45); }
+        .pill.status-poc { background: var(--status-poc-bg); color: var(--status-poc-text); border: 1px solid rgba(120, 147, 183, 0.45); }
+        .pill.status-mvp-internal { background: var(--status-mvp-bg); color: var(--status-mvp-text); border: 1px solid rgba(57, 208, 255, 0.45); }
+        .pill.status-validation-ready { background: var(--status-validation-bg); color: var(--status-validation-text); border: 1px solid rgba(41, 201, 138, 0.45); }
+        .pill.status-production-candidate { background: var(--status-candidate-bg); color: var(--status-candidate-text); border: 1px solid rgba(243, 169, 82, 0.45); }
+        .pill.status-implemented { background: var(--status-implemented-bg); color: var(--status-implemented-text); border: 1px solid rgba(139, 92, 246, 0.45); }
 
         .small {
             color: var(--muted);
@@ -569,9 +590,12 @@
                 </div>
                 <div class="status-legend">
                     <span class="guide-label row-label">Status (ring):</span>
-                    <span class="status-item"><span class="status-ring" style="border-color:#6ee7ff;background:rgba(110,231,255,0.16);"></span>Implemented</span>
-                    <span class="status-item"><span class="status-ring" style="border-color:#b8c7ff;background:rgba(184,199,255,0.16);"></span>In Progress</span>
                     <span class="status-item"><span class="status-ring" style="border-color:#cbd5e1;background:rgba(203,213,225,0.18);"></span>Planned</span>
+                    <span class="status-item"><span class="status-ring" style="border-color:#9fb2cf;background:rgba(120,147,183,0.2);"></span>POC</span>
+                    <span class="status-item"><span class="status-ring" style="border-color:#6ee7ff;background:rgba(110,231,255,0.16);"></span>MVP Internal</span>
+                    <span class="status-item"><span class="status-ring" style="border-color:#66e2b0;background:rgba(102,226,176,0.16);"></span>Validation Ready</span>
+                    <span class="status-item"><span class="status-ring" style="border-color:#ffca8d;background:rgba(255,202,141,0.18);"></span>Production Candidate</span>
+                    <span class="status-item"><span class="status-ring" style="border-color:#c6a4ff;background:rgba(198,164,255,0.18);"></span>Implemented</span>
                 </div>
                 <p class="small" style="margin-top: 8px;">Friction is an implementation-in-production score (integration, validation, compliance, and operational change), not just model difficulty.</p>
             </article>
@@ -603,9 +627,12 @@
             <div class="filter-group">
                 <span class="filter-label row-label">Status:</span>
                 <button class="active" data-group="status" data-filter="all">All</button>
-                <button data-group="status" data-filter="implemented">Implemented</button>
-                <button data-group="status" data-filter="in-progress">In Progress</button>
                 <button data-group="status" data-filter="planned">Planned</button>
+                <button data-group="status" data-filter="poc">POC</button>
+                <button data-group="status" data-filter="mvp-internal">MVP Internal</button>
+                <button data-group="status" data-filter="validation-ready">Validation Ready</button>
+                <button data-group="status" data-filter="production-candidate">Production Candidate</button>
+                <button data-group="status" data-filter="implemented">Implemented</button>
             </div>
             <div id="cards" class="cards"></div>
         </section>
@@ -615,7 +642,7 @@
             <p class="small"><strong>Impact (1-10)</strong>: expected clinical and operational value if deployed safely.</p>
             <p class="small" style="margin-top: 6px;"><strong>Friction (1-10)</strong>: real-world effort to productionize safely, combining technical integration, data quality, clinical validation, governance/compliance, and change management.</p>
             <p class="small" style="margin-top: 6px;"><strong>Navigation</strong>: active follow-up monitoring by clinical service staff, with owner, due date, status tracking, and escalation until closure.</p>
-            <p class="small" style="margin-top: 6px;"><strong>Status</strong>: implemented modules are already operational; in-progress modules are partially delivered; planned modules are roadmap targets.</p>
+            <p class="small" style="margin-top: 6px;"><strong>Status</strong>: planned -> poc -> mvp internal -> validation ready -> production candidate -> implemented.</p>
             <p class="small" style="margin-top: 10px;"><strong>Horizon Legend</strong>:</p>
             <p class="small" style="margin-top: 6px;"><span class="pill foundation">foundation</span> baseline safety, interoperability, and throughput foundation for production readiness.</p>
             <p class="small" style="margin-top: 6px;"><span class="pill acceleration">acceleration</span> modules that increase clinical/operational performance on top of a stable base.</p>
@@ -651,26 +678,26 @@
 
     <script>
         const modules = [
-            { id: 1, title: 'DICOM C-STORE Intake Listener', track: 'ops', horizon: 'foundation', status: 'implemented', impact: 8, friction: 3, note: 'Production listener for PACS/modality intake.' },
-            { id: 2, title: 'Case Prep and Queue Worker', track: 'ops', horizon: 'foundation', status: 'implemented', impact: 8, friction: 4, note: 'Automated DICOM selection, NIfTI conversion, and queued processing flow.' },
-            { id: 3, title: 'Dashboard + API Surface', track: 'ops', horizon: 'foundation', status: 'implemented', impact: 7, friction: 3, note: 'FastAPI endpoints and operational dashboard already serving case workflows.' },
+            { id: 1, title: 'DICOM C-STORE Intake Listener', track: 'ops', horizon: 'foundation', status: 'mvp-internal', impact: 8, friction: 3, note: 'Production listener for PACS/modality intake.' },
+            { id: 2, title: 'Case Prep and Queue Worker', track: 'ops', horizon: 'foundation', status: 'mvp-internal', impact: 8, friction: 4, note: 'Automated DICOM selection, NIfTI conversion, and queued processing flow.' },
+            { id: 3, title: 'Dashboard + API Surface', track: 'ops', horizon: 'foundation', status: 'mvp-internal', impact: 7, friction: 3, note: 'FastAPI endpoints and operational dashboard already serving case workflows.' },
             { id: 4, title: 'HL7-Triggered Smart Prefetch', track: 'ops', horizon: 'foundation', status: 'planned', impact: 8, friction: 4, note: 'Route relevant priors from ADT/ORM events using study similarity scoring.' },
             { id: 5, title: 'Unified Worklist Orchestrator', track: 'ops', horizon: 'foundation', status: 'planned', impact: 7, friction: 5, note: 'Fair case assignment by subspecialty, workload, and SLA risk.' },
             { id: 6, title: 'SLA Policy Engine', track: 'ops', horizon: 'foundation', status: 'planned', impact: 6, friction: 4, note: 'Alert and escalate when breach risk increases for urgent studies.' },
 
-            { id: 26, title: 'De-identification Gateway', track: 'governance', horizon: 'foundation', status: 'implemented', impact: 10, friction: 5, note: 'Pixel + metadata PHI stripping is enforced before external model calls.' },
-            { id: 7, title: 'AP Chest X-ray Assist APIs', track: 'clinical', horizon: 'foundation', status: 'implemented', impact: 7, friction: 3, note: 'Anthropic and MedGemma assistant flows integrated through server endpoints.' },
-            { id: 8, title: 'TotalSegmentator Core Pipeline', track: 'clinical', horizon: 'foundation', status: 'in-progress', impact: 8, friction: 4, note: 'Robust segmentation backbone powering multi-structure quantitative workflows.' },
-            { id: 9, title: 'L3 Muscle Area + SMI Calculator', track: 'clinical', horizon: 'foundation', status: 'implemented', impact: 8, friction: 4, note: 'Measures muscle area at L3 and calculates SMI using patient height input.' },
-            { id: 10, title: 'Automated Organ Volumetry', track: 'clinical', horizon: 'foundation', status: 'implemented', impact: 8, friction: 5, note: 'Automatic organ volumetry from segmentation outputs for structured reporting and analytics.' },
-            { id: 11, title: 'Intracranial Hemorrhage Detection', track: 'clinical', horizon: 'acceleration', status: 'implemented', impact: 10, friction: 5, note: 'Operational ICH detection integrated into the preprocessing/triage flow.' },
-            { id: 12, title: 'Structured Report Copilot', track: 'clinical', horizon: 'acceleration', status: 'in-progress', impact: 7, friction: 6, note: 'Template-bound drafting from findings and quantitative metrics.' },
+            { id: 26, title: 'De-identification Gateway', track: 'governance', horizon: 'foundation', status: 'poc', impact: 10, friction: 5, note: 'Pixel + metadata PHI stripping is enforced before external model calls.' },
+            { id: 7, title: 'AP Chest X-ray Assist APIs', track: 'clinical', horizon: 'foundation', status: 'poc', impact: 7, friction: 3, note: 'Anthropic and MedGemma assistant flows integrated through server endpoints.' },
+            { id: 8, title: 'TotalSegmentator Core Pipeline', track: 'clinical', horizon: 'foundation', status: 'mvp-internal', impact: 8, friction: 4, note: 'Robust segmentation backbone powering multi-structure quantitative workflows.' },
+            { id: 9, title: 'L3 Muscle Area + SMI Calculator', track: 'clinical', horizon: 'foundation', status: 'mvp-internal', impact: 8, friction: 4, note: 'Measures muscle area at L3 and calculates SMI using patient height input.' },
+            { id: 10, title: 'Automated Organ Volumetry', track: 'clinical', horizon: 'foundation', status: 'poc', impact: 8, friction: 5, note: 'Automatic organ volumetry from segmentation outputs for structured reporting and analytics.' },
+            { id: 11, title: 'Intracranial Hemorrhage Detection', track: 'clinical', horizon: 'acceleration', status: 'poc', impact: 10, friction: 5, note: 'Operational ICH detection integrated into the preprocessing/triage flow.' },
+            { id: 12, title: 'Structured Report Copilot', track: 'clinical', horizon: 'acceleration', status: 'poc', impact: 7, friction: 6, note: 'Template-bound drafting from findings and quantitative metrics.' },
             { id: 13, title: 'Urgency Flagging and Reordering', track: 'clinical', horizon: 'acceleration', status: 'planned', impact: 9, friction: 8, note: 'Reprioritize suspected critical findings with auditable thresholds.' },
-            { id: 14, title: 'Opportunistic Liver Quant', track: 'clinical', horizon: 'acceleration', status: 'in-progress', impact: 7, friction: 6, note: 'Steatosis risk extraction from routine CT studies.' },
-            { id: 15, title: 'Opportunistic Bone Quant', track: 'clinical', horizon: 'acceleration', status: 'in-progress', impact: 6, friction: 6, note: 'Vertebral volumetric HU proxy for osteoporosis triage.' },
+            { id: 14, title: 'Opportunistic Liver Quant', track: 'clinical', horizon: 'acceleration', status: 'planned', impact: 7, friction: 6, note: 'Steatosis risk extraction from routine CT studies.' },
+            { id: 15, title: 'Opportunistic Bone Quant', track: 'clinical', horizon: 'acceleration', status: 'planned', impact: 6, friction: 6, note: 'Vertebral volumetric HU proxy for osteoporosis triage.' },
             { id: 16, title: 'Opportunistic Coronary Calcium (CAC-DRS)', track: 'clinical', horizon: 'acceleration', status: 'planned', impact: 7, friction: 6, note: 'Opportunistic coronary calcium detection in eligible CT studies followed by CAC-DRS structured classification.' },
             { id: 17, title: 'Hippocampal Volumetry Project', track: 'clinical', horizon: 'scaling', status: 'planned', impact: 8, friction: 7, note: 'Longitudinal hippocampal volumetry project for neurodegeneration-oriented workflows.' },
-            { id: 18, title: 'Emphysema Longitudinal Quant', track: 'clinical', horizon: 'scaling', status: 'in-progress', impact: 5, friction: 7, note: 'LAA%-based burden tracking and trend summaries.' },
+            { id: 18, title: 'Emphysema Longitudinal Quant', track: 'clinical', horizon: 'scaling', status: 'planned', impact: 5, friction: 7, note: 'LAA%-based burden tracking and trend summaries.' },
             { id: 29, title: 'Lung Nodule Longitudinal Tracker', track: 'clinical', horizon: 'scaling', status: 'planned', impact: 8, friction: 7, note: 'Serial nodule tracking with growth and interval-aware follow-up triggers.' },
             { id: 30, title: 'Aortic Aneurysm Surveillance Pipeline', track: 'clinical', horizon: 'scaling', status: 'planned', impact: 8, friction: 7, note: 'Longitudinal aortic diameter surveillance with guideline-aligned escalation rules.' },
             { id: 31, title: 'Kidney Stone Burden Longitudinal Module', track: 'continuity', horizon: 'scaling', status: 'planned', impact: 8, friction: 6, note: 'Time-series stone burden tracking integrated with urology navigation workflows.' },
@@ -730,8 +757,11 @@
         }
 
         function statusLabel(v) {
+            if (v === 'mvp-internal') return 'mvp internal';
+            if (v === 'validation-ready') return 'validation ready';
+            if (v === 'production-candidate') return 'production candidate';
+            if (v === 'poc') return 'poc';
             if (v === 'implemented') return 'implemented';
-            if (v === 'in-progress') return 'in progress';
             return 'planned';
         }
 
@@ -794,9 +824,12 @@
         });
 
         const statusBorder = {
-            implemented: '#6ee7ff',
-            'in-progress': '#b8c7ff',
-            planned: '#cbd5e1'
+            planned: '#cbd5e1',
+            poc: '#9fb2cf',
+            'mvp-internal': '#6ee7ff',
+            'validation-ready': '#66e2b0',
+            'production-candidate': '#ffca8d',
+            implemented: '#c6a4ff'
         };
 
         function buildPriorityPoints(list) {
