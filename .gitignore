@@ -67,3 +67,14 @@ Thumbs.db
 # Future features
 upcoming_features.md
 
+# Prompts
+*.local.prompt.md
+
+# Commercial docs generated artifacts
+docs/commercial/generated/*
+!docs/commercial/generated/.gitkeep
+docs/commercial/generated/**/*.pdf
+docs/commercial/generated/**/*.docx
+docs/commercial/generated/**/*.xlsx
+docs/commercial/generated/**/*.csv
+docs/commercial/generated/**/*.pptx
