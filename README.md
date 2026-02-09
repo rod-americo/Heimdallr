@@ -215,6 +215,7 @@ For endpoint coverage and payload conventions, see [`docs/API.md`](docs/API.md).
 - API contracts and examples: [`docs/API.md`](docs/API.md)
 - Strategic visual board source: [`docs/pipeline-strategy.html`](docs/pipeline-strategy.html)
 - Motivation and justification guide: [`docs/motivation-justification.html`](docs/motivation-justification.html)
+- Validation stage manual (`validation-ready` and `production-candidate`): [`docs/validation-stage-manual.md`](docs/validation-stage-manual.md)
 - Full research report (HTML): [`docs/radiology-preprocessing-ecosystem-report.html`](docs/radiology-preprocessing-ecosystem-report.html)
 - Full research report (Markdown): [`docs/radiology-preprocessing-ecosystem-report.md`](docs/radiology-preprocessing-ecosystem-report.md)
 - Public docs landing page (GitHub Pages): [https://rod-americo.github.io/Heimdallr/](https://rod-americo.github.io/Heimdallr/)
@@ -237,6 +238,7 @@ To publish the HTML strategy board as a rendered page:
 
 - Strategic backlog source: [`UPCOMING.md`](UPCOMING.md)
 - Strategic backlog viewer: [`docs/upcoming.html`](docs/upcoming.html)
+- Validation gate manual: [`docs/validation-stage-manual.md`](docs/validation-stage-manual.md)
 - Dark-mode strategic planning page (based on your concept): [`docs/pipeline-strategy.html`](docs/pipeline-strategy.html)
 - Motivation and strategic justification page: [`docs/motivation-justification.html`](docs/motivation-justification.html)
 - Full research report page: [`docs/radiology-preprocessing-ecosystem-report.html`](docs/radiology-preprocessing-ecosystem-report.html)
