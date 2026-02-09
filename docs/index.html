@@ -63,6 +63,7 @@
 
         .links {
             display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 12px;
             margin-top: 18px;
         }
@@ -81,6 +82,12 @@
             border-color: var(--accent);
             box-shadow: 0 0 0 2px rgba(70, 211, 255, 0.2);
         }
+
+        @media (max-width: 760px) {
+            .links {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 
@@ -90,16 +97,16 @@
             <h1>Heimdallr Documentation Hub</h1>
             <p>Public project documentation and strategy artifacts.</p>
             <div class="links">
-                <a href="./pipeline-strategy.html">Open Strategy Board (Interactive)</a>
-                <a href="https://github.com/rod-americo/Heimdallr/blob/main/docs/ARCHITECTURE.md">Open Architecture Overview</a>
-                <a href="./upcoming.html">Open Upcoming Roadmap (HTML)</a>
-                <a href="https://github.com/rod-americo/Heimdallr/blob/main/docs/validation-stage-manual.md">Open Validation Stage Manual</a>
+                <a href="./pipeline-strategy.html">Open Strategy Board</a>
                 <a href="./motivation-justification.html">Open Motivation & Justification Guide</a>
                 <a href="./radiology-preprocessing-ecosystem-report.html">Open Research Report (HTML)</a>
+                <a href="https://github.com/rod-americo/Heimdallr/blob/main/docs/ARCHITECTURE.md">Open Architecture Overview</a>
+                <a href="./upcoming.html">Open Upcoming Roadmap</a>
+                <a href="https://github.com/rod-americo/Heimdallr/blob/main/docs/validation-stage-manual.md">Open Validation Stage Manual</a>
                 <a href="https://github.com/rod-americo/Heimdallr/blob/main/SECURITY.md">Open Security Policy</a>
                 <a href="https://github.com/rod-americo/Heimdallr/blob/main/README.md">Open README (Repository)</a>
                 <a href="https://github.com/rod-americo/Heimdallr/blob/main/UPCOMING.md">Open UPCOMING Source (Repository)</a>
-                <a href="https://github.com/rod-americo/Heimdallr/blob/main/docs/radiology-preprocessing-ecosystem-report.md">Open Research Report (Markdown)</a>
+                <a href="https://github.com/rod-americo/Heimdallr/blob/main/docs/radiology-preprocessing-ecosystem-report.md">Open Research Report (Repository)</a>
             </div>
         </section>
     </main>
