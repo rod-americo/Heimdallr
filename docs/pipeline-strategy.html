@@ -611,6 +611,7 @@
 
         <section class="panel">
             <h2>What Is Live Today</h2>
+            <p class="small">Live criteria: `mvp-internal`, `validation-ready`, `production-candidate`, and `implemented`.</p>
             <ul id="liveToday" class="live-list"></ul>
         </section>
 
@@ -780,8 +781,9 @@
 
         function renderLiveToday() {
             liveToday.innerHTML = '';
+            const liveStatuses = new Set(['mvp-internal', 'validation-ready', 'production-candidate', 'implemented']);
             modules
-                .filter((m) => m.status === 'implemented')
+                .filter((m) => liveStatuses.has(m.status))
                 .forEach((m) => {
                     const li = document.createElement('li');
                     li.textContent = `${m.title}: ${m.note}`;
