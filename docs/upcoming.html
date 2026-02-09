@@ -289,7 +289,30 @@
             <article class="panel">
                 <h2>Start Here</h2>
                 <p><strong>Delivery logic:</strong> Foundation first, then Clinical Acceleration, then Care Continuity at Scale, then Strategic Innovation.</p>
-                <p class="tiny" style="margin-top:8px;">If you are new to the project, <a href="#prioritized-module-backlog">review backlog ranks 1-6 first</a>.</p>
+                <p class="tiny" style="margin-top:8px;">If you are new to the project, review <a href="#prioritized-module-backlog">backlog ranks 1-6</a> first, then use the <a href="#rank-and-pillar-legend">rank/pillar legend</a> to decode priority and scope.</p>
+            </article>
+        </section>
+
+        <section class="grid-2" id="rank-and-pillar-legend">
+            <article class="panel">
+                <h2>Rank Legend</h2>
+                <ul>
+                    <li><strong>Rank</strong> is execution order, not model sophistication.</li>
+                    <li><strong>Ranks 1-6</strong> are the first implementation tranche for new readers and contributors.</li>
+                    <li><strong>Lower rank number</strong> means higher delivery priority in this roadmap.</li>
+                </ul>
+            </article>
+            <article class="panel">
+                <h2>Pillar Codes (A-G)</h2>
+                <ul>
+                    <li><strong>A:</strong> Logistics Automation and Smart Prefetch</li>
+                    <li><strong>B:</strong> Workflow Orchestration and Clinical Triage</li>
+                    <li><strong>C:</strong> Opportunistic Quantification and Precision Triage</li>
+                    <li><strong>D:</strong> LLM/VLM Reporting Copilot</li>
+                    <li><strong>E:</strong> De-identification and API Security</li>
+                    <li><strong>F:</strong> Patient Navigation and Closing the Loop</li>
+                    <li><strong>G:</strong> Disruptive and Long-Horizon R&amp;D</li>
+                </ul>
             </article>
         </section>
 
@@ -326,13 +349,14 @@
 
         <section class="panel stack" id="prioritized-module-backlog">
             <h2>Prioritized Module Backlog</h2>
-            <p class="tiny">Ordered by strategic sequence (not only by model sophistication).</p>
+            <p class="tiny">Ordered by strategic sequence (not only by model sophistication). Ranks are shown in the first column, and Pillar Codes map to A-G definitions above.</p>
             <div class="table-wrap">
                 <table>
                     <thead>
                         <tr>
                             <th>Rank</th>
                             <th>Module</th>
+                            <th>Pillar Code</th>
                             <th>Pillar</th>
                             <th>Horizon</th>
                             <th>Impact</th>
@@ -341,30 +365,30 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr><td>1</td><td>HL7-triggered prefetch orchestration</td><td>Logistics</td><td><span class="pill foundation">Foundation</span></td><td>9</td><td>4</td><td>Immediate throughput win with low clinical risk</td></tr>
-                        <tr><td>2</td><td>Unified worklist orchestration</td><td>Workflow</td><td><span class="pill foundation">Foundation</span></td><td>9</td><td>5</td><td>Reduces queue switching and unfair distribution</td></tr>
-                        <tr><td>3</td><td>De-identification governance hardening</td><td>Security</td><td><span class="pill scaling">Scaling</span></td><td>10</td><td>6</td><td>Extend an implemented gateway with stronger policy and audit controls</td></tr>
-                        <tr><td>4</td><td>Deterministic pseudonymization + crosswalk</td><td>Security</td><td><span class="pill foundation">Foundation</span></td><td>10</td><td>5</td><td>Enables traceable privacy-preserving workflows</td></tr>
-                        <tr><td>5</td><td>Follow-up recommendation extraction (NLP)</td><td>Navigation</td><td><span class="pill scaling">Scaling</span></td><td>8</td><td>5</td><td>High value and operationally feasible</td></tr>
-                        <tr><td>6</td><td>Urology navigation pathway</td><td>Navigation</td><td><span class="pill scaling">Scaling</span></td><td>9</td><td>6</td><td>Direct care-continuity impact with clear rule set</td></tr>
-                        <tr><td>7</td><td>Opportunistic coronary calcium (CAC-DRS)</td><td>Quantification</td><td><span class="pill acceleration">Acceleration</span></td><td>8</td><td>6</td><td>High preventive-care value from opportunistic CT workflows</td></tr>
-                        <tr><td>8</td><td>AI-assisted urgency flagging</td><td>Workflow</td><td><span class="pill acceleration">Acceleration</span></td><td>9</td><td>7</td><td>Improves time-to-open for high-acuity cases</td></tr>
-                        <tr><td>9</td><td>Liver steatosis opportunistic pipeline</td><td>Quantification</td><td><span class="pill acceleration">Acceleration</span></td><td>7</td><td>6</td><td>Population-health insight from existing scans</td></tr>
-                        <tr><td>10</td><td>Osteoporosis opportunistic screening</td><td>Quantification</td><td><span class="pill acceleration">Acceleration</span></td><td>7</td><td>6</td><td>Scalable DXA-proxy value from routine CT</td></tr>
-                        <tr><td>11</td><td>Structured report drafting copilot</td><td>Reporting</td><td><span class="pill acceleration">Acceleration</span></td><td>8</td><td>7</td><td>Reporting acceleration with strong guardrails</td></tr>
-                        <tr><td>12</td><td>Emphysema quantification at scale</td><td>Quantification</td><td><span class="pill scaling">Scaling</span></td><td>6</td><td>7</td><td>Valuable but depends on segmentation throughput</td></tr>
-                        <tr><td>13</td><td>On-prem AI gateway enforcement</td><td>Security</td><td><span class="pill scaling">Scaling</span></td><td>9</td><td>7</td><td>Critical for enterprise deployment maturity</td></tr>
-                        <tr><td>14</td><td>Drift/hallucination control framework</td><td>Reporting</td><td><span class="pill innovation">Innovation</span></td><td>9</td><td>8</td><td>Needed before broad automation trust</td></tr>
-                        <tr><td>15</td><td>Agentic workflow coordination</td><td>R&amp;D</td><td><span class="pill innovation">Innovation</span></td><td>8</td><td>9</td><td>Long-horizon orchestration capability</td></tr>
-                        <tr><td>16</td><td>Foundation model fine-tuning layer</td><td>R&amp;D</td><td><span class="pill innovation">Innovation</span></td><td>9</td><td>9</td><td>Institution-adapted model performance with controlled governance</td></tr>
-                        <tr><td>17</td><td>Temporal imaging intelligence (delta engine)</td><td>R&amp;D</td><td><span class="pill innovation">Innovation</span></td><td>9</td><td>8</td><td>Longitudinal change tracking for follow-up-heavy workflows</td></tr>
-                        <tr><td>18</td><td>Causal triage simulator</td><td>R&amp;D</td><td><span class="pill innovation">Innovation</span></td><td>8</td><td>8</td><td>Safe policy simulation before live queue changes</td></tr>
-                        <tr><td>19</td><td>Synthetic + federated validation sandbox</td><td>R&amp;D</td><td><span class="pill innovation">Innovation</span></td><td>8</td><td>8</td><td>Privacy-preserving multi-site validation and benchmarking</td></tr>
-                        <tr><td>20</td><td>Autonomous follow-up orchestrator (human-gated)</td><td>R&amp;D</td><td><span class="pill innovation">Innovation</span></td><td>9</td><td>8</td><td>Strong continuity and financial recovery upside with clinical oversight</td></tr>
-                        <tr><td>21</td><td>Prospective trial mode</td><td>R&amp;D</td><td><span class="pill innovation">Innovation</span></td><td>8</td><td>7</td><td>Embedded publication-grade evidence generation</td></tr>
-                        <tr><td>22</td><td>General surgery navigation pathway</td><td>Navigation</td><td><span class="pill scaling">Scaling</span></td><td>7</td><td>5</td><td>Low-friction continuity value for common actionable findings</td></tr>
-                        <tr><td>23</td><td>Oncology high-suspicion navigation router</td><td>Navigation</td><td><span class="pill scaling">Scaling</span></td><td>10</td><td>7</td><td>High clinical-risk routing for ER/inpatient neoplastic suspicion</td></tr>
-                        <tr><td>24</td><td>Gynecology navigation pathway</td><td>Navigation</td><td><span class="pill scaling">Scaling</span></td><td>9</td><td>7</td><td>Structured continuity for adnexal/uterine/cervical suspicious findings</td></tr>
+                        <tr><td>1</td><td>HL7-triggered prefetch orchestration</td><td>A</td><td>Logistics</td><td><span class="pill foundation">Foundation</span></td><td>9</td><td>4</td><td>Immediate throughput win with low clinical risk</td></tr>
+                        <tr><td>2</td><td>Unified worklist orchestration</td><td>B</td><td>Workflow</td><td><span class="pill foundation">Foundation</span></td><td>9</td><td>5</td><td>Reduces queue switching and unfair distribution</td></tr>
+                        <tr><td>3</td><td>De-identification governance hardening</td><td>E</td><td>Security</td><td><span class="pill scaling">Scaling</span></td><td>10</td><td>6</td><td>Extend an implemented gateway with stronger policy and audit controls</td></tr>
+                        <tr><td>4</td><td>Deterministic pseudonymization + crosswalk</td><td>E</td><td>Security</td><td><span class="pill foundation">Foundation</span></td><td>10</td><td>5</td><td>Enables traceable privacy-preserving workflows</td></tr>
+                        <tr><td>5</td><td>Follow-up recommendation extraction (NLP)</td><td>F</td><td>Navigation</td><td><span class="pill scaling">Scaling</span></td><td>8</td><td>5</td><td>High value and operationally feasible</td></tr>
+                        <tr><td>6</td><td>Urology navigation pathway</td><td>F</td><td>Navigation</td><td><span class="pill scaling">Scaling</span></td><td>9</td><td>6</td><td>Direct care-continuity impact with clear rule set</td></tr>
+                        <tr><td>7</td><td>Opportunistic coronary calcium (CAC-DRS)</td><td>C</td><td>Quantification</td><td><span class="pill acceleration">Acceleration</span></td><td>8</td><td>6</td><td>High preventive-care value from opportunistic CT workflows</td></tr>
+                        <tr><td>8</td><td>AI-assisted urgency flagging</td><td>B</td><td>Workflow</td><td><span class="pill acceleration">Acceleration</span></td><td>9</td><td>7</td><td>Improves time-to-open for high-acuity cases</td></tr>
+                        <tr><td>9</td><td>Liver steatosis opportunistic pipeline</td><td>C</td><td>Quantification</td><td><span class="pill acceleration">Acceleration</span></td><td>7</td><td>6</td><td>Population-health insight from existing scans</td></tr>
+                        <tr><td>10</td><td>Osteoporosis opportunistic screening</td><td>C</td><td>Quantification</td><td><span class="pill acceleration">Acceleration</span></td><td>7</td><td>6</td><td>Scalable DXA-proxy value from routine CT</td></tr>
+                        <tr><td>11</td><td>Structured report drafting copilot</td><td>D</td><td>Reporting</td><td><span class="pill acceleration">Acceleration</span></td><td>8</td><td>7</td><td>Reporting acceleration with strong guardrails</td></tr>
+                        <tr><td>12</td><td>Emphysema quantification at scale</td><td>C</td><td>Quantification</td><td><span class="pill scaling">Scaling</span></td><td>6</td><td>7</td><td>Valuable but depends on segmentation throughput</td></tr>
+                        <tr><td>13</td><td>On-prem AI gateway enforcement</td><td>E</td><td>Security</td><td><span class="pill scaling">Scaling</span></td><td>9</td><td>7</td><td>Critical for enterprise deployment maturity</td></tr>
+                        <tr><td>14</td><td>Drift/hallucination control framework</td><td>D</td><td>Reporting</td><td><span class="pill innovation">Innovation</span></td><td>9</td><td>8</td><td>Needed before broad automation trust</td></tr>
+                        <tr><td>15</td><td>Agentic workflow coordination</td><td>G</td><td>R&amp;D</td><td><span class="pill innovation">Innovation</span></td><td>8</td><td>9</td><td>Long-horizon orchestration capability</td></tr>
+                        <tr><td>16</td><td>Foundation model fine-tuning layer</td><td>G</td><td>R&amp;D</td><td><span class="pill innovation">Innovation</span></td><td>9</td><td>9</td><td>Institution-adapted model performance with controlled governance</td></tr>
+                        <tr><td>17</td><td>Temporal imaging intelligence (delta engine)</td><td>G</td><td>R&amp;D</td><td><span class="pill innovation">Innovation</span></td><td>9</td><td>8</td><td>Longitudinal change tracking for follow-up-heavy workflows</td></tr>
+                        <tr><td>18</td><td>Causal triage simulator</td><td>G</td><td>R&amp;D</td><td><span class="pill innovation">Innovation</span></td><td>8</td><td>8</td><td>Safe policy simulation before live queue changes</td></tr>
+                        <tr><td>19</td><td>Synthetic + federated validation sandbox</td><td>G</td><td>R&amp;D</td><td><span class="pill innovation">Innovation</span></td><td>8</td><td>8</td><td>Privacy-preserving multi-site validation and benchmarking</td></tr>
+                        <tr><td>20</td><td>Autonomous follow-up orchestrator (human-gated)</td><td>G</td><td>R&amp;D</td><td><span class="pill innovation">Innovation</span></td><td>9</td><td>8</td><td>Strong continuity and financial recovery upside with clinical oversight</td></tr>
+                        <tr><td>21</td><td>Prospective trial mode</td><td>G</td><td>R&amp;D</td><td><span class="pill innovation">Innovation</span></td><td>8</td><td>7</td><td>Embedded publication-grade evidence generation</td></tr>
+                        <tr><td>22</td><td>General surgery navigation pathway</td><td>F</td><td>Navigation</td><td><span class="pill scaling">Scaling</span></td><td>7</td><td>5</td><td>Low-friction continuity value for common actionable findings</td></tr>
+                        <tr><td>23</td><td>Oncology high-suspicion navigation router</td><td>F</td><td>Navigation</td><td><span class="pill scaling">Scaling</span></td><td>10</td><td>7</td><td>High clinical-risk routing for ER/inpatient neoplastic suspicion</td></tr>
+                        <tr><td>24</td><td>Gynecology navigation pathway</td><td>F</td><td>Navigation</td><td><span class="pill scaling">Scaling</span></td><td>9</td><td>7</td><td>Structured continuity for adnexal/uterine/cervical suspicious findings</td></tr>
                     </tbody>
                 </table>
             </div>
