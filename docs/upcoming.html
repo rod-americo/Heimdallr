@@ -255,8 +255,47 @@
                 padding: 14px;
             }
 
+            .table-wrap {
+                overflow-x: visible;
+            }
+
             table {
-                min-width: 760px;
+                min-width: 0;
+                border-collapse: separate;
+                border-spacing: 0 10px;
+            }
+
+            table thead {
+                display: none;
+            }
+
+            table,
+            table tbody,
+            table tr,
+            table td {
+                display: block;
+                width: 100%;
+            }
+
+            table tr {
+                border: 1px solid var(--line);
+                border-radius: 10px;
+                background: var(--bg-card);
+                padding: 4px 0;
+            }
+
+            table td {
+                border: 0;
+                padding: 8px 10px;
+            }
+
+            table td::before {
+                content: attr(data-label);
+                display: block;
+                color: var(--text);
+                font-weight: 700;
+                margin-bottom: 3px;
+                font-size: 0.82rem;
             }
         }
     </style>
@@ -267,14 +306,7 @@
         <section class="hero">
             <h1>Heimdallr Upcoming Roadmap</h1>
             <p class="lead">Planned capabilities for Heimdallr's radiology preprocessing ecosystem, organized to protect delivery quality, clinical safety, and governance as the platform scales.</p>
-            <div class="nav-links">
-                <a href="./index.html">Open Docs Hub</a>
-                <a href="./pipeline-strategy.html">Open Strategy Board</a>
-                <a href="./motivation-justification.html">Open Motivation Guide</a>
-                <a href="./radiology-preprocessing-ecosystem-report.html">Open Full Report</a>
-                <a href="https://github.com/rod-americo/Heimdallr/blob/main/UPCOMING.md">Open UPCOMING Source (Markdown)</a>
-                <a href="https://github.com/rod-americo/Heimdallr/blob/main/README.md">Open README</a>
-            </div>
+            <div class="nav-links" data-shared-nav="hero"></div>
         </section>
 
         <section class="grid-2">
@@ -350,7 +382,7 @@
             <h2>Prioritized Module Backlog</h2>
             <p class="tiny">Ordered by strategic sequence (not only by model sophistication). Ranks are shown in the first column, and Pillar Codes map to A-G definitions above.</p>
             <div class="table-wrap">
-                <table>
+                <table data-auto-labels>
                     <thead>
                         <tr>
                             <th>Rank</th>
@@ -475,21 +507,23 @@
 
         <section class="panel">
             <h2>Where to Go Next</h2>
-            <div class="nav-links">
-                <a href="./index.html">Docs Hub</a>
-                <a href="./pipeline-strategy.html">Strategy Board</a>
-                <a href="./motivation-justification.html">Motivation Guide</a>
-                <a href="./upcoming.html">Upcoming Roadmap</a>
-                <a href="./radiology-preprocessing-ecosystem-report.html">Full Report</a>
-                <a href="https://github.com/rod-americo/Heimdallr/blob/main/docs/ARCHITECTURE.md">Architecture Overview</a>
-                <a href="https://github.com/rod-americo/Heimdallr/blob/main/docs/validation-stage-manual.md">Validation Stage Manual</a>
-                <a href="https://github.com/rod-americo/Heimdallr/blob/main/SECURITY.md">Security Policy</a>
-                <a href="https://github.com/rod-americo/Heimdallr/blob/main/README.md">README.md</a>
-                <a href="https://github.com/rod-americo/Heimdallr/blob/main/UPCOMING.md">UPCOMING Source</a>
-                <a href="https://github.com/rod-americo/Heimdallr/blob/main/docs/radiology-preprocessing-ecosystem-report.md">Research Report (Repository)</a>
-            </div>
+            <div class="nav-links" data-shared-nav="related"></div>
         </section>
     </main>
+    <script src="./shared-nav.js"></script>
+    <script>
+        (function () {
+            const tables = document.querySelectorAll('table[data-auto-labels]');
+            tables.forEach((table) => {
+                const headers = [...table.querySelectorAll('thead th')].map((th) => th.textContent.trim());
+                table.querySelectorAll('tbody tr').forEach((tr) => {
+                    [...tr.children].forEach((td, idx) => {
+                        td.setAttribute('data-label', headers[idx] || '');
+                    });
+                });
+            });
+        })();
+    </script>
 </body>
 
 </html>
