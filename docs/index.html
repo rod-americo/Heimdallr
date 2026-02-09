@@ -61,6 +61,23 @@
             line-height: 1.6;
         }
 
+        .top-link {
+            margin-top: 10px;
+            display: inline-block;
+            color: var(--link-text);
+            text-decoration: none;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 7px 12px;
+            background: var(--link-bg);
+            font-size: 0.9rem;
+        }
+
+        .top-link:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(70, 211, 255, 0.2);
+        }
+
         .links {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -96,6 +113,7 @@
         <section class="card">
             <h1>Heimdallr Documentation Hub</h1>
             <p>Public project documentation and strategy artifacts. Suggested reading order: strategy first, then technical references.</p>
+            <a class="top-link" href="./index-internal.html">Open Internal Hub</a>
             <div class="links">
                 <a href="./upcoming.html">Open Upcoming Roadmap</a>
                 <a href="./pipeline-strategy.html">Open Strategy Board</a>
