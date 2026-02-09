@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heimdallr Internal Docs Hub</title>
+    <style>
+        :root {
+            --bg: #0b1220;
+            --card: #101a2e;
+            --line: rgba(143, 172, 224, 0.25);
+            --text: #e8f0ff;
+            --muted: #a9bad8;
+            --accent: #46d3ff;
+            --link-bg: #12203a;
+            --link-text: #e8f0ff;
+            color-scheme: dark light;
+        }
+
+        @media (prefers-color-scheme: light) {
+            :root {
+                --bg: #f3f7ff;
+                --card: #ffffff;
+                --line: rgba(38, 68, 125, 0.18);
+                --text: #0f1b33;
+                --muted: #4d6283;
+                --accent: #0f87c9;
+                --link-bg: #eaf2ff;
+                --link-text: #12345f;
+            }
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: "Inter", "Segoe UI", sans-serif;
+            color: var(--text);
+            background: radial-gradient(circle at 20% 10%, rgba(70, 211, 255, 0.15), transparent 30%), var(--bg);
+            min-height: 100vh;
+        }
+
+        .wrap {
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 48px 20px;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 24px;
+        }
+
+        h1 { margin: 0 0 10px; }
+
+        p {
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .top-link {
+            margin-top: 10px;
+            display: inline-block;
+            color: var(--link-text);
+            text-decoration: none;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 7px 12px;
+            background: var(--link-bg);
+            font-size: 0.9rem;
+        }
+
+        .top-link:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(70, 211, 255, 0.2);
+        }
+
+        .links {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 18px;
+        }
+
+        a.link {
+            color: var(--link-text);
+            text-decoration: none;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 12px 14px;
+            background: var(--link-bg);
+            display: block;
+        }
+
+        a.link:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(70, 211, 255, 0.2);
+        }
+
+        @media (max-width: 760px) {
+            .links { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+
+<body>
+    <main class="wrap">
+        <section class="card">
+            <h1>Heimdallr Internal Documentation Hub</h1>
+            <p>Internal-first navigation for engineering, operations, validation, and governance workflows.</p>
+            <a class="top-link" href="./index.html">Back to Public Hub</a>
+            <div class="links">
+                <a class="link" href="https://github.com/rod-americo/Heimdallr/blob/main/README.md">Open README</a>
+                <a class="link" href="https://github.com/rod-americo/Heimdallr/blob/main/docs/ARCHITECTURE.md">Open Architecture Overview</a>
+                <a class="link" href="https://github.com/rod-americo/Heimdallr/blob/main/docs/API.md">Open API Contracts</a>
+                <a class="link" href="https://github.com/rod-americo/Heimdallr/blob/main/docs/OPERATIONS.md">Open Operations Runbook</a>
+                <a class="link" href="https://github.com/rod-americo/Heimdallr/blob/main/docs/validation-stage-manual.md">Open Validation Stage Manual</a>
+                <a class="link" href="https://github.com/rod-americo/Heimdallr/blob/main/SECURITY.md">Open Security Policy</a>
+                <a class="link" href="https://github.com/rod-americo/Heimdallr/blob/main/UPCOMING.md">Open UPCOMING Source</a>
+                <a class="link" href="./upcoming.html">Open Upcoming Roadmap (HTML)</a>
+                <a class="link" href="./pipeline-strategy.html">Open Strategy Board</a>
+                <a class="link" href="./motivation-justification.html">Open Motivation & Justification Guide</a>
+                <a class="link" href="./radiology-preprocessing-ecosystem-report.html">Open Research Report (HTML)</a>
+                <a class="link" href="https://github.com/rod-americo/Heimdallr/blob/main/docs/radiology-preprocessing-ecosystem-report.md">Open Research Report (Repository)</a>
+            </div>
+        </section>
+    </main>
+</body>
+
+</html>
