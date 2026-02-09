@@ -209,7 +209,8 @@ For endpoint coverage and payload conventions, see [`docs/API.md`](docs/API.md).
 
 ## Documentation Map
 
-- Strategic roadmap and future architecture: [`UPCOMING.md`](UPCOMING.md)
+- Strategic roadmap source (Markdown): [`UPCOMING.md`](UPCOMING.md)
+- Strategic roadmap viewer (HTML): [`docs/upcoming.html`](docs/upcoming.html)
 - Operations and deployment runbook: [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 - API contracts and examples: [`docs/API.md`](docs/API.md)
 - Strategic visual board source: [`docs/pipeline-strategy.html`](docs/pipeline-strategy.html)
@@ -218,6 +219,7 @@ For endpoint coverage and payload conventions, see [`docs/API.md`](docs/API.md).
 - Full research report (Markdown): [`docs/radiology-preprocessing-ecosystem-report.md`](docs/radiology-preprocessing-ecosystem-report.md)
 - Public docs landing page (GitHub Pages): [https://rod-americo.github.io/Heimdallr/](https://rod-americo.github.io/Heimdallr/)
 - Public strategy board (GitHub Pages): [https://rod-americo.github.io/Heimdallr/pipeline-strategy.html](https://rod-americo.github.io/Heimdallr/pipeline-strategy.html)
+- Public upcoming roadmap (GitHub Pages): [https://rod-americo.github.io/Heimdallr/upcoming.html](https://rod-americo.github.io/Heimdallr/upcoming.html)
 - Public motivation guide (GitHub Pages): [https://rod-americo.github.io/Heimdallr/motivation-justification.html](https://rod-americo.github.io/Heimdallr/motivation-justification.html)
 - Public research report (GitHub Pages): [https://rod-americo.github.io/Heimdallr/radiology-preprocessing-ecosystem-report.html](https://rod-americo.github.io/Heimdallr/radiology-preprocessing-ecosystem-report.html)
 
@@ -233,7 +235,8 @@ To publish the HTML strategy board as a rendered page:
 
 ## Strategy and Roadmap
 
-- Strategic backlog and upcoming modules: [`UPCOMING.md`](UPCOMING.md)
+- Strategic backlog source: [`UPCOMING.md`](UPCOMING.md)
+- Strategic backlog viewer: [`docs/upcoming.html`](docs/upcoming.html)
 - Dark-mode strategic planning page (based on your concept): [`docs/pipeline-strategy.html`](docs/pipeline-strategy.html)
 - Motivation and strategic justification page: [`docs/motivation-justification.html`](docs/motivation-justification.html)
 - Full research report page: [`docs/radiology-preprocessing-ecosystem-report.html`](docs/radiology-preprocessing-ecosystem-report.html)
