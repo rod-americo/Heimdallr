@@ -78,4 +78,10 @@ docs/commercial/generated/**/*.docx
 docs/commercial/generated/**/*.xlsx
 docs/commercial/generated/**/*.csv
 docs/commercial/generated/**/*.pptx
+
+# Commercial docs source (private/internal only)
+docs/commercial/*.md
+
+# Local service logs
+*.log
 docs/commercial/matriz-valor-financeiro.md
