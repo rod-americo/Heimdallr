@@ -69,6 +69,26 @@ dcmsend localhost 11112 -aec HEIMDALLR test.dcm
 3. Queue path `upload -> input/ -> output/` completes for a known study.
 4. GPU capacity is available for segmentation processing.
 
+## Backup and Restore (SQLite)
+
+Backup example:
+
+```bash
+cp database/dicom.db database/dicom_backup_$(date +%Y%m%d_%H%M%S).db
+```
+
+Restore example:
+
+```bash
+cp database/dicom_backup_<timestamp>.db database/dicom.db
+```
+
+Integrity check:
+
+```bash
+sqlite3 database/dicom.db "PRAGMA integrity_check;"
+```
+
 ## Incident Triage Shortlist
 
 1. Validate service process state and restart order (`server -> run -> listener`).
@@ -76,6 +96,19 @@ dcmsend localhost 11112 -aec HEIMDALLR test.dcm
 3. Inspect `input/`, `output/`, and `errors/` for stuck or failed cases.
 4. Verify model/API credentials and quota for report-assist flows.
 5. Confirm data storage permissions for intake and output paths.
+
+## Incident Severity Model (Suggested)
+
+- `SEV-1`: complete intake/processing outage or confirmed data exposure risk
+- `SEV-2`: degraded throughput, repeated failed studies, or unstable report-assist path
+- `SEV-3`: isolated case failure without systemic impact
+
+Suggested response:
+
+1. Open incident log with timestamp, owner, and current impact.
+2. Stabilize service (stop bleed / rollback / isolate dependency).
+3. Capture root cause evidence before cleanup.
+4. Document corrective and preventive actions.
 
 ## Safety Reminder
 

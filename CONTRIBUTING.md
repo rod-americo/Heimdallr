@@ -14,6 +14,13 @@ Thank you for your interest in contributing to Heimdallr! We welcome contributio
 
 5. **Submit a Pull Request**: Once your changes are ready, submit a pull request with a clear description of what you've changed and why.
 
+## Pull Request Expectations
+
+- Use the PR template and include reproducible test steps.
+- Document operational or API contract changes in `README.md`, `docs/API.md`, or `docs/OPERATIONS.md` when applicable.
+- Record user-visible or contract-relevant updates in `CHANGELOG.md` (`[Unreleased]` section).
+- Do not include PHI/PII, credentials, or sensitive clinical data in code, fixtures, screenshots, or logs.
+
 ## Licensing
 
 By contributing to Heimdallr, you agree that your contributions will be licensed under the **Apache License 2.0**, the same license that covers the project.
