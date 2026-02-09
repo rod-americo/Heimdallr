@@ -160,7 +160,7 @@ Exit criteria:
 ## Pillar E: De-identification and API Security
 
 ### E1. Multimodal PHI removal pipeline
-- **Implemented baseline**: DICOM metadata redaction + pixel-level burned-text removal before external calls.
+- **Implemented baseline (status: mvp-internal)**: DICOM metadata redaction + pixel-level burned-text removal before external calls.
 - Expand OCR-assisted masking coverage for edge overlay/annotation patterns.
 
 ### E2. Deterministic pseudonymization + secure crosswalk
@@ -168,7 +168,7 @@ Exit criteria:
 - Encrypted, access-controlled crosswalk separation.
 
 ### E3. On-prem AI gateway enforcement
-- **Implemented baseline**: external inference requests pass through de-identification checks.
+- **Implemented baseline (status: mvp-internal)**: external inference requests pass through de-identification checks.
 - Pending hardening: tamper-evident logs, policy attestations, and stricter outbound controls.
 
 Exit criteria:

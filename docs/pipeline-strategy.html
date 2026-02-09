@@ -567,14 +567,7 @@
         <header class="hero">
             <h1>Heimdallr Radiology Pipeline Strategy</h1>
             <p class="sub">Impact vs implementation friction for upcoming modules across logistics, triage, reporting, de-identification, and patient navigation.</p>
-            <div class="nav-links">
-                <a href="./index.html">Open Docs Hub</a>
-                <a href="./pipeline-strategy.html">Open Strategy Board</a>
-                <a href="./upcoming.html">Open Upcoming Roadmap</a>
-                <a href="./motivation-justification.html">Open Motivation Guide</a>
-                <a href="./radiology-preprocessing-ecosystem-report.html">Open Full Report</a>
-                <a href="https://github.com/rod-americo/Heimdallr/blob/main/README.md">Open README</a>
-            </div>
+            <div class="nav-links" data-shared-nav="hero"></div>
         </header>
 
         <section class="grid">
@@ -665,19 +658,7 @@
         <section class="panel" style="margin-top: 14px;">
             <h2>Where to Go Next</h2>
             <p class="small">Use these links to continue from strategy design into project context and implementation motivation.</p>
-            <div class="nav-links" style="margin-top: 10px;">
-                <a href="./index.html">Docs Hub</a>
-                <a href="./pipeline-strategy.html">Strategy Board</a>
-                <a href="./motivation-justification.html">Motivation & Justification</a>
-                <a href="./upcoming.html">Upcoming Roadmap</a>
-                <a href="./radiology-preprocessing-ecosystem-report.html">Research Report</a>
-                <a href="https://github.com/rod-americo/Heimdallr/blob/main/docs/ARCHITECTURE.md">Architecture Overview</a>
-                <a href="https://github.com/rod-americo/Heimdallr/blob/main/docs/validation-stage-manual.md">Validation Stage Manual</a>
-                <a href="https://github.com/rod-americo/Heimdallr/blob/main/SECURITY.md">Security Policy</a>
-                <a href="https://github.com/rod-americo/Heimdallr/blob/main/README.md">README.md</a>
-                <a href="https://github.com/rod-americo/Heimdallr/blob/main/UPCOMING.md">UPCOMING Source</a>
-                <a href="https://github.com/rod-americo/Heimdallr/blob/main/docs/radiology-preprocessing-ecosystem-report.md">Research Report (Repository)</a>
-            </div>
+            <div class="nav-links" style="margin-top: 10px;" data-shared-nav="related"></div>
         </section>
     </div>
 
@@ -690,7 +671,7 @@
             { id: 5, title: 'Unified Worklist Orchestrator', track: 'ops', horizon: 'foundation', status: 'planned', impact: 7, friction: 5, note: 'Fair case assignment by subspecialty, workload, and SLA risk.' },
             { id: 6, title: 'SLA Policy Engine', track: 'ops', horizon: 'foundation', status: 'planned', impact: 6, friction: 4, note: 'Alert and escalate when breach risk increases for urgent studies.' },
 
-            { id: 26, title: 'De-identification Gateway', track: 'governance', horizon: 'foundation', status: 'poc', impact: 10, friction: 5, note: 'Pixel + metadata PHI stripping is enforced before external model calls.' },
+            { id: 26, title: 'De-identification Gateway', track: 'governance', horizon: 'foundation', status: 'mvp-internal', impact: 10, friction: 5, note: 'Pixel + metadata PHI stripping is enforced before external model calls.' },
             { id: 7, title: 'AP Chest X-ray Assist APIs', track: 'clinical', horizon: 'foundation', status: 'poc', impact: 7, friction: 3, note: 'Anthropic and MedGemma assistant flows integrated through server endpoints.' },
             { id: 8, title: 'TotalSegmentator Core Pipeline', track: 'clinical', horizon: 'foundation', status: 'mvp-internal', impact: 8, friction: 4, note: 'Robust segmentation backbone powering multi-structure quantitative workflows.' },
             { id: 9, title: 'L3 Muscle Area + SMI Calculator', track: 'clinical', horizon: 'foundation', status: 'mvp-internal', impact: 8, friction: 4, note: 'Measures muscle area at L3 and calculates SMI using patient height input.' },
@@ -966,6 +947,7 @@
         renderLiveToday();
         renderCards();
     </script>
+    <script src="./shared-nav.js"></script>
 </body>
 
 </html>

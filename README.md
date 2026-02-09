@@ -52,7 +52,7 @@ Future-facing capabilities (workflow orchestration, clinical urgency triage, adv
 - `medgemma_api.py`: dedicated microservice for AP chest X-ray assistant flow
 - `medgemma_prompts.py`: prompt templates and structured output helpers
 - `anthropic_report_builder.py`: report-building utilities for narrative output
-- `deid_gateway.py`: outbound de-identification gateway (pixel masking + metadata scrubbing)
+- `deid_gateway.py`: outbound de-identification gateway (pixel masking + metadata scrubbing, status: `mvp-internal`)
 
 ### Data Layer and Outputs
 - SQLite schema in `database/schema.sql`
