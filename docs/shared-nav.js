@@ -1,19 +1,21 @@
 (() => {
     const HERO_LINKS = [
         { href: "./index.html", label: "Open Docs Hub" },
+        { href: "./motivation-justification.html", label: "Open Motivation Guide" },
         { href: "./pipeline-strategy.html", label: "Open Strategy Board" },
         { href: "./upcoming.html", label: "Open Upcoming Roadmap" },
-        { href: "./motivation-justification.html", label: "Open Motivation Guide" },
         { href: "./radiology-preprocessing-ecosystem-report.html", label: "Open Research Report" },
+        { href: "./index-technical.html", label: "Open Technical Hub" },
         { href: "https://github.com/rod-americo/Heimdallr/blob/main/README.md", label: "Open README" }
     ];
 
     const RELATED_LINKS = [
         { href: "./index.html", label: "Docs Hub" },
-        { href: "./pipeline-strategy.html", label: "Strategy Board" },
         { href: "./motivation-justification.html", label: "Motivation Guide" },
+        { href: "./pipeline-strategy.html", label: "Strategy Board" },
         { href: "./upcoming.html", label: "Upcoming Roadmap" },
         { href: "./radiology-preprocessing-ecosystem-report.html", label: "Research Report" },
+        { href: "./index-technical.html", label: "Technical Hub" },
         { href: "https://github.com/rod-americo/Heimdallr/blob/main/docs/ARCHITECTURE.md", label: "Architecture Overview" },
         { href: "https://github.com/rod-americo/Heimdallr/blob/main/docs/validation-stage-manual.md", label: "Validation Stage Manual" },
         { href: "https://github.com/rod-americo/Heimdallr/blob/main/SECURITY.md", label: "Security Policy" },
