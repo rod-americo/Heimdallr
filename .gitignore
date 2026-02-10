@@ -81,7 +81,7 @@ docs/commercial/generated/**/*.pptx
 
 # Commercial docs source (private/internal only)
 docs/commercial/*.md
-
+docs/commercial/OOP/*
 # Local service logs
 *.log
 docs/commercial/matriz-valor-financeiro.md
