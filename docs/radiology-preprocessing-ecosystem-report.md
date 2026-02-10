@@ -11,6 +11,12 @@ Operational definitions used across project docs:
 - **Friction**: implementation-in-production effort (integration, data quality, validation, compliance, and change management), not model complexity alone.
 - **Navigation**: active follow-up monitoring by service staff with owner, due date, status tracking, and escalation until clinical closure.
 
+Current evidence snapshot (to avoid one-sided interpretation):
+- In AI-assisted worklist reprioritization for ICH, queue-adjusted waiting time improved from 15.75 to 12.01 minutes when AI was actively used.[52]
+- A prospective single-center validation of widget-only AI triage reported no statistically significant TAT gain for ICH-positive cases (147.1 vs 149.9 minutes).[53]
+- Real-world multi-site validation (101,944 exams) reported sensitivity/specificity around 82.2%/97.6%, reinforcing both utility and operating limits.[54]
+- Follow-up adherence in baseline workflows may remain near half, while dedicated automated closed-loop programs can materially improve completion.[44][55]
+
 ## 1. Logistics Automation and Data Acquisition Autonomy
 
 The first stage of an effective preprocessing pipeline is eliminating data-availability friction. Radiologists still lose time manually searching prior studies and reconciling data across PACS, RIS, and EHR systems.[5]
@@ -46,7 +52,7 @@ Assignment logic should account for license scope, real-time availability, and s
 
 ### 2.2 AI Urgency Flagging
 
-Early-detection algorithms for critical findings (e.g., intracranial hemorrhage, LVO, suspicious pulmonary nodules) can automatically reorder worklists.[16] Platforms such as Viz.ai and Aidoc have shown major treatment-time reductions in stroke pathways, including reports of up to 66 minutes in selected scenarios.[16]
+Early-detection algorithms for critical findings (e.g., intracranial hemorrhage, LVO, suspicious pulmonary nodules) can automatically reorder worklists.[16] Platforms such as Viz.ai and Aidoc have shown major treatment-time reductions in stroke pathways, including reports of up to 66 minutes in selected scenarios.[16] However, implementation outcomes are heterogeneous: some prospective deployments show limited TAT effect when AI is added only as a widget, without full operational redesign.[53]
 
 This is not autonomous diagnosis. It is queue intelligence: ensuring the most critical case is opened next.[2]
 
@@ -103,9 +109,9 @@ Configuration errors in real-world healthcare AI deployments have already led to
 
 Preprocessing should not stop at report generation. A robust system must close the loop by ensuring follow-up recommendations become clinical action.[41][42]
 
-NLP pipelines (e.g., transformer variants such as ClinicalBERT-class approaches) can identify follow-up recommendations and track completion with high precision in published studies.[43][44]
+NLP pipelines (e.g., transformer variants such as ClinicalBERT-class approaches) can identify follow-up recommendations and track completion with high precision in published studies.[43][44] In practice, baseline completion for recommended follow-up imaging may remain around 52% across sites, which supports explicit navigation ownership and escalation design.[44]
 
-Navigation platforms (e.g., Radloop, RADNAV, Nursenav) can automate reminders, escalation, and navigator dashboards, improving adherence and reducing lost follow-up risk.[41][45][46]
+Navigation platforms (e.g., Radloop, RADNAV, Nursenav) can automate reminders, escalation, and navigator dashboards, improving adherence and reducing lost follow-up risk.[41][45][46] Closed-loop implementations have reported completion rates near 74.8% for clinically necessary follow-up imaging.[55]
 
 ### 6.1 Urology Navigation Track
 
@@ -186,3 +192,7 @@ This initiative is intentionally positioned at the intersection of software engi
 49. AI Digital Twins and Synthetic Data: Application to Clinical Trials (MRCT Center). Accessed February 7, 2026. https://mrctcenter.org/resource/ai-digital-twins-and-synthetic-data-application-to-clinical-trials/
 50. AI for CT Image Quality and Radiation Protection: Systematic Review (JMIR). Accessed February 7, 2026. https://www.jmir.org/2025/1/e66622/
 51. AI-Driven Advances in Low-Dose Imaging and Enhancement (MDPI). Accessed February 7, 2026. https://www.mdpi.com/2075-4418/15/6/689
+52. Active Reprioritization of Reading Worklists with AI for Intracranial Hemorrhage (Radiology: Artificial Intelligence). Accessed February 10, 2026. https://pmc.ncbi.nlm.nih.gov/articles/PMC8043365/
+53. Prospective Evaluation of AI Triage of Intracranial Hemorrhage on Non-Contrast CT (AJR, 2024). Accessed February 10, 2026. https://doi.org/10.2214/AJR.24.31639
+54. Real-World Performance of a Commercial Intracranial Hemorrhage Detection Model (npj Digital Medicine, 2025). Accessed February 10, 2026. https://www.nature.com/articles/s41746-025-02244-3
+55. Predictors of Completion of Clinically Necessary Radiologist-Recommended Follow-Up Imaging (AJR, 2025). Accessed February 10, 2026. https://pmc.ncbi.nlm.nih.gov/articles/PMC12831625/

@@ -104,6 +104,10 @@
             padding: 28px 20px 60px;
         }
 
+        .wrap > section + section {
+            margin-top: 14px;
+        }
+
         .hero,
         .panel {
             background: var(--bg-soft);
@@ -163,7 +167,7 @@
 
         .kpis {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 12px;
             margin: 14px 0 0;
         }
@@ -191,13 +195,11 @@
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 14px;
-            margin-top: 14px;
         }
 
         .stack {
             display: grid;
             gap: 14px;
-            margin-top: 14px;
         }
 
         .bullets-tight li {
@@ -223,6 +225,40 @@
             color: var(--accent);
             font-size: 1rem;
             margin-bottom: 4px;
+        }
+
+        .count-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .count-card {
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 10px;
+            background: var(--bg-card);
+        }
+
+        .count-card strong {
+            display: block;
+            font-size: 1.2rem;
+            color: var(--accent);
+            margin-bottom: 2px;
+        }
+
+        .count-card p {
+            margin: 0;
+            font-size: 0.95rem;
+            line-height: 1.45;
+            color: var(--muted);
+        }
+
+        .tiny {
+            font-size: 0.86rem;
+            color: var(--muted);
+            line-height: 1.45;
         }
 
         .panel ul,
@@ -335,6 +371,7 @@
             .kpis { grid-template-columns: 1fr 1fr; }
             .grid { grid-template-columns: 1fr; }
             .metric-row { grid-template-columns: 1fr; }
+            .count-grid { grid-template-columns: 1fr 1fr; }
             .refs { column-count: 1; }
         }
 
@@ -342,6 +379,7 @@
             .wrap { padding: 16px 12px 40px; }
             .hero, .panel { padding: 14px; }
             .kpis { grid-template-columns: 1fr; }
+            .count-grid { grid-template-columns: 1fr; }
             .table-wrap { overflow-x: visible; }
             .table {
                 min-width: 0;
@@ -386,23 +424,31 @@
             <h1>Architecture and Implementation of a Radiology Preprocessing Ecosystem</h1>
             <p class="lead">From logistics automation to agentic AI and patient navigation: this is the technical and strategic justification behind Heimdallr as an AI operating layer for radiology.</p>
             <div class="nav-links" data-shared-nav="hero"></div>
-            <p class="kpi-note">Reported impact from cited external references (context-dependent; not guaranteed local outcomes).</p>
+            <p class="kpi-note">Reported impact from cited peer-reviewed and real-world studies (context-dependent; implementation-dependent).</p>
             <div class="kpis">
                 <div class="kpi">
-                    <strong>+34%</strong>
-                    <p>Reported improvement in fair workload distribution.[13]</p>
+                    <strong>12.01 vs 15.75 min</strong>
+                    <p>Queue-adjusted wait time improved when AI was actively used for worklist reprioritization.[56]</p>
                 </div>
                 <div class="kpi">
-                    <strong>-50%</strong>
-                    <p>Reported reduction in manual workflow steps.[13]</p>
+                    <strong>147.1 vs 149.9 min</strong>
+                    <p>Prospective single-center validation found no significant ICH-positive TAT gain with widget-only AI triage.[57]</p>
                 </div>
                 <div class="kpi">
-                    <strong>+23-35%</strong>
-                    <p>Reported physician throughput increase range.[13]</p>
+                    <strong>101,944 exams</strong>
+                    <p>Large multi-site real-world cohort used to evaluate deployed ICH triage performance.[58]</p>
                 </div>
                 <div class="kpi">
-                    <strong>Up to 66 min</strong>
-                    <p>Reported treatment-time reduction in stroke triage scenarios.[16]</p>
+                    <strong>82.2% / 97.6%</strong>
+                    <p>Real-world ICH model sensitivity and specificity, highlighting both utility and limits.[58]</p>
+                </div>
+                <div class="kpi">
+                    <strong>51.9% / 52.0%</strong>
+                    <p>Cross-site baseline adherence to follow-up imaging recommendations remained near half without dedicated closure workflows.[44]</p>
+                </div>
+                <div class="kpi">
+                    <strong>74.8%</strong>
+                    <p>Completion rate achieved for clinically necessary follow-up imaging when tracked via an automated closed-loop program.[59]</p>
                 </div>
             </div>
         </section>
@@ -410,7 +456,7 @@
         <section class="grid">
             <article class="panel">
                 <h2>Why This Matters Now</h2>
-                <p>Radiology is constrained less by scanner physics and more by workflow friction: missing priors, fragmented systems, overload, and follow-up leakage.[1][5] The 2026 opportunity is not a single model, but an orchestrated pipeline where logistics, triage, reporting, and navigation are engineered as one system.[3]</p>
+                <p>The main bottlenecks in modern radiology are operational and organizational: studies arrive with uneven context, worklists accumulate variability, reporting quality must stay stable under volume pressure, and follow-up recommendations often fail to close the loop. Heimdallr is motivated by this gap between image acquisition capability and execution reliability in day-to-day clinical flow.</p>
                 <div class="tag-row">
                     <span class="tag">PACS/RIS/EHR orchestration</span>
                     <span class="tag">LLM/VLM with governance</span>
@@ -422,33 +468,75 @@
                 <h2>Core Definitions</h2>
                 <p><strong>Friction</strong> is implementation-in-production effort (integration, data quality, validation, governance, and operational change). It is not model complexity alone.</p>
                 <p style="margin-top:8px;"><strong>Navigation</strong> means active follow-up monitoring by service staff, with owner, due date, status, and escalation until closure.</p>
+                <p style="margin-top:8px;"><strong>Why now</strong> means the concrete reason a module should be prioritized now, not simply listed in a roadmap.</p>
             </article>
         </section>
 
         <section class="grid">
             <article class="panel">
-                <h2>Strategic Positioning</h2>
-                <p>This work intentionally positions the project and its author in the Applied Software Engineering frontier of healthcare AI: execution-focused, clinically aware, and operationally measurable.</p>
+                <h2>Project Thesis</h2>
+                <p>The project thesis is that sustainable AI value in radiology comes from an integrated operating layer, not from isolated model demos. The system must connect intake reliability, assistive prioritization, structured reporting support, and post-report closure under auditable controls.</p>
                 <ul class="bullets-tight">
-                    <li><strong>Personal brand:</strong> build credibility as an Applied Software Engineer for high-impact medical workflows.</li>
-                    <li><strong>Collaboration magnet:</strong> attract engineers, radiologists, data scientists, and compliance partners.</li>
-                    <li><strong>Return paths:</strong> enable academic publications, open collaboration, and sustainable commercialization.</li>
+                    <li><strong>Operational objective:</strong> reduce time-to-open and queue volatility while preserving fairness and safety.</li>
+                    <li><strong>Clinical objective:</strong> increase consistency of assistive outputs with explicit human review gates.</li>
+                    <li><strong>Continuity objective:</strong> convert report recommendations into owned follow-up tasks until closure.</li>
                 </ul>
             </article>
             <article class="panel">
                 <h2>Execution Lens</h2>
-                <p>The project is positioned as a production-grade radiology operations layer, not a model showcase. Every module is framed by measurable operational value and governance constraints from day one.</p>
+                <p>Every module is evaluated by the same criteria: measurable impact, implementation friction, governance burden, and reversibility. This keeps scope coherent when the portfolio grows.</p>
                 <div class="metric-row">
                     <div class="metric-box">
                         <strong>Delivery Logic</strong>
-                        <p>Build production-grade infrastructure and de-identification first, then scale toward higher-autonomy clinical AI as governance and reliability mature.</p>
+                        <p>Stabilize ingestion, policy, and observability first; accelerate clinical assistance only when monitoring and rollback are explicit.</p>
                     </div>
                     <div class="metric-box">
-                        <strong>Clinical Logic</strong>
-                        <p>Expand automation only where human oversight, auditability, and rollback remain explicit.</p>
+                        <strong>Trust Logic</strong>
+                        <p>Automation trust is earned through deterministic behavior, traceability, and disciplined post-deployment review.</p>
                     </div>
                 </div>
             </article>
+        </section>
+
+        <section class="panel">
+            <h2>Portfolio Coherence (44 Modules)</h2>
+            <p>This motivation is implemented through a single module portfolio that spans three workflow moments and four operating tracks. The goal is not breadth for its own sake, but coverage of the full value chain from intake to closure.</p>
+            <div class="count-grid">
+                <div class="count-card">
+                    <strong id="mod-total">-</strong>
+                    <p>Modules in unified portfolio</p>
+                </div>
+                <div class="count-card">
+                    <strong id="mod-before">-</strong>
+                    <p>Before report modules</p>
+                </div>
+                <div class="count-card">
+                    <strong id="mod-during">-</strong>
+                    <p>During report modules</p>
+                </div>
+                <div class="count-card">
+                    <strong id="mod-after">-</strong>
+                    <p>After report modules</p>
+                </div>
+            </div>
+            <div class="count-grid" style="margin-top:10px;">
+                <div class="count-card">
+                    <strong id="trk-ops">-</strong>
+                    <p>Operations track</p>
+                </div>
+                <div class="count-card">
+                    <strong id="trk-clinical">-</strong>
+                    <p>Clinical decision support track</p>
+                </div>
+                <div class="count-card">
+                    <strong id="trk-governance">-</strong>
+                    <p>Governance and compliance track</p>
+                </div>
+                <div class="count-card">
+                    <strong id="trk-continuity">-</strong>
+                    <p>Care continuity track</p>
+                </div>
+            </div>
         </section>
 
         <section class="stack">
@@ -642,6 +730,10 @@
                     <li><a href="https://mrctcenter.org/resource/ai-digital-twins-and-synthetic-data-application-to-clinical-trials/">Digital Twins and Synthetic Data</a></li>
                     <li><a href="https://www.jmir.org/2025/1/e66622/">AI for CT Image Quality and Radiation Protection</a></li>
                     <li><a href="https://www.mdpi.com/2075-4418/15/6/689">AI-Driven Low-Dose Imaging Advances</a></li>
+                    <li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8043365/">Active Reprioritization of Reading Worklists with AI for ICH (Radiology: AI)</a></li>
+                    <li><a href="https://doi.org/10.2214/AJR.24.31639">Prospective Evaluation of AI Triage of ICH on NCCT (AJR, 2024)</a></li>
+                    <li><a href="https://www.nature.com/articles/s41746-025-02244-3">Real-World Performance of a Commercial ICH Detection Model (npj Digital Medicine, 2025)</a></li>
+                    <li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12831625/">Predictors of Completion of Clinically Necessary Radiologist-Recommended Follow-Up Imaging (AJR, 2025)</a></li>
                 </ol>
             </article>
 
@@ -666,6 +758,40 @@
                     `<a class="cite" href="#ref-${n}" aria-label="Reference ${n}">[${n}]</a>`
                 );
             });
+        })();
+
+        (async function () {
+            try {
+                const response = await fetch('./data/pipeline-modules.json');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const modules = await response.json();
+
+                const byStage = modules.reduce((acc, m) => {
+                    acc[m.stage] = (acc[m.stage] || 0) + 1;
+                    return acc;
+                }, {});
+
+                const byTrack = modules.reduce((acc, m) => {
+                    acc[m.track] = (acc[m.track] || 0) + 1;
+                    return acc;
+                }, {});
+
+                const setText = (id, value) => {
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = String(value ?? 0);
+                };
+
+                setText('mod-total', modules.length);
+                setText('mod-before', byStage.before || 0);
+                setText('mod-during', byStage.during || 0);
+                setText('mod-after', byStage.after || 0);
+                setText('trk-ops', byTrack.ops || 0);
+                setText('trk-clinical', byTrack.clinical || 0);
+                setText('trk-governance', byTrack.governance || 0);
+                setText('trk-continuity', byTrack.continuity || 0);
+            } catch (error) {
+                console.error('Failed to load module portfolio summary:', error);
+            }
         })();
     </script>
 </body>

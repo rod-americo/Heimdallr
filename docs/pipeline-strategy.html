@@ -65,6 +65,10 @@
             --focus-4: #29c98a;
             --status-planned-bg: rgba(148, 163, 184, 0.2);
             --status-planned-text: #d8e2f2;
+            --status-consideration-bg: rgba(243, 169, 82, 0.2);
+            --status-consideration-text: #ffd39f;
+            --status-exploratory-bg: rgba(245, 108, 124, 0.2);
+            --status-exploratory-text: #ffc0c7;
             --status-poc-bg: rgba(120, 147, 183, 0.24);
             --status-poc-text: #d4e0f5;
             --status-mvp-bg: rgba(57, 208, 255, 0.2);
@@ -131,6 +135,10 @@
                 --focus-4: #1e9f6e;
                 --status-planned-bg: rgba(115, 133, 163, 0.2);
                 --status-planned-text: #344862;
+                --status-consideration-bg: rgba(198, 127, 29, 0.14);
+                --status-consideration-text: #885400;
+                --status-exploratory-bg: rgba(200, 74, 89, 0.14);
+                --status-exploratory-text: #8f2f3a;
                 --status-poc-bg: rgba(87, 110, 148, 0.18);
                 --status-poc-text: #355172;
                 --status-mvp-bg: rgba(15, 135, 201, 0.12);
@@ -173,6 +181,10 @@
             margin: 0 auto;
             padding: 28px 20px 60px;
             width: 100%;
+        }
+
+        .wrap > section + section {
+            margin-top: 14px;
         }
 
         .hero {
@@ -285,6 +297,19 @@
             display: inline-flex;
             align-items: center;
             gap: 6px;
+        }
+
+        .status-caps {
+            font-variant-caps: all-small-caps;
+            letter-spacing: 0.04em;
+        }
+
+        @supports not (font-variant-caps: all-small-caps) {
+            .status-caps {
+                text-transform: uppercase;
+                font-size: 0.9em;
+                letter-spacing: 0.03em;
+            }
         }
 
         .status-ring {
@@ -400,6 +425,10 @@
 
         .top-meta.status.status-planned { color: var(--status-planned-text); }
         .top-meta.status.status-planned .dot { background: var(--status-planned-text); }
+        .top-meta.status.status-in-review { color: var(--status-consideration-text); }
+        .top-meta.status.status-in-review .dot { background: var(--status-consideration-text); }
+        .top-meta.status.status-exploratory { color: var(--status-exploratory-text); }
+        .top-meta.status.status-exploratory .dot { background: var(--status-exploratory-text); }
         .top-meta.status.status-poc { color: var(--status-poc-text); }
         .top-meta.status.status-poc .dot { background: var(--status-poc-text); }
         .top-meta.status.status-mvp-internal { color: var(--status-mvp-text); }
@@ -452,6 +481,8 @@
         .pill.friction-medium { background: var(--pill-acceleration-bg); color: var(--pill-acceleration-text); }
         .pill.friction-high { background: var(--friction-high-bg); color: var(--friction-high-text); }
         .pill.status-planned { background: var(--status-planned-bg); color: var(--status-planned-text); border: 1px solid rgba(100, 116, 139, 0.45); }
+        .pill.status-in-review { background: var(--status-consideration-bg); color: var(--status-consideration-text); border: 1px solid rgba(243, 169, 82, 0.45); }
+        .pill.status-exploratory { background: var(--status-exploratory-bg); color: var(--status-exploratory-text); border: 1px solid rgba(245, 108, 124, 0.45); }
         .pill.status-poc { background: var(--status-poc-bg); color: var(--status-poc-text); border: 1px solid rgba(120, 147, 183, 0.45); }
         .pill.status-mvp-internal { background: var(--status-mvp-bg); color: var(--status-mvp-text); border: 1px solid rgba(57, 208, 255, 0.45); }
         .pill.status-validation-ready { background: var(--status-validation-bg); color: var(--status-validation-text); border: 1px solid rgba(41, 201, 138, 0.45); }
@@ -582,13 +613,15 @@
                     <div><span style="background: var(--hard);"></span>High complexity / governance-heavy</div>
                 </div>
                 <div class="status-legend">
-                    <span class="guide-label row-label">Status (ring):</span>
-                    <span class="status-item"><span class="status-ring" style="border-color:#cbd5e1;background:rgba(203,213,225,0.18);"></span>Planned</span>
-                    <span class="status-item"><span class="status-ring" style="border-color:#9fb2cf;background:rgba(120,147,183,0.2);"></span>POC</span>
-                    <span class="status-item"><span class="status-ring" style="border-color:#6ee7ff;background:rgba(110,231,255,0.16);"></span>MVP Internal</span>
-                    <span class="status-item"><span class="status-ring" style="border-color:#66e2b0;background:rgba(102,226,176,0.16);"></span>Validation Ready</span>
-                    <span class="status-item"><span class="status-ring" style="border-color:#ffca8d;background:rgba(255,202,141,0.18);"></span>Production Candidate</span>
-                    <span class="status-item"><span class="status-ring" style="border-color:#c6a4ff;background:rgba(198,164,255,0.18);"></span>Implemented</span>
+                    <span class="guide-label row-label" style="flex-basis:100%;">Status (ring):</span>
+                    <span class="status-item"><span class="status-ring" style="border-color:#f4a4ad;background:rgba(245,108,124,0.18);"></span><span class="status-caps">Exploratory</span></span>
+                    <span class="status-item"><span class="status-ring" style="border-color:#ffca8d;background:rgba(255,202,141,0.18);"></span><span class="status-caps">In Review</span></span>
+                    <span class="status-item"><span class="status-ring" style="border-color:#cbd5e1;background:rgba(203,213,225,0.18);"></span><span class="status-caps">Planned</span></span>
+                    <span class="status-item"><span class="status-ring" style="border-color:#9fb2cf;background:rgba(120,147,183,0.2);"></span><span class="status-caps">POC</span></span>
+                    <span class="status-item"><span class="status-ring" style="border-color:#6ee7ff;background:rgba(110,231,255,0.16);"></span><span class="status-caps">MVP Internal</span></span>
+                    <span class="status-item"><span class="status-ring" style="border-color:#66e2b0;background:rgba(102,226,176,0.16);"></span><span class="status-caps">Validation Ready</span></span>
+                    <span class="status-item"><span class="status-ring" style="border-color:#ffca8d;background:rgba(255,202,141,0.18);"></span><span class="status-caps">Production Candidate</span></span>
+                    <span class="status-item"><span class="status-ring" style="border-color:#c6a4ff;background:rgba(198,164,255,0.18);"></span><span class="status-caps">Implemented</span></span>
                 </div>
                 <p class="small" style="margin-top: 8px;">Friction is an implementation-in-production score (integration, validation, compliance, and operational change), not just model difficulty.</p>
             </article>
@@ -620,12 +653,14 @@
             <div class="filter-group">
                 <span class="filter-label row-label">Status:</span>
                 <button class="active" data-group="status" data-filter="all">All</button>
-                <button data-group="status" data-filter="planned">Planned</button>
-                <button data-group="status" data-filter="poc">POC</button>
-                <button data-group="status" data-filter="mvp-internal">MVP Internal</button>
-                <button data-group="status" data-filter="validation-ready">Validation Ready</button>
-                <button data-group="status" data-filter="production-candidate">Production Candidate</button>
-                <button data-group="status" data-filter="implemented">Implemented</button>
+                <button class="status-caps" data-group="status" data-filter="exploratory">Exploratory</button>
+                <button class="status-caps" data-group="status" data-filter="in-review">In Review</button>
+                <button class="status-caps" data-group="status" data-filter="planned">Planned</button>
+                <button class="status-caps" data-group="status" data-filter="poc">POC</button>
+                <button class="status-caps" data-group="status" data-filter="mvp-internal">MVP Internal</button>
+                <button class="status-caps" data-group="status" data-filter="validation-ready">Validation Ready</button>
+                <button class="status-caps" data-group="status" data-filter="production-candidate">Production Candidate</button>
+                <button class="status-caps" data-group="status" data-filter="implemented">Implemented</button>
             </div>
             <div id="cards" class="cards"></div>
         </section>
@@ -635,7 +670,7 @@
             <p class="small"><strong>Impact (1-10)</strong>: expected clinical and operational value if deployed safely.</p>
             <p class="small" style="margin-top: 6px;"><strong>Friction (1-10)</strong>: real-world effort to productionize safely, combining technical integration, data quality, clinical validation, governance/compliance, and change management.</p>
             <p class="small" style="margin-top: 6px;"><strong>Navigation</strong>: active follow-up monitoring by clinical service staff, with owner, due date, status tracking, and escalation until closure.</p>
-            <p class="small" style="margin-top: 6px;"><strong>Status</strong>: planned → poc → mvp internal → validation ready → production candidate → implemented.</p>
+            <p class="small" style="margin-top: 6px;"><strong>Status</strong>: <span class="status-caps">EXPLORATORY | IN REVIEW → PLANNED → POC → MVP INTERNAL → VALIDATION READY → PRODUCTION CANDIDATE → IMPLEMENTED</span>.</p>
             <p class="small" style="margin-top: 10px;"><strong>Horizon Legend</strong>:</p>
             <p class="small" style="margin-top: 6px;"><span class="pill foundation">foundation</span> baseline safety, interoperability, and throughput foundation for production readiness.</p>
             <p class="small" style="margin-top: 6px;"><span class="pill acceleration">acceleration</span> modules that increase clinical/operational performance on top of a stable base.</p>
@@ -662,292 +697,7 @@
         </section>
     </div>
 
-    <script>
-        const modules = [
-            { id: 1, title: 'DICOM C-STORE Intake Listener', track: 'ops', horizon: 'foundation', status: 'mvp-internal', impact: 8, friction: 3, note: 'Production listener for PACS/modality intake.' },
-            { id: 2, title: 'Case Prep and Queue Worker', track: 'ops', horizon: 'foundation', status: 'mvp-internal', impact: 8, friction: 4, note: 'Automated DICOM selection, NIfTI conversion, and queued processing flow.' },
-            { id: 3, title: 'Dashboard + API Surface', track: 'ops', horizon: 'foundation', status: 'mvp-internal', impact: 7, friction: 3, note: 'FastAPI endpoints and operational dashboard already serving case workflows.' },
-            { id: 4, title: 'HL7-Triggered Smart Prefetch', track: 'ops', horizon: 'foundation', status: 'planned', impact: 8, friction: 4, note: 'Route relevant priors from ADT/ORM events using study similarity scoring.' },
-            { id: 5, title: 'Unified Worklist Orchestrator', track: 'ops', horizon: 'foundation', status: 'planned', impact: 7, friction: 5, note: 'Fair case assignment by subspecialty, workload, and SLA risk.' },
-            { id: 6, title: 'SLA Policy Engine', track: 'ops', horizon: 'foundation', status: 'planned', impact: 6, friction: 4, note: 'Alert and escalate when breach risk increases for urgent studies.' },
-
-            { id: 26, title: 'De-identification Gateway', track: 'governance', horizon: 'foundation', status: 'mvp-internal', impact: 10, friction: 5, note: 'Pixel + metadata PHI stripping is enforced before external model calls.' },
-            { id: 7, title: 'AP Chest X-ray Assist APIs', track: 'clinical', horizon: 'foundation', status: 'poc', impact: 7, friction: 3, note: 'Anthropic and MedGemma assistant flows integrated through server endpoints.' },
-            { id: 8, title: 'TotalSegmentator Core Pipeline', track: 'clinical', horizon: 'foundation', status: 'mvp-internal', impact: 8, friction: 4, note: 'Robust segmentation backbone powering multi-structure quantitative workflows.' },
-            { id: 9, title: 'L3 Muscle Area + SMI Calculator', track: 'clinical', horizon: 'foundation', status: 'mvp-internal', impact: 8, friction: 4, note: 'Measures muscle area at L3 and calculates SMI using patient height input.' },
-            { id: 10, title: 'Automated Organ Volumetry', track: 'clinical', horizon: 'foundation', status: 'poc', impact: 8, friction: 5, note: 'Automatic organ volumetry from segmentation outputs for structured reporting and analytics.' },
-            { id: 11, title: 'Intracranial Hemorrhage Detection', track: 'clinical', horizon: 'acceleration', status: 'poc', impact: 10, friction: 5, note: 'Operational ICH detection integrated into the preprocessing/triage flow.' },
-            { id: 12, title: 'Structured Report Copilot', track: 'clinical', horizon: 'acceleration', status: 'poc', impact: 7, friction: 6, note: 'Template-bound drafting from findings and quantitative metrics.' },
-            { id: 13, title: 'Urgency Flagging and Reordering', track: 'clinical', horizon: 'acceleration', status: 'planned', impact: 9, friction: 8, note: 'Reprioritize suspected critical findings with auditable thresholds.' },
-            { id: 14, title: 'Opportunistic Liver Quant', track: 'clinical', horizon: 'acceleration', status: 'planned', impact: 7, friction: 6, note: 'Steatosis risk extraction from routine CT studies.' },
-            { id: 15, title: 'Opportunistic Bone Quant', track: 'clinical', horizon: 'acceleration', status: 'planned', impact: 6, friction: 6, note: 'Vertebral volumetric HU proxy for osteoporosis triage.' },
-            { id: 16, title: 'Opportunistic Coronary Calcium (CAC-DRS)', track: 'clinical', horizon: 'acceleration', status: 'planned', impact: 7, friction: 6, note: 'Opportunistic coronary calcium detection in eligible CT studies followed by CAC-DRS structured classification.' },
-            { id: 37, title: 'Fracture Detection and Triage Module', track: 'clinical', horizon: 'acceleration', status: 'planned', impact: 9, friction: 7, note: 'Performs triage of cases with suspected fractures in trauma/emergency workflows using auditable urgency thresholds.' },
-            { id: 17, title: 'Hippocampal Volumetry Project', track: 'clinical', horizon: 'scaling', status: 'planned', impact: 8, friction: 7, note: 'Longitudinal hippocampal volumetry project for neurodegeneration-oriented workflows.' },
-            { id: 18, title: 'Emphysema Longitudinal Quant', track: 'clinical', horizon: 'scaling', status: 'planned', impact: 5, friction: 7, note: 'LAA%-based burden tracking and trend summaries.' },
-            { id: 29, title: 'Lung Nodule Longitudinal Tracker', track: 'clinical', horizon: 'scaling', status: 'planned', impact: 8, friction: 7, note: 'Serial nodule tracking with growth and interval-aware follow-up triggers.' },
-            { id: 30, title: 'Aortic Aneurysm Surveillance Pipeline', track: 'clinical', horizon: 'scaling', status: 'planned', impact: 8, friction: 7, note: 'Longitudinal aortic diameter surveillance with guideline-aligned escalation rules.' },
-            { id: 31, title: 'Kidney Stone Burden Longitudinal Module', track: 'continuity', horizon: 'scaling', status: 'planned', impact: 8, friction: 6, note: 'Time-series stone burden tracking integrated with urology navigation workflows.' },
-            { id: 32, title: 'Incidental Findings Closure Engine', track: 'continuity', horizon: 'scaling', status: 'planned', impact: 10, friction: 6, note: 'Operational engine to drive incidental findings from report mention to documented closure.' },
-            { id: 33, title: 'Prostate MRI Longitudinal PI-RADS Tracker', track: 'continuity', horizon: 'scaling', status: 'planned', impact: 8, friction: 8, note: 'Longitudinal PI-RADS and prostate-volume trend tracking for structured follow-up pathways.' },
-            { id: 19, title: 'Agentic Workflow Coordinator', track: 'clinical', horizon: 'innovation', status: 'planned', impact: 8, friction: 9, note: 'Multi-step assistants for triage, reporting, and handoff execution.' },
-            { id: 20, title: 'Foundation Model Fine-Tuning Layer', track: 'clinical', horizon: 'innovation', status: 'planned', impact: 9, friction: 9, note: 'Governance-controlled institutional adaptation of VLM/LLM models with safety gates and rollback.' },
-            { id: 21, title: 'Temporal Imaging Intelligence (Delta Engine)', track: 'clinical', horizon: 'innovation', status: 'planned', impact: 9, friction: 8, note: 'Longitudinal change engine for prior/current imaging deltas and progression-aware interpretation support.' },
-            { id: 22, title: 'Causal Triage Simulator', track: 'ops', horizon: 'innovation', status: 'planned', impact: 8, friction: 8, note: 'Offline simulation of triage policies to estimate SLA, fairness, and urgency latency before production.' },
-            { id: 23, title: 'Synthetic + Federated Validation Sandbox', track: 'governance', horizon: 'innovation', status: 'planned', impact: 8, friction: 8, note: 'Unified privacy-preserving validation stack combining federated workflows and synthetic benchmarking.' },
-            { id: 24, title: 'Autonomous Follow-up Orchestrator (Human-Gated)', track: 'continuity', horizon: 'innovation', status: 'planned', impact: 9, friction: 8, note: 'AI proposes follow-up routing and deadlines, with explicit human approval gates before activation.' },
-            { id: 25, title: 'Prospective Trial Mode', track: 'governance', horizon: 'innovation', status: 'planned', impact: 8, friction: 7, note: 'Native trial-cohort and endpoint capture mode for publication-grade evaluation and reproducibility.' },
-
-            { id: 27, title: 'Patient Follow-up Navigator', track: 'continuity', horizon: 'scaling', status: 'planned', impact: 8, friction: 5, note: 'Extract recommendations and orchestrate reminders/escalations.' },
-            { id: 28, title: 'Urology Navigation Module', track: 'continuity', horizon: 'scaling', status: 'planned', impact: 8, friction: 6, note: 'Active service-led tracking for urology navigable findings, with secondary routing to oncology when neoplasm is suspected.' },
-            { id: 34, title: 'General Surgery Navigation Module', track: 'continuity', horizon: 'scaling', status: 'planned', impact: 7, friction: 5, note: 'Navigation rules for cholelithiasis and abdominal wall hernias with closure ownership.' },
-            { id: 35, title: 'Oncology High-Suspicion Navigation Router', track: 'continuity', horizon: 'scaling', status: 'planned', impact: 10, friction: 7, note: 'Flags all suspicious/potentially neoplastic findings in ER and inpatient populations for oncology follow-up.' },
-            { id: 36, title: 'Gynecology Navigation Module', track: 'continuity', horizon: 'scaling', status: 'planned', impact: 9, friction: 7, note: 'Structured routing for suspicious ovarian/adnexal, uterine, cervical, and endometriosis-related findings.' }
-        ];
-
-        const trackName = {
-            ops: 'Operations',
-            clinical: 'Clinical Decision Support',
-            governance: 'Governance and Compliance',
-            continuity: 'Care Continuity'
-        };
-
-        const cards = document.getElementById('cards');
-        const liveToday = document.getElementById('liveToday');
-        const filterButtons = [...document.querySelectorAll('button[data-group][data-filter]')];
-        const isMobile = window.matchMedia('(max-width: 760px)').matches;
-        const css = getComputedStyle(document.documentElement);
-        const chartText = css.getPropertyValue('--chart-text').trim();
-        const chartAxis = css.getPropertyValue('--chart-axis').trim();
-        const chartGrid = css.getPropertyValue('--chart-grid').trim();
-        const chartBorder = css.getPropertyValue('--chart-border').trim();
-        const bubbleGood = css.getPropertyValue('--bubble-good').trim();
-        const bubbleMid = css.getPropertyValue('--bubble-mid').trim();
-        const bubbleHard = css.getPropertyValue('--bubble-hard').trim();
-        const focus1 = css.getPropertyValue('--focus-1').trim();
-        const focus2 = css.getPropertyValue('--focus-2').trim();
-        const focus3 = css.getPropertyValue('--focus-3').trim();
-        const focus4 = css.getPropertyValue('--focus-4').trim();
-        let activeTrackFilter = 'all';
-        let activeStatusFilter = 'all';
-
-        function frictionBand(v) {
-            if (v <= 3) return 'low';
-            if (v <= 6) return 'medium';
-            return 'high';
-        }
-
-        function impactBand(v) {
-            if (v <= 3) return 'low';
-            if (v <= 6) return 'medium';
-            return 'high';
-        }
-
-        function statusLabel(v) {
-            if (v === 'mvp-internal') return 'mvp internal';
-            if (v === 'validation-ready') return 'validation ready';
-            if (v === 'production-candidate') return 'production candidate';
-            if (v === 'poc') return 'poc';
-            if (v === 'implemented') return 'implemented';
-            return 'planned';
-        }
-
-        function filterModules() {
-            return modules.filter((m) => {
-                const trackMatch = activeTrackFilter === 'all' || m.track === activeTrackFilter;
-                const statusMatch = activeStatusFilter === 'all' || m.status === activeStatusFilter;
-                return trackMatch && statusMatch;
-            });
-        }
-
-        function renderLiveToday() {
-            liveToday.innerHTML = '';
-            const liveStatuses = new Set(['mvp-internal', 'validation-ready', 'production-candidate', 'implemented']);
-            modules
-                .filter((m) => liveStatuses.has(m.status))
-                .forEach((m) => {
-                    const li = document.createElement('li');
-                    li.textContent = `${m.title}: ${m.note}`;
-                    liveToday.appendChild(li);
-                });
-        }
-
-        function renderCards() {
-            cards.innerHTML = '';
-            const list = filterModules();
-            list.forEach((m) => {
-                const el = document.createElement('article');
-                el.className = 'card';
-                el.innerHTML = `
-                    <div class="card-top">
-                        <span class="top-meta horizon ${m.horizon}"><span class="dot"></span>${m.horizon}</span>
-                        <span class="top-meta status status-${m.status}"><span class="dot"></span>${statusLabel(m.status)}</span>
-                    </div>
-                    <h3>${m.title}</h3>
-                    <div class="track">${trackName[m.track]}</div>
-                    <div class="card-body">
-                        <p class="small">${m.note}</p>
-                    </div>
-                    <div class="meta">
-                        <span class="metric-pill impact ${impactBand(m.impact)}">Impact ${m.impact}/10</span>
-                        <span class="metric-pill friction ${frictionBand(m.friction)}">Friction ${m.friction}/10</span>
-                    </div>
-                `;
-                cards.appendChild(el);
-            });
-        }
-
-        filterButtons.forEach((btn) => {
-            btn.addEventListener('click', () => {
-                const group = btn.dataset.group;
-                const value = btn.dataset.filter;
-                filterButtons
-                    .filter((b) => b.dataset.group === group)
-                    .forEach((b) => b.classList.remove('active'));
-                btn.classList.add('active');
-                if (group === 'track') activeTrackFilter = value;
-                if (group === 'status') activeStatusFilter = value;
-                renderCards();
-            });
-        });
-
-        const statusBorder = {
-            planned: '#cbd5e1',
-            poc: '#9fb2cf',
-            'mvp-internal': '#6ee7ff',
-            'validation-ready': '#66e2b0',
-            'production-candidate': '#ffca8d',
-            implemented: '#c6a4ff'
-        };
-
-        function buildPriorityPoints(list) {
-            const groups = new Map();
-            list.forEach((m) => {
-                const key = `${m.friction}-${m.impact}`;
-                if (!groups.has(key)) groups.set(key, []);
-                groups.get(key).push(m);
-            });
-
-            const jitterStep = 0.14;
-            const jitterMax = 0.28;
-            const radius = isMobile ? 8 : 9;
-
-            const points = [];
-            for (const [, group] of groups.entries()) {
-                const n = group.length;
-                group.forEach((m, idx) => {
-                    const center = (n - 1) / 2;
-                    let jitter = (idx - center) * jitterStep;
-                    if (jitter > jitterMax) jitter = jitterMax;
-                    if (jitter < -jitterMax) jitter = -jitterMax;
-                    points.push({
-                        x: m.friction,
-                        y: m.impact + jitter,
-                        r: radius,
-                        title: m.title,
-                        status: m.status,
-                        impact: m.impact,
-                        friction: m.friction
-                    });
-                });
-            }
-            return points;
-        }
-
-        const priorityPoints = buildPriorityPoints(modules);
-
-        const priorityChart = new Chart(document.getElementById('priorityChart'), {
-            type: 'bubble',
-            data: {
-                datasets: [{
-                    data: priorityPoints,
-                    backgroundColor: priorityPoints.map((p) => {
-                        if (p.friction <= 4) return bubbleGood;
-                        if (p.friction <= 7) return bubbleMid;
-                        return bubbleHard;
-                    }),
-                    borderColor: priorityPoints.map((p) => statusBorder[p.status] || chartBorder),
-                    borderWidth: 3
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                layout: {
-                    padding: isMobile ? 6 : 10
-                },
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: (ctx) => `${ctx.raw.title} | ${ctx.raw.status} | Impact ${ctx.raw.impact} | Friction ${ctx.raw.friction}`
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        type: 'linear',
-                        min: 2,
-                        max: 10,
-                        title: { display: !isMobile, text: 'Implementation Friction', color: chartAxis },
-                        ticks: { color: chartText, maxTicksLimit: isMobile ? 6 : 9, stepSize: 1 },
-                        grid: { color: chartGrid }
-                    },
-                    y: {
-                        type: 'linear',
-                        min: 4,
-                        max: 10,
-                        title: { display: !isMobile, text: 'Clinical/Operational Impact', color: chartAxis },
-                        ticks: { color: chartText, maxTicksLimit: isMobile ? 6 : 7, stepSize: 1 },
-                        grid: { color: chartGrid }
-                    }
-                }
-            }
-        });
-
-        const trackOrder = ['ops', 'clinical', 'governance', 'continuity'];
-        const focusBreakdown = modules.reduce((acc, m) => {
-            acc[m.track] = (acc[m.track] || 0) + 1;
-            return acc;
-        }, {});
-
-        const focusChart = new Chart(document.getElementById('focusChart'), {
-            type: 'doughnut',
-            data: {
-                labels: trackOrder.map((k) => trackName[k]),
-                datasets: [{
-                    data: trackOrder.map((k) => focusBreakdown[k] || 0),
-                    backgroundColor: [focus1, focus2, focus3, focus4],
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                layout: {
-                    padding: isMobile ? 2 : 8
-                },
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            color: chartText,
-                            usePointStyle: true,
-                            pointStyle: 'rect',
-                            boxWidth: isMobile ? 10 : 12,
-                            padding: isMobile ? 8 : 12,
-                            font: {
-                                size: isMobile ? 11 : 13
-                            }
-                        }
-                    }
-                }
-            }
-        });
-
-        renderLiveToday();
-        renderCards();
-    </script>
+    <script src="./pipeline-strategy.js"></script>
     <script src="./shared-nav.js"></script>
 </body>
 

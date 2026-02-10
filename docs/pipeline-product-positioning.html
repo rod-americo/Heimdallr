@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heimdallr - Pipeline Product Positioning</title>
+    <style>
+        :root {
+            --bg: #070c16;
+            --bg-soft: #101a2d;
+            --bg-card: #121f36;
+            --text: #e8f0ff;
+            --muted: #9eb0ca;
+            --accent: #39d0ff;
+            --line: rgba(126, 157, 210, 0.25);
+            --radial-1: rgba(57, 208, 255, 0.15);
+            --radial-2: rgba(138, 164, 255, 0.10);
+            --hero-grad-a: rgba(18, 31, 54, 0.95);
+            --hero-grad-b: rgba(10, 18, 32, 0.98);
+            --link-text: #d6e8ff;
+            --link-bg: #12203a;
+            --ring: rgba(57, 208, 255, 0.2);
+
+            --status-planned-bg: rgba(148, 163, 184, 0.2);
+            --status-planned-text: #d8e2f2;
+            --status-poc-bg: rgba(120, 147, 183, 0.24);
+            --status-poc-text: #d4e0f5;
+            --status-mvp-bg: rgba(57, 208, 255, 0.2);
+            --status-mvp-text: #b5ecff;
+            --status-consideration-bg: rgba(243, 169, 82, 0.2);
+            --status-consideration-text: #ffd39f;
+            --status-exploratory-bg: rgba(245, 108, 124, 0.2);
+            --status-exploratory-text: #ffc0c7;
+
+            --stage-before: rgba(57, 208, 255, 0.13);
+            --stage-during: rgba(138, 164, 255, 0.16);
+            --stage-after: rgba(245, 108, 124, 0.13);
+
+            --radius: 14px;
+            color-scheme: dark light;
+        }
+
+        @media (prefers-color-scheme: light) {
+            :root {
+                --bg: #f3f7ff;
+                --bg-soft: #ffffff;
+                --bg-card: #f7faff;
+                --text: #0f1b33;
+                --muted: #4d6283;
+                --accent: #0f87c9;
+                --line: rgba(38, 68, 125, 0.18);
+                --radial-1: rgba(15, 135, 201, 0.10);
+                --radial-2: rgba(86, 115, 216, 0.08);
+                --hero-grad-a: rgba(240, 247, 255, 0.95);
+                --hero-grad-b: rgba(233, 242, 255, 0.98);
+                --link-text: #12345f;
+                --link-bg: #eaf2ff;
+                --ring: rgba(15, 135, 201, 0.2);
+
+                --status-planned-bg: rgba(115, 133, 163, 0.2);
+                --status-planned-text: #344862;
+                --status-poc-bg: rgba(87, 110, 148, 0.18);
+                --status-poc-text: #355172;
+                --status-mvp-bg: rgba(15, 135, 201, 0.12);
+                --status-mvp-text: #0f5f99;
+                --status-consideration-bg: rgba(198, 127, 29, 0.14);
+                --status-consideration-text: #885400;
+                --status-exploratory-bg: rgba(200, 74, 89, 0.14);
+                --status-exploratory-text: #8f2f3a;
+
+                --stage-before: rgba(15, 135, 201, 0.09);
+                --stage-during: rgba(86, 115, 216, 0.12);
+                --stage-after: rgba(200, 74, 89, 0.10);
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Inter", "Segoe UI", sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at 15% 20%, var(--radial-1), transparent 30%),
+                radial-gradient(circle at 85% 80%, var(--radial-2), transparent 30%),
+                var(--bg);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .wrap {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 28px 20px 60px;
+        }
+
+        .hero,
+        .panel {
+            background: var(--bg-soft);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            padding: 20px;
+        }
+
+        .hero {
+            margin-bottom: 18px;
+            background: linear-gradient(140deg, var(--hero-grad-a), var(--hero-grad-b));
+        }
+
+        .wrap>section+section {
+            margin-top: 14px;
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: clamp(1.4rem, 2vw, 2.1rem);
+        }
+
+        h2 {
+            margin: 0 0 10px;
+            font-size: 1.2rem;
+        }
+
+        h3 {
+            margin: 0 0 8px;
+            font-size: 1rem;
+        }
+
+        p {
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.62;
+        }
+
+        .lead {
+            color: var(--text);
+            opacity: 0.95;
+        }
+
+        .small {
+            color: var(--muted);
+            font-size: 0.88rem;
+            margin-top: 8px;
+        }
+
+        .panel ul,
+        .panel ol {
+            margin: 8px 0 0 18px;
+            padding: 0;
+            color: var(--muted);
+            line-height: 1.55;
+        }
+
+        .panel li {
+            margin-bottom: 5px;
+        }
+
+        .nav-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .nav-links a {
+            color: var(--link-text);
+            text-decoration: none;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 6px 12px;
+            font-size: 0.82rem;
+            background: var(--link-bg);
+        }
+
+        .nav-links a:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px var(--ring);
+        }
+
+        .line-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .line-card {
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 14px;
+            background: var(--bg-card);
+        }
+
+        .line-card.before {
+            box-shadow: inset 0 0 0 999px var(--stage-before);
+        }
+
+        .line-card.during {
+            box-shadow: inset 0 0 0 999px var(--stage-during);
+        }
+
+        .line-card.after {
+            box-shadow: inset 0 0 0 999px var(--stage-after);
+        }
+
+        .pipeline {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .stage {
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 14px;
+            background: var(--bg-card);
+            min-height: 560px;
+        }
+
+        .stage.before {
+            box-shadow: inset 0 0 0 999px var(--stage-before);
+        }
+
+        .stage.during {
+            box-shadow: inset 0 0 0 999px var(--stage-during);
+        }
+
+        .stage.after {
+            box-shadow: inset 0 0 0 999px var(--stage-after);
+        }
+
+        .stage-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .count {
+            font-size: 0.78rem;
+            color: var(--muted);
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 3px 8px;
+        }
+
+        .cards {
+            display: grid;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .project {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 8px 10px;
+            background: rgba(0, 0, 0, 0.06);
+        }
+
+        .project-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text);
+            line-height: 1.35;
+        }
+
+        .project-note {
+            display: block;
+            margin-top: 3px;
+            color: var(--muted);
+            font-size: 0.8rem;
+            line-height: 1.35;
+        }
+
+        .flag {
+            border-radius: 999px;
+            padding: 3px 8px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            border: 1px solid var(--line);
+            white-space: nowrap;
+            line-height: 1.2;
+        }
+
+        .flag.planned {
+            background: var(--status-planned-bg);
+            color: var(--status-planned-text);
+        }
+
+        .flag.poc {
+            background: var(--status-poc-bg);
+            color: var(--status-poc-text);
+        }
+
+        .flag.mvp-internal {
+            background: var(--status-mvp-bg);
+            color: var(--status-mvp-text);
+        }
+
+        .flag.in-review {
+            background: var(--status-consideration-bg);
+            color: var(--status-consideration-text);
+        }
+
+        .flag.exploratory {
+            background: var(--status-exploratory-bg);
+            color: var(--status-exploratory-text);
+        }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+            align-items: center;
+        }
+
+        .legend-label {
+            color: var(--muted);
+            font-size: 0.84rem;
+        }
+
+        .status-caps {
+            font-variant-caps: all-small-caps;
+            letter-spacing: 0.04em;
+        }
+
+        @supports not (font-variant-caps: all-small-caps) {
+            .status-caps {
+                text-transform: uppercase;
+                font-size: 0.9em;
+                letter-spacing: 0.03em;
+            }
+        }
+
+        @media (max-width: 1050px) {
+            .line-grid,
+            .pipeline {
+                grid-template-columns: 1fr;
+            }
+
+            .stage {
+                min-height: 0;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .wrap {
+                padding: 16px 12px 40px;
+            }
+
+            .hero,
+            .panel,
+            .line-card,
+            .stage {
+                padding: 12px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main class="wrap">
+        <header class="hero">
+            <h1>Pipeline Product Positioning</h1>
+            <p class="lead">Positioning of Heimdallr projects across the radiology pipeline: before report, during report, and after report.</p>
+            <div class="nav-links" data-shared-nav="hero"></div>
+        </header>
+
+        <section class="panel">
+            <h2>Product Line</h2>
+            <p>This page consolidates the product line by workflow stage and delivered value.</p>
+            <div class="line-grid">
+                <article class="line-card before">
+                    <h3>Before Report</h3>
+                    <ul>
+                        <li>Ingestion, prefetch, routing, privacy controls, and queue readiness.</li>
+                        <li>Goal: reduce waiting and context-friction before first image open.</li>
+                        <li>Primary product axis: throughput reliability and operational control.</li>
+                    </ul>
+                </article>
+                <article class="line-card during">
+                    <h3>During Report</h3>
+                    <ul>
+                        <li>Assistive triage, pre-analysis, quantification, and structured drafting support.</li>
+                        <li>Goal: improve speed-to-read and consistency without replacing clinical judgment.</li>
+                        <li>Primary product axis: silent workflow acceleration at read time.</li>
+                    </ul>
+                </article>
+                <article class="line-card after">
+                    <h3>After Report</h3>
+                    <ul>
+                        <li>Follow-up extraction, navigation, closure tracking, and longitudinal monitoring.</li>
+                        <li>Goal: convert recommendations into auditable clinical action.</li>
+                        <li>Primary product axis: continuity of care and closure outcomes.</li>
+                    </ul>
+                </article>
+            </div>
+            <div class="legend">
+                <span class="legend-label">Status flags:</span>
+                <span class="flag exploratory status-caps">Exploratory</span>
+                <span class="flag in-review status-caps">In Review</span>
+                <span class="flag planned status-caps">Planned</span>
+                <span class="flag poc status-caps">POC</span>
+                <span class="flag mvp-internal status-caps">MVP Internal</span>
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2>Pipeline Positioning Diagram</h2>
+
+            <div class="pipeline">
+                <article class="stage before">
+                    <div class="stage-head">
+                        <h3>1) Before Report</h3>
+                        <span class="count" id="count-before">0 cards</span>
+                    </div>
+                    <div class="cards" id="cards-before"></div>
+                </article>
+
+                <article class="stage during">
+                    <div class="stage-head">
+                        <h3>2) During Report</h3>
+                        <span class="count" id="count-during">0 cards</span>
+                    </div>
+                    <div class="cards" id="cards-during"></div>
+                </article>
+
+                <article class="stage after">
+                    <div class="stage-head">
+                        <h3>3) After Report</h3>
+                        <span class="count" id="count-after">0 cards</span>
+                    </div>
+                    <div class="cards" id="cards-after"></div>
+                </article>
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2>Strategic Read</h2>
+            <ul>
+                <li><strong>Near term:</strong> lock in the before + during blocks to sustain measurable throughput and TAT improvements.</li>
+                <li><strong>Mid term:</strong> promote operational intelligence modules once workflow telemetry is stable and auditable.</li>
+                <li><strong>Long term:</strong> scale post-report navigation and closure modules to capture continuity and financial value.</li>
+            </ul>
+        </section>
+
+        <section class="panel">
+            <h2>Where to Go Next</h2>
+            <p class="small">Use these links to continue from positioning into strategy, roadmap, and repository context.</p>
+            <div class="nav-links" style="margin-top: 10px;" data-shared-nav="related"></div>
+        </section>
+    </main>
+
+    <script src="./pipeline-product-positioning.js"></script>
+    <script src="./shared-nav.js"></script>
+</body>
+
+</html>
