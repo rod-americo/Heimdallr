@@ -432,33 +432,7 @@
                             <th>Why now</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <tr><td>1</td><td>HL7-triggered prefetch orchestration</td><td>A</td><td>Logistics</td><td>9</td><td>4</td><td>Immediate throughput win with low clinical risk</td></tr>
-                        <tr><td>2</td><td>Unified worklist orchestration</td><td>B</td><td>Workflow</td><td>9</td><td>5</td><td>Reduces queue switching and unfair distribution</td></tr>
-                        <tr><td>3</td><td>De-identification governance hardening</td><td>E</td><td>Security</td><td>10</td><td>6</td><td>Extend an implemented gateway with stronger policy and audit controls</td></tr>
-                        <tr><td>4</td><td>Deterministic pseudonymization + crosswalk</td><td>E</td><td>Security</td><td>10</td><td>5</td><td>Enables traceable privacy-preserving workflows</td></tr>
-                        <tr><td>5</td><td>Follow-up recommendation extraction (NLP)</td><td>F</td><td>Navigation</td><td>8</td><td>5</td><td>High value and operationally feasible</td></tr>
-                        <tr><td>6</td><td>Urology navigation pathway</td><td>F</td><td>Navigation</td><td>9</td><td>6</td><td>Direct care-continuity impact with clear rule set</td></tr>
-                        <tr><td>7</td><td>Opportunistic coronary calcium (CAC-DRS)</td><td>C</td><td>Quantification</td><td>8</td><td>6</td><td>High preventive-care value from opportunistic CT workflows</td></tr>
-                        <tr><td>8</td><td>AI-assisted urgency flagging</td><td>B</td><td>Workflow</td><td>9</td><td>7</td><td>Improves time-to-open for high-acuity cases</td></tr>
-                        <tr><td>9</td><td>Liver steatosis opportunistic pipeline</td><td>C</td><td>Quantification</td><td>7</td><td>6</td><td>Population-health insight from existing scans</td></tr>
-                        <tr><td>10</td><td>Osteoporosis opportunistic screening</td><td>C</td><td>Quantification</td><td>7</td><td>6</td><td>Scalable DXA-proxy value from routine CT</td></tr>
-                        <tr><td>11</td><td>Structured report drafting copilot</td><td>D</td><td>Reporting</td><td>8</td><td>7</td><td>Reporting acceleration with strong guardrails</td></tr>
-                        <tr><td>12</td><td>Emphysema quantification at scale</td><td>C</td><td>Quantification</td><td>6</td><td>7</td><td>Valuable but depends on segmentation throughput</td></tr>
-                        <tr><td>13</td><td>On-prem AI gateway enforcement</td><td>E</td><td>Security</td><td>9</td><td>7</td><td>Critical for enterprise deployment maturity</td></tr>
-                        <tr><td>14</td><td>Drift/hallucination control framework</td><td>D</td><td>Reporting</td><td>9</td><td>8</td><td>Needed before broad automation trust</td></tr>
-                        <tr><td>15</td><td>Agentic workflow coordination</td><td>G</td><td>R&amp;D</td><td>8</td><td>9</td><td>Long-horizon orchestration capability</td></tr>
-                        <tr><td>16</td><td>Foundation model fine-tuning layer</td><td>G</td><td>R&amp;D</td><td>9</td><td>9</td><td>Institution-adapted model performance with controlled governance</td></tr>
-                        <tr><td>17</td><td>Temporal imaging intelligence (delta engine)</td><td>G</td><td>R&amp;D</td><td>9</td><td>8</td><td>Longitudinal change tracking for follow-up-heavy workflows</td></tr>
-                        <tr><td>18</td><td>Causal triage simulator</td><td>G</td><td>R&amp;D</td><td>8</td><td>8</td><td>Safe policy simulation before live queue changes</td></tr>
-                        <tr><td>19</td><td>Synthetic + federated validation sandbox</td><td>G</td><td>R&amp;D</td><td>8</td><td>8</td><td>Privacy-preserving multi-site validation and benchmarking</td></tr>
-                        <tr><td>20</td><td>Autonomous follow-up orchestrator (human-gated)</td><td>G</td><td>R&amp;D</td><td>9</td><td>8</td><td>Strong continuity and financial recovery upside with clinical oversight</td></tr>
-                        <tr><td>21</td><td>Prospective trial mode</td><td>G</td><td>R&amp;D</td><td>8</td><td>7</td><td>Embedded publication-grade evidence generation</td></tr>
-                        <tr><td>22</td><td>General surgery navigation pathway</td><td>F</td><td>Navigation</td><td>7</td><td>5</td><td>Low-friction continuity value for common actionable findings</td></tr>
-                        <tr><td>23</td><td>Oncology high-suspicion navigation router</td><td>F</td><td>Navigation</td><td>10</td><td>7</td><td>High clinical-risk routing for ER/inpatient neoplastic suspicion</td></tr>
-                        <tr><td>24</td><td>Gynecology navigation pathway</td><td>F</td><td>Navigation</td><td>9</td><td>7</td><td>Structured continuity for adnexal/uterine/cervical suspicious findings</td></tr>
-                        <tr><td>25</td><td>Fracture Detection and Triage Module</td><td>B</td><td>Workflow</td><td>9</td><td>7</td><td>Triage of cases with suspected fractures in trauma/emergency workflows with auditable urgency flags</td></tr>
-                    </tbody>
+                    <tbody id="upcoming-backlog-body"></tbody>
                 </table>
             </div>
         </section>
@@ -533,19 +507,7 @@
         </section>
     </main>
     <script src="./shared-nav.js"></script>
-    <script>
-        (function () {
-            const tables = document.querySelectorAll('table[data-auto-labels]');
-            tables.forEach((table) => {
-                const headers = [...table.querySelectorAll('thead th')].map((th) => th.textContent.trim());
-                table.querySelectorAll('tbody tr').forEach((tr) => {
-                    [...tr.children].forEach((td, idx) => {
-                        td.setAttribute('data-label', headers[idx] || '');
-                    });
-                });
-            });
-        })();
-    </script>
+    <script src="./upcoming.js"></script>
 </body>
 
 </html>

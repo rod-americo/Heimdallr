@@ -1,0 +1,10 @@
+{
+  "name": "heimdallr-docs-builder",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Markdown to HTML docs builder",
+  "scripts": {
+    "build:report": "node scripts/build-docs.mjs report",
+    "build:docs": "node scripts/build-docs.mjs all"
+  }
+}
