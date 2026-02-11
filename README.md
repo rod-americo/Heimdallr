@@ -297,4 +297,4 @@ Apache License 2.0. See [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
 
 ### Third-Party Dependencies
 
-This software uses **TotalSegmentator**, which may require a separate commercial license depending on usage context. Users are responsible for independent license compliance.
+This project uses **TotalSegmentator**, which may require a separate commercial license depending on usage context. Users are responsible for independent license compliance.
