@@ -682,5 +682,21 @@
     "pillar": "Reporting",
     "whyNow": "Needed before broad automation trust",
     "backlogModule": "Drift/hallucination control framework"
+  },
+  {
+    "id": 45,
+    "title": "Bone Lesion CT Pipeline (TotalSegmentator + nnU-Net + MONAI Label)",
+    "track": "clinical",
+    "horizon": "acceleration",
+    "status": "exploratory",
+    "impact": 9,
+    "friction": 6,
+    "note": "HITL workflow for bone metastasis/multiple myeloma candidate detection in CT with retraining loop and low-cost open stack.",
+    "stage": "during",
+    "rank": 45,
+    "pillarCode": "C",
+    "pillar": "Quantification",
+    "whyNow": "Fastest low-cost path to deployable bone lesion assistive workflow with human review and continuous model improvement",
+    "backlogModule": "Bone lesion CT assistive pipeline (TotalSegmentator -> nnU-Net -> MONAI Label)"
   }
 ]
