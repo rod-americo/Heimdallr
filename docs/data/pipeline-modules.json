@@ -708,12 +708,12 @@
     "status": "exploratory",
     "impact": 9,
     "friction": 7,
-    "note": "Agente autônomo para priorizar exames por urgência (ex: fraturas, hemorragias), integrando segmentação e histórico via EHR/HL7.",
+    "note": "Autonomous agent to prioritize studies by urgency (e.g., fractures, hemorrhages), integrating segmentation and history through EHR/HL7.",
     "stage": "during",
     "rank": 46,
     "pillarCode": "B",
     "pillar": "Workflow",
-    "whyNow": "Acelera tempo-to-read em emergências, validado em simulações recentes.",
+    "whyNow": "Accelerates time-to-read in emergencies, validated in recent simulations.",
     "backlogModule": "AI triage agent integration"
   },
   {
@@ -724,12 +724,12 @@
     "status": "exploratory",
     "impact": 8,
     "friction": 8,
-    "note": "Orquestrador com agentes especializados (análise imagem, extração contexto, redação estruturada), com auditoria e edição humana.",
+    "note": "Orchestrator with specialized agents (image analysis, context extraction, structured drafting), with auditing and human editing.",
     "stage": "during",
     "rank": 47,
     "pillarCode": "D",
     "pillar": "Reporting",
-    "whyNow": "Supera LLMs isolados para workflows complexos, como em frameworks multi-agente.",
+    "whyNow": "Outperforms isolated LLMs for complex workflows, as seen in multi-agent frameworks.",
     "backlogModule": "Multi-agent report pipeline"
   }
 ]
