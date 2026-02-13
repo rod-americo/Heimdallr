@@ -699,5 +699,37 @@
     "whyNow": "Fastest low-cost path to deployable bone lesion assistive workflow with human review and continuous model improvement",
     "backlogModule": "Bone lesion CT assistive pipeline (TotalSegmentator -> nnU-Net -> MONAI Label)",
     "obs": "retraining loop and low-cost open stack."
+  },
+  {
+    "id": 46,
+    "title": "Radiology Triage Agent",
+    "track": "clinical",
+    "horizon": "acceleration",
+    "status": "exploratory",
+    "impact": 9,
+    "friction": 7,
+    "note": "Agente autônomo para priorizar exames por urgência (ex: fraturas, hemorragias), integrando segmentação e histórico via EHR/HL7.",
+    "stage": "during",
+    "rank": 46,
+    "pillarCode": "B",
+    "pillar": "Workflow",
+    "whyNow": "Acelera tempo-to-read em emergências, validado em simulações recentes.",
+    "backlogModule": "AI triage agent integration"
+  },
+  {
+    "id": 47,
+    "title": "Multi-Agent Report Orchestrator",
+    "track": "clinical",
+    "horizon": "innovation",
+    "status": "exploratory",
+    "impact": 8,
+    "friction": 8,
+    "note": "Orquestrador com agentes especializados (análise imagem, extração contexto, redação estruturada), com auditoria e edição humana.",
+    "stage": "during",
+    "rank": 47,
+    "pillarCode": "D",
+    "pillar": "Reporting",
+    "whyNow": "Supera LLMs isolados para workflows complexos, como em frameworks multi-agente.",
+    "backlogModule": "Multi-agent report pipeline"
   }
 ]
