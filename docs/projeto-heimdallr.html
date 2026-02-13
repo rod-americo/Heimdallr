@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pitch Redman · Heimdallr</title>
+    <style>
+        :root {
+            --bg: #040712;
+            --card: #0f172a;
+            --accent: #4dd0ff;
+            --muted: #cfd8ff;
+            --border: rgba(255, 255, 255, 0.12);
+            font-family: "Inter", "Segoe UI", sans-serif;
+            color-scheme: dark;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: radial-gradient(circle at 20% 20%, rgba(77, 208, 255, 0.15), transparent 40%),
+                var(--bg);
+            color: var(--muted);
+        }
+
+        .page {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 32px 20px 60px;
+        }
+
+        header.hero {
+            background: linear-gradient(160deg, rgba(77, 208, 255, 0.25), rgba(15, 23, 42, 0.95));
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 40px;
+            margin-bottom: 28px;
+        }
+
+        header.hero h1 {
+            margin: 0 0 12px;
+            font-size: clamp(2rem, 2.8vw, 2.6rem);
+            color: #fff;
+        }
+
+        header.hero p {
+            margin: 0 0 20px;
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+
+        header.hero .tagline {
+            display: inline-flex;
+            gap: 8px;
+            padding: 6px 16px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            font-size: 0.9rem;
+            color: #d6e8ff;
+            margin-bottom: 14px;
+            line-height: 1.2;
+        }
+
+        section.card {
+            margin-bottom: 26px;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 30px;
+            background: var(--card);
+        }
+
+        section.card h2 {
+            margin-top: 0;
+            color: #fff;
+            font-size: 1.5rem;
+        }
+
+        section.card p {
+            line-height: 1.7;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 18px;
+            margin-top: 18px;
+        }
+
+        .card-list {
+            list-style: none;
+            padding: 0;
+            margin: 12px 0 0;
+            display: grid;
+            gap: 10px;
+        }
+
+        .card-list li {
+            padding: 12px 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.02);
+            line-height: 1.5;
+        }
+
+        .pill {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-right: 10px;
+        }
+
+        .cta {
+            text-align: center;
+            background: linear-gradient(160deg, rgba(77, 208, 255, 0.18), rgba(15, 23, 42, 0.9));
+        }
+
+        .cta button {
+            background: var(--accent);
+            border: none;
+            border-radius: 999px;
+            padding: 14px 26px;
+            font-size: 1rem;
+            color: #03060b;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .cta button:hover {
+            transform: translateY(-2px);
+        }
+
+        footer {
+            margin-top: 40px;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9rem;
+        }
+
+        footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page">
+        <header class="hero">
+            <div class="tagline">Pitch · Heimdallr</div>
+            <h1>Heimdallr vigia cada pixel como um guardião incansável</h1>
+            <p>
+                Três pitches em um documento: diretores de hospital, radiologistas clínicos e clínicas independentes.
+                Todas as narrativas combinam urgência, solução e números para fechar a venda do pipeline agentic de IA.
+            </p>
+        </header>
+
+        <section class="card">
+            <h2>Diretores de hospital (Foco em impacto e escala)</h2>
+            <p>
+                Hook: em cidades como Fortaleza há filas de até 35 mil pessoas aguardando tomografias, radiologistas com burnout entre 45% e 57%
+                e um salto de 20 para 1.200 imagens por TC — erros crescem, diagnósticos atrasam e o hospital perde vidas e milhões.
+            </p>
+            <p>
+                Solução: Heimdallr entra como pipeline agentic de IA, fazendo triagem inteligente, segmentação de mais de 100 órgãos com CNNs/Transformers,
+                detecção de hemorragia, relatórios DICOM/NIfTI e integração seamless com PACS/RIS. O médico edita com loop de feedback contínuo,
+                reduzindo o tempo de leitura em 50%, mantendo acurácia acima de 95% e desacelerando o burnout.
+            </p>
+            <p>
+                Diferencial: somos vendor-neutral como Rad AI/CARPL, mas com agentes autônomos que priorizam dinamicamente, otimizam protocolos brasileiros
+                e escalam para nossa rede de hospitais carentes de especialistas. TRL 6-7 pronto para produção.
+            </p>
+            <p>
+                Prova social: estudos mostram corte de 17-26% no tempo de relatório, +14% de confiança e detecção 29% melhor sem falsos positivos.
+                Chamada à ação: agende demo gratuita agora e acelere diagnósticos em 50%.
+            </p>
+        </section>
+
+        <section class="card">
+            <h2>Radiologistas clínicos (Foco em confiança e autonomia)</h2>
+            <p>
+                Hook: filas gigantes, burnout de até 57%, exames que passam de 20 para 1.200 imagens por TC — o risco de errar cresce e a pressão dá nó no turno.
+            </p>
+            <p>
+                Solução: Heimdallr vigiando cada pixel com triagem inteligente, segmentação 100+ órgãos, detecção de hemorragia e relatórios DICOM/NIfTI prontos para revisão humana.
+                Integra PACS/RIS em segundos, e cada edição alimenta o loop de melhoria contínua; reduz o tempo de leitura em 50%, mantendo acurácia acima de 95%.
+            </p>
+            <p>
+                Diferencial: além de neutralidade igual a CARPL/Rad AI, agentes autônomos priorizam urgências e adaptam protocolos locais; prontos para clínicas e hospitais brasileiros.
+            </p>
+            <p>
+                Prova social: 17-26% de redução no tempo de laudo, +14% de confiança e 29% melhor detecção sem aumentar falsos positivos. Chamada à ação: agende demo gratuita agora e acelere diagnósticos em 50%.
+            </p>
+        </section>
+
+        <section class="card">
+            <h2>Clínicas independentes (Foco em receita e operacionalização)</h2>
+            <p>
+                Hook: pacientes aguardam filas de 35 mil tomografias, radiologistas vivem burnout de até 57%, e cada TC gera 1.200 imagens — sobra custo e falta escala.
+            </p>
+            <p>
+                Solução: Heimdallr automatiza o pipeline com triagem inteligente, segmentação multiórgãos (CNNs/Transformers), detecção de hemorragia, relatórios DICOM/NIfTI e integração imediata com PACS/RIS.
+                A edição humana alimenta o loop de melhoria contínua e reduz o tempo de leitura em 50%, com acurácia acima de 95%.
+            </p>
+            <p>
+                Diferencial: vendor-neutral como CARPL, mas com agentes autônomos que priorizam dinamicamente, otimizam protocolos e liberam capacidade para mais turnos.
+                Escalável para clínicas brasileiras com déficit crônico de radiologistas. TRL 6-7 pronto para rodar.
+            </p>
+            <p>
+                Prova social: cortes de 17-26% no tempo de laudo, +14% de confiança, 29% melhor detecção sem falsos positivos.
+                Chamada à ação: agende demo gratuita agora e acelere diagnósticos em 50%.
+            </p>
+        </section>
+
+        <section class="card">
+            <h2>Desafios e impactos comprovados</h2>
+            <p>
+                O relatório técnico (`docs/radiology-preprocessing-ecosystem-report.md`) reforça que o sucesso em AI para radiologia em 2026 não é apenas velocidade de leitura,
+                mas impacto clínico mensurável, confiabilidade de workflow e fechamento de follow-up. Os principais desafios
+                incluem reconstruir triagem de urgência com governança, automatizar logística sem quebrar segurança e fechar o ciclo de recorrências com monitoramento humano.
+            </p>
+            <div class="grid">
+                <div>
+                    <strong>Impactos quantificados</strong>
+                    <ul class="card-list">
+                        <li>Triagem assistida reduziu tempo em fila de 15,75 para 12,01 minutos em cenários controlados.</li>
+                        <li>70‑75% de fechamento de follow-up quando assinado por programas automatizados com navegação dedicada.</li>
+                        <li>Estudos multi-site (mais de 100 mil exames) alinhados com sensibilidades de 82,2% / 97,6%, evidenciando utilidade e limites.</li>
+                    </ul>
+                </div>
+                <div>
+                    <strong>Desafios críticos</strong>
+                    <ul class="card-list">
+                        <li>Orquestrar HL7/DICOM com políticas de SLA para eliminar latência sem comprometer auditoria.</li>
+                        <li>Conduzir assistentes de LLM/VLM com drift control e gateways de desidentificação antes de qualquer API externa.</li>
+                        <li>Manter pipeline inteiro rastreável (`pipeline-modules.json`) com métricas, hipótese e rollback antes de cada entrega.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section class="card">
+            <h2>Estratégia e Roadmap</h2>
+            <p>
+                O portfólio de módulos descreve <strong><span id="module-count-text">-</span></strong> iniciativas distribuídas por momentos de fluxo e trilhas (Operações, Clínica, Governança,
+                Continuidade). A carta de intenções exige documentação robusta (“Design Doc + backlog + dataset”), hipóteses claras e métricas definidas antes de cada engenharia.
+            </p>
+            <div class="grid">
+                <div>
+                    <strong>Módulos futuros em foco</strong>
+                    <ul class="card-list">
+                        <li>Prefetch HL7 inteligente, worklist unificada e ordenação de urgência.</li>
+                        <li>Quantificações oportunísticas (fígado, osso, coronária) com validações locais.</li>
+                        <li>Navegação de pacientes para urologia, cirurgia geral, oncologia e ginecologia.</li>
+                        <li>Agente de triagem, orquestrador multi-agente e sandbox de modelos fundacionais.</li>
+                    </ul>
+                </div>
+                <div>
+                    <strong>Governança de entrega</strong>
+                    <ul class="card-list">
+                        <li>Documentação mínima por card: problema, escopo, dados, modelo, loop humano, SLO e critério go/no-go.</li>
+                        <li>Status como planned, in-review, exploratory determinam roteiro e exigem validação antes da produção.</li>
+                        <li>Diretrizes reforçam shadow → assistive → produção (com kill switch) e mantêm auditoria ativa.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section class="card">
+            <h2>Portfólio em foco: módulos do pipeline</h2>
+            <p>
+                Cada módulo descrito em <code>docs/data/pipeline-modules.json</code> é acompanhado por status, trilha,
+                impacto e fricção. Abaixo estão os principais indicadores que sustentam a narrativa comercial.
+            </p>
+            <div class="grid">
+                <div>
+                    <span class="pill">Portfólio</span>
+                    <strong id="module-total">-</strong>
+                    <p>Total de módulos rastreados neste pipeline.</p>
+                </div>
+                <div>
+                    <span class="pill">Status</span>
+                    <ul id="module-status-list" class="card-list" style="margin-top:8px;"></ul>
+                </div>
+                <div>
+                    <span class="pill">Trilhas</span>
+                    <ul id="module-track-list" class="card-list" style="margin-top:8px;"></ul>
+                </div>
+            </div>
+            <p style="margin-top:18px;">
+                Essa visão conecta os ativos técnicos já implementados com os planos de inovação em operações, clínica, governança e continuidade,
+                reforçando o pitch de venda com métricas que se atualizam automaticamente conforme o JSON evolui.
+            </p>
+        </section>
+
+        <section class="card">
+            <h2>Navegações e receita</h2>
+            <p>
+                A <code>docs/commercial/matriz-valor-financeiro.md</code> mostra que as navegações são alavancas de alto impacto para monetizar o piloto: aumentar volume em linhas de alta margem, converter pacientes no funil assistencial, reduzir no-shows e expandir a capacidade instalada.
+                Heimdallr já honra esse playbook com os módulos de continuidade (Patient Follow-up Navigator, navegação urológica, cirurgia geral, oncologia e ginecologia) documentados no pipeline.
+            </p>
+            <ul class="card-list">
+                <li>Recuperar consultas e exames previstos reduz o abandono e libera salas críticas para procedimentos de maior margem.</li>
+                <li>Monitoramento ativo mantém o follow-up em ciclo fechado com ownership e alertas, alimentando KPIs que justificam a atribuição de valor conservador descrita na matriz.</li>
+                <li>Dados estruturados de navegação permitem demonstrar conversão, fidelização e mix de casos para apoiar precificação anual ou contrato de serviços.</li>
+            </ul>
+            <p style="margin-top:18px;">
+                Navegações bem-sucedidas traduzem-se em receita recorrente e sustentam o pitch Redman como solução que não apenas resolve desafios clínicos, mas paga por si mesma via impacto financeiro comprovado.
+            </p>
+        </section>
+
+        <section class="card cta">
+            <h2>Convite ao time</h2>
+            <p>
+                Este pitch é o ponto de partida para quem quer vender Heimdallr com argumentos técnicos e operacionais sólidos.
+                O ecossistema está pronto para receber contribuições em interoperabilidade DICOM/HL7, validação clínica, governança de LLMs, de-identificação e
+                análise de follow-up para comprovação de ROI.
+            </p>
+            <button onclick="window.location.href='https://github.com/rod-americo/Heimdallr'">Entrar no repositório</button>
+        </section>
+
+        <footer>
+        </footer>
+    </div>
+    <script>
+        (async function () {
+            try {
+                const response = await fetch('./data/pipeline-modules.json');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const modules = await response.json();
+
+                const statusCounts = {};
+                const trackCounts = {};
+
+                modules.forEach((mod) => {
+                    statusCounts[mod.status] = (statusCounts[mod.status] || 0) + 1;
+                    trackCounts[mod.track] = (trackCounts[mod.track] || 0) + 1;
+                });
+
+                document.getElementById('module-total').textContent = modules.length;
+                const moduleCountText = document.getElementById('module-count-text');
+                if (moduleCountText) {
+                    moduleCountText.textContent = modules.length;
+                }
+
+                const statusList = document.getElementById('module-status-list');
+                statusList.innerHTML = Object.entries(statusCounts)
+                    .map(([status, count]) => `<li><strong>${count}</strong> em ${status}</li>`)
+                    .join('');
+
+                const trackList = document.getElementById('module-track-list');
+                trackList.innerHTML = Object.entries(trackCounts)
+                    .map(([track, count]) => `<li><strong>${count}</strong> na trilha ${track}</li>`)
+                    .join('');
+            } catch (error) {
+                console.error('Não foi possível carregar docs/data/pipeline-modules.json', error);
+            }
+        })();
+    </script>
+</body>
+
+</html>
