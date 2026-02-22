@@ -27,7 +27,7 @@ except ImportError:
 load_dotenv()
 
 # Configuration
-PORT = int(os.getenv("ANTHROPIC_PORT", "8003"))
+PORT = int(os.getenv("ANTHROPIC_PORT", "8101"))
 API_KEY = os.getenv("ANTHROPIC_API_KEY")
 DATA_DIR = Path("data/dataset")
 
