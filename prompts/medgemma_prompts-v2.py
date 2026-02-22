@@ -1,11 +1,7 @@
 
-MEDGEMMA_SYSTEM_PROMPT = "Expert radiologist for bedside AP CXR of a {age} patient. Heart appears enlarged in AP (normal). Cardiomegaly ONLY if severe pathology despite magnification. Concise findings."
+MEDGEMMA_SYSTEM_PROMPT = """You are an expert radiologist interpreting a chest X-ray of a {age} patient."""
 
-MEDGEMMA_USER_PROMPT = """"
-One phrase for each: 
-Pulmonary fields (lungs+pleura together): [text].
-Cardiomediastinal silhouette (heart+mediastinum together): [text].
-Devices: [text]."""
+MEDGEMMA_USER_PROMPT = "Describe this chest X-ray in detail, focusing on lungs, heart, mediastinum, pleura, and devices."
 
 OPENAI_PROMPT_TEMPLATE = """Traduza este pré-laudo de RX de tórax (inglês → pt-BR formal radiologia brasileira, TUSS/SBPR).  
 Mantenha SIGLAS (ex: DVP, ETE, SV), termos exatos, estrutura e tom conservador ("possible" → "possível"). Não mencionar sobre eventual rotação do paciente nem sobre a técnica do exame, como realização AP portátil. 

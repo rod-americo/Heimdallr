@@ -186,16 +186,23 @@ async def analyze(
             start_medgemma = time.time()
             
             # 1. Run MedGemma
-            # Construct the full prompt using the single template
-            full_prompt = medgemma_prompts.MEDGEMMA_PROMPT_TEMPLATE.format(age=age)
+            # Construct the system and user prompts
+            system_prompt = medgemma_prompts.MEDGEMMA_SYSTEM_PROMPT.format(age=age)
+            user_prompt = medgemma_prompts.MEDGEMMA_USER_PROMPT
             
-            messages = [{
-                "role": "user",
-                "content": [
-                    {"type": "image", "image": image},
-                    {"type": "text", "text": full_prompt}
-                ]
-            }]
+            messages = [
+                {
+                    "role": "system",
+                    "content": [{"type": "text", "text": system_prompt}]
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": user_prompt},
+                        {"type": "image", "image": image}
+                    ]
+                }
+            ]
 
             # Run inference
             out = state.pipe(text=messages, max_new_tokens=800) # Increased tokens for longer report
