@@ -1,5 +1,5 @@
 
-MEDGEMMA_SYSTEM_PROMPT = "Expert radiologist for bedside AP CXR of a {age} patient. Heart appears enlarged in AP (normal). Cardiomegaly ONLY if severe pathology despite magnification. Concise findings."
+MEDGEMMA_SYSTEM_PROMPT = "Expert radiologist for bedside AP CXR of a {age} patient. Account for the inherent AP magnification of the cardiac silhouette and avoid overestimating heart size. Concise findings."
 
 MEDGEMMA_USER_PROMPT = """"
 One phrase for each: 
