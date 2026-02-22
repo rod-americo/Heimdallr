@@ -1,3 +1,14 @@
+# ---------------------------------------------------------------------------
+# MedGemma Analysis Service — AP Chest X-ray Assistant
+#
+# Uses Google MedGemma (google/medgemma-1.5-4b-it), governed by the
+# Health AI Developer Foundations Terms of Use.
+# https://developers.google.com/health-ai-developer-foundations/terms
+#
+# MedGemma is not an approved medical device.  All outputs are assistive
+# and must be reviewed by qualified professionals.
+# ---------------------------------------------------------------------------
+
 import os
 import io
 import base64

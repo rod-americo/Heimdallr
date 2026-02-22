@@ -53,6 +53,7 @@ Future-facing capabilities (workflow orchestration, clinical urgency triage, adv
 - `medgemma_prompts.py`: prompt templates and structured output helpers
 - `anthropic_report_builder.py`: report-building utilities for narrative output
 - `deid_gateway.py`: outbound de-identification gateway (pixel masking + metadata scrubbing, status: `mvp-internal`)
+- `ctr_api.py`: CTR (Cardiothoracic Ratio / ICT) extraction microservice via CXAS (port `8003`)
 
 ### Data Layer and Outputs
 - SQLite schema in `database/schema.sql`
@@ -138,6 +139,10 @@ python run.py
 # 3) Optional: DICOM listener for PACS integration
 source venv/bin/activate
 python dicom_listener.py
+
+# 4) Optional: CTR extraction service (port 8003)
+source venv/bin/activate
+python ctr_api.py
 ```
 
 ### Preflight Check (optional, recommended)
@@ -161,6 +166,8 @@ python -m py_compile server.py run.py dicom_listener.py prepare.py
 
 - Heimdallr is distributed under Apache License 2.0.
 - This project uses **TotalSegmentator**. Commercial usage may require a separate TotalSegmentator license.
+- The CTR extraction module (`ctr_api.py`) is based on **ChestXRayAnatomySegmentation (CXAS)** by Constantin Seibold et al., licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). This integration is used for personal/experimental purposes only; derivatives must carry the same license.
+- The MedGemma Analysis Service (`medgemma_api.py`) uses **Google MedGemma** (`google/medgemma-1.5-4b-it`), governed by the [Health AI Developer Foundations Terms of Use](https://developers.google.com/health-ai-developer-foundations/terms). MedGemma is not an approved medical device.
 - Each institution and deployer is responsible for validating third-party licensing and regulatory compliance before production use.
 - For attributions and notices, see [`NOTICE`](NOTICE).
 

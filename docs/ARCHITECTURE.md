@@ -28,6 +28,11 @@ Heimdallr is an imaging operations pipeline designed to convert incoming radiolo
 - `medgemma_api.py`
 - Anthropic flow through server endpoints plus outbound de-identification gateway (`deid_gateway.py`)
 
+6. `ctr_api.py`
+   - CTR (Cardiothoracic Ratio / ICT) extraction microservice (default port `8003`)
+   - Based on ChestXRayAnatomySegmentation (CXAS) by Constantin Seibold et al. (CC BY-NC-SA 4.0)
+   - Loads CXAS UNet_ResNet50 model at startup, exposes `POST /extract_ctr`
+
 ## Data and Storage
 
 - Queue/input: `input/`
@@ -67,6 +72,7 @@ PACS/Modality (DICOM) --> dicom_listener.py --> POST /upload (server.py)
 - Python 3.10+
 - `dcm2niix`
 - TotalSegmentator license (`TOTALSEGMENTATOR_LICENSE`)
+- CXAS (ChestXRayAnatomySegmentation) — CC BY-NC-SA 4.0, for CTR extraction
 - Optional OCR: `pytesseract` + `tesseract` system binary
 
 ## Operational Boundaries

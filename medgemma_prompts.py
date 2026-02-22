@@ -14,7 +14,14 @@ REGRAS DE VOCABULÁRIO (Traduza EXATAMENTE como listado abaixo):
 - "enlarged heart" -> "aumento da área cardíaca" (NÃO use cardiomegalia)
 - "blunted costophrenic angle" -> "velamento do seio costofrênico"
 - "infiltrate" -> "opacidade"
+- "patchy opacities" -> "opacidades em focos esparsos"
+- "bilateral pleural effusions" -> "derrame pleural bilateral"
 - "device" -> "dispositivo"
+- "Devices: None" -> "Dispositivos: nenhum identificado"
+- "pacemaker" -> "dispositivo de eletroestimulação"
+- "Pulmonary fields: Clear" -> "Campos pulmonares: sem alterações relevantes"
+- "bilateral pulmonary edema with layering pleural effusions" -> "edema pulmonar e derrame pleural bilaterais"
+- "normal heart size" -> "área cardíaca normal"
 
 Saída APENAS o laudo traduzido, uma frase por linha, sem o termo ACHADOS e sem impressão.
 

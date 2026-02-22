@@ -53,6 +53,9 @@ database/*.db-journal
 *.dcm
 *.zip
 
+# Model weights (large binaries, downloaded at runtime)
+models/
+
 # IDE
 .vscode/
 .idea/

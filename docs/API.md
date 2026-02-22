@@ -58,6 +58,33 @@ curl -X POST http://localhost:8001/api/medgemma/ap-thorax-xray \
 
 Both endpoints return a `deid` object with gateway details (for example: `metadata_removed`, `pixel_redaction`, `age_coarsened`, `review_required`, `bounding_boxes`).
 
+### CTR Extraction (standalone service)
+
+CTR (Cardiothoracic Ratio / ICT) extraction runs as an independent microservice on port `8003`.
+
+Based on ChestXRayAnatomySegmentation (CXAS) by Constantin Seibold et al., CC BY-NC-SA 4.0.
+
+- `POST /extract_ctr` — upload a chest X-ray image, returns CTR score and cardiomegaly flag
+- `GET /health` — health check and model status
+
+Example:
+
+```bash
+curl -X POST http://localhost:8003/extract_ctr \
+  -F "file=@/path/to/chest_xray.png"
+```
+
+Response:
+
+```json
+{
+  "ctr": "0.482310",
+  "cardiomegaly_flag": "0"
+}
+```
+
+> **Note**: `cardiomegaly_flag` is `"1"` when CTR > 0.50.
+
 ## Common Response Semantics
 
 - `2xx`: request accepted/processed

@@ -811,5 +811,20 @@
     "pillar": "Security",
     "whyNow": "Prevents silent safety degradation as data mix and workflow context evolve over time.",
     "backlogModule": "Agent drift and bias sentinel"
+  },
+  {
+    "id": 53,
+    "title": "CTR Extraction (ICT via CXAS)",
+    "track": "clinical",
+    "horizon": "foundation",
+    "status": "mvp-internal",
+    "impact": 7,
+    "friction": 3,
+    "note": "Cardiothoracic Ratio extraction microservice using ChestXRayAnatomySegmentation (CXAS) by Constantin Seibold et al. (CC BY-NC-SA 4.0). Personal/experimental use only.",
+    "stage": "during",
+    "rank": 53,
+    "pillarCode": "C",
+    "pillar": "Quantification",
+    "whyNow": "Low-friction quantitative cardiomegaly screening from existing chest X-ray workflows"
   }
 ]

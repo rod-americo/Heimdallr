@@ -38,3 +38,25 @@ dcm2niix
 --------
 This software uses dcm2niix for DICOM to NIfTI conversion. dcm2niix is
 licensed under the BSD 2-Clause License.
+
+ChestXRayAnatomySegmentation (CXAS)
+------------------------------------
+The CTR (Cardiothoracic Ratio / ICT) extraction module (ctr_api.py) is
+based on ChestXRayAnatomySegmentation by Constantin Seibold et al.
+Licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0
+International (CC BY-NC-SA 4.0).
+https://github.com/ConstantinSeibold/ChestXRayAnatomySegmentation
+
+This integration is used for personal and experimental purposes only.
+No commercial distribution or monetization is permitted under this license.
+Derivatives must carry the same CC BY-NC-SA 4.0 license.
+
+MedGemma
+--------
+The MedGemma Analysis Service (medgemma_api.py) uses Google MedGemma
+(google/medgemma-1.5-4b-it), governed by the Health AI Developer
+Foundations Terms of Use.
+https://developers.google.com/health-ai-developer-foundations/terms
+
+MedGemma is not an approved medical device.  All outputs are assistive
+and must be reviewed by qualified professionals.
