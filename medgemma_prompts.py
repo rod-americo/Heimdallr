@@ -16,7 +16,6 @@ REGRAS DE VOCABULÁRIO (Traduza EXATAMENTE como listado abaixo):
 - "infiltrate" -> "opacidade"
 - "patchy opacities" -> "opacidades em focos esparsos"
 - "bilateral pleural effusions" -> "derrame pleural bilateral"
-- "device" -> "dispositivo"
 - "Devices: None" -> "Dispositivos: nenhum identificado"
 - "pacemaker" -> "dispositivo de eletroestimulação"
 - "Pulmonary fields: Clear" -> "Campos pulmonares: sem alterações relevantes"
