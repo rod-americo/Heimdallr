@@ -115,6 +115,9 @@ MEDGEMMA_SERVICE_URL = os.getenv("MEDGEMMA_SERVICE_URL", "http://localhost:8002/
 # Anthropic Analysis Service
 ANTHROPIC_SERVICE_URL = os.getenv("ANTHROPIC_SERVICE_URL", "http://localhost:8101/analyze")
 
+# TotalSegmentator Processing Service
+TOTALSEGMENTATOR_SERVICE_URL = os.getenv("TOTALSEGMENTATOR_SERVICE_URL", "http://localhost:8004/process")
+
 
 # ============================================================
 # PREPARE SCRIPT CONFIGURATION (prepare.py)
