@@ -820,7 +820,7 @@
     "status": "mvp-internal",
     "impact": 7,
     "friction": 3,
-    "note": "Cardiothoracic Ratio extraction microservice using ChestXRayAnatomySegmentation (CXAS) by Constantin Seibold et al. (CC BY-NC-SA 4.0). Personal/experimental use only.",
+    "note": "Cardiothoracic Ratio extraction microservice using CXAS by Constantin Seibold et al. (CC BY-NC-SA 4.0).",
     "stage": "during",
     "rank": 53,
     "pillarCode": "C",
