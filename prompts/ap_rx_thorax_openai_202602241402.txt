@@ -13,7 +13,7 @@ Campos pulmonares (gramática obrigatória — concordar singular/plural natural
   LOCALIZAÇÃO → UNILATERAL | BILATERAL_SIM | BILATERAL_ASSIM
   UNILATERAL → PREP_TERÇO TERÇOS "à" LADO
   BILATERAL_SIM → "bilaterais" PREP_TERÇO TERÇOS
-  BILATERAL_ASSIM → PREP_TERÇO TERÇOS "à direita e" PREP_TERÇO TERÇOS "à esquerda" (usar somente quando os terços diferem entre os lados; se iguais, usar obrigatoriamente BILATERAL_SIM)
+  BILATERAL_ASSIM → PREP_TERÇO TERÇOS "à direita e" PREP_TERÇO TERÇOS "à esquerda"
   PREP_TERÇO → "no terço" (singular) | "nos terços" (plural)
   TERÇOS → "superior" | "médio" | "inferior" | "superior e médio" | "superior e inferior" | "médio e inferior" | "superior, médio e inferior"
   LADO → "direita" | "esquerda"
