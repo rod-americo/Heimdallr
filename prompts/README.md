@@ -4,10 +4,10 @@ Todos os prompts neste diretório devem ser versionados antes de qualquer modifi
 
 ## Regra de versionamento
 
-Antes de editar um prompt, copiar o arquivo atual com o seguinte padrão de nome:
+Antes de editar um prompt, copiar o arquivo atual para a pasta `versions/` com o seguinte padrão de nome:
 
 ```
-nome_do_arquivo_AAAAMMDDHHmm.txt
+versions/nome_do_arquivo_AAAAMMDDHHmm.txt
 ```
 
 | Campo | Formato | Exemplo |
@@ -23,7 +23,7 @@ nome_do_arquivo_AAAAMMDDHHmm.txt
 Ao editar `ap_rx_thorax_openai.txt` em 24/02/2026 às 10:51:
 
 ```
-cp ap_rx_thorax_openai.txt ap_rx_thorax_openai_202602241051.txt
+cp ap_rx_thorax_openai.txt versions/ap_rx_thorax_openai_202602241051.txt
 ```
 
-A versão anterior fica preservada e o arquivo sem sufixo é sempre a versão **corrente**.
+A versão anterior fica preservada em `versions/` e o arquivo sem sufixo é sempre a versão **corrente**.
