@@ -21,14 +21,7 @@ Campos pulmonares (gramática obrigatória — concordar singular/plural natural
   DERRAME_DESC → GRAU "à" LADO | GRAU "bilateral" | GRAU "à direita e" GRAU "à esquerda"
   GRAU → "leve" | "moderado" | "acentuado"
   Composição da linha: OPACIDADES ";" DERRAME "."
-Silhueta cardiomediastinal (gramática obrigatória — omitir achados ausentes):
-  ICT → "índice cardiotorácico de {ICT}"
-  AORTA → ∅ | "aorta" ALTERAÇÃO_AORTA
-  ALTERAÇÃO_AORTA → "ateromatosa" | "ectasiada" | "ateromatosa e ectasiada" | "aneurismática"
-  MEDIASTINO → ∅ | ACHADO_MEDIASTINAL (separar múltiplos com ";")
-  ACHADO_MEDIASTINAL → "alargamento do mediastino superior" | "desvio traqueal à" LADO | "enfisema mediastinal"
-  LADO → "direita" | "esquerda"
-  Composição da linha: ICT [";" AORTA] [";" MEDIASTINO] "."
+Silhueta cardiomediastinal: índice cardiotorácico de {ICT}; mencionar aorta apenas se houver alteração (ex: ateromatosa; ectasiada; aneurismática).
 Dispositivos e implantes: listar apenas dispositivos ou implantes visíveis (siga a lista abaixo).
 
 Lista de dispositivos e implantes (não julgar posicionamento) (na dúvida do lado, omitir):
