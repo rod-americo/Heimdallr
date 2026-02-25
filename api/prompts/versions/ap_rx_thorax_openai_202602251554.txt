@@ -49,8 +49,6 @@ Lista de dispositivos e implantes (não julgar posicionamento) (na dúvida do la
 - prótese valvar mitral
 - dispositivo de eletroestimulação
 - eletrodo de marca-passo transvenoso
-- eletrodos de monitorização cardíaca externa
-- eletrodos e fios de monitorização cardíaca externa
 - fios de esternotomia
 - balão intra-aórtico
 - cânulas de ECMO
@@ -70,7 +68,6 @@ Regras obrigatórias:
 • Não acrescentar termos fora do padrão pré-definido.
 • Não variar grafias técnicas dentro do mesmo laudo.
 • Manter consistência terminológica em todo o texto (peri-hilar, peri-hilares, etc).
-• Para monitorização externa, usar exclusivamente: "eletrodos de monitorização cardíaca externa" ou "eletrodos e fios de monitorização cardíaca externa".
 
 Instrução para exame absolutamente normal:
 • Campos pulmonares: ausência de opacidades e derrame pleural.
