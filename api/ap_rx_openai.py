@@ -42,7 +42,7 @@ load_dotenv()
 PORT = int(os.getenv("OPENAI_API_PORT", "8002"))
 API_KEY = os.getenv("OPENAI_API_KEY")
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.2") # Default to gpt-5.2 per user preference
-DATA_DIR = Path("data/dataset/ap_rx_openai")
+DATA_DIR = config.DATA_DIR / "dataset/ap_rx_openai"
 
 if not API_KEY:
     print("WARNING: OPENAI_API_KEY not found in environment.")
@@ -117,7 +117,7 @@ async def analyze_xray(
 
     # 4. Prepare Prompt
     try:
-        prompt_path = "prompts/ap_rx_thorax_openai.txt"
+        prompt_path = Path(__file__).resolve().parent / "prompts" / "ap_rx_thorax_openai.txt"
         with open(prompt_path, "r", encoding="utf-8") as f:
             system_instruction = f.read()
         
