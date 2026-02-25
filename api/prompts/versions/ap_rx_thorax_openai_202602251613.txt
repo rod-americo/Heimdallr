@@ -42,10 +42,10 @@ Lista de dispositivos e implantes (não julgar posicionamento) (na dúvida do la
 - CVC à direita ou à esquerda
 - cateter de diálise à direita ou à esquerda
 - PICC à direita ou à esquerda
-- *portacath* à direita ou à esquerda
+- port-a-cath à direita ou à esquerda
 - cateter Swan-Ganz
 - dreno torácico à direita ou à esquerda
-- dreno *pigtail* à direita ou à esquerda
+- dreno pigtail à direita ou à esquerda
 - dreno mediastinal
 - prótese valvar aórtica
 - prótese valvar mitral
@@ -72,7 +72,6 @@ Regras obrigatórias:
 • Não acrescentar termos fora do padrão pré-definido.
 • Não variar grafias técnicas dentro do mesmo laudo.
 • Manter consistência terminológica em todo o texto (peri-hilar, peri-hilares, etc).
-• Ao citar *portacath* e *pigtail*, manter obrigatoriamente os asteriscos de itálico no texto final.
 • Para monitorização externa, usar exclusivamente: "eletrodos de monitorização cardíaca externa" ou "eletrodos e fios de monitorização cardíaca externa".
 • Em campos pulmonares, descrever apenas consolidações/opacidades consolidativas potencialmente relacionadas a pneumonia.
 • Só reportar "consolidações pulmonares" quando houver achado focal/lobar ou multifocal com padrão de preenchimento alveolar compatível com consolidação verdadeira.
