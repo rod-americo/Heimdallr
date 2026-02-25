@@ -8,7 +8,7 @@ import os
 # Add project root to sys.path
 sys.path.append("/home/rodrigo/Heimdallr")
 
-from metrics import calculate_all_metrics
+from core.metrics import calculate_all_metrics
 import config
 
 def run_retroactive():

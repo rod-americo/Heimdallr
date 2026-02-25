@@ -13,10 +13,15 @@ from pydantic import BaseModel
 import openai
 from dotenv import load_dotenv
 
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+
+import config
 # Import conversion and parsing logic
-from img_conversor import otimizar_imagem_para_api
+from utils.img_conversor import otimizar_imagem_para_api
 try:
-    from anthropic_report_builder import extrair_json_do_texto
+    from services.anthropic_report_builder import extrair_json_do_texto
 except ImportError:
     def extrair_json_do_texto(text):
         # Basic fallback for JSON extraction

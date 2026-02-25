@@ -23,7 +23,7 @@ from watchdog.events import FileSystemEventHandler, FileSystemEvent
 
 WATCH_DIR = Path.home() / "Temp" / "HEIMDALLR"
 PYTHON = Path.home() / "Heimdallr" / "venv" / "bin" / "python"
-UPLOADER = Path.home() / "Heimdallr" / "uploader.py"
+UPLOADER = Path.home() / "Heimdallr" / "clients" / "uploader.py"
 
 QUIET_SECONDS = 3
 POLL_SECONDS = 1

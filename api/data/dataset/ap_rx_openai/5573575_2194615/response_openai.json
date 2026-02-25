@@ -1,0 +1,13 @@
+{
+    "laudo_estruturado": "Técnica: exame realizado no leito; incidência frontal única; média expansibilidade pulmonar.  \nCampos pulmonares: opacidades bilaterais nos terços médio e inferior; ausência de derrame pleural.  \nSilhueta cardiomediastinal: índice cardiotorácico de 0,47 (discordante do aspecto visual, que sugere cardiomegalia).  \nDispositivos e implantes: TOT.",
+    "dados_json": {},
+    "timings": {
+        "conversion": 0.01,
+        "openai_api": 5.942
+    },
+    "usage": {
+        "prompt_tokens": 2999,
+        "completion_tokens": 95,
+        "total_tokens": 3094
+    }
+}

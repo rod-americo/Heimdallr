@@ -15,9 +15,12 @@ from dotenv import load_dotenv
 
 # Import conversion and parsing logic
 # Assuming these files are in the same directory (Heimdallr)
-from img_conversor import otimizar_imagem_para_api
+import sys
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+
+from utils.img_conversor import otimizar_imagem_para_api
 try:
-    from anthropic_report_builder import extrair_json_do_texto, montar_laudo_a_partir_json
+    from services.anthropic_report_builder import extrair_json_do_texto, montar_laudo_a_partir_json
 except ImportError:
     # Fallback if file not found (will be verified next step)
     def extrair_json_do_texto(text): return {"raw": text}
@@ -99,7 +102,8 @@ async def analyze_xray(
 
     # 4. Prepare Prompt
     try:
-        with open("prompts/rx_thorax_ap.txt", "r", encoding="utf-8") as f:
+        prompt_file = Path(__file__).resolve().parent / "prompts" / "rx_thorax_ap.txt"
+        with open(prompt_file, "r", encoding="utf-8") as f:
             system_instruction = f.read()
     except FileNotFoundError:
         system_instruction = "You are an expert Radiologist. Analyze this image."

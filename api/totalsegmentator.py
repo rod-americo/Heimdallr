@@ -42,10 +42,13 @@ import contextlib
 import time
 import datetime
 import tempfile
+import uuid
+import base64
 from pathlib import Path
 from typing import Dict, Any
+from tempfile import NamedTemporaryFile
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request, Body
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
@@ -54,6 +57,9 @@ load_dotenv()
 
 # Ensure virtual environment binaries are in PATH
 os.environ["PATH"] = str(Path(sys.executable).parent) + os.pathsep + os.environ["PATH"]
+
+# Ensure central configuration is accessible
+sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 # Import centralized configuration
 import config

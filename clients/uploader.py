@@ -34,13 +34,10 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskPr
 from rich.console import Console
 from requests_toolbelt import MultipartEncoder, MultipartEncoderMonitor
 
-# Import centralized configuration
-import config
+# Default server URL
+SERVER_URL = os.getenv("HEIMDALLR_UPLOADER_SERVER", "http://thor:8001/upload")
 
 console = Console()
-
-# Default server URL from config
-SERVER_URL = config.UPLOADER_DEFAULT_SERVER
 
 def create_progress_callback(task_id, progress):
     """

@@ -38,14 +38,15 @@ os.environ["PATH"] = str(Path(sys.executable).parent) + os.pathsep + os.environ[
 # CONFIGURATIONS
 # ============================================================
 
-BASE = Path(__file__).resolve().parent
-INPUT_DIR = BASE / "input"
-OUTPUT_BASE_DIR = BASE / "output"
-DB_PATH = BASE / "database" / "dicom.db"
+# Add root directory to sys.path so config can be imported
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+import config
 
-INPUT_DIR.mkdir(exist_ok=True)
-OUTPUT_BASE_DIR.mkdir(exist_ok=True)
-DB_PATH.parent.mkdir(exist_ok=True) 
+INPUT_DIR = config.INPUT_DIR
+OUTPUT_BASE_DIR = config.OUTPUT_DIR
+DB_PATH = config.DB_PATH
+
+config.ensure_directories()
 
 def clean_filename(s):
     s = str(s).strip()

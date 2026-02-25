@@ -1,0 +1,13 @@
+{
+    "laudo_estruturado": "Técnica: exame realizado no leito; incidência frontal única; boa expansibilidade pulmonar.  \nCampos pulmonares: opacidades no terço médio e inferior à direita; derrame pleural moderado à direita.  \nSilhueta cardiomediastinal: índice cardiotorácico de 0,50; aorta ateromatosa.  \nDispositivos e implantes: PICC à direita; sonda digestiva.",
+    "dados_json": {},
+    "timings": {
+        "conversion": 0.014,
+        "openai_api": 3.262
+    },
+    "usage": {
+        "prompt_tokens": 3057,
+        "completion_tokens": 96,
+        "total_tokens": 3153
+    }
+}
