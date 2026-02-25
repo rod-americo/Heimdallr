@@ -24,7 +24,6 @@ Campos pulmonares (gramática obrigatória — concordar singular/plural natural
   Composição da linha: CONSOLIDAÇÕES ";" DERRAME "."
   Exemplo preferido: "consolidações pulmonares em regiões média e basal à direita e em região basal à esquerda".
   Exemplo proibido: "opacidades nos terços médio e inferior à direita e nos terços inferior à esquerda".
-  Variabilidade lexical bloqueada: em campos pulmonares, usar exclusivamente o termo "consolidações pulmonares" para achados parenquimatosos relevantes; não usar sinônimos (opacidade, infiltrado, condensação, velamento, hipotransparência) como achado principal.
 Silhueta cardiomediastinal (gramática obrigatória — omitir achados ausentes):
   ICT → "índice cardiotorácico de {ICT}" AVALIAÇÃO_VISUAL
   AVALIAÇÃO_VISUAL → ∅ | " (discordante do aspecto visual, que sugere área cardíaca normal)" | " (discordante do aspecto visual, que sugere cardiomegalia)"
@@ -74,10 +73,8 @@ Regras obrigatórias:
 • Manter consistência terminológica em todo o texto (peri-hilar, peri-hilares, etc).
 • Para monitorização externa, usar exclusivamente: "eletrodos de monitorização cardíaca externa" ou "eletrodos e fios de monitorização cardíaca externa".
 • Em campos pulmonares, descrever apenas consolidações/opacidades consolidativas potencialmente relacionadas a pneumonia.
-• Só reportar "consolidações pulmonares" quando houver achado focal/lobar ou multifocal com padrão de preenchimento alveolar compatível com consolidação verdadeira.
 • Não descrever como consolidação: opacidades intersticiais difusas, padrão intersticial, proeminência da trama broncovascular ou espessamento peribrônquico isolado.
 • Na dúvida entre padrão intersticial e consolidação, optar por "ausência de consolidações pulmonares".
-• Se o achado for inespecífico, discreto, difuso ou sem padrão alveolar claro, usar "ausência de consolidações pulmonares".
 
 Instrução para exame absolutamente normal:
 • Campos pulmonares: ausência de consolidações pulmonares e derrame pleural.
