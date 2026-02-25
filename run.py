@@ -37,7 +37,7 @@ import concurrent.futures  # For parallel case processing
 from pathlib import Path
 
 # Import metrics calculation module
-from metrics import calculate_all_metrics
+from core import metrics
 
 # Import centralized configuration
 import config
@@ -354,10 +354,11 @@ def process_case(nifti_path):
     else:
         logger.print("Calculating metrics...")
     try:
+        from core import metrics
         json_path = case_output / "resultados.json"
-        metrics = calculate_all_metrics(case_id, nifti_path, case_output) # Original call
+        metrics_data = metrics.calculate_all_metrics(case_id, nifti_path, case_output)
         with open(json_path, "w") as f:
-            json.dump(metrics, f, indent=2)
+            json.dump(metrics_data, f, indent=2)
         if not config.VERBOSE_CONSOLE:
             logger.print("[Metrics] ✓ Saved to resultados.json")
         else:

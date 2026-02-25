@@ -16,10 +16,15 @@
 
 import os
 import sys
+from pathlib import Path
+
+# Add root directory to sys.path so config and core modules can be imported
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+import config
+
 import json
 import shutil
 import tempfile
-from pathlib import Path
 from typing import Dict, Any
 
 from fastapi import FastAPI, HTTPException, UploadFile, File
@@ -40,7 +45,7 @@ PORT = int(os.getenv("CTR_PORT", "8003"))
 
 # Configure centralized CXAS model weight caching
 # These weights are ~841MB, so we keep them persistent.
-os.environ["CXAS_PATH"] = str((Path(__file__).resolve().parent / "models" / "cxas").resolve())
+os.environ["CXAS_PATH"] = str((Path(__file__).resolve().parent.parent / "models" / "cxas").resolve())
 
 class AppState:
     model: cxas.CXAS = None
@@ -186,4 +191,4 @@ def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("ctr_api:app", host="0.0.0.0", port=PORT)
+    uvicorn.run("api.ctr:app", host="0.0.0.0", port=PORT)

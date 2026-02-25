@@ -29,14 +29,16 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
-
 # ============================================================
 # BASE PATHS
 # ============================================================
 
 BASE_DIR = Path(__file__).resolve().parent
+
+# Load environment variables explicitly from root .env file
+env_path = BASE_DIR / ".env"
+load_dotenv(dotenv_path=env_path)
+
 UPLOAD_DIR = BASE_DIR / "uploads"
 NII_DIR = BASE_DIR / "nii"
 OUTPUT_DIR = BASE_DIR / "output"
@@ -44,6 +46,20 @@ INPUT_DIR = BASE_DIR / "input"
 ERROR_DIR = BASE_DIR / "errors"
 STATIC_DIR = BASE_DIR / "static"
 DATA_DIR = BASE_DIR / "data"
+
+# ============================================================
+# DATABASE CONFIGURATION
+# ============================================================
+
+DB_DIR = BASE_DIR / "database"
+DB_PATH = DB_DIR / "dicom.db"
+
+# ============================================================
+# PREPARE SCRIPT CONFIGURATION (prepare.py)
+# ============================================================
+
+# DICOM to NIfTI conversion settings
+PREPARE_SCRIPT = BASE_DIR / "core" / "prepare.py"
 
 # ============================================================
 # SERVER CONFIGURATION (server.py)
@@ -119,19 +135,7 @@ ANTHROPIC_SERVICE_URL = os.getenv("ANTHROPIC_SERVICE_URL", "http://localhost:810
 TOTALSEGMENTATOR_SERVICE_URL = os.getenv("TOTALSEGMENTATOR_SERVICE_URL", "http://localhost:8004/process")
 
 
-# ============================================================
-# PREPARE SCRIPT CONFIGURATION (prepare.py)
-# ============================================================
 
-# DICOM to NIfTI conversion settings
-PREPARE_SCRIPT = BASE_DIR / "prepare.py"
-
-# ============================================================
-# DATABASE CONFIGURATION
-# ============================================================
-
-DB_DIR = BASE_DIR / "database"
-DB_PATH = DB_DIR / "dicom.db"
 
 # ============================================================
 # HELPER FUNCTIONS

@@ -17,6 +17,15 @@ import contextlib
 import time
 from typing import Dict, Any, List
 
+# Import Heimdallr configuration and our text prompt
+import sys
+from pathlib import Path
+
+# Add root directory to sys.path so config and utils can be imported
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+import config
+from utils import img_conversor
+
 import torch
 import numpy as np
 import pydicom
@@ -26,8 +35,9 @@ from pydantic import BaseModel, Field
 from transformers import pipeline
 import openai
 from dotenv import load_dotenv
-import medgemma_prompts
-from deid_gateway import (
+# Since we are inside api/, medgemma_prompts is in the same directory
+from medgemma_prompts import PROMPT_AP_RX_THORAX
+from services.deid_gateway import (
     DeidReviewRequiredError,
     deidentify_image_payload,
     sanitize_outbound_metadata,
