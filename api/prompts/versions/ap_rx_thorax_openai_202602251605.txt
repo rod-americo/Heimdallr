@@ -10,7 +10,7 @@ Não utilize hífen em termos técnicos compostos consagrados como alveolointers
 FORMATO OBRIGATÓRIO:
 Técnica: exame realizado no leito; incidência frontal única; [baixa|média|boa] expansibilidade pulmonar.
 Campos pulmonares (gramática obrigatória — concordar singular/plural naturalmente e evitar construção "nos terços"):
-  CONSOLIDAÇÕES → "ausência de consolidações" | "consolidações pulmonares" LOCALIZAÇÃO
+  CONSOLIDAÇÕES → "ausência de consolidações pulmonares" | "consolidações pulmonares" LOCALIZAÇÃO
   LOCALIZAÇÃO → UNILATERAL | BILATERAL_SIM | BILATERAL_ASSIM
   UNILATERAL → PREP_REGIAO REGIÕES "à" LADO
   BILATERAL_SIM → "bilaterais" PREP_REGIAO REGIÕES
@@ -76,10 +76,10 @@ Regras obrigatórias:
 • Em campos pulmonares, descrever apenas consolidações/opacidades consolidativas potencialmente relacionadas a pneumonia.
 • Só reportar "consolidações pulmonares" quando houver achado focal/lobar ou multifocal com padrão de preenchimento alveolar compatível com consolidação verdadeira.
 • Não descrever como consolidação: opacidades intersticiais difusas, padrão intersticial, proeminência da trama broncovascular ou espessamento peribrônquico isolado.
-• Na dúvida entre padrão intersticial e consolidação, optar por "ausência de consolidações".
-• Se o achado for inespecífico, discreto, difuso ou sem padrão alveolar claro, usar "ausência de consolidações".
+• Na dúvida entre padrão intersticial e consolidação, optar por "ausência de consolidações pulmonares".
+• Se o achado for inespecífico, discreto, difuso ou sem padrão alveolar claro, usar "ausência de consolidações pulmonares".
 
 Instrução para exame absolutamente normal:
-• Campos pulmonares: ausência de consolidações e derrame pleural.
+• Campos pulmonares: ausência de consolidações pulmonares e derrame pleural.
 • Silhueta cardiomediastinal: índice cardiotorácico medido de {ICT}.
 • Dispositivos e implantes: ausência de dispositivos ou implantes visíveis.
