@@ -10,23 +10,23 @@ Este documento resume a arquitetura, os fluxos e os pontos de alteracao mais pro
   - DICOM Listener (`dicom_listener.py`) via C-STORE (porta 11112 por padrao)
   - Upload manual (`uploader.py`) via HTTP `/upload`
 - Orquestracao:
-  - `server.py` recebe ZIP e dispara `prepare.py`
-  - `prepare.py` converte DICOM->NIfTI e coloca em `input/`
+  - `app.py` recebe ZIP e dispara `core/prepare.py`
+  - `core/prepare.py` converte DICOM->NIfTI e coloca em `input/`
   - `run.py` monitora `input/` e processa casos
-  - `metrics.py` calcula metricas e gera `resultados.json`
+  - `core/metrics.py` calcula metricas e gera `resultados.json`
 - Saida por caso: `output/<CaseID>/` com `id.json`, `resultados.json`, mascaras e overlays.
 
 ## 2) Mapa de arquivos (o que editar em cada tipo de demanda)
 
 - API/backend:
-  - `server.py`: endpoints REST, downloads, biometria, SMI, dashboard root.
+  - `app.py`: endpoints REST, downloads, biometria, SMI, dashboard root.
   - `config.py`: configuracoes centralizadas via env vars.
 - Ingestao e preparo:
   - `dicom_listener.py`: recepcao DICOM, agrupamento por estudo, upload com retry.
-  - `prepare.py`: selecao de serie, conversao NIfTI, metadados e insercao inicial no DB.
+  - `core/prepare.py`: selecao de serie, conversao NIfTI, metadados e insercao inicial no DB.
 - Processamento:
   - `run.py`: daemon, execucao de tarefas TotalSegmentator, update de DB e arquivo final.
-  - `metrics.py`: regras clinicas/metricas, overlays, deteccao de regioes.
+  - `core/metrics.py`: regras clinicas/metricas, overlays, deteccao de regioes.
 - Frontend:
   - `static/index.html`, `static/styles.css`, `static/app.js`
 - Banco:
@@ -37,8 +37,8 @@ Este documento resume a arquitetura, os fluxos e os pontos de alteracao mais pro
 ## 3) Fluxo ponta a ponta (mental model)
 
 1. Exame chega por DICOM Listener ou uploader manual.
-2. `server.py:/upload` salva ZIP em `uploads/` e roda `prepare.py` em background.
-3. `prepare.py`:
+2. `app.py:/upload` salva ZIP em `uploads/` e roda `core/prepare.py` em background.
+3. `core/prepare.py`:
    - extrai ZIP
    - le DICOMs e escolhe a melhor serie (logica diferente para CT e MR)
    - converte com `dcm2niix`
@@ -48,10 +48,10 @@ Este documento resume a arquitetura, os fluxos e os pontos de alteracao mais pro
 4. `run.py` detecta NIfTI novo em `input/` e processa:
    - segmentacao (`total`/`total_mr`, `tissue_types`)
    - opcional: `cerebral_bleed` se cerebro detectado (CT)
-   - metricas via `metrics.py`
+   - metricas via `core/metrics.py`
    - atualiza DB (`CalculationResults`, `IdJson`, biometria se houver)
    - move NIfTI para `nii/` (arquivo final)
-5. Dashboard consulta `server.py` para lista de pacientes, resultados, imagens e downloads.
+5. Dashboard consulta `app.py` para lista de pacientes, resultados, imagens e downloads.
 
 ## 4) Contratos de dados importantes
 
@@ -84,7 +84,7 @@ Este documento resume a arquitetura, os fluxos e os pontos de alteracao mais pro
 ## 7) Pontos de atencao (riscos tecnicos)
 
 - `config.py` exige `TOTALSEGMENTATOR_LICENSE`; sem isso processos falham ao importar config.
-- `prepare.py` faz `sys.exit(1)` em varios erros: impacto direto no fluxo de ingestao.
+- `core/prepare.py` faz `sys.exit(1)` em varios erros: impacto direto no fluxo de ingestao.
 - `run.py` paraleliza casos; erros por corrida de `config.json` do TotalSegmentator ja tem retry.
 - Frontend calcula e envia SMI apos salvar peso/altura; depende de SMA existir no resultado.
 - Schema SQL base nao inclui `Weight/Height/SMI`; requer migracoes para ambientes antigos.
@@ -92,11 +92,11 @@ Este documento resume a arquitetura, os fluxos e os pontos de alteracao mais pro
 ## 8) Playbook rapido por tipo de solicitacao
 
 - "Criar/ajustar endpoint":
-  - editar `server.py` + validar impacto em `static/app.js` (se UI usar).
+  - editar `app.py` + validar impacto em `static/app.js` (se UI usar).
 - "Mudar criterio de selecao de serie":
-  - editar `prepare.py` (blocos CT/MR e score).
+  - editar `core/prepare.py` (blocos CT/MR e score).
 - "Nova metrica clinica":
-  - editar `metrics.py`, persistencia segue por `run.py`.
+  - editar `core/metrics.py`, persistencia segue por `run.py`.
 - "Ajuste de pipeline/execucao":
   - editar `run.py` (ordem de tarefas, retries, concorrencia).
 - "Melhoria PACS/DICOM":
@@ -108,7 +108,7 @@ Este documento resume a arquitetura, os fluxos e os pontos de alteracao mais pro
 
 Em terminais separados:
 
-1. `source venv/bin/activate && python server.py`
+1. `source venv/bin/activate && python app.py`
 2. `source venv/bin/activate && python run.py`
 3. (Opcional PACS) `source venv/bin/activate && python dicom_listener.py`
 
@@ -118,8 +118,8 @@ Docs API: `http://localhost:8001/docs`
 ## 10) Checklist antes de qualquer mudanca futura
 
 - Confirmar impacto em:
-  - API (`server.py`)
-  - pipeline (`prepare.py`/`run.py`)
+  - API (`app.py`)
+  - pipeline (`core/prepare.py`/`run.py`)
   - persistencia (`database/dicom.db`)
   - dashboard (`static/app.js`)
 - Verificar compatibilidade CT vs MR.
