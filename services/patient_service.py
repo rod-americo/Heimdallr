@@ -78,6 +78,9 @@ class PatientService:
                     "has_hemorrhage": results.get("hemorrhage_vol_cm3", 0.0) > 0.1
                 })
                 
+            # Sort alphabetically by the displayed name (first part of case_id)
+            patients.sort(key=lambda x: x["case_id"].split('_')[0].lower())
+            
             return patients
         except Exception as e:
             logger.error(f"Error fetching patients from DB: {e}")
