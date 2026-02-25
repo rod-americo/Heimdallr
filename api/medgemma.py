@@ -48,7 +48,7 @@ from services.deid_gateway import (
 load_dotenv()
 
 # Configuration
-PORT = int(os.getenv("MEDGEMMA_PORT", "8002"))
+PORT = int(os.getenv("MEDGEMMA_PORT", "8009"))
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 MODEL_ID = "google/medgemma-1.5-4b-it"
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
