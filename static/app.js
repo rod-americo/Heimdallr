@@ -195,9 +195,40 @@ function renderResults(results, caseId, metadata = {}) {
 
     // Sarcopenia (L3)
     if (results.SMA_cm2 !== undefined) {
+        let sarcopeniaStatusHtml = '';
+
+        if (metadata.Height && metadata.Sex) {
+            const smi = results.SMA_cm2 / (metadata.Height * metadata.Height);
+            let hasSarcopenia = false;
+
+            if (metadata.Sex === 'M' || metadata.Sex === 'Masculino') {
+                hasSarcopenia = smi <= 52.4;
+            } else if (metadata.Sex === 'F' || metadata.Sex === 'Feminino') {
+                hasSarcopenia = smi <= 38.5;
+            }
+
+            if (metadata.Sex === 'M' || metadata.Sex === 'F' || metadata.Sex === 'Masculino' || metadata.Sex === 'Feminino') {
+                const badgeColor = hasSarcopenia ? 'var(--danger, #ef4444)' : 'var(--success, #22c55e)';
+                const badgeEmoji = hasSarcopenia ? '🔴' : '🟢';
+                const statusText = hasSarcopenia ? 'Sarcopenia Detectada' : 'Normal';
+
+                sarcopeniaStatusHtml = `
+                    <div class="result-card">
+                        <div class="result-label">Classificação (Prado et al.)</div>
+                        <div class="result-value">
+                            <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px; background: ${badgeColor}22; color: ${badgeColor}; border: 1px solid ${badgeColor}; font-weight: 600; font-size: 0.85rem;">
+                                ${badgeEmoji} ${statusText}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
         sections.push(`
             <h3 style="margin: 1.5rem 0 1rem; color: var(--text-secondary);">Análise de Sarcopenia (L3)</h3>
             <div class="results-grid">
+                ${sarcopeniaStatusHtml}
                 <div class="result-card">
                     <div class="result-label">Área Muscular (SMA)</div>
                     <div class="result-value highlight">${results.SMA_cm2.toFixed(2)} <span class="result-unit">cm²</span></div>
@@ -206,6 +237,7 @@ function renderResults(results, caseId, metadata = {}) {
                     <div class="result-label">Densidade Muscular</div>
                     <div class="result-value">${results.muscle_HU_mean?.toFixed(1) || '-'} <span class="result-unit">HU</span></div>
                 </div>
+
                 <div class="result-card">
                     <div class="result-label">Fatia L3</div>
                     <div class="result-value">${results.slice_L3 || '-'}</div>
@@ -214,9 +246,181 @@ function renderResults(results, caseId, metadata = {}) {
         `);
     }
 
-    // Organs
+    // BMD / Bone Mineral Density (L1)
+    if (results.L1_bmd_classification) {
+        const bmdClass = results.L1_bmd_classification;
+        let badgeColor, badgeEmoji;
+        if (bmdClass === 'Normal') {
+            badgeColor = 'var(--success, #22c55e)';
+            badgeEmoji = '🟢';
+        } else if (bmdClass === 'Osteopenia') {
+            badgeColor = '#eab308';
+            badgeEmoji = '🟡';
+        } else {
+            badgeColor = 'var(--danger, #ef4444)';
+            badgeEmoji = '🔴';
+        }
+
+        sections.push(`
+            <h3 style="margin: 1.5rem 0 1rem; color: var(--text-secondary);">Análise de Osteoporose (L1)</h3>
+            <div class="results-grid">
+                <div class="result-card">
+                    <div class="result-label">Classificação — Pickhardt et al., Radiology 2013</div>
+                    <div class="result-value">
+                        <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px; background: ${badgeColor}22; color: ${badgeColor}; border: 1px solid ${badgeColor}; font-weight: 600; font-size: 0.85rem;">
+                            ${badgeEmoji} ${bmdClass}
+                        </span>
+                    </div>
+                </div>
+                <div class="result-card">
+                    <div class="result-label">HU Trabecular (L1)</div>
+                    <div class="result-value">${results.L1_trabecular_HU_mean?.toFixed(1) || '-'} ± ${results.L1_trabecular_HU_std?.toFixed(1) || '-'} <span class="result-unit">HU</span></div>
+                </div>
+                <div class="result-card">
+                    <div class="result-label">Voxels Analisados</div>
+                    <div class="result-value">${(results.L1_trabecular_voxel_count || 0).toLocaleString()}</div>
+                </div>
+            </div>
+        `);
+    }
+
+    // Liver Section (Volume + Fat Content)
+    const liverVol = results.liver_vol_cm3;
+    const liverHU = results.liver_hu_mean;
+    const hasPDFF = results.liver_pdff_percent !== undefined;
+
+    if (liverVol > 0 || hasPDFF) {
+        let liverCards = [];
+
+        // Liver Volume Card
+        if (liverVol > 0) {
+            liverCards.push(`
+                <div class="result-card" style="padding-bottom: 0.75rem;">
+                    <div class="result-label" style="text-transform: uppercase; margin-bottom: 1.25rem; font-size: 0.7rem; border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.5rem; display: block;">Volume Total do Fígado</div>
+                    <div class="result-value" style="font-size: 1.8rem; line-height: 1;">${liverVol.toFixed(1)} <span class="result-unit">cm³</span></div>
+                    ${liverHU !== null && liverHU !== undefined ? `<div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;">Densidade Média: ${liverHU.toFixed(1)} HU</div>` : ''}
+                </div>
+            `);
+        }
+
+        // Liver Fat Content Card
+        if (hasPDFF) {
+            let kvpBadge = '';
+            const pdff = results.liver_pdff_percent;
+            const kvp = results.liver_pdff_kvp;
+
+            // New Thresholds for PDFF (2026-02-24)
+            let pdffColor = "var(--text-primary, #fff)"; // Default
+            if (pdff < 5.0) {
+                pdffColor = "var(--success, #22c55e)"; // Normal
+            } else if (pdff < 15.0) {
+                pdffColor = "var(--warning, #eab308)"; // Leve
+            } else if (pdff < 30.0) {
+                pdffColor = "#f97316"; // Moderado (Orange)
+            } else {
+                pdffColor = "var(--danger, #ef4444)"; // Acentuado
+            }
+
+            if (kvp === "120" || kvp === "120.0") {
+                kvpBadge = `<span style="display: inline-block; padding: 0.2rem 0.6rem; border-radius: 6px; background: var(--success, #06d6a0)15; color: var(--success, #06d6a0); border: 1px solid var(--success, #06d6a0); font-size: 0.75rem; font-weight: 600; white-space: nowrap;">120 KV</span>`;
+            } else if (kvp === "Unknown") {
+                kvpBadge = `<span title="KV Desconhecido" style="display: inline-block; padding: 0.2rem 0.4rem; border-radius: 6px; background: var(--warning, #ff8c42)15; color: var(--warning, #ff8c42); border: 1px solid var(--warning, #ff8c42); font-size: 0.75rem; font-weight: 600; white-space: nowrap;">❓ KV</span>`;
+            } else {
+                kvpBadge = `<span title="Cálculo idealizado para 120 kV" style="display: inline-block; padding: 0.2rem 0.6rem; border-radius: 6px; background: var(--warning, #ff8c42)15; color: var(--warning, #ff8c42); border: 1px solid var(--warning, #ff8c42); font-size: 0.75rem; font-weight: 600; white-space: nowrap;">⚠️ ${kvp} KV</span>`;
+            }
+
+            liverCards.push(`
+                <div class="result-card" style="padding-bottom: 0.75rem;">
+                    <div class="result-label" style="text-transform: uppercase; margin-bottom: 1.25rem; font-size: 0.7rem; border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.5rem; display: block;">Conteúdo de Gordura Hepática Estimado</div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="flex: 1;">
+                            <div class="result-value" style="font-size: 1.8rem; line-height: 1; color: ${pdffColor};">${pdff.toFixed(1)} <span class="result-unit">%</span></div>
+                            <div style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-top: 0.4rem; opacity: 0.9;">MRI-PDFF Equivalente</div>
+                        </div>
+                        <div style="margin-left: 1rem; flex-shrink: 0;">
+                            ${kvpBadge}
+                        </div>
+                    </div>
+                    <div style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 1.5rem; opacity: 0.6; font-style: italic;">Pickhardt et al., AJR 2018</div>
+                </div>
+            `);
+        }
+
+        sections.push(`
+            <h3 style="margin: 1.5rem 0 1rem; color: var(--text-secondary);">Fígado</h3>
+            <div class="results-grid">
+                ${liverCards.join('')}
+            </div>
+        `);
+    }
+
+    // Pulmonary Emphysema (Lobar)
+    if (results.lung_analysis_status === "Complete") {
+        const lobes = [
+            { key: 'lung_upper_lobe_right', name: 'Lobo Superior Direito' },
+            { key: 'lung_middle_lobe_right', name: 'Lobo Médio' },
+            { key: 'lung_lower_lobe_right', name: 'Lobo Inferior Direito' },
+            { key: 'lung_upper_lobe_left', name: 'Lobo Superior Esquerdo' },
+            { key: 'lung_lower_lobe_left', name: 'Lobo Inferior Esquerdo' }
+        ];
+
+        const getProgressColor = (perc) => {
+            if (perc < 5) return 'var(--success, #22c55e)';  // Normal
+            if (perc < 15) return '#eab308';                // Mild (Amarelo)
+            if (perc < 25) return '#f97316';                // Moderate (Laranja)
+            return 'var(--danger, #ef4444)';                // Severe (Vermelho)
+        };
+
+        const lobarHtml = lobes.map(lobe => {
+            const perc = results[`${lobe.key}_emphysema_percent`];
+            const volTotal = results[`${lobe.key}_vol_cm3`];
+            const volEmph = results[`${lobe.key}_emphysema_vol_cm3`];
+            const color = getProgressColor(perc);
+
+            return `
+                <div style="margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.03);">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 0.4rem; color: #eee;">
+                        <span style="font-weight: 500;">${lobe.name}</span>
+                        <span style="font-weight: 600; color: ${color};">${perc.toFixed(1)}%</span>
+                    </div>
+                    <div style="height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; margin-bottom: 0.4rem;">
+                        <div style="height: 100%; width: ${Math.min(100, perc)}%; background: ${color}; box-shadow: 0 0 10px ${color}44;"></div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-secondary); opacity: 0.8;">
+                        <span>Vol. Total: ${volTotal ? volTotal.toFixed(0) : '-'} cm³</span>
+                        <span>Vol. Enfisema: ${volEmph ? volEmph.toFixed(0) : '-'} cm³</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        sections.push(`
+            <h3 style="margin: 1.5rem 0 1rem; color: var(--text-secondary);">Enfisema Pulmonar Quantitativo</h3>
+            <div class="results-grid" style="grid-template-columns: 1fr 1.6fr; gap: 1.5rem;">
+                <div class="result-card" style="display: flex; flex-direction: column; justify-content: center; align-items: center; background: linear-gradient(145deg, rgba(30,30,50,0.4), rgba(20,20,35,0.4)); padding: 1.5rem;">
+                    <div class="result-label" style="text-align: center; margin-bottom: 1.5rem; font-size: 0.8rem; letter-spacing: 0.05em;">LAA TOTAL (-950 HU)</div>
+                    <div style="position: relative; width: 120px; height: 120px; display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem;">
+                         <svg viewBox="0 0 36 36" style="width: 100%; height: 100%; transform: rotate(-90deg);">
+                            <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="2.5" />
+                            <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="${getProgressColor(results.total_lung_emphysema_percent)}" stroke-width="3" stroke-dasharray="${results.total_lung_emphysema_percent}, 100" stroke-linecap="round" />
+                        </svg>
+                        <div style="position: absolute; text-align: center;">
+                            <div style="font-size: 1.8rem; font-weight: 700; color: #eee; line-height: 1;">${results.total_lung_emphysema_percent.toFixed(1)}<span style="font-size: 1rem; margin-left:1px;">%</span></div>
+                        </div>
+                    </div>
+                    <div style="width: 100%; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1rem; text-align: center;">
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.3rem;">Volume Pulmonar: <span style="color: #eee; font-weight: 500;">${results.total_lung_vol_cm3?.toFixed(0) || '-'} cm³</span></div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">Carga de Enfisema: <span style="color: #eee; font-weight: 500;">${results.total_lung_emphysema_vol_cm3?.toFixed(0) || '-'} cm³</span></div>
+                    </div>
+                </div>
+                <div class="result-card" style="padding: 1.5rem; background: rgba(15,15,25,0.3);">
+                    ${lobarHtml}
+                </div>
+            </div>
+        `);
+    }
+
     const organs = [
-        { key: 'liver', name: 'Fígado', icon: '🫀' },
         { key: 'spleen', name: 'Baço', icon: '🩸' },
         { key: 'kidney_right', name: 'Rim Direito', icon: '🫘' },
         { key: 'kidney_left', name: 'Rim Esquerdo', icon: '🫘' }
@@ -263,7 +467,7 @@ function renderResults(results, caseId, metadata = {}) {
 
         sections.push(`
             <h3 style="margin: 1.5rem 0 1rem; color: var(--text-secondary);">Visualizações</h3>
-            <div class="results-grid" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
+            <div class="results-grid" style="grid-template-columns: 1fr;">
                 ${imageCards}
             </div>
         `);
@@ -291,7 +495,7 @@ function renderBiometricSection(caseId, metadata, results) {
     }
 
     return `
-        <h3 style="margin-bottom: 1rem; color: var(--text-secondary);">📊 Dados Biométricos</h3>
+        <h3 style="margin-bottom: 1rem; color: var(--text-secondary);">Dados Biométricos</h3>
         <div class="results-grid" id="biometric-section">
             <div class="result-card">
                 <div class="result-label">Peso</div>

@@ -109,6 +109,7 @@ def init_and_insert_db(metadata):
                 JsonDump TEXT,
                 DicomMetadata TEXT,
                 CalculationResults TEXT,
+                PatientSex TEXT,
                 ProcessedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
@@ -118,18 +119,21 @@ def init_and_insert_db(metadata):
         except: pass
         try: c.execute("ALTER TABLE dicom_metadata ADD COLUMN CalculationResults TEXT")
         except: pass
+        try: c.execute("ALTER TABLE dicom_metadata ADD COLUMN PatientSex TEXT")
+        except: pass
 
         # Upsert (Only initial fields)
         c.execute('''
             INSERT OR REPLACE INTO dicom_metadata 
-            (StudyInstanceUID, PatientName, ClinicalName, AccessionNumber, StudyDate, Modality, JsonDump)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            (StudyInstanceUID, PatientName, ClinicalName, AccessionNumber, StudyDate, PatientSex, Modality, JsonDump)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             metadata["StudyInstanceUID"],
             metadata["PatientName"],
             metadata.get("ClinicalName", ""),
             metadata["AccessionNumber"],
             metadata.get("StudyDate", ""),
+            metadata.get("PatientSex", ""),
             metadata["Modality"],
             json.dumps(metadata)
         ))
@@ -306,9 +310,11 @@ def process_zip(zip_path):
         
         global_meta = {
             "PatientName": "Unknown",
+            "PatientSex": "Unknown",
             "AccessionNumber": "000000",
             "StudyInstanceUID": "",
             "StudyDate": "", # Added
+            "KVP": "Unknown", # Added
             "Modality": "" # Overall Modality match
         }
         
@@ -338,9 +344,11 @@ def process_zip(zip_path):
                                 name_val = get_tag_value(ds, "PatientName", "")
                                 if name_val:
                                     global_meta["PatientName"] = str(name_val).replace('^', ' ').strip()
+                                global_meta["PatientSex"] = str(get_tag_value(ds, "PatientSex", "Unknown"))
                                 global_meta["AccessionNumber"] = str(get_tag_value(ds, "AccessionNumber", "000000"))
                                 global_meta["StudyInstanceUID"] = str(get_tag_value(ds, "StudyInstanceUID", ""))
                                 global_meta["StudyDate"] = str(get_tag_value(ds, "StudyDate", ""))
+                                global_meta["KVP"] = str(get_tag_value(ds, "KVP", "Unknown"))
                                 global_meta["Modality"] = modality
 
                         series_map[uid]["files"].append(fpath)
@@ -380,12 +388,14 @@ def process_zip(zip_path):
         
         id_data = {
             "PatientName": global_meta["PatientName"],
+            "PatientSex": global_meta["PatientSex"],
             "AccessionNumber": global_meta["AccessionNumber"],
             "StudyInstanceUID": global_meta["StudyInstanceUID"],
             "Modality": exam_modality,
             "StudyDate": str(study_date),
             "CaseID": case_id,
-            "ClinicalName": clinical_name
+            "ClinicalName": clinical_name,
+            "KVP": global_meta.get("KVP", "Unknown")
         }
 
         # Insert into DB immediately

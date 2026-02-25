@@ -301,7 +301,7 @@ async def get_metadata(case_id: str):
                 conn = sqlite3.connect(db_path)
                 cursor = conn.cursor()
                 cursor.execute(
-                    "SELECT Weight, Height FROM dicom_metadata WHERE StudyInstanceUID = ?",
+                    "SELECT Weight, Height, PatientSex FROM dicom_metadata WHERE StudyInstanceUID = ?",
                     (study_uid,)
                 )
                 row = cursor.fetchone()
@@ -312,6 +312,8 @@ async def get_metadata(case_id: str):
                         metadata["Weight"] = row[0]
                     if row[1] is not None:
                         metadata["Height"] = row[1]
+                    if row[2] is not None:
+                        metadata["Sex"] = row[2]
         except Exception as db_err:
             # Don't fail if database lookup fails, just log and continue
             print(f"Warning: Could not fetch biometric data from database: {db_err}")

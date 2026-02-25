@@ -59,7 +59,7 @@ def get_mean_hu(path, ct_data):
         tuple: (mean_HU, std_HU) both rounded to 2 decimal places
     """
     if not path.exists():
-        return 0.0, 0.0
+        return None, None
     try:
         nii = nib.load(str(path))
         mask = nii.get_fdata()
@@ -67,18 +67,18 @@ def get_mean_hu(path, ct_data):
         # Ensure mask and CT have matching dimensions
         if mask.shape != ct_data.shape:
             print(f"Shape mismatch: Mask {mask.shape} vs CT {ct_data.shape}")
-            return 0.0, 0.0
+            return None, None
         
         # Extract CT values where mask is positive
         voxels = ct_data[mask > 0]
         if voxels.size == 0:
-            return 0.0, 0.0
+            return None, None
             
         return round(float(np.mean(voxels)), 2), round(float(np.std(voxels)), 2)
         
     except Exception as ex:
         print(f"Error calculating HU for {path.name}: {ex}")
-        return 0.0, 0.0
+        return None, None
 
 def calculate_all_metrics(case_id, nifti_path, case_output_folder):
     """
@@ -106,13 +106,22 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder):
     # ============================================================
     detected_regions = detect_body_regions(total_dir)
     
-    # Determine modality from metadata (default to CT)
+    # Determine modality and KVP from metadata
     id_json_path = case_output_folder / "id.json"
     modality = "CT"
+    kvp_value = None
+    kvp_raw = "Unknown"
     if id_json_path.exists():
         try:
             with open(id_json_path, 'r') as f:
-                modality = json.load(f).get("Modality", "CT")
+                id_data = json.load(f)
+                modality = id_data.get("Modality", "CT")
+                kvp_raw = id_data.get("KVP", "Unknown")
+                if kvp_raw is not None and kvp_raw != "Unknown":
+                    try:
+                        kvp_value = float(kvp_raw)
+                    except ValueError:
+                        pass
         except: 
             pass
 
@@ -150,6 +159,15 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder):
             hu_mean, hu_std = get_mean_hu(fpath, ct)
             results[f"{organ_name}_hu_mean"] = hu_mean
             results[f"{organ_name}_hu_std"] = hu_std
+            
+            # Liver PDFF calculation based on Pickhardt et al. (120 kVp)
+            # Only calculate if organ is present (vol > 0.1 and hu_mean is not None)
+            if organ_name == "liver" and vol > 0.1 and hu_mean is not None:
+                # Calculate for all cases, and add a tag with the KVP
+                pdff = -0.58 * hu_mean + 38.2
+                pdff = max(0.0, min(100.0, pdff)) # Clamp to 0-100%
+                results[f"{organ_name}_pdff_percent"] = round(pdff, 2)
+                results[f"{organ_name}_pdff_kvp"] = kvp_raw
         else:
             # MR: signal intensity varies by sequence, not standardized like HU
             results[f"{organ_name}_hu_mean"] = None
@@ -331,7 +349,271 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder):
                             
         except Exception as e:
             print(f"Error in hemorrhage analysis: {e}")
+
+    # ============================================================
+    # STEP 5: Bone Mineral Density (BMD) Analysis — L1 Vertebra
+    # ============================================================
+    # Opportunistic osteoporosis screening using CT Hounsfield Units
+    # Method: 2D ROI on central axial slice of L1 (Pickhardt et al. 2013)
+    #   > 160 HU  → Normal
+    #   100–160 HU → Osteopenia
+    #   < 100 HU  → Osteoporosis
+    
+    vertebra_L1_file = total_dir / "vertebrae_L1.nii.gz"
+    
+    if vertebra_L1_file.exists() and modality == "CT":
+        try:
+            from scipy.ndimage import binary_erosion
             
+            nii_L1 = nib.load(str(vertebra_L1_file))
+            mask_L1 = nii_L1.get_fdata() > 0
+            spacing = nii_L1.header.get_zooms()  # (x_mm, y_mm, z_mm)
+            
+            if ct.shape != mask_L1.shape:
+                print(f"Warning: Shape mismatch L1 {mask_L1.shape} vs CT {ct.shape}. Skipping BMD.")
+            else:
+                # Find central axial slice of L1
+                z_indices = np.where(mask_L1.sum(axis=(0, 1)) > 0)[0]
+                
+                if len(z_indices) > 0:
+                    center_z = int(z_indices[len(z_indices) // 2])
+                    
+                    # Extract 2D mask and CT at central slice
+                    mask_2d = mask_L1[:, :, center_z]
+                    ct_2d = ct[:, :, center_z]
+                    
+                    # 1. 2D erosion to find the vertebral body core (discard posterior elements)
+                    in_plane_spacing = min(spacing[0], spacing[1])
+                    erosion_iters = max(1, int(5.0 / in_plane_spacing))
+                    
+                    eroded_2d = binary_erosion(mask_2d, iterations=erosion_iters)
+                    
+                    # 2. Keep only the largest connected component (vertebral body)
+                    from scipy.ndimage import label as ndlabel, center_of_mass
+                    labeled, num_features = ndlabel(eroded_2d)
+                    if num_features > 1:
+                        component_sizes = [np.sum(labeled == i) for i in range(1, num_features + 1)]
+                        largest = np.argmax(component_sizes) + 1
+                        eroded_2d = (labeled == largest)
+                    
+                    if np.sum(eroded_2d) > 0:
+                        # 3. Calculate centroids to determine anterior direction
+                        full_com_x, full_com_y = center_of_mass(mask_2d)
+                        body_com_x, body_com_y = center_of_mass(eroded_2d)
+                        
+                        # 4. Find bounding box of the vertebral body
+                        x_indices, y_indices = np.where(eroded_2d)
+                        x_min, x_max = x_indices.min(), x_indices.max()
+                        y_min, y_max = y_indices.min(), y_indices.max()
+                        
+                        # Compare X vs Y variances to find the AP axis (usually Y in standard axial)
+                        diff_x = abs(full_com_x - body_com_x)
+                        diff_y = abs(full_com_y - body_com_y)
+                        
+                        # 5. Define oval radii (Increased size to match user visual preference)
+                        # Diameter X = 70% of vertebral body width
+                        # Diameter Y = 40% of vertebral body height
+                        rx = (x_max - x_min) * 0.70 / 2.0
+                        ry = (y_max - y_min) * 0.40 / 2.0
+                        
+                        if diff_y > diff_x:
+                            # AP axis is Y. Opposite direction of full_com from body_com is Anterior.
+                            anterior_is_larger_y = body_com_y > full_com_y
+                            center_x = (x_min + x_max) / 2.0
+                            
+                            if anterior_is_larger_y:
+                                # Offset from anterior edge (25% into the body)
+                                center_y = y_max - (y_max - y_min) * 0.25
+                            else:
+                                center_y = y_min + (y_max - y_min) * 0.25
+                        else:
+                            # AP axis is X.
+                            anterior_is_larger_x = body_com_x > full_com_x
+                            center_y = (y_min + y_max) / 2.0
+                            
+                            if anterior_is_larger_x:
+                                center_x = x_max - (x_max - x_min) * 0.25
+                            else:
+                                center_x = x_min + (x_max - x_min) * 0.25
+                                
+                        # 6. Generate the oval mask mathematically
+                        y_grid, x_grid = np.ogrid[:mask_2d.shape[0], :mask_2d.shape[1]]
+                        # Note: np.ogrid returns y_grid as (N, 1) and x_grid as (1, M)
+                        # np.where(eroded_2d) treats dim 0 as X in our previous extraction, so let's match dimensions
+                        # In numpy array indexing, dim 0 is rows (y_grid), dim 1 is cols (x_grid)
+                        # Wait, x_indices, y_indices = np.where(eroded_2d) means dim 0 is x_indices, dim 1 is y_indices.
+                        # So dim 0 (x) goes with np.ogrid row, dim 1 (y) goes with np.ogrid col.
+                        x_grid_arr, y_grid_arr = np.ogrid[:mask_2d.shape[0], :mask_2d.shape[1]]
+                        
+                        ellipse = ((x_grid_arr - center_x)**2 / rx**2) + ((y_grid_arr - center_y)**2 / ry**2) <= 1
+                        
+                        # Strict intersection with eroded body to ensure no cortical bone is included
+                        roi_mask = ellipse & eroded_2d
+                        
+                        trabecular_voxel_count = int(np.sum(roi_mask))
+                        
+                        if trabecular_voxel_count > 0:
+                            trabecular_hu = ct_2d[roi_mask]
+                            hu_mean = float(np.mean(trabecular_hu))
+                            hu_std = float(np.std(trabecular_hu))
+                            
+                            # Pickhardt classification
+                            if hu_mean > 160:
+                                classification = "Normal"
+                            elif hu_mean >= 100:
+                                classification = "Osteopenia"
+                            else:
+                                classification = "Osteoporose"
+                            
+                            results["L1_trabecular_HU_mean"] = round(hu_mean, 2)
+                            results["L1_trabecular_HU_std"] = round(hu_std, 2)
+                            results["L1_trabecular_voxel_count"] = trabecular_voxel_count
+                            results["L1_bmd_classification"] = classification
+                            
+                            # Generate zoomed overlay image
+                            try:
+                                import matplotlib
+                                matplotlib.use('Agg')
+                                import matplotlib.pyplot as plt
+                                
+                                ct_slice = np.rot90(ct_2d)
+                                roi_slice = np.rot90(roi_mask)
+                                mask_slice = np.rot90(mask_2d)
+                                
+                                # Crop to L1 bounding box with padding
+                                rows = np.where(mask_slice.any(axis=1))[0]
+                                cols = np.where(mask_slice.any(axis=0))[0]
+                                
+                                if len(rows) > 0 and len(cols) > 0:
+                                    r_min_crop, r_max_crop = rows[0], rows[-1]
+                                    c_min_crop, c_max_crop = cols[0], cols[-1]
+                                    
+                                    # Pad by ~0.8x vertebra size for anatomic context
+                                    h = r_max_crop - r_min_crop
+                                    w = c_max_crop - c_min_crop
+                                    pad = int(max(h, w) * 0.8)
+                                    
+                                    r_min_crop = max(0, r_min_crop - pad)
+                                    r_max_crop = min(ct_slice.shape[0], r_max_crop + pad)
+                                    c_min_crop = max(0, c_min_crop - pad)
+                                    c_max_crop = min(ct_slice.shape[1], c_max_crop + pad)
+                                    
+                                    ct_crop = ct_slice[r_min_crop:r_max_crop, c_min_crop:c_max_crop]
+                                    roi_crop = roi_slice[r_min_crop:r_max_crop, c_min_crop:c_max_crop]
+                                    hu_crop = np.where(roi_crop, ct_crop, np.nan)
+                                    
+                                    plt.figure(figsize=(6, 6))
+                                    plt.imshow(ct_crop, cmap='gray', vmin=-250, vmax=1250)
+                                    
+                                    masked_hu = np.ma.masked_where(~roi_crop, hu_crop)
+                                    
+                                    # Use a clear colormap for the oval ROI
+                                    plt.imshow(masked_hu, cmap='cool', alpha=0.8, vmin=0, vmax=300)
+                                    
+                                    plt.axis('off')
+                                    plt.title(f"L1 BMD (Oval ROI) — {classification} ({hu_mean:.0f} HU)")
+                                    plt.tight_layout()
+                                    
+                                    overlay_path = case_output_folder / "L1_BMD_overlay.png"
+                                    plt.savefig(overlay_path, dpi=150, bbox_inches='tight')
+                                    plt.close()
+                                    
+                            except Exception as plot_err:
+                                print(f"Error generating L1 BMD overlay: {plot_err}")
+                        else:
+                            print("Warning: L1 oval ROI resulted in empty mask.")
+                    else:
+                        print("Warning: L1 erosion resulted in empty mask.")
+                else:
+                    print("Warning: L1 mask has no axial slices.")
+                    
+        except Exception as e:
+            print(f"Error in BMD analysis: {e}")
+
+    # ============================================================
+    # STEP 6: Pulmonary Emphysema Quantification (Lobar)
+    # ============================================================
+    # Quantify emphysema using the "Density Mask" method (< -950 HU)
+    # Calculated per lung lobe segmented by TotalSegmentator.
+    # Metrics are only reported if all 5 lobes are successfully segmented.
+    
+    lung_lobes_map = [
+        ("lung_upper_lobe_left", "lung_upper_lobe_left.nii.gz"),
+        ("lung_lower_lobe_left", "lung_lower_lobe_left.nii.gz"),
+        ("lung_upper_lobe_right", "lung_upper_lobe_right.nii.gz"),
+        ("lung_middle_lobe_right", "lung_middle_lobe_right.nii.gz"),
+        ("lung_lower_lobe_right", "lung_lower_lobe_right.nii.gz")
+    ]
+    
+    # Step 6.1: Validation - Check for completeness
+    # Ensure all lobe files exist and are not empty
+    lobes_complete = True
+    for _, filename in lung_lobes_map:
+        fpath = total_dir / filename
+        if not fpath.exists():
+            lobes_complete = False
+            break
+        # Quick check for non-empty mask
+        try:
+            nii_lobe = nib.load(str(fpath))
+            if np.sum(nii_lobe.dataobj) == 0:
+                lobes_complete = False
+                break
+        except:
+            lobes_complete = False
+            break
+            
+    if lobes_complete and modality == "CT":
+        try:
+            emphysema_results = {}
+            total_lung_voxels = 0
+            total_emphysema_voxels = 0
+            
+            # Get voxel volume in cm3 (1 voxel = pixdim[1]*pixdim[2]*pixdim[3] mm3)
+            # 1 cm3 = 1000 mm3
+            voxel_vol_mm3 = nii_lobe.header.get_zooms()[0] * nii_lobe.header.get_zooms()[1] * nii_lobe.header.get_zooms()[2]
+            voxel_vol_cm3 = voxel_vol_mm3 / 1000.0
+            
+            for lobe_name, filename in lung_lobes_map:
+                fpath = total_dir / filename
+                nii_lobe = nib.load(str(fpath))
+                mask_lobe = nii_lobe.get_fdata() > 0
+                
+                if mask_lobe.shape != ct.shape:
+                    continue
+                
+                lobe_voxels = ct[mask_lobe]
+                n_total = lobe_voxels.size
+                
+                if n_total > 0:
+                    # -950 HU threshold for emphysema
+                    n_emphysema = np.sum(lobe_voxels < -950)
+                    perc = round((n_emphysema / n_total) * 100, 2)
+                    
+                    results[f"{lobe_name}_emphysema_percent"] = perc
+                    results[f"{lobe_name}_vol_cm3"] = round(float(n_total * voxel_vol_cm3), 2)
+                    results[f"{lobe_name}_emphysema_vol_cm3"] = round(float(n_emphysema * voxel_vol_cm3), 2)
+                    results[f"{lobe_name}_total_voxels"] = int(n_total)
+                    
+                    total_lung_voxels += n_total
+                    total_emphysema_voxels += n_emphysema
+            
+            # Global lung emphysema metric
+            if total_lung_voxels > 0:
+                global_perc = round((total_emphysema_voxels / total_lung_voxels) * 100, 2)
+                results["total_lung_emphysema_percent"] = global_perc
+                results["total_lung_vol_cm3"] = round(float(total_lung_voxels * voxel_vol_cm3), 2)
+                results["total_lung_emphysema_vol_cm3"] = round(float(total_emphysema_voxels * voxel_vol_cm3), 2)
+                results["lung_analysis_status"] = "Complete"
+            
+        except Exception as e:
+            print(f"Error in emphysema analysis: {e}")
+            results["lung_analysis_status"] = "Error"
+    else:
+        results["lung_analysis_status"] = "Incomplete or non-CT"
+        if modality == "CT":
+             print("Warning: Skipping emphysema analysis due to incomplete lung lobe masks.")
+
     return results
 
 def detect_body_regions(total_dir):

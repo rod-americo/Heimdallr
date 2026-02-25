@@ -22,7 +22,7 @@ Campos pulmonares (gramática obrigatória — concordar singular/plural natural
   GRAU → "leve" | "moderado" | "acentuado"
   Composição da linha: OPACIDADES ";" DERRAME "."
 Silhueta cardiomediastinal (gramática obrigatória — omitir achados ausentes):
-  ICT → "índice cardiotorácico medido de {ICT}" AVALIAÇÃO_VISUAL
+  ICT → "índice cardiotorácico de {ICT}" AVALIAÇÃO_VISUAL
   AVALIAÇÃO_VISUAL → ∅ | " (discordante do aspecto visual, que sugere área cardíaca normal)" | " (discordante do aspecto visual, que sugere cardiomegalia)"
   AORTA → ∅ | "aorta" ALTERAÇÃO_AORTA
   ALTERAÇÃO_AORTA → "ateromatosa" | "ectasiada" | "ateromatosa e ectasiada" | "aneurismática"
