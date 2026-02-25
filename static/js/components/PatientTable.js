@@ -4,7 +4,11 @@ import { showResults } from './ResultsModal.js';
 
 export function renderPatients() {
     const tbody = document.getElementById('patients-body');
-    const filtered = getFilteredPatients();
+    const filtered = getFilteredPatients().sort((a, b) => {
+        const nameA = a.case_id.split('_')[0].toLowerCase();
+        const nameB = b.case_id.split('_')[0].toLowerCase();
+        return nameA.localeCompare(nameB);
+    });
 
     if (filtered.length === 0) {
         const message = state.patients.length === 0 ? "Nenhum paciente encontrado" : "Nenhum resultado para a busca";

@@ -185,6 +185,7 @@ body::before {
     overflow-x: auto;
     border: 1px solid var(--border);
     box-shadow: var(--shadow);
+    min-height: 300px;
 }
 
 table {
@@ -587,6 +588,7 @@ footer a:hover {
     display: none;
     position: absolute;
     right: 0;
+    top: calc(100% + 4px);
     background-color: var(--bg-secondary);
     min-width: 180px;
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
@@ -595,6 +597,13 @@ footer a:hover {
     z-index: 100;
     overflow: hidden;
     padding: 0.5rem 0;
+}
+
+/* Anti-clipping: Open upwards for the last 3 rows if the table is tall enough */
+tbody tr:nth-last-child(-n+3):nth-child(n+3) .dropdown-content {
+    top: auto;
+    bottom: calc(100% + 4px);
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.3);
 }
 
 .dropdown-content a {

@@ -547,19 +547,29 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder):
     
     # Step 6.1: Validation - Check for completeness
     # Ensure all lobe files exist and are not empty
+    # In abdominal CTs, the lung bases are often segmented, which leads to partial lobes being considered "complete".
+    # Therefore, we use minimum clinical volume thresholds (cm3) for each lobe to ensure the lung is actually complete.
+    lobe_min_volumes_cm3 = {
+        "lung_upper_lobe_left": 100.0,
+        "lung_lower_lobe_left": 100.0,
+        "lung_upper_lobe_right": 100.0,
+        "lung_middle_lobe_right": 50.0,
+        "lung_lower_lobe_right": 100.0
+    }
+
     lobes_complete = True
-    for _, filename in lung_lobes_map:
+    for lobe_key, filename in lung_lobes_map:
         fpath = total_dir / filename
         if not fpath.exists():
             lobes_complete = False
             break
-        # Quick check for non-empty mask
-        try:
-            nii_lobe = nib.load(str(fpath))
-            if np.sum(nii_lobe.dataobj) == 0:
-                lobes_complete = False
-                break
-        except:
+        
+        # Check if the volume is above the threshold
+        vol_cm3 = get_volume_cm3(fpath)
+        min_vol = lobe_min_volumes_cm3.get(lobe_key, 0)
+        
+        if vol_cm3 < min_vol:
+            # print(f"Lobe {lobe_key} volume ({vol_cm3} cm³) is below the minimum threshold ({min_vol} cm³). Marking lungs as incomplete.")
             lobes_complete = False
             break
             
