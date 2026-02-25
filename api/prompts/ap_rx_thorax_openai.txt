@@ -51,8 +51,8 @@ Lista de dispositivos e implantes (não julgar posicionamento) (na dúvida do la
 - prótese valvar mitral
 - dispositivo de eletroestimulação
 - eletrodo de marca-passo transvenoso
-- eletrodos de monitorização cardíaca externa
-- eletrodos e fios de monitorização cardíaca externa
+- eletrodos de monitorização cardíaca
+- eletrodos e fios de monitorização cardíaca
 - fios de esternotomia
 - balão intra-aórtico
 - cânulas de ECMO
