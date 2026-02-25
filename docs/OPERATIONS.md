@@ -6,7 +6,7 @@ This document provides a baseline for operating Heimdallr in production-like env
 
 Run as independent services:
 
-1. `server.py` (API, dashboard, upload endpoints)
+1. `app.py` (API, dashboard, upload endpoints)
 2. `run.py` (processing worker)
 3. `dicom_listener.py` (DICOM C-STORE intake)
 
@@ -15,7 +15,7 @@ Run as independent services:
 ```bash
 # API + Dashboard
 source venv/bin/activate
-python server.py
+python app.py
 
 # Processing worker
 source venv/bin/activate
@@ -91,7 +91,7 @@ sqlite3 database/dicom.db "PRAGMA integrity_check;"
 
 ## Incident Triage Shortlist
 
-1. Validate service process state and restart order (`server -> run -> listener`).
+1. Validate service process state and restart order (`app -> run -> listener`).
 2. Check PACS destination configuration and network reachability.
 3. Inspect `input/`, `output/`, and `errors/` for stuck or failed cases.
 4. Verify model/API credentials and quota for report-assist flows.

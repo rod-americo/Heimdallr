@@ -27,7 +27,7 @@ Heimdallr currently focuses on three practical layers:
    - Chest X-ray assistance flow (Anthropic + MedGemma with structured prompting)
    - Downloadable artifacts for auditability and review
 
-Future-facing capabilities (workflow orchestration, clinical urgency triage, advanced de-identification hardening, patient navigation, and agentic AI) are tracked in [`UPCOMING.md`](UPCOMING.md).
+Future-facing capabilities (workflow orchestration, clinical urgency triage, advanced de-identification hardening, patient navigation, and agentic AI) are tracked in [`docs/UPCOMING.md`](docs/UPCOMING.md).
 
 ## Working Definitions
 
@@ -39,21 +39,21 @@ Future-facing capabilities (workflow orchestration, clinical urgency triage, adv
 ### Ingestion and Preparation
 - `dicom_listener.py`: DICOM C-STORE SCP (`HEIMDALLR`, port `11112`)
 - `uploader.py`: manual/CLI uploads (ZIP or folder)
-- `server.py`: upload API, dashboard API, static web serving
-- `prepare.py`: DICOM parsing, series selection, NIfTI conversion via `dcm2niix`
+- `app.py`: upload API, dashboard API, static web serving
+- `core/prepare.py`: DICOM parsing, series selection, NIfTI conversion via `dcm2niix`
 
 ### Processing and Metrics
 - `run.py`: queue worker with parallel case processing
-- `metrics.py`: quantitative extraction and derived metrics
+- `core/metrics.py`: quantitative extraction and derived metrics
 - Segmentation and tissue maps through TotalSegmentator pipeline integration
 
 ### Reporting Assistance
-- `server.py`: report-assist endpoints, including Anthropic chest X-ray flow (`/api/anthropic/ap-thorax-xray`)
-- `medgemma_api.py`: dedicated microservice for AP chest X-ray assistant flow
-- `medgemma_prompts.py`: prompt templates and structured output helpers
+- `app.py`: report-assist endpoints, including Anthropic chest X-ray flow (`/api/anthropic/ap-thorax-xray`)
+- `api/medgemma.py`: dedicated microservice for AP chest X-ray assistant flow
+- `api/medgemma_prompts.py`: prompt templates and structured output helpers
 - `anthropic_report_builder.py`: report-building utilities for narrative output
-- `deid_gateway.py`: outbound de-identification gateway (pixel masking + metadata scrubbing, status: `mvp-internal`)
-- `ctr_api.py`: CTR (Cardiothoracic Ratio / ICT) extraction microservice via CXAS (port `8003`)
+- `services/deid_gateway.py`: outbound de-identification gateway (pixel masking + metadata scrubbing, status: `mvp-internal`)
+- `api/ctr.py`: CTR (Cardiothoracic Ratio / ICT) extraction microservice via CXAS (port `8003`)
 
 ### Data Layer and Outputs
 - SQLite schema in `database/schema.sql`
@@ -68,10 +68,10 @@ Future-facing capabilities (workflow orchestration, clinical urgency triage, adv
 PACS / Modality (DICOM C-STORE)
             |
             v
-   dicom_listener.py  --->  HTTP /upload  --->  server.py
+   dicom_listener.py  --->  HTTP /upload  --->  app.py
                                               |
                                               v
-                                        prepare.py
+                                        core/prepare.py
                                   (DICOM selection + NIfTI)
                                               |
                                               v
@@ -84,11 +84,11 @@ PACS / Modality (DICOM C-STORE)
                                               v
                                            output/
                                               |
-                                              +--> Dashboard/API (server.py)
+                                              +--> Dashboard/API (app.py)
                                               +--> Report assist endpoints
 
-medgemma_api.py runs as an isolated service,
-while Anthropic-backed report flows are orchestrated by server endpoints.
+api/medgemma.py runs as an isolated service,
+while Anthropic-backed report flows are orchestrated by app endpoints.
 ```
 
 ## Quick Start
@@ -130,7 +130,7 @@ sudo apt-get update && sudo apt-get install -y tesseract-ocr
 ```bash
 # 1) API + Dashboard
 source venv/bin/activate
-python server.py
+python app.py
 
 # 2) Processing worker
 source venv/bin/activate
@@ -142,14 +142,14 @@ python dicom_listener.py
 
 # 4) Optional: CTR extraction service (port 8003)
 source venv/bin/activate
-python ctr_api.py
+python api/ctr.py
 ```
 
 ### Preflight Check (optional, recommended)
 
 ```bash
 source venv/bin/activate
-python -m py_compile server.py run.py dicom_listener.py prepare.py
+python -m py_compile app.py run.py dicom_listener.py core/prepare.py
 ```
 
 ### Access
@@ -159,15 +159,15 @@ python -m py_compile server.py run.py dicom_listener.py prepare.py
 ## Operational Notes
 
 - Configuration is centralized in `config.py` and can be overridden with `HEIMDALLR_*` environment variables.
-- For deployment, run `server.py`, `run.py`, and `dicom_listener.py` as independent services (systemd examples were previously used and can be reintroduced as infrastructure docs if needed).
+- For deployment, run `app.py`, `run.py`, and `dicom_listener.py` as independent services (systemd examples were previously used and can be reintroduced as infrastructure docs if needed).
 - This repository contains active experimentation and production-facing utilities; validate feature toggles before rolling out in clinical environments.
 
 ## Licensing and Third-Party Compliance
 
 - Heimdallr is distributed under Apache License 2.0.
 - This project uses **TotalSegmentator**. Commercial usage may require a separate TotalSegmentator license.
-- The CTR extraction module (`ctr_api.py`) is based on **ChestXRayAnatomySegmentation (CXAS)** by Constantin Seibold et al., licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). This integration is used for personal/experimental purposes only; derivatives must carry the same license.
-- The MedGemma Analysis Service (`medgemma_api.py`) uses **Google MedGemma** (`google/medgemma-1.5-4b-it`), governed by the [Health AI Developer Foundations Terms of Use](https://developers.google.com/health-ai-developer-foundations/terms). MedGemma is not an approved medical device.
+- The CTR extraction module (`api/ctr.py`) is based on **ChestXRayAnatomySegmentation (CXAS)** by Constantin Seibold et al., licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). This integration is used for personal/experimental purposes only; derivatives must carry the same license.
+- The MedGemma Analysis Service (`api/medgemma.py`) uses **Google MedGemma** (`google/medgemma-1.5-4b-it`), governed by the [Health AI Developer Foundations Terms of Use](https://developers.google.com/health-ai-developer-foundations/terms). MedGemma is not an approved medical device.
 - Each institution and deployer is responsible for validating third-party licensing and regulatory compliance before production use.
 - For attributions and notices, see [`NOTICE`](NOTICE).
 
@@ -183,7 +183,7 @@ python -m py_compile server.py run.py dicom_listener.py prepare.py
 
 Minimum production topology:
 
-1. `server.py` (API + dashboard)
+1. `app.py` (API + dashboard)
 2. `run.py` (processing worker)
 3. `dicom_listener.py` (DICOM intake)
 
@@ -236,7 +236,7 @@ For endpoint coverage and payload conventions, see [`docs/API.md`](docs/API.md).
 ## Documentation Map
 
 - Architecture overview: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
-- Strategic roadmap source (Markdown): [`UPCOMING.md`](UPCOMING.md)
+- Strategic roadmap source (Markdown): [`docs/UPCOMING.md`](docs/UPCOMING.md)
 - Strategic roadmap viewer (HTML): [`docs/upcoming.html`](docs/upcoming.html)
 - Operations and deployment runbook: [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 - API contracts and examples: [`docs/API.md`](docs/API.md)
@@ -263,7 +263,7 @@ To publish the HTML strategy board as a rendered page:
 
 ## Strategy and Roadmap
 
-- Strategic backlog source: [`UPCOMING.md`](UPCOMING.md)
+- Strategic backlog source: [`docs/UPCOMING.md`](docs/UPCOMING.md)
 - Strategic backlog viewer: [`docs/upcoming.html`](docs/upcoming.html)
 - Validation gate manual: [`docs/validation-stage-manual.md`](docs/validation-stage-manual.md)
 - Dark-mode strategic planning page (based on your concept): [`docs/pipeline-strategy.html`](docs/pipeline-strategy.html)
@@ -296,7 +296,7 @@ Heimdallr is intended as **clinical decision support** infrastructure, not an au
 - Test radiographs used in this repository do not contain burned-in PHI overlays.
 
 Current external-call flows enforce a de-identification gateway (`pixel masking + metadata scrubbing`) before outbound model requests.
-For additional governance controls (auditability hardening, model drift controls, and shadow-AI mitigation), see [`UPCOMING.md`](UPCOMING.md).
+For additional governance controls (auditability hardening, model drift controls, and shadow-AI mitigation), see [`docs/UPCOMING.md`](docs/UPCOMING.md).
 
 ## License
 

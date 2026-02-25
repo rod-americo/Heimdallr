@@ -40,22 +40,19 @@ Ordered by strategic sequence (not only by model sophistication).
 | 6 | Urology navigation pathway | Navigation | 9 | 6 | Direct care-continuity impact with clear rule set |
 | 7 | Opportunistic coronary calcium (CAC-DRS) | Quantification | 8 | 6 | High preventive-care value from opportunistic CT workflows |
 | 8 | AI-assisted urgency flagging | Workflow | 9 | 7 | Improves time-to-open for high-acuity cases |
-| 9 | Liver steatosis opportunistic pipeline | Quantification | 7 | 6 | Population-health insight from existing scans |
-| 10 | Osteoporosis opportunistic screening | Quantification | 7 | 6 | Scalable DXA-proxy value from routine CT |
-| 11 | Structured report drafting copilot | Reporting | 8 | 7 | Reporting acceleration with strong guardrails |
-| 12 | Emphysema quantification at scale | Quantification | 6 | 7 | Valuable but depends on segmentation throughput |
-| 13 | On-prem AI gateway enforcement | Security | 9 | 7 | Critical for enterprise deployment maturity |
-| 14 | Drift/hallucination control framework | Reporting | 9 | 8 | Needed before broad automation trust |
-| 15 | Agentic workflow coordination | R&D | 8 | 9 | Long-horizon orchestration capability |
-| 16 | Foundation model fine-tuning layer | R&D | 9 | 9 | Institution-adapted model performance with controlled governance |
-| 17 | Temporal imaging intelligence (delta engine) | R&D | 9 | 8 | Longitudinal change tracking for follow-up-heavy workflows |
-| 18 | Causal triage simulator | R&D | 8 | 8 | Safe policy simulation before live queue changes |
-| 19 | Synthetic + federated validation sandbox | R&D | 8 | 8 | Privacy-preserving multi-site validation and benchmarking |
-| 20 | Autonomous follow-up orchestrator (human-gated) | R&D | 9 | 8 | Strong continuity and financial recovery upside with clinical oversight |
-| 21 | Prospective trial mode | R&D | 8 | 7 | Embedded publication-grade evidence generation |
-| 22 | General surgery navigation pathway | Navigation | 7 | 5 | Low-friction continuity value for common actionable findings |
-| 23 | Oncology high-suspicion navigation router | Navigation | 10 | 7 | High clinical-risk routing for ER/inpatient neoplastic suspicion |
-| 24 | Gynecology navigation pathway | Navigation | 9 | 7 | Structured continuity for adnexal/uterine/cervical suspicious findings |
+| 9 | Structured report drafting copilot | Reporting | 8 | 7 | Reporting acceleration with strong guardrails |
+| 10 | On-prem AI gateway enforcement | Security | 9 | 7 | Critical for enterprise deployment maturity |
+| 11 | Drift/hallucination control framework | Reporting | 9 | 8 | Needed before broad automation trust |
+| 12 | Agentic workflow coordination | R&D | 8 | 9 | Long-horizon orchestration capability |
+| 13 | Foundation model fine-tuning layer | R&D | 9 | 9 | Institution-adapted model performance with controlled governance |
+| 14 | Temporal imaging intelligence (delta engine) | R&D | 9 | 8 | Longitudinal change tracking for follow-up-heavy workflows |
+| 15 | Causal triage simulator | R&D | 8 | 8 | Safe policy simulation before live queue changes |
+| 16 | Synthetic + federated validation sandbox | R&D | 8 | 8 | Privacy-preserving multi-site validation and benchmarking |
+| 17 | Autonomous follow-up orchestrator (human-gated) | R&D | 9 | 8 | Strong continuity and financial recovery upside with clinical oversight |
+| 18 | Prospective trial mode | R&D | 8 | 7 | Embedded publication-grade evidence generation |
+| 19 | General surgery navigation pathway | Navigation | 7 | 5 | Low-friction continuity value for common actionable findings |
+| 20 | Oncology high-suspicion navigation router | Navigation | 10 | 7 | High clinical-risk routing for ER/inpatient neoplastic suspicion |
+| 21 | Gynecology navigation pathway | Navigation | 9 | 7 | Structured continuity for adnexal/uterine/cervical suspicious findings |
 
 ## Pillar A: Logistics Automation and Smart Prefetch
 
@@ -106,25 +103,13 @@ Exit criteria (B1-B3):
 
 ## Pillar C: Opportunistic Quantification and Precision Triage
 
-### C1. Liver steatosis opportunistic pipeline
-- 3D liver/spleen segmentation with HU analytics.
-- Structured risk block for reporting templates.
-
-### C2. Osteoporosis opportunistic screening
-- L1-L4 segmentation with volumetric HU estimation.
-- DXA-proxy fields + confidence and QC indicators.
-
-### C3. Emphysema quantification at scale
-- LAA%-based burden score.
-- Optional lobe-level distribution and longitudinal trend.
-
-### C4. Opportunistic coronary calcium (CAC-DRS)
+### C1. Opportunistic coronary calcium (CAC-DRS)
 - Opportunistic coronary calcium detection in eligible non-gated chest CT.
 - CAC-DRS-oriented structured classification after opportunistic detection.
 - Pre-report block with category, confidence, and recommendation text.
 - Governance note: this module targets CAC-DRS workflows, not Agatston scoring pipelines.
 
-Exit criteria (C1-C4):
+Exit criteria (C1):
 - Deterministic repeated-run consistency.
 - Structured outputs consumable by reporting and analytics.
 

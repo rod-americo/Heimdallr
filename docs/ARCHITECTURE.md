@@ -10,11 +10,11 @@ Heimdallr is an imaging operations pipeline designed to convert incoming radiolo
 - DICOM C-STORE intake service (`AE=HEIMDALLR`, default port `11112`)
 - Groups incoming files by study and forwards packaged data to upload endpoint
 
-2. `server.py`
+2. `app.py`
 - FastAPI service for upload intake, dashboard data, and assistive-report endpoints
 - Serves static frontend from `static/`
 
-3. `prepare.py`
+3. `core/prepare.py`
 - Validates uploaded study package
 - Selects target series and converts DICOM to NIfTI (`dcm2niix`)
 - Persists initial metadata to SQLite
@@ -25,10 +25,10 @@ Heimdallr is an imaging operations pipeline designed to convert incoming radiolo
 - Writes outputs to `output/<case_id>/` and updates database fields
 
 5. Optional model-assist services
-- `medgemma_api.py`
-- Anthropic flow through server endpoints plus outbound de-identification gateway (`deid_gateway.py`)
+- `api/medgemma.py`
+- Anthropic flow through server endpoints plus outbound de-identification gateway (`services/deid_gateway.py`)
 
-6. `ctr_api.py`
+6. `api/ctr.py`
    - CTR (Cardiothoracic Ratio / ICT) extraction microservice (default port `8003`)
    - Based on ChestXRayAnatomySegmentation (CXAS) by Constantin Seibold et al. (CC BY-NC-SA 4.0)
    - Loads CXAS UNet_ResNet50 model at startup, exposes `POST /extract_ctr`
@@ -45,10 +45,10 @@ Heimdallr is an imaging operations pipeline designed to convert incoming radiolo
 ## Request/Data Flow
 
 ```text
-PACS/Modality (DICOM) --> dicom_listener.py --> POST /upload (server.py)
+PACS/Modality (DICOM) --> dicom_listener.py --> POST /upload (app.py)
                                                |
                                                v
-                                         prepare.py
+                                         core/prepare.py
                                     (select + convert + persist)
                                                |
                                                v
@@ -79,11 +79,11 @@ PACS/Modality (DICOM) --> dicom_listener.py --> POST /upload (server.py)
 
 - Assistive outputs are non-autonomous and require qualified reviewer validation.
 - External model calls should traverse de-identification controls.
-- Production operation expects independent process supervision for `server.py`, `run.py`, and `dicom_listener.py`.
+- Production operation expects independent process supervision for `app.py`, `run.py`, and `dicom_listener.py`.
 
 ## Cross-References
 
 - Operations runbook: `docs/OPERATIONS.md`
 - API contracts: `docs/API.md`
 - Validation stages: `docs/validation-stage-manual.md`
-- Strategic roadmap: `UPCOMING.md`
+- Strategic roadmap: `docs/UPCOMING.md`
