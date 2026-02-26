@@ -11,6 +11,11 @@ export function renderBiometricSection(caseId, metadata, results) {
         bmi = (weight / (height * height)).toFixed(1);
     }
 
+    let bsa = null;
+    if (weight && height) {
+        bsa = calculateBsa(weight, height);
+    }
+
     let smi = null;
     if (height && sma) {
         smi = (sma / (height * height)).toFixed(2);
@@ -37,6 +42,12 @@ export function renderBiometricSection(caseId, metadata, results) {
                 <div class="result-value highlight" id="bmi-display">${bmi} <span class="result-unit">kg/m²</span></div>
             </div>
             ` : '<div id="bmi-card-container"></div>'}
+            ${bsa ? `
+            <div class="result-card" id="bsa-card">
+                <div class="result-label">ASC</div>
+                <div class="result-value highlight" id="bsa-display">${bsa} <span class="result-unit">m²</span></div>
+            </div>
+            ` : '<div id="bsa-card-container"></div>'}
             ${smi ? `
             <div class="result-card" id="smi-card">
                 <div class="result-label">SMI (Índice Músculo-Esquelético)</div>
@@ -127,6 +138,18 @@ async function saveBiometrics(caseId) {
                 </div>`;
         }
 
+        const bsa = calculateBsa(weight, height);
+        let bsaDisplay = document.getElementById('bsa-display');
+        if (bsaDisplay) {
+            bsaDisplay.innerHTML = `${bsa} <span class="result-unit">m²</span>`;
+        } else {
+            document.getElementById('bsa-card-container').outerHTML = `
+                <div class="result-card" id="bsa-card">
+                    <div class="result-label">ASC</div>
+                    <div class="result-value highlight" id="bsa-display">${bsa} <span class="result-unit">m²</span></div>
+                </div>`;
+        }
+
         const smaElements = document.querySelectorAll('.result-value');
         let smaValue = null;
         smaElements.forEach(el => {
@@ -161,4 +184,9 @@ async function saveBiometrics(caseId) {
     } catch (error) {
         messageDiv.innerHTML = `<span class="text-danger">❌ Erro: ${escapeHtml(error.message)}</span>`;
     }
+}
+
+function calculateBsa(weightKg, heightMeters) {
+    const heightCm = heightMeters * 100;
+    return Math.sqrt((heightCm * weightKg) / 3600).toFixed(2);
 }
