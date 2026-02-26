@@ -10,6 +10,7 @@ Não utilize hífen em termos técnicos compostos consagrados como alveolointers
 FORMATO OBRIGATÓRIO:
 Técnica: exame realizado no leito; incidência frontal única; [baixa|média|boa] expansibilidade pulmonar.
 Campos pulmonares (gramática obrigatória — concordar singular/plural naturalmente e evitar construção "nos terços"):
+  PNEUMOTÓRAX → "pneumotórax" GRAU "à" LADO | "pneumotórax bilateral"
   CONSOLIDAÇÕES → "consolidações pulmonares" LOCALIZAÇÃO
   LOCALIZAÇÃO → UNILATERAL | BILATERAL_SIM | BILATERAL_ASSIM
   UNILATERAL → PREP_REGIAO REGIÕES "à" LADO
@@ -22,10 +23,12 @@ Campos pulmonares (gramática obrigatória — concordar singular/plural natural
   DERRAME_DESC → GRAU "à" LADO | GRAU "bilateral" | GRAU "à direita e" GRAU "à esquerda"
   GRAU → "leve" | "moderado" | "acentuado"
   Composição da linha:
-    • Ambos ausentes: "ausência de consolidações e derrame pleural."
-    • Só consolidação: CONSOLIDAÇÕES "; ausência de derrame pleural."
-    • Só derrame: "ausência de consolidações; " DERRAME "."
-    • Ambos presentes: CONSOLIDAÇÕES "; " DERRAME "."
+    • Começar obrigatoriamente por PNEUMOTÓRAX (se presente).
+    • Se pneumotórax ausente, não mencionar sua ausência.
+    • Separar achados presentes (PNEUMOTÓRAX, CONSOLIDAÇÕES, DERRAME) com ponto-e-vírgula.
+    • Casos de ausência:
+      - Se ambos (consolidação e derrame) ausentes: "ausência de consolidações e derrame pleural." (precedido por pneumotórax se houver).
+      - Se um ausente: negar individualmente (ex: "; ausência de derrame pleural.").
   Variabilidade lexical bloqueada: em campos pulmonares, usar exclusivamente o termo "consolidações pulmonares" para achados parenquimatosos relevantes; não usar sinônimos (opacidade, infiltrado, condensação, velamento, hipotransparência) como achado principal.
 Silhueta cardiomediastinal (gramática obrigatória — omitir achados ausentes):
   ICT → "índice cardiotorácico de {ICT}" AVALIAÇÃO_VISUAL
@@ -33,7 +36,7 @@ Silhueta cardiomediastinal (gramática obrigatória — omitir achados ausentes)
   AORTA → ∅ | "aorta" ALTERAÇÃO_AORTA
   ALTERAÇÃO_AORTA → "ateromatosa" | "ectasiada" | "ateromatosa e ectasiada" | "aneurismática"
   MEDIASTINO → ∅ | ACHADO_MEDIASTINAL (separar múltiplos com ";")
-  ACHADO_MEDIASTINAL → "alargamento do mediastino superior" | "desvio traqueal à" LADO | "enfisema mediastinal"
+  ACHADO_MEDIASTINAL → "alargamento do mediastino superior" | "desvio traqueal à" LADO | "enfisema mediastinal" | "desvio do mediastino à" LADO
   LADO → "direita" | "esquerda"
   Composição da linha: ICT [";" AORTA] [";" MEDIASTINO] "."
 Dispositivos e implantes: listar apenas dispositivos ou implantes visíveis (siga a lista abaixo).
