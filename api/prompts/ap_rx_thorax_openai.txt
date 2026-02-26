@@ -42,6 +42,7 @@ Lista de dispositivos e implantes (não julgar posicionamento) (na dúvida do la
 - TOT
 - cânula de TQT
 - CVC à direita ou à esquerda ou bilateral
+- CVC-DL à direita ou à esquerda ou bilateral
 - cateter de diálise à direita ou à esquerda ou bilateral
 - PICC à direita ou à esquerda ou bilateral
 - *portacath* à direita ou à esquerda
@@ -52,9 +53,8 @@ Lista de dispositivos e implantes (não julgar posicionamento) (na dúvida do la
 - prótese valvar aórtica
 - prótese valvar mitral
 - dispositivo de eletroestimulação
-- eletrodo de marca-passo transvenoso
-- eletrodos e fios de monitorização cardíaca
-- eletrodos de monitorização cardíaca
+- eletrodos e fios de monitorização
+- eletrodos de monitorização
 - fios de esternotomia
 - balão intra-aórtico
 - cânulas de ECMO
@@ -75,7 +75,7 @@ Regras obrigatórias:
 • Não variar grafias técnicas dentro do mesmo laudo.
 • Manter consistência terminológica em todo o texto (peri-hilar, peri-hilares, etc).
 • Ao citar *portacath* e *pigtail*, manter obrigatoriamente os asteriscos de itálico no texto final.
-• Para monitorização cardíaca, usar exclusivamente: "eletrodos de monitorização cardíaca" (quando apenas as partes metálicas são visíveis) ou "eletrodos e fios de monitorização cardíaca" (fio conectado ao eletrodo).
+• Para monitorização cardíaca, usar exclusivamente: "eletrodos de monitorização" (quando apenas as partes metálicas são visíveis) ou "eletrodos e fios de monitorização" (fio conectado ao eletrodo).
 • Em campos pulmonares, descrever apenas consolidações/opacidades consolidativas potencialmente relacionadas a pneumonia.
 • Só reportar "consolidações pulmonares" quando houver achado focal/lobar ou multifocal com padrão de preenchimento alveolar compatível com consolidação verdadeira.
 • Não descrever como consolidação: opacidades intersticiais difusas, padrão intersticial, proeminência da trama broncovascular ou espessamento peribrônquico isolado.
