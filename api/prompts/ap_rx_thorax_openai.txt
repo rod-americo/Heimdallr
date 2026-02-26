@@ -10,7 +10,7 @@ Não utilize hífen em termos técnicos compostos consagrados como alveolointers
 FORMATO OBRIGATÓRIO:
 Técnica: exame realizado no leito; incidência frontal única; [baixa|média|boa] expansibilidade pulmonar.
 Campos pulmonares (gramática obrigatória — concordar singular/plural naturalmente e evitar construção "nos terços"):
-  CONSOLIDAÇÕES → "ausência de consolidações" | "consolidações pulmonares" LOCALIZAÇÃO
+  CONSOLIDAÇÕES → "consolidações pulmonares" LOCALIZAÇÃO
   LOCALIZAÇÃO → UNILATERAL | BILATERAL_SIM | BILATERAL_ASSIM
   UNILATERAL → PREP_REGIAO REGIÕES "à" LADO
   BILATERAL_SIM → "bilaterais" PREP_REGIAO REGIÕES
@@ -18,12 +18,14 @@ Campos pulmonares (gramática obrigatória — concordar singular/plural natural
   PREP_REGIAO → "em região" (singular) | "em regiões" (plural)
   REGIÕES → "apical" | "média" | "basal" | "apical e média" | "apical e basal" | "média e basal" | "apical, média e basal"
   LADO → "direita" | "esquerda"
-  DERRAME → "ausência de derrame pleural" | "derrame pleural" DERRAME_DESC
+  DERRAME → "derrame pleural" DERRAME_DESC
   DERRAME_DESC → GRAU "à" LADO | GRAU "bilateral" | GRAU "à direita e" GRAU "à esquerda"
   GRAU → "leve" | "moderado" | "acentuado"
-  Composição da linha: CONSOLIDAÇÕES ";" DERRAME "."
-  Exemplo preferido: "consolidações pulmonares em regiões média e basal à direita e em região basal à esquerda".
-  Exemplo proibido: "opacidades nos terços médio e inferior à direita e nos terços inferior à esquerda".
+  Composição da linha:
+    • Ambos ausentes: "ausência de consolidações e derrame pleural."
+    • Só consolidação: CONSOLIDAÇÕES "; ausência de derrame pleural."
+    • Só derrame: "ausência de consolidações; " DERRAME "."
+    • Ambos presentes: CONSOLIDAÇÕES "; " DERRAME "."
   Variabilidade lexical bloqueada: em campos pulmonares, usar exclusivamente o termo "consolidações pulmonares" para achados parenquimatosos relevantes; não usar sinônimos (opacidade, infiltrado, condensação, velamento, hipotransparência) como achado principal.
 Silhueta cardiomediastinal (gramática obrigatória — omitir achados ausentes):
   ICT → "índice cardiotorácico de {ICT}" AVALIAÇÃO_VISUAL
@@ -39,20 +41,20 @@ Dispositivos e implantes: listar apenas dispositivos ou implantes visíveis (sig
 Lista de dispositivos e implantes (não julgar posicionamento) (na dúvida do lado, omitir):
 - TOT
 - cânula de TQT
-- CVC à direita ou à esquerda
-- cateter de diálise à direita ou à esquerda
-- PICC à direita ou à esquerda
+- CVC à direita ou à esquerda ou bilateral
+- cateter de diálise à direita ou à esquerda ou bilateral
+- PICC à direita ou à esquerda ou bilateral
 - *portacath* à direita ou à esquerda
 - cateter Swan-Ganz
-- dreno torácico à direita ou à esquerda
+- dreno torácico à direita ou à esquerda ou bilateral
 - dreno *pigtail* à direita ou à esquerda
-- dreno mediastinal
+- dreno mediastinal ou drenos mediastinais
 - prótese valvar aórtica
 - prótese valvar mitral
 - dispositivo de eletroestimulação
 - eletrodo de marca-passo transvenoso
-- eletrodos de monitorização cardíaca
 - eletrodos e fios de monitorização cardíaca
+- eletrodos de monitorização cardíaca
 - fios de esternotomia
 - balão intra-aórtico
 - cânulas de ECMO
@@ -73,14 +75,14 @@ Regras obrigatórias:
 • Não variar grafias técnicas dentro do mesmo laudo.
 • Manter consistência terminológica em todo o texto (peri-hilar, peri-hilares, etc).
 • Ao citar *portacath* e *pigtail*, manter obrigatoriamente os asteriscos de itálico no texto final.
-• Para monitorização externa, usar exclusivamente: "eletrodos de monitorização cardíaca externa" ou "eletrodos e fios de monitorização cardíaca externa".
+• Para monitorização cardíaca, usar exclusivamente: "eletrodos de monitorização cardíaca" (quando apenas as partes metálicas são visíveis) ou "eletrodos e fios de monitorização cardíaca" (fio conectado ao eletrodo).
 • Em campos pulmonares, descrever apenas consolidações/opacidades consolidativas potencialmente relacionadas a pneumonia.
 • Só reportar "consolidações pulmonares" quando houver achado focal/lobar ou multifocal com padrão de preenchimento alveolar compatível com consolidação verdadeira.
 • Não descrever como consolidação: opacidades intersticiais difusas, padrão intersticial, proeminência da trama broncovascular ou espessamento peribrônquico isolado.
 • Na dúvida entre padrão intersticial e consolidação, optar por "ausência de consolidações".
 • Se o achado for inespecífico, discreto, difuso ou sem padrão alveolar claro, usar "ausência de consolidações".
 
-Instrução para exame absolutamente normal:
-• Campos pulmonares: ausência de consolidações e derrame pleural.
-• Silhueta cardiomediastinal: índice cardiotorácico medido de {ICT}.
-• Dispositivos e implantes: ausência de dispositivos ou implantes visíveis.
+Instrução para achados normais:
+• Campos pulmonares: Seguir as regras de composição acima (usar frase combinada apenas se ambos forem normais; se um for presente, negar o outro individualmente).
+• Silhueta cardiomediastinal: descrever apenas o índice cardiotorácico e achados presentes (aorta/mediastino); omitir qualquer menção a normalidades.
+• Dispositivos e implantes: usar "ausência de dispositivos ou implantes visíveis." somente se nenhum dispositivo da lista for identificado.
