@@ -46,7 +46,6 @@ Lista de dispositivos e implantes (não julgar posicionamento) (na dúvida do la
 - cânula de TQT
 - CVC à direita ou à esquerda ou bilateral
 - CVC-DL à direita ou à esquerda ou bilateral
-- cateter de diálise à direita ou à esquerda ou bilateral
 - PICC à direita ou à esquerda ou bilateral
 - *portacath* à direita ou à esquerda
 - cateter Swan-Ganz
