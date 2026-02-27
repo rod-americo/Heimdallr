@@ -51,7 +51,7 @@ Lista de dispositivos e implantes (não julgar posicionamento) (na dúvida do la
 - *portacath* à direita ou à esquerda
 - cateter Swan-Ganz
 - dreno torácico à direita ou à esquerda ou bilateral
-- dreno *pigtail* à direita ou à esquerda
+- dreno *pigtail* à direita ou à esquerda ou bilateral
 - dreno mediastinal ou drenos mediastinais
 - prótese valvar aórtica
 - prótese valvar mitral
