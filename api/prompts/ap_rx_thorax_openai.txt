@@ -44,23 +44,22 @@ Dispositivos e implantes: listar apenas dispositivos ou implantes visíveis (sig
 Lista de dispositivos e implantes (não julgar posicionamento) (na dúvida do lado, omitir):
 - TOT
 - cânula de TQT
+- dreno torácico à direita ou à esquerda ou bilateral
+- dreno *pigtail* à direita ou à esquerda ou bilateral
+- dreno mediastinal ou drenos mediastinais
 - CVC à direita ou à esquerda ou bilateral
 - CVC-DL à direita ou à esquerda ou bilateral
 - PICC à direita ou à esquerda ou bilateral
 - *portacath* à direita ou à esquerda
 - cateter Swan-Ganz
-- dreno torácico à direita ou à esquerda ou bilateral
-- dreno *pigtail* à direita ou à esquerda ou bilateral
-- dreno mediastinal ou drenos mediastinais
+- cânulas de ECMO
 - prótese valvar aórtica
 - prótese valvar mitral
+- sonda digestiva
+- fios de esternotomia
 - dispositivo de eletroestimulação
 - eletrodos e fios de monitorização
 - eletrodos de monitorização
-- fios de esternotomia
-- balão intra-aórtico
-- cânulas de ECMO
-- sonda digestiva
 
 Regras obrigatórias:
 • Produzir exatamente quatro linhas além dos títulos.

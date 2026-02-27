@@ -89,25 +89,64 @@
     white-space: nowrap;
 }
 
-.lung-grid { grid-template-columns: 1fr 1.6fr; gap: 1.5rem; }
+.lung-grid { grid-template-columns: 1fr 1.6fr; gap: 1.5rem; margin-top: 1rem; }
 .lung-total-card {
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    background: linear-gradient(145deg, rgba(30,30,50,0.4), rgba(20,20,35,0.4));
-    padding: 1.5rem;
+    background: #0f172a; /* Deep dark blue */
+    padding: 2rem 1.5rem;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.03);
 }
-.lung-label { text-align: center; margin-bottom: 1.5rem; font-size: 0.8rem; letter-spacing: 0.05em; }
-.lung-chart-container { position: relative; width: 120px; height: 120px; display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem; }
+.lung-label { 
+    text-align: center; 
+    margin-bottom: 2rem; 
+    font-size: 1.5rem; 
+    font-weight: 700;
+    letter-spacing: 0.05em; 
+    color: #fff;
+}
+.lung-label sub {
+    font-size: 0.6em;
+    vertical-align: sub;
+    margin-left: 2px;
+    opacity: 0.9;
+}
+.lung-chart-container { 
+    position: relative; 
+    width: 140px; 
+    height: 140px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    margin-bottom: 2rem; 
+}
 .lung-svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 .lung-bg { fill: none; stroke: rgba(255,255,255,0.05); stroke-width: 2.5; }
-.lung-fill { fill: none; stroke-width: 3; stroke-linecap: round; }
-.lung-percentage { position: absolute; text-align: center; font-size: 1.8rem; font-weight: 700; color: #eee; line-height: 1; }
-.lung-percentage span { font-size: 1rem; margin-left:1px; }
-.lung-footer { width: 100%; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1rem; text-align: center; }
-.lung-footer div { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.3rem; }
-.lung-footer span { color: #eee; font-weight: 500; }
+.lung-fill { fill: none; stroke-width: 3.5; stroke-linecap: round; }
+.lung-percentage { 
+    position: absolute; 
+    text-align: center; 
+    font-size: 2.2rem; 
+    font-weight: 800; 
+    color: #fff; 
+    line-height: 1; 
+}
+.lung-percentage span { font-size: 1.1rem; margin-left: 1px; color: rgba(255,255,255,0.7); }
+.lung-footer { 
+    width: 100%; 
+    border-top: 1px solid rgba(255,255,255,0.08); 
+    padding-top: 1.5rem; 
+    text-align: center; 
+}
+.lung-footer div { 
+    font-size: 0.95rem; 
+    color: rgba(255,255,255,0.7); 
+    margin-bottom: 0.6rem; 
+}
+.lung-footer span { color: #fff; font-weight: 700; margin-left: 4px; }
 
 .lobes-card { padding: 1.5rem; background: rgba(15,15,25,0.3); }
 .lobe-row { margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.03); }

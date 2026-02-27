@@ -162,7 +162,7 @@ function renderResults(results, caseId, metadata = {}) {
             <h3 class="section-title">Enfisema Pulmonar Quantitativo</h3>
             <div class="results-grid lung-grid">
                 <div class="result-card lung-total-card">
-                    <div class="lung-label">LAA TOTAL (-950 HU)</div>
+                    <div class="lung-label">LAA<sub>I-950</sub></div>
                     <div class="lung-chart-container">
                          <svg viewBox="0 0 36 36" class="lung-svg">
                             <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" class="lung-bg" />
