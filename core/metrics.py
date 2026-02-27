@@ -581,7 +581,9 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder):
             
             # Get voxel volume in cm3 (1 voxel = pixdim[1]*pixdim[2]*pixdim[3] mm3)
             # 1 cm3 = 1000 mm3
-            voxel_vol_mm3 = nii_lobe.header.get_zooms()[0] * nii_lobe.header.get_zooms()[1] * nii_lobe.header.get_zooms()[2]
+            # Load the first lobe to get the header resolution
+            nii_ref = nib.load(str(total_dir / lung_lobes_map[0][1]))
+            voxel_vol_mm3 = nii_ref.header.get_zooms()[0] * nii_ref.header.get_zooms()[1] * nii_ref.header.get_zooms()[2]
             voxel_vol_cm3 = voxel_vol_mm3 / 1000.0
             
             for lobe_name, filename in lung_lobes_map:
