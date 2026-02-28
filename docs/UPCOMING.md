@@ -28,31 +28,36 @@ It is designed to protect delivery quality, clinical safety, and governance as t
 
 ## Prioritized Module Backlog
 
-Ordered by strategic sequence (not only by model sophistication).
+Ordered by pipeline viability and delivery sequence.
+Live-only baseline modules remain documented in the strategy board and `README.md`, while this backlog keeps future hardening work that extends already-running modules.
 
 | Rank | Module | Pillar | Impact | Friction | Why now |
 |---|---|---|---:|---:|---|
-| 1 | HL7-triggered prefetch orchestration | Logistics | 9 | 4 | Immediate throughput win with low clinical risk |
-| 2 | Unified worklist orchestration | Workflow | 9 | 5 | Reduces queue switching and unfair distribution |
-| 3 | De-identification governance hardening | Security | 10 | 6 | Extend an implemented gateway with stronger policy and audit controls |
-| 4 | Deterministic pseudonymization + crosswalk | Security | 10 | 5 | Enables traceable privacy-preserving workflows |
-| 5 | Follow-up recommendation extraction (NLP) | Navigation | 8 | 5 | High value and operationally feasible |
-| 6 | Urology navigation pathway | Navigation | 9 | 6 | Direct care-continuity impact with clear rule set |
-| 7 | Opportunistic coronary calcium (CAC-DRS) | Quantification | 8 | 6 | High preventive-care value from opportunistic CT workflows |
-| 8 | AI-assisted urgency flagging | Workflow | 9 | 7 | Improves time-to-open for high-acuity cases |
-| 9 | Structured report drafting copilot | Reporting | 8 | 7 | Reporting acceleration with strong guardrails |
-| 10 | On-prem AI gateway enforcement | Security | 9 | 7 | Critical for enterprise deployment maturity |
-| 11 | Drift/hallucination control framework | Reporting | 9 | 8 | Needed before broad automation trust |
-| 12 | Agentic workflow coordination | R&D | 8 | 9 | Long-horizon orchestration capability |
-| 13 | Foundation model fine-tuning layer | R&D | 9 | 9 | Institution-adapted model performance with controlled governance |
-| 14 | Temporal imaging intelligence (delta engine) | R&D | 9 | 8 | Longitudinal change tracking for follow-up-heavy workflows |
-| 15 | Causal triage simulator | R&D | 8 | 8 | Safe policy simulation before live queue changes |
-| 16 | Synthetic + federated validation sandbox | R&D | 8 | 8 | Privacy-preserving multi-site validation and benchmarking |
-| 17 | Autonomous follow-up orchestrator (human-gated) | R&D | 9 | 8 | Strong continuity and financial recovery upside with clinical oversight |
-| 18 | Prospective trial mode | R&D | 8 | 7 | Embedded publication-grade evidence generation |
-| 19 | General surgery navigation pathway | Navigation | 7 | 5 | Low-friction continuity value for common actionable findings |
-| 20 | Oncology high-suspicion navigation router | Navigation | 10 | 7 | High clinical-risk routing for ER/inpatient neoplastic suspicion |
-| 21 | Gynecology navigation pathway | Navigation | 9 | 7 | Structured continuity for adnexal/uterine/cervical suspicious findings |
+| 1 | HL7-triggered prefetch orchestration | Logistics | 8 | 4 | Immediate throughput win with low clinical risk |
+| 2 | Unified worklist orchestration | Workflow | 7 | 5 | Reduces queue switching and unfair distribution |
+| 3 | De-identification governance hardening | Security | 10 | 5 | Extend an implemented gateway with stronger policy and audit controls |
+| 4 | Deterministic pseudonymization + crosswalk | Security | 7 | 5 | Enables traceable privacy-preserving workflows |
+| 5 | Follow-up recommendation extraction (NLP) | Navigation | 8 | 6 | High value and operationally feasible |
+| 6 | Urology navigation pathway | Navigation | 8 | 6 | Direct care-continuity impact with clear rule set |
+| 7 | Opportunistic coronary calcium (CAC-DRS) | Quantification | 7 | 6 | High preventive-care value from opportunistic CT workflows |
+| 8 | AI-assisted urgency flagging | Workflow | 9 | 8 | Improves time-to-open for high-acuity cases |
+| 9 | Liver steatosis opportunistic pipeline | Quantification | 7 | 6 | Population-health insight from existing scans |
+| 10 | Osteoporosis opportunistic screening | Quantification | 6 | 6 | Scalable DXA-proxy value from routine CT |
+| 11 | Structured report drafting copilot | Reporting | 7 | 6 | Reporting acceleration with strong guardrails |
+| 12 | Patient follow-up navigator | Navigation | 8 | 5 | Converts follow-up intent into tracked operational ownership and completion flow |
+| 13 | On-prem AI gateway enforcement | Security | 7 | 5 | Critical for enterprise deployment maturity |
+| 14 | Drift/hallucination control framework | Reporting | 9 | 8 | Needed before broad automation trust |
+| 15 | Agentic workflow coordination | R&D | 8 | 9 | Long-horizon orchestration capability |
+| 16 | Foundation model fine-tuning layer | R&D | 9 | 9 | Institution-adapted model performance with controlled governance |
+| 17 | Temporal imaging intelligence (delta engine) | R&D | 9 | 8 | Longitudinal change tracking for follow-up-heavy workflows |
+| 18 | Causal triage simulator | R&D | 8 | 8 | Safe policy simulation before live queue changes |
+| 19 | Synthetic + federated validation sandbox | R&D | 8 | 8 | Privacy-preserving multi-site validation and benchmarking |
+| 20 | Autonomous follow-up orchestrator (human-gated) | R&D | 9 | 8 | Strong continuity and financial recovery upside with clinical oversight |
+| 21 | Prospective trial mode | R&D | 8 | 7 | Embedded publication-grade evidence generation |
+| 22 | General surgery navigation pathway | Navigation | 7 | 5 | Low-friction continuity value for common actionable findings |
+| 23 | Oncology high-suspicion navigation router | Navigation | 10 | 7 | High clinical-risk routing for ER/inpatient neoplastic suspicion |
+| 24 | Gynecology navigation pathway | Navigation | 9 | 7 | Structured continuity for adnexal/uterine/cervical suspicious findings |
+| 25 | Fracture detection and triage module | Workflow | 9 | 7 | Triage of cases with suspected fractures in trauma/emergency workflows with auditable urgency flags |
 
 ## Pillar A: Logistics Automation and Smart Prefetch
 
