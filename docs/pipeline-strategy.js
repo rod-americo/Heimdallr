@@ -1,5 +1,21 @@
 (() => {
     let modules = [];
+    const liveStatuses = new Set(['mvp-internal', 'validation-ready', 'production-candidate', 'implemented']);
+    const stageOrder = {
+        before: 0,
+        during: 1,
+        after: 2
+    };
+    const maturityOrder = {
+        implemented: 0,
+        'production-candidate': 1,
+        'validation-ready': 2,
+        'mvp-internal': 3,
+        'in-review': 4,
+        planned: 5,
+        poc: 6,
+        exploratory: 7
+    };
 
     const trackName = {
         ops: 'Operations',
@@ -58,11 +74,34 @@
         });
     }
 
+    function compareModules(a, b) {
+        const aIsLive = liveStatuses.has(a.status);
+        const bIsLive = liveStatuses.has(b.status);
+
+        if (aIsLive !== bIsLive) return aIsLive ? -1 : 1;
+
+        if (aIsLive && bIsLive) {
+            const stageDiff = (stageOrder[a.stage] ?? 99) - (stageOrder[b.stage] ?? 99);
+            if (stageDiff !== 0) return stageDiff;
+
+            const maturityDiff = (maturityOrder[a.status] ?? 99) - (maturityOrder[b.status] ?? 99);
+            if (maturityDiff !== 0) return maturityDiff;
+
+            const idDiff = (a.id ?? 999) - (b.id ?? 999);
+            if (idDiff !== 0) return idDiff;
+        }
+
+        const rankDiff = (a.rank ?? 999) - (b.rank ?? 999);
+        if (rankDiff !== 0) return rankDiff;
+
+        return a.title.localeCompare(b.title);
+    }
+
     function renderLiveToday() {
         liveToday.innerHTML = '';
-        const liveStatuses = new Set(['mvp-internal', 'validation-ready', 'production-candidate', 'implemented']);
         modules
             .filter((m) => liveStatuses.has(m.status))
+            .sort(compareModules)
             .forEach((m) => {
                 const li = document.createElement('li');
                 li.textContent = `${m.title}: ${m.note}`;
@@ -72,7 +111,7 @@
 
     function renderCards() {
         cards.innerHTML = '';
-        const list = filterModules();
+        const list = filterModules().sort(compareModules);
         list.forEach((m) => {
             const el = document.createElement('article');
             el.className = 'card';

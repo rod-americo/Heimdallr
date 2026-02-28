@@ -270,20 +270,31 @@ To publish the HTML strategy board as a rendered page:
 - Motivation and strategic justification page: [`docs/motivation-justification.html`](docs/motivation-justification.html)
 - Full research report page: [`docs/radiology-preprocessing-ecosystem-report.html`](docs/radiology-preprocessing-ecosystem-report.html)
 
-### Upcoming Prioritization (Ordered)
+### Current Viable Pipeline Baseline
+
+1. DICOM C-STORE intake listener
+2. Case prep and queue worker
+3. Dashboard and API surface
+4. De-identification gateway
+5. TotalSegmentator core pipeline
+6. L3 muscle area and SMI calculator
+7. Opportunistic bone quantification
+8. CTR extraction (ICT via CXAS)
+
+### Next Viable Roadmap Modules
 
 1. HL7-triggered smart prefetch orchestration
 2. Unified worklist orchestration and fair assignment
-3. Advanced de-identification hardening (auditability, policy controls, and governance expansion)
-4. AI urgency flagging with auditable reprioritization
-5. Structured LLM report drafting with style-safe templates
-6. CAC-DRS coronary calcium classification workflow
-7. Opportunistic liver and bone quantification at scale
-8. Urology navigation module with oncology secondary routing for suspicious neoplasia
-9. Follow-up recommendation extraction and navigation workflows
-10. SLA-aware orchestration and escalation policy engine
-11. Enterprise audit hardening for external model gateways
-12. Agentic workflow coordinator for multi-step radiology operations
+3. De-identification governance hardening and audit controls
+4. Deterministic pseudonymization and secure crosswalk
+5. Follow-up recommendation extraction and navigation trigger creation
+6. Urology navigation pathway with oncology secondary routing
+7. CAC-DRS coronary calcium workflow
+8. AI-assisted urgency flagging with auditable reprioritization
+9. Opportunistic liver steatosis pipeline
+10. Structured report drafting copilot
+11. Patient follow-up navigator
+12. On-prem AI gateway enforcement
 
 ## Safety, Compliance, and Clinical Use
 
