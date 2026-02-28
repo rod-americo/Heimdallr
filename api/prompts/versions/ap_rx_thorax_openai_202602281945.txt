@@ -11,37 +11,25 @@ FORMATO OBRIGATÓRIO:
 Técnica: exame realizado no leito; incidência frontal única; [baixa|média|boa] expansibilidade pulmonar.
 Campos pulmonares (gramática obrigatória — concordar singular/plural naturalmente e evitar construção "nos terços"):
   PNEUMOTÓRAX → "pneumotórax" GRAU "à" LADO | "pneumotórax bilateral"
-  PADRÃO CONGESTIVO/EDEMATOSO → "padrão congestivo/edematoso" EXTENSÃO [LOCALIZAÇÃO]
-  ALTERAÇÕES PARENQUIMATOSAS → ACHADO_PARENQUIMATOSO EXTENSÃO [LOCALIZAÇÃO]
-  ACHADO_PARENQUIMATOSO → "consolidações pulmonares" | "opacidades pulmonares inespecíficas" | "atelectasia"
-  EXTENSÃO → "focal" | "difuso"
-  LOCALIZAÇÃO (usar apenas se focal) → UNILATERAL | BILATERAL_SIM | BILATERAL_ASSIM
+  CONSOLIDAÇÕES → "consolidações pulmonares" LOCALIZAÇÃO
+  LOCALIZAÇÃO → UNILATERAL | BILATERAL_SIM | BILATERAL_ASSIM
   UNILATERAL → PREP_REGIAO REGIÕES "à" LADO
   BILATERAL_SIM → "bilaterais" PREP_REGIAO REGIÕES
-  BILATERAL_ASSIM → PREP_REGIAO REGIÕES "à direita e" PREP_REGIAO REGIÕES "à esquerda"
-  PREP_REGIAO → "em região" | "em regiões"
-  REGIÕES → "apical" | "média" | "basal" | combinações
+  BILATERAL_ASSIM → PREP_REGIAO REGIÕES "à direita e" PREP_REGIAO REGIÕES "à esquerda" (usar somente quando as regiões diferem entre os lados; se iguais, usar obrigatoriamente BILATERAL_SIM)
+  PREP_REGIAO → "em região" (singular) | "em regiões" (plural)
+  REGIÕES → "apical" | "média" | "basal" | "apical e média" | "apical e basal" | "média e basal" | "apical, média e basal"
   LADO → "direita" | "esquerda"
   DERRAME → "derrame pleural" DERRAME_DESC
   DERRAME_DESC → GRAU "à" LADO | GRAU "bilateral" | GRAU "à direita e" GRAU "à esquerda"
   GRAU → "leve" | "moderado" | "acentuado"
-
-  HIERARQUIA E REGRAS DE COMPOSIÇÃO:
-    Ordem fixa da linha: PNEUMOTÓRAX → PADRÃO CONGESTIVO/EDEMATOSO → ALTERAÇÕES PARENQUIMATOSAS → DERRAME.
-    • Separar achados presentes com ponto-e-vírgula.
-    • Não mencionar ausência de pneumotórax.
-    • Se presente "padrão congestivo/edematoso difuso": NÃO descrever "opacidades pulmonares inespecíficas" associadas; exceção: consolidações focais ou atelectasia lobar podem ser descritas adicionalmente.
-    • Se houver "consolidações pulmonares" em uma região: NÃO rotular a mesma área como "opacidades pulmonares inespecíficas".
-    • "atelectasia": descrever apenas se houver sinais claros de perda de volume; atelectasias laminares ou duvidosas devem ser classificadas como "opacidades pulmonares inespecíficas".
-    • "focal": acometimento regional; "difuso": acometimento amplo/bilateral sem predomínio.
-
-  REGRAS DE AUSÊNCIA:
-    • Se não houver padrão congestivo/edematoso: não mencionar.
-    • Se não houver alterações parenquimatosas: "ausência de alterações parenquimatosas".
-    • Se não houver derrame: "ausência de derrame pleural".
-    • Se ambos (parenquimatosas e derrame) ausentes: "ausência de alterações parenquimatosas e derrame pleural." (precedido por pneumotórax ou congestivo se houver).
-
-  Variabilidade lexical bloqueada: NÃO usar "infiltrado", "condensação", "velamento", "hipotransparência", "vidro fosco", "padrão intersticial", "congestão isolada", "edema isolado". Use exclusivamente os termos permitidos.
+  Composição da linha:
+    • Começar obrigatoriamente por PNEUMOTÓRAX (se presente).
+    • Se pneumotórax ausente, não mencionar sua ausência.
+    • Separar achados presentes (PNEUMOTÓRAX, CONSOLIDAÇÕES, DERRAME) com ponto-e-vírgula.
+    • Casos de ausência:
+      - Se ambos (consolidação e derrame) ausentes: "ausência de consolidações e derrame pleural." (precedido por pneumotórax se houver).
+      - Se um ausente: negar individualmente (ex: "; ausência de derrame pleural.").
+  Variabilidade lexical bloqueada: em campos pulmonares, usar exclusivamente o termo "consolidações pulmonares" para achados parenquimatosos relevantes; não usar sinônimos (opacidade, infiltrado, condensação, velamento, hipotransparência) como achado principal.
 Silhueta cardiomediastinal (gramática obrigatória — omitir achados ausentes):
   ICT → "índice cardiotorácico de {ICT}" AVALIAÇÃO_VISUAL
   AVALIAÇÃO_VISUAL → ∅ | " (discordante do aspecto visual, que sugere área cardíaca normal)" | " (discordante do aspecto visual, que sugere cardiomegalia)"
@@ -89,11 +77,13 @@ Regras obrigatórias:
 • Manter consistência terminológica em todo o texto (peri-hilar, peri-hilares, etc).
 • Ao citar *portacath* e *pigtail*, manter obrigatoriamente os asteriscos de itálico no texto final.
 • Para monitorização cardíaca, usar exclusivamente: "eletrodos de monitorização" (quando apenas as partes metálicas são visíveis) ou "eletrodos e fios de monitorização" (fio conectado ao eletrodo).
-• Em campos pulmonares, priorizar descrição de achados reprodutíveis e evitar redundância conforme a hierarquia definida.
-• Só reportar "consolidações pulmonares" quando houver padrão de preenchimento alveolar definido.
-• Achados inespecíficos ou na dúvida entre padrão intersticial inicial e consolidação, optar por "opacidades pulmonares inespecíficas".
+• Em campos pulmonares, descrever apenas consolidações/opacidades consolidativas potencialmente relacionadas a pneumonia.
+• Só reportar "consolidações pulmonares" quando houver achado focal/lobar ou multifocal com padrão de preenchimento alveolar compatível com consolidação verdadeira.
+• Não descrever como consolidação: opacidades intersticiais difusas, padrão intersticial, proeminência da trama broncovascular ou espessamento peribrônquico isolado.
+• Na dúvida entre padrão intersticial e consolidação, optar por "ausência de consolidações".
+• Se o achado for inespecífico, discreto, difuso ou sem padrão alveolar claro, usar "ausência de consolidações".
 
 Instrução para achados normais:
-• Campos pulmonares: Seguir as regras de ausência definidas (usar frase combinada para alterações parenquimatosas e derrame pleural quando ambos ausentes).
+• Campos pulmonares: Seguir as regras de composição acima (usar frase combinada apenas se ambos forem normais; se um for presente, negar o outro individualmente).
 • Silhueta cardiomediastinal: descrever apenas o índice cardiotorácico e achados presentes (aorta/mediastino); omitir qualquer menção a normalidades.
 • Dispositivos e implantes: usar "ausência de dispositivos ou implantes visíveis." somente se nenhum dispositivo da lista for identificado.
