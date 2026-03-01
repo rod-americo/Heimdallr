@@ -74,8 +74,16 @@
         return 'Not Started';
     }
 
+    function horizonLabel(v) {
+        if (v === 'foundation') return 'Foundation';
+        if (v === 'acceleration') return 'Acceleration';
+        if (v === 'scaling') return 'Scaling';
+        if (v === 'innovation') return 'Innovation';
+        return 'Unspecified';
+    }
+
     function trackShortLabel(v) {
-        if (v === 'ops') return 'Ops';
+        if (v === 'ops') return 'Operations';
         if (v === 'clinical') return 'Clinical';
         if (v === 'governance') return 'Governance';
         if (v === 'continuity') return 'Continuity';
@@ -150,7 +158,7 @@
             el.innerHTML = `
                 <div class="card-top">
                     <div class="meta-group left">
-                        <span class="meta-chip horizon ${m.horizon}">${m.horizon}</span>
+                        <span class="meta-chip horizon ${m.horizon}">${horizonLabel(m.horizon)}</span>
                         <span class="meta-chip track track-${m.track}">${trackShortLabel(m.track)}</span>
                     </div>
                     <div class="meta-group right">
