@@ -396,23 +396,17 @@
         }
 
         .card-top {
-            display: grid;
-            gap: 8px;
-            margin-bottom: 10px;
-        }
-
-        .meta-row {
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
+            margin-bottom: 10px;
         }
 
         .meta-chip {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
             border-radius: 999px;
-            padding: 5px 10px;
+            padding: 4px 9px;
             font-size: 0.73rem;
             font-weight: 700;
             line-height: 1.1;
@@ -420,16 +414,6 @@
             background: rgba(15, 23, 42, 0.2);
             color: var(--text);
             white-space: nowrap;
-        }
-
-        .meta-chip .meta-label {
-            color: var(--muted);
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-        }
-
-        .meta-chip .meta-value {
-            color: inherit;
         }
 
         .meta-chip.horizon.foundation { background: var(--pill-foundation-bg); color: var(--pill-foundation-text); border-color: rgba(56, 189, 248, 0.24); }
@@ -684,7 +668,7 @@
 
         <section class="panel" style="margin-top: 14px;">
             <h2>Metric Definitions</h2>
-            <p class="small"><strong>Card header</strong>: each module card shows four chips: <strong>Horizon</strong>, <strong>Track</strong>, <strong>Repo</strong>, and <strong>Status</strong>.</p>
+            <p class="small"><strong>Card header</strong>: each module card shows four compact chips, in fixed order: <strong>Horizon</strong>, <strong>Track</strong>, <strong>Repo</strong>, and <strong>Status</strong>.</p>
             <p class="small" style="margin-top: 6px;"><strong>Horizon</strong> expresses delivery horizon: <span class="pill foundation">foundation</span> baseline throughput and safety infrastructure; <span class="pill acceleration">acceleration</span> near-term performance expansion; <span class="pill scaling">scaling</span> broader operational rollout; <span class="pill innovation">innovation</span> longer-horizon strategic bets.</p>
             <p class="small" style="margin-top: 6px;"><strong>Track</strong> groups modules by portfolio domain: Operations, Clinical Decision Support, Governance and Compliance, or Care Continuity.</p>
             <p class="small" style="margin-top: 6px;"><strong>Repo</strong> reflects code reality: `implemented` means present in repository workflows, `prototype` means partial or alternative code exists, and `not-started` means no implementation was verified in the repository.</p>

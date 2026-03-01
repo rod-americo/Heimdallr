@@ -74,11 +74,6 @@
         return 'Not Started';
     }
 
-    function horizonLabel(v) {
-        if (v === 'mvp-internal') return 'MVP Internal';
-        return v ? `${v.charAt(0).toUpperCase()}${v.slice(1)}` : 'Unspecified';
-    }
-
     function trackShortLabel(v) {
         if (v === 'ops') return 'Ops';
         if (v === 'clinical') return 'Clinical';
@@ -154,26 +149,10 @@
             el.className = 'card';
             el.innerHTML = `
                 <div class="card-top">
-                    <div class="meta-row">
-                        <span class="meta-chip horizon ${m.horizon}">
-                            <span class="meta-label">Horizon</span>
-                            <span class="meta-value">${horizonLabel(m.horizon)}</span>
-                        </span>
-                        <span class="meta-chip track track-${m.track}">
-                            <span class="meta-label">Track</span>
-                            <span class="meta-value">${trackShortLabel(m.track)}</span>
-                        </span>
-                    </div>
-                    <div class="meta-row">
-                        <span class="meta-chip repo-state repo-${m.repoState || 'not-started'}">
-                            <span class="meta-label">Repo</span>
-                            <span class="meta-value">${repoStateLabel(m.repoState)}</span>
-                        </span>
-                        <span class="meta-chip status status-${m.status}">
-                            <span class="meta-label">Status</span>
-                            <span class="meta-value">${statusLabel(m.status)}</span>
-                        </span>
-                    </div>
+                    <span class="meta-chip horizon ${m.horizon}">${m.horizon}</span>
+                    <span class="meta-chip track track-${m.track}">${trackShortLabel(m.track)}</span>
+                    <span class="meta-chip repo-state repo-${m.repoState || 'not-started'}">${repoStateLabel(m.repoState)}</span>
+                    <span class="meta-chip status status-${m.status}">${statusLabel(m.status)}</span>
                 </div>
                 <h3>${m.title}</h3>
                 <div class="card-body">
