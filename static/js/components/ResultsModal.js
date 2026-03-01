@@ -20,8 +20,18 @@ export async function showResults(caseId) {
     }
 }
 
+function buildArtifactUrl(caseId, artifactPath) {
+    if (!artifactPath) return null;
+    const marker = `/output/${caseId}/`;
+    const normalized = artifactPath.includes(marker)
+        ? artifactPath.split(marker)[1]
+        : artifactPath.replace(/^\.?\//, '');
+    return `/api/patients/${encodeURIComponent(caseId)}/artifacts/${normalized.split('/').map(encodeURIComponent).join('/')}`;
+}
+
 function renderResults(results, caseId, metadata = {}) {
     const sections = [];
+    const triageReport = results.kidney_stone_triage_report || null;
 
     sections.push(renderBiometricSection(caseId, metadata, results));
 
@@ -179,6 +189,132 @@ function renderResults(results, caseId, metadata = {}) {
                     ${lobarHtml}
                 </div>
             </div>
+        `);
+    }
+
+    const hasRenalStones =
+        Number(results.renal_stone_count || 0) > 0 ||
+        Number(results.renal_stone_total_volume_mm3 || 0) > 0;
+
+    if (hasRenalStones) {
+        const statusMap = {
+            'Complete': { label: 'Completo', className: 'badge-success', emoji: '🟢' },
+            'Partial': { label: 'Parcial', className: 'badge-warning', emoji: '🟡' },
+            'Total-only': { label: 'Máscara Total Apenas', className: 'badge-warning', emoji: '🟡' },
+            'Incomplete kidneys': { label: 'Rins Incompletos', className: 'badge-danger', emoji: '🔴' },
+            'Error': { label: 'Erro', className: 'badge-danger', emoji: '🔴' }
+        };
+        const stoneStatus = statusMap[results.renal_stone_analysis_status] || {
+            label: results.renal_stone_analysis_status,
+            className: 'badge-warning',
+            emoji: '🟡'
+        };
+
+        sections.push(`
+            <h3 class="section-title">Carga de Cálculos Renais</h3>
+            <div class="results-grid">
+                <div class="result-card">
+                    <div class="result-label">Status da Análise</div>
+                    <div class="result-value">
+                        <span class="status-badge ${stoneStatus.className}">${stoneStatus.emoji} ${stoneStatus.label}</span>
+                    </div>
+                </div>
+                <div class="result-card">
+                    <div class="result-label">Rim Esquerdo Completo</div>
+                    <div class="result-value">${results.renal_stone_kidney_left_complete === null || results.renal_stone_kidney_left_complete === undefined ? '-' : (results.renal_stone_kidney_left_complete ? 'Sim' : 'Não')}</div>
+                </div>
+                <div class="result-card">
+                    <div class="result-label">Rim Direito Completo</div>
+                    <div class="result-value">${results.renal_stone_kidney_right_complete === null || results.renal_stone_kidney_right_complete === undefined ? '-' : (results.renal_stone_kidney_right_complete ? 'Sim' : 'Não')}</div>
+                </div>
+                <div class="result-card">
+                    <div class="result-label">Carga Total</div>
+                    <div class="result-value">${results.renal_stone_total_volume_mm3?.toFixed(1) || '-'} <span class="result-unit">mm³</span></div>
+                </div>
+                <div class="result-card">
+                    <div class="result-label">Número de Cálculos</div>
+                    <div class="result-value">${results.renal_stone_count ?? '-'}</div>
+                </div>
+                <div class="result-card">
+                    <div class="result-label">Maior Diâmetro</div>
+                    <div class="result-value">${results.renal_stone_largest_diameter_mm?.toFixed(1) || '-'} <span class="result-unit">mm</span></div>
+                </div>
+            </div>
+        `);
+    }
+
+    const triageComponents = Number(results.kidney_stone_triage_total_components || 0);
+    const triageHasContent = triageReport || triageComponents > 0 || results.kidney_stone_triage_status;
+    if (triageHasContent) {
+        const triageStatusMap = {
+            'Candidates detected': { label: 'Candidatos Detectados', className: 'badge-warning', emoji: '🟡' },
+            'No candidates': { label: 'Sem Candidatos', className: 'badge-success', emoji: '🟢' },
+            'Missing kidney masks': { label: 'Máscaras Ausentes', className: 'badge-danger', emoji: '🔴' },
+            'Error': { label: 'Erro', className: 'badge-danger', emoji: '🔴' }
+        };
+        const triageStatus = triageStatusMap[results.kidney_stone_triage_status] || {
+            label: results.kidney_stone_triage_status || '-',
+            className: 'badge-warning',
+            emoji: '🟡'
+        };
+
+        const kidneys = triageReport?.kidneys || [];
+        const componentCards = kidneys.flatMap(kidney => {
+            const sideLabel = kidney.mask_name === 'kidney_left' ? 'Rim Esquerdo' : 'Rim Direito';
+            return (kidney.components || []).map(component => {
+                const axialUrl = buildArtifactUrl(caseId, component.axial_overlay_png);
+                const coronalUrl = buildArtifactUrl(caseId, component.coronal_overlay_png);
+
+                return `
+                    <div class="triage-component-card">
+                        <div class="triage-component-header">
+                            <strong>${escapeHtml(sideLabel)}</strong>
+                            <span>${escapeHtml(component.component_id)}</span>
+                        </div>
+                        <div class="triage-component-metrics">
+                            <span>${component.volume_mm3?.toFixed(1) || '-'} mm³</span>
+                            <span>${component.largest_axis_mm?.toFixed(1) || '-'} mm</span>
+                            <span>${component.hu_max?.toFixed(0) || '-'} HU max</span>
+                        </div>
+                        <div class="triage-overlay-grid">
+                            ${axialUrl ? `<a class="triage-overlay-link" href="${axialUrl}" target="_blank" rel="noopener noreferrer"><img src="${axialUrl}" alt="${escapeHtml(component.component_id)} axial"></a>` : ''}
+                            ${coronalUrl ? `<a class="triage-overlay-link" href="${coronalUrl}" target="_blank" rel="noopener noreferrer"><img src="${coronalUrl}" alt="${escapeHtml(component.component_id)} coronal"></a>` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+        }).join('');
+
+        sections.push(`
+            <h3 class="section-title">Triage de Cálculos por HU</h3>
+            <div class="results-grid">
+                <div class="result-card">
+                    <div class="result-label">Status do Triage</div>
+                    <div class="result-value">
+                        <span class="status-badge ${triageStatus.className}">${triageStatus.emoji} ${triageStatus.label}</span>
+                    </div>
+                </div>
+                <div class="result-card">
+                    <div class="result-label">Componentes</div>
+                    <div class="result-value">${results.kidney_stone_triage_total_components ?? '-'}</div>
+                </div>
+                <div class="result-card">
+                    <div class="result-label">Carga Heurística</div>
+                    <div class="result-value">${results.kidney_stone_triage_total_volume_mm3?.toFixed(1) || '-'} <span class="result-unit">mm³</span></div>
+                </div>
+                <div class="result-card">
+                    <div class="result-label">Maior Eixo</div>
+                    <div class="result-value">${results.kidney_stone_triage_max_component_axis_mm?.toFixed(1) || '-'} <span class="result-unit">mm</span></div>
+                </div>
+            </div>
+            ${componentCards ? `
+                <details class="triage-panel">
+                    <summary>Ver componentes e overlays</summary>
+                    <div class="triage-panel-body">
+                        ${componentCards}
+                    </div>
+                </details>
+            ` : ''}
         `);
     }
 

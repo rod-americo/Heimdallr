@@ -64,6 +64,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 # Import centralized configuration
 import config
 import sqlite3
+from core import kidney_stone_triage
 
 # Import metrics calculation module
 import metrics
@@ -322,6 +323,35 @@ def process_case(nifti_path: Path, case_id: str) -> Dict[str, Any]:
         except Exception as e:
             logger.print(f"[Conditional] Error: {e}")
 
+    kidney_stone_triage_summary = {}
+    if modality == "CT":
+        triage_dir = case_output / "urology"
+        triage_json_path = triage_dir / "kidney_stone_triage.json"
+        triage_render_dir = triage_dir / "kidney_stone_renders"
+        try:
+            logger.print("\n[Conditional] Running kidney stone HU triage...")
+            triage_start = time.time()
+            triage_report = kidney_stone_triage.write_report(
+                ct_path=nifti_path,
+                mask_dir=case_output / "total",
+                output_path=triage_json_path,
+                render_dir=triage_render_dir,
+            )
+            kidney_stone_triage_summary = kidney_stone_triage.summarize_report(
+                triage_report,
+                report_path=triage_json_path,
+                base_dir=case_output,
+            )
+            timings["kidney_stone_triage"] = round(time.time() - triage_start, 1)
+            logger.print("[Conditional] ✓ Kidney stone triage complete")
+        except Exception as e:
+            kidney_stone_triage_summary = {
+                "kidney_stone_triage_status": "Error",
+                "kidney_stone_triage_error": str(e),
+                "kidney_stone_triage_report_path": "urology/kidney_stone_triage.json",
+            }
+            logger.print(f"[Conditional] Kidney stone triage failed: {e}")
+
     # ============================================================
     # STEP 2: Metrics Calculation
     # ============================================================
@@ -331,6 +361,7 @@ def process_case(nifti_path: Path, case_id: str) -> Dict[str, Any]:
         metrics_start = time.time()
         json_path = case_output / "resultados.json"
         metrics = calculate_all_metrics(case_id, nifti_path, case_output)
+        metrics.update(kidney_stone_triage_summary)
         with open(json_path, "w") as f:
             json.dump(metrics, f, indent=2)
         timings["metrics"] = round(time.time() - metrics_start, 1)

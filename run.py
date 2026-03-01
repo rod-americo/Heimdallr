@@ -36,8 +36,8 @@ import datetime
 import concurrent.futures  # For parallel case processing
 from pathlib import Path
 
-# Import metrics calculation module
-from core import metrics
+# Import metrics calculation modules
+from core import kidney_stone_triage, metrics
 
 # Import centralized configuration
 import config
@@ -54,6 +54,7 @@ os.environ["PATH"] = str(Path(sys.executable).parent) + os.pathsep + os.environ[
 LICENSE = config.TOTALSEGMENTATOR_LICENSE
 BASE_DIR = config.BASE_DIR
 INPUT_DIR = config.INPUT_DIR
+PROCESSING_DIR = config.PROCESSING_DIR
 OUTPUT_DIR = config.OUTPUT_DIR
 ARCHIVE_DIR = config.NII_DIR
 NII_DIR = ARCHIVE_DIR  # Alias for compatibility
@@ -117,7 +118,6 @@ def run_task(task_name, input_file, output_folder, extra_args=None, max_retries=
     # Build TotalSegmentator command
     cmd = [
         "TotalSegmentator",
-        "-l", LICENSE,
         "-i", str(input_file),
         "-o", str(output_folder),
         "--task", task_name
@@ -214,6 +214,38 @@ def run_task(task_name, input_file, output_folder, extra_args=None, max_retries=
     raise RuntimeError(f"[{task_name}] Failed after {max_retries} attempts")
 
 
+def is_file_stable(file_path, min_age_seconds=None):
+    """Return True when a new input file looks old enough to process."""
+    if min_age_seconds is None:
+        min_age_seconds = max(5, config.PROCESSING_SCAN_INTERVAL * 2)
+    try:
+        age_seconds = time.time() - file_path.stat().st_mtime
+    except FileNotFoundError:
+        return False
+    return age_seconds >= min_age_seconds
+
+
+def move_case_file(source_path, destination_dir):
+    """Move a case NIfTI to a destination directory, overwriting any stale copy."""
+    destination_dir.mkdir(parents=True, exist_ok=True)
+    destination_path = destination_dir / source_path.name
+    if destination_path.exists():
+        destination_path.unlink()
+    shutil.move(str(source_path), str(destination_path))
+    return destination_path
+
+
+def claim_input_file(input_path):
+    """
+    Atomically move a case from input/ to processing/ so restarts do not resubmit it.
+    """
+    processing_path = PROCESSING_DIR / input_path.name
+    if processing_path.exists():
+        raise FileExistsError(f"Case already exists in processing/: {processing_path.name}")
+    shutil.move(str(input_path), str(processing_path))
+    return processing_path
+
+
 def process_case(nifti_path):
     """
     Process a single patient case through the complete pipeline.
@@ -231,159 +263,149 @@ def process_case(nifti_path):
     Returns:
         bool: True if successful, False on error
     """
-    # Extract case ID from filename (e.g., "PatientRACS_20260201_5531196.nii.gz" -> "PatientRACS_20260201_5531196")
     case_id = nifti_path.name.replace("".join(nifti_path.suffixes), "")
     case_output = OUTPUT_DIR / case_id
-    
-    # Create output directory structure
-    if not case_output.exists():
-        case_output.mkdir(parents=True)
-    
-    # Create logs directory for detailed TotalSegmentator output
+    case_output.mkdir(parents=True, exist_ok=True)
+
     log_dir = case_output / "logs"
     log_dir.mkdir(exist_ok=True)
-    
-    # Initialize pipeline logger (captures all stdout to pipeline.log)
     pipeline_log_path = None if config.VERBOSE_CONSOLE else log_dir / "pipeline.log"
     logger = PipelineLogger(pipeline_log_path)
-    
-    # Clean and recreate TotalSegmentator output directories
-    # This ensures we don't mix results from multiple runs
-    for subdir in ["total", "tissue_types"]:
-        p = case_output / subdir
-        if p.exists():
-            shutil.rmtree(p)
-        p.mkdir(exist_ok=True)
 
-    logger.print(f"\n=== Processing Case: {case_id} ===")
-
-    # Determine modality from metadata (created by prepare.py)
-    # Default to CT if not found (for legacy compatibility)
-    modality = "CT"
-    id_json_path = case_output / "id.json"
-    if id_json_path.exists():
-        try:
-            with open(id_json_path, 'r') as f:
-                modality = json.load(f).get("Modality", "CT")
-        except: 
-            pass  # Silently default to CT
-            
-    logger.print(f"Detected modality: {modality}")
-
-    # ============================================================
-    # STEP 1: Parallel Segmentation
-    # ============================================================
-    # Thread 1: General Anatomy
-    #   - CT: 'total' task (104 organs)
-    #   - MR: 'total_mr' task (MR-specific segmentation)
-    # Both use --fast flag for improved performance
-    
-    task_gen = "total"
-    if modality == "MR":
-        task_gen = "total_mr"
-    
-    # Determine log file paths based on VERBOSE_CONSOLE setting
-    log_file_total = None if config.VERBOSE_CONSOLE else log_dir / f"{task_gen}.log"
-    log_file_tissue = None if config.VERBOSE_CONSOLE else log_dir / "tissue_types.log"
-    
-    # Console output for non-verbose mode
-    if not config.VERBOSE_CONSOLE:
-        logger.print(f"\n[Segmentation] Running {2 if modality == 'CT' else 1} task(s) in parallel...")
-    
-    # Record start time for elapsed calculation
-    seg_start_time = time.time()
-        
-    # Start general anatomy segmentation in background thread
-    t1 = threading.Thread(
-        target=run_task, 
-        args=(task_gen, nifti_path, case_output / "total", ["--fast"]),
-        kwargs={"log_file": log_file_total}
-    )
-    t1.start()
-    
-    # Thread 2: Tissue Segmentation (CT only)
-    #   Segments skeletal muscle, visceral/subcutaneous fat
-    t2 = None
-    if modality == "CT":
-        t2 = threading.Thread(
-            target=run_task, 
-            args=("tissue_types", nifti_path, case_output / "tissue_types"),
-            kwargs={"log_file": log_file_tissue}
-        )
-        t2.start()
-
-    # Wait for both threads to complete
-    t1.join()
-    if t2:
-        t2.join()
-    
-    # Console summary for non-verbose mode
-    if not config.VERBOSE_CONSOLE:
-        seg_elapsed = time.time() - seg_start_time
-        logger.print(f"[Segmentation] ✓ Complete ({seg_elapsed:.1f}s)")
-        logger.print(f"  → Logs: {log_dir.relative_to(OUTPUT_DIR)}/")
-
-
-    # ============================================================
-    # STEP 1.5: Conditional Specialized Analysis
-    # ============================================================
-    # If brain detected and modality is CT -> Run hemorrhage detection
-    brain_file = case_output / "total" / "brain.nii.gz"
-    if modality == "CT" and brain_file.exists():
-        try:
-             # Check if brain mask is non-empty
-             # TotalSegmentator sometimes creates empty placeholder files
-             if brain_file.stat().st_size > 1000:  # 1KB threshold
-                 if not config.VERBOSE_CONSOLE:
-                     logger.print("\n[Conditional] Brain detected. Running hemorrhage detection...")
-                 bleed_output = case_output / "bleed"
-                 bleed_output.mkdir(exist_ok=True)
-                 log_file_bleed = None if config.VERBOSE_CONSOLE else log_dir / "cerebral_bleed.log"
-                 run_task("cerebral_bleed", nifti_path, bleed_output, log_file=log_file_bleed)
-                 if not config.VERBOSE_CONSOLE:
-                     logger.print("[Conditional] ✓ Hemorrhage detection complete")
-        except Exception as e:
-            logger.print(f"[Conditional] Error: {e}")
-
-    # ============================================================
-    # STEP 2: Metrics Calculation
-    # ============================================================
-    # Results written to resultados.json
-    if not config.VERBOSE_CONSOLE:
-        logger.print("\n[Metrics] Calculating volumes and densities...")
-    else:
-        logger.print("Calculating metrics...")
     try:
-        from core import metrics
+        nifti_path = claim_input_file(nifti_path)
+    except FileNotFoundError:
+        logger.print(f"Skipping case because input disappeared before claim: {nifti_path.name}")
+        logger.close()
+        return False
+    except Exception as e:
+        logger.print(f"Failed to claim input file {nifti_path.name}: {e}")
+        logger.close()
+        return False
+
+    try:
+        for subdir in ["total", "tissue_types"]:
+            p = case_output / subdir
+            if p.exists():
+                shutil.rmtree(p)
+            p.mkdir(exist_ok=True)
+
+        logger.print(f"\n=== Processing Case: {case_id} ===")
+
+        modality = "CT"
+        id_json_path = case_output / "id.json"
+        if id_json_path.exists():
+            try:
+                with open(id_json_path, "r") as f:
+                    modality = json.load(f).get("Modality", "CT")
+            except Exception:
+                pass
+        logger.print(f"Detected modality: {modality}")
+
+        task_gen = "total_mr" if modality == "MR" else "total"
+        log_file_total = None if config.VERBOSE_CONSOLE else log_dir / f"{task_gen}.log"
+        log_file_tissue = None if config.VERBOSE_CONSOLE else log_dir / "tissue_types.log"
+
+        if not config.VERBOSE_CONSOLE:
+            logger.print(f"\n[Segmentation] Running {2 if modality == 'CT' else 1} task(s) sequentially...")
+
+        seg_start_time = time.time()
+        run_task(
+            task_gen,
+            nifti_path,
+            case_output / "total",
+            log_file=log_file_total
+        )
+
+        if modality == "CT":
+            run_task(
+                "tissue_types",
+                nifti_path,
+                case_output / "tissue_types",
+                log_file=log_file_tissue
+            )
+
+        if not config.VERBOSE_CONSOLE:
+            seg_elapsed = time.time() - seg_start_time
+            logger.print(f"[Segmentation] ✓ Complete ({seg_elapsed:.1f}s)")
+            logger.print(f"  → Logs: {log_dir.relative_to(OUTPUT_DIR)}/")
+
+        brain_file = case_output / "total" / "brain.nii.gz"
+        brain_status, _, _ = metrics.get_structure_completeness(brain_file)
+        if modality == "CT" and brain_file.exists():
+            try:
+                if brain_file.stat().st_size > 1000:
+                    if brain_status == "Complete":
+                        if not config.VERBOSE_CONSOLE:
+                            logger.print("\n[Conditional] Brain detected and complete. Running hemorrhage detection...")
+                        bleed_output = case_output / "bleed"
+                        bleed_output.mkdir(exist_ok=True)
+                        log_file_bleed = None if config.VERBOSE_CONSOLE else log_dir / "cerebral_bleed.log"
+                        run_task("cerebral_bleed", nifti_path, bleed_output, log_file=log_file_bleed)
+                        if not config.VERBOSE_CONSOLE:
+                            logger.print("[Conditional] ✓ Hemorrhage detection complete")
+                    else:
+                        logger.print(f"[Conditional] Skipping hemorrhage detection due to brain status: {brain_status}")
+            except Exception as e:
+                logger.print(f"[Conditional] Error: {e}")
+
+        kidney_stone_triage_summary = {}
+        if modality == "CT":
+            triage_dir = case_output / "urology"
+            triage_json_path = triage_dir / "kidney_stone_triage.json"
+            triage_render_dir = triage_dir / "kidney_stone_renders"
+            try:
+                if not config.VERBOSE_CONSOLE:
+                    logger.print("\n[Conditional] Running kidney stone HU triage...")
+                triage_report = kidney_stone_triage.write_report(
+                    ct_path=nifti_path,
+                    mask_dir=case_output / "total",
+                    output_path=triage_json_path,
+                    render_dir=triage_render_dir,
+                )
+                kidney_stone_triage_summary = kidney_stone_triage.summarize_report(
+                    triage_report,
+                    report_path=triage_json_path,
+                    base_dir=case_output,
+                )
+                if not config.VERBOSE_CONSOLE:
+                    logger.print("[Conditional] ✓ Kidney stone triage complete")
+            except Exception as e:
+                kidney_stone_triage_summary = {
+                    "kidney_stone_triage_status": "Error",
+                    "kidney_stone_triage_error": str(e),
+                    "kidney_stone_triage_report_path": "urology/kidney_stone_triage.json",
+                }
+                logger.print(f"[Conditional] Kidney stone triage failed: {e}")
+
+        if not config.VERBOSE_CONSOLE:
+            logger.print("\n[Metrics] Calculating volumes and densities...")
+        else:
+            logger.print("Calculating metrics...")
+
         json_path = case_output / "resultados.json"
         metrics_data = metrics.calculate_all_metrics(case_id, nifti_path, case_output)
+        metrics_data.update(kidney_stone_triage_summary)
         with open(json_path, "w") as f:
             json.dump(metrics_data, f, indent=2)
         if not config.VERBOSE_CONSOLE:
             logger.print("[Metrics] ✓ Saved to resultados.json")
         else:
             logger.print(f"Metrics saved to {json_path}")
-        
-        # ============================================================
-        # STEP 2.5: Update Database with Calculation Results
-        # ============================================================
+
         try:
-            # Read the results JSON
-            with open(json_path, 'r') as f:
+            with open(json_path, "r") as f:
                 results_data = json.load(f)
-            
-            # Get StudyInstanceUID from id.json
-            id_json_path = case_output / "id.json"
+
             study_uid = None
+            id_json_path = case_output / "id.json"
             if id_json_path.exists():
-                with open(id_json_path, 'r') as f:
+                with open(id_json_path, "r") as f:
                     id_data = json.load(f)
                     study_uid = id_data.get("StudyInstanceUID")
-            
+
             if study_uid:
-                # Update database with calculation results
-                db_path = config.DB_PATH
-                conn = sqlite3.connect(db_path)
+                conn = sqlite3.connect(config.DB_PATH)
                 c = conn.cursor()
                 c.execute(
                     "UPDATE dicom_metadata SET CalculationResults = ? WHERE StudyInstanceUID = ?",
@@ -397,136 +419,101 @@ def process_case(nifti_path):
                     logger.print(f"  [DB] Calculation results updated for {study_uid}")
             else:
                 logger.print("[Database] ⚠️  Could not find StudyInstanceUID")
-                
         except Exception as e:
             logger.print(f"  [Warning] Failed to update database with results: {e}")
-            # Don't fail the entire process if DB update fails
-        
-    except Exception as e:
-        logger.print(f"Error calculating metrics for {case_id}: {e}")
-        
-        # Write error log
-        with open(case_output / "error.log", "w") as f:
-            f.write(str(e))
-        
-        # Move NIfTI to error directory to prevent infinite reprocessing
-        error_dest = ERROR_DIR / nifti_path.name
+
         try:
-            shutil.move(str(nifti_path), str(error_dest))
-            logger.print(f"Input moved to error folder: {error_dest}")
+            id_json_path = case_output / "id.json"
+            if id_json_path.exists():
+                with open(id_json_path, "r") as f:
+                    meta = json.load(f)
+
+                pipeline_data = meta.get("Pipeline", {})
+                start_str = pipeline_data.get("start_time")
+                end_dt = datetime.datetime.now()
+                pipeline_data["end_time"] = end_dt.isoformat()
+
+                if start_str:
+                    try:
+                        start_dt = datetime.datetime.fromisoformat(start_str)
+                        pipeline_data["elapsed_time"] = str(end_dt - start_dt)
+                    except Exception:
+                        pipeline_data["elapsed_time"] = "Error parsing start_time"
+                else:
+                    pipeline_data["elapsed_time"] = "Unknown start_time"
+
+                meta["Pipeline"] = pipeline_data
+                with open(id_json_path, "w") as f:
+                    json.dump(meta, f, indent=2)
+
+                try:
+                    study_uid = meta.get("StudyInstanceUID")
+                    if study_uid:
+                        conn = sqlite3.connect(config.DB_PATH)
+                        c = conn.cursor()
+                        c.execute(
+                            "UPDATE dicom_metadata SET IdJson = ?, Weight = ?, Height = ? WHERE StudyInstanceUID = ?",
+                            (json.dumps(meta), meta.get("Weight"), meta.get("Height"), study_uid)
+                        )
+                        conn.commit()
+                        conn.close()
+                        if not config.VERBOSE_CONSOLE:
+                            logger.print("[Database] ✓ Updated id.json")
+                        else:
+                            logger.print(f"  [DB] id.json updated for {study_uid}")
+                except Exception as e:
+                    logger.print(f"  [Warning] Failed to update database with id.json: {e}")
+        except Exception as e:
+            logger.print(f"Error updating pipeline time: {e}")
+
+        try:
+            final_name = case_id
+            try:
+                with open(case_output / "id.json", "r") as f:
+                    idd = json.load(f)
+                    if "ClinicalName" in idd and idd["ClinicalName"] and idd["ClinicalName"] != "Unknown":
+                        final_name = idd["ClinicalName"]
+            except Exception:
+                pass
+
+            final_nii_path = NII_DIR / f"{final_name}.nii.gz"
+            if final_nii_path.exists():
+                final_nii_path.unlink()
+            shutil.move(str(nifti_path), str(final_nii_path))
+            if not config.VERBOSE_CONSOLE:
+                logger.print(f"\n[Archive] ✓ Moved to nii/{final_name}.nii.gz")
+            else:
+                logger.print(f"Input archived to: {final_nii_path}")
+        except Exception as e:
+            logger.print(f"Error archiving input: {e}")
+
+        if not config.VERBOSE_CONSOLE:
+            try:
+                with open(case_output / "id.json", "r") as f:
+                    meta = json.load(f)
+                    elapsed_str = meta.get("Pipeline", {}).get("elapsed_time", "Unknown")
+                    logger.print(f"\n✅ Case complete ({elapsed_str})")
+            except Exception:
+                logger.print("\n✅ Case complete")
+
+        logger.close()
+        return True
+
+    except Exception as e:
+        logger.print(f"Unhandled processing error for {case_id}: {e}")
+        try:
+            with open(case_output / "error.log", "w") as f:
+                f.write(str(e))
+        except Exception:
+            pass
+        try:
+            if nifti_path.exists():
+                error_dest = move_case_file(nifti_path, ERROR_DIR)
+                logger.print(f"Input moved to error folder: {error_dest}")
         except Exception as move_err:
             logger.print(f"Critical error: Could not move error file {nifti_path}: {move_err}")
-            
         logger.close()
         return False
-
-
-    # ============================================================
-    # STEP 3: Update Pipeline Timing
-    # ============================================================
-    # Record end time and elapsed time in id.json
-    try:
-        id_json_path = case_output / "id.json"
-        if id_json_path.exists():
-            with open(id_json_path, 'r') as f:
-                meta = json.load(f)
-            
-            pipeline_data = meta.get("Pipeline", {})
-            start_str = pipeline_data.get("start_time")
-            
-            end_dt = datetime.datetime.now()
-            pipeline_data["end_time"] = end_dt.isoformat()
-            
-            # Calculate elapsed time
-            if start_str:
-                try:
-                    start_dt = datetime.datetime.fromisoformat(start_str)
-                    delta = end_dt - start_dt
-                    pipeline_data["elapsed_time"] = str(delta)
-                except:
-                    pipeline_data["elapsed_time"] = "Error parsing start_time"
-            else:
-                 pipeline_data["elapsed_time"] = "Unknown start_time"
-                 
-            meta["Pipeline"] = pipeline_data
-            
-            with open(id_json_path, 'w') as f:
-                json.dump(meta, f, indent=2)
-            
-            # ============================================================
-            # STEP 3.5: Update Database with Complete id.json
-            # ============================================================
-            try:
-                study_uid = meta.get("StudyInstanceUID")
-                if study_uid:
-                    db_path = config.DB_PATH
-                    conn = sqlite3.connect(db_path)
-                    c = conn.cursor()
-                    
-                    # Extract biometric data if available
-                    weight = meta.get("Weight")
-                    height = meta.get("Height")
-                    
-                    # Update IdJson and biometric data
-                    c.execute(
-                        "UPDATE dicom_metadata SET IdJson = ?, Weight = ?, Height = ? WHERE StudyInstanceUID = ?",
-                        (json.dumps(meta), weight, height, study_uid)
-                    )
-                    conn.commit()
-                    conn.close()
-                    if not config.VERBOSE_CONSOLE:
-                        logger.print("[Database] ✓ Updated id.json")
-                    else:
-                        logger.print(f"  [DB] id.json updated for {study_uid}")
-                
-            except Exception as e:
-                logger.print(f"  [Warning] Failed to update database with id.json: {e}")
-                # Don't fail the entire process if DB update fails
-                
-    except Exception as e:
-        logger.print(f"Error updating pipeline time: {e}")
-
-    # ============================================================
-    # STEP 4: Archive NIfTI File
-    # ============================================================
-    # Move processed NIfTI from input/ to nii/ archive
-    # Use clinical naming if available
-    try:
-        # Try to read ClinicalName from id.json for better file organization
-        final_name = case_id
-        try:
-            with open(case_output / "id.json", 'r') as f:
-                idd = json.load(f)
-                if "ClinicalName" in idd and idd["ClinicalName"] and idd["ClinicalName"] != "Unknown":
-                    final_name = idd["ClinicalName"]
-        except: 
-            pass  # Use case_id if clinical name not available
-        
-        final_nii_path = NII_DIR / f"{final_name}.nii.gz"
-        shutil.move(str(nifti_path), str(final_nii_path))
-        if not config.VERBOSE_CONSOLE:
-            logger.print(f"\n[Archive] ✓ Moved to nii/{final_name}.nii.gz")
-        else:
-            logger.print(f"Input archived to: {final_nii_path}")
-    except Exception as e:
-        logger.print(f"Error archiving input: {e}")
-    
-    # ============================================================
-    # FINAL: Case Completion Summary
-    # ============================================================
-    if not config.VERBOSE_CONSOLE:
-        # Calculate total elapsed time from id.json
-        try:
-            with open(case_output / "id.json", 'r') as f:
-                meta = json.load(f)
-                pipeline_data = meta.get("Pipeline", {})
-                elapsed_str = pipeline_data.get("elapsed_time", "Unknown")
-                logger.print(f"\n✅ Case complete ({elapsed_str})")
-        except:
-            logger.print(f"\n✅ Case complete")
-
-    logger.close()
-    return True
 
 
 def main():
@@ -536,7 +523,7 @@ def main():
     Monitors input/ directory for new NIfTI files and processes them in parallel.
     Supports up to 3 simultaneous cases for optimal resource utilization.
     """
-    print("Starting input/ directory monitoring (Parallel - 3 Cases)...")
+    print("Starting input/ directory monitoring...")
     
     max_cases = config.MAX_PARALLEL_CASES  # Maximum concurrent cases from config
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_cases)
@@ -569,6 +556,14 @@ def main():
                         # Skip if file is already being processed
                         if f in processing_files:
                             continue
+
+                        # Skip files that may still be mid-copy.
+                        if not is_file_stable(f):
+                            continue
+
+                        # Skip files that already have a claimed twin in processing/.
+                        if (PROCESSING_DIR / f.name).exists():
+                            continue
                             
                         # Submit new case for processing
                         print(f"Submitting new case: {f.name}")
@@ -576,12 +571,11 @@ def main():
                         future = executor.submit(process_case, f)
                         future.add_done_callback(lambda fut, p=f: on_complete(fut, p))
             
-                # Check for new files every 2 seconds
-                time.sleep(2)
+                time.sleep(config.PROCESSING_SCAN_INTERVAL)
                 
             except Exception as e:
                 print(f"Error in main loop: {e}")
-                time.sleep(2)
+                time.sleep(config.PROCESSING_SCAN_INTERVAL)
                 
     except KeyboardInterrupt:
         print("\nStopping monitoring...")

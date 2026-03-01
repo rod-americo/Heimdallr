@@ -506,6 +506,93 @@ td:last-child {
     font-weight: 400;
 }
 
+.triage-panel {
+    margin-top: 1rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    overflow: hidden;
+}
+
+.triage-panel summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 0.9rem 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.triage-panel summary::-webkit-details-marker {
+    display: none;
+}
+
+.triage-panel summary::after {
+    content: "Expandir";
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+}
+
+.triage-panel[open] summary::after {
+    content: "Recolher";
+}
+
+.triage-panel-body {
+    padding: 0 1rem 1rem;
+    display: grid;
+    gap: 0.85rem;
+}
+
+.triage-component-card {
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    padding: 0.9rem;
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.triage-component-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.triage-component-header strong {
+    color: var(--text-primary);
+}
+
+.triage-component-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+}
+
+.triage-overlay-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+}
+
+.triage-overlay-link {
+    display: block;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border-subtle);
+    background: #0c1422;
+}
+
+.triage-overlay-link img {
+    width: 100%;
+    display: block;
+}
+
 /* Footer */
 footer {
     text-align: center;
@@ -588,7 +675,7 @@ footer a:hover {
     display: none;
     position: absolute;
     right: 0;
-    top: calc(100% + 4px);
+    top: 100%;
     background-color: var(--bg-secondary);
     min-width: 180px;
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
@@ -602,7 +689,7 @@ footer a:hover {
 /* Anti-clipping: Open upwards for the last 3 rows if the table is tall enough */
 tbody tr:nth-last-child(-n+3):nth-child(n+3) .dropdown-content {
     top: auto;
-    bottom: calc(100% + 4px);
+    bottom: 100%;
     box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.3);
 }
 
@@ -621,7 +708,7 @@ tbody tr:nth-last-child(-n+3):nth-child(n+3) .dropdown-content {
     color: var(--accent);
 }
 
-.dropdown:hover .dropdown-content {
+.dropdown.open .dropdown-content {
     display: block;
 }
 
