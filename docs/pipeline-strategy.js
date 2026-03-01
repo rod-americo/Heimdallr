@@ -149,10 +149,14 @@
             el.className = 'card';
             el.innerHTML = `
                 <div class="card-top">
-                    <span class="meta-chip horizon ${m.horizon}">${m.horizon}</span>
-                    <span class="meta-chip track track-${m.track}">${trackShortLabel(m.track)}</span>
-                    <span class="meta-chip repo-state repo-${m.repoState || 'not-started'}">${repoStateLabel(m.repoState)}</span>
-                    <span class="meta-chip status status-${m.status}">${statusLabel(m.status)}</span>
+                    <div class="meta-group left">
+                        <span class="meta-chip horizon ${m.horizon}">${m.horizon}</span>
+                        <span class="meta-chip track track-${m.track}">${trackShortLabel(m.track)}</span>
+                    </div>
+                    <div class="meta-group right">
+                        <span class="meta-chip repo-state repo-${m.repoState || 'not-started'}">${repoStateLabel(m.repoState)}</span>
+                        <span class="meta-chip status status-${m.status}">${statusLabel(m.status)}</span>
+                    </div>
                 </div>
                 <h3>${m.title}</h3>
                 <div class="card-body">

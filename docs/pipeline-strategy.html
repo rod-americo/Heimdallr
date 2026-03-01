@@ -397,9 +397,21 @@
 
         .card-top {
             display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .meta-group {
+            display: flex;
             flex-wrap: wrap;
             gap: 8px;
-            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        .meta-group.right {
+            justify-content: flex-end;
         }
 
         .meta-chip {
@@ -441,13 +453,25 @@
 
         .meta {
             display: flex;
-            gap: 8px;
+            justify-content: space-between;
+            gap: 12px;
             font-size: 0.82rem;
             color: var(--muted);
             margin-top: auto;
             margin-bottom: 0;
-            flex-wrap: wrap;
             align-items: center;
+        }
+
+        @media (max-width: 760px) {
+            .card-top,
+            .meta {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .meta-group.right {
+                justify-content: flex-start;
+            }
         }
 
         .pill {
