@@ -29,6 +29,7 @@ import numpy as np
 import json
 from pathlib import Path
 import sqlite3
+from scipy.ndimage import label as ndlabel
 
 def get_volume_cm3(path):
     """Calcula o volume em cm³ de uma máscara NIfTI."""
@@ -80,7 +81,119 @@ def get_mean_hu(path, ct_data):
         print(f"Error calculating HU for {path.name}: {ex}")
         return None, None
 
-def calculate_all_metrics(case_id, nifti_path, case_output_folder):
+def find_first_existing_path(base_dir, relative_paths):
+    """Return the first existing path from a list of relative candidates."""
+    for rel_path in relative_paths:
+        candidate = base_dir / rel_path
+        if candidate.exists():
+            return candidate
+    return None
+
+def get_mask_mean_std(mask_data, ct_data):
+    """Calculate mean and standard deviation for CT voxels inside a binary mask."""
+    if mask_data.shape != ct_data.shape:
+        print(f"Shape mismatch: Mask {mask_data.shape} vs CT {ct_data.shape}")
+        return None, None
+
+    voxels = ct_data[mask_data]
+    if voxels.size == 0:
+        return None, None
+
+    return round(float(np.mean(voxels)), 2), round(float(np.std(voxels)), 2)
+
+def load_binary_mask(path):
+    """Load a NIfTI file and return a boolean mask plus the loaded image."""
+    nii = nib.load(str(path))
+    return nii.get_fdata() > 0, nii
+
+def calculate_stone_mask_metrics(mask_data, spacing_mm, ct_data=None):
+    """
+    Calculate stone burden metrics from a binary segmentation mask.
+
+    Returns:
+        dict: count, total volume, largest axis-aligned diameter, and HU stats.
+    """
+    metrics = {
+        "count": 0,
+        "total_volume_mm3": 0.0,
+        "total_volume_cm3": 0.0,
+        "largest_diameter_mm": 0.0,
+        "hu_mean": None,
+        "hu_std": None
+    }
+
+    mask_bool = np.asarray(mask_data) > 0
+    if not np.any(mask_bool):
+        return metrics
+
+    voxel_volume_mm3 = float(spacing_mm[0] * spacing_mm[1] * spacing_mm[2])
+    total_voxels = int(np.sum(mask_bool))
+    total_volume_mm3 = total_voxels * voxel_volume_mm3
+
+    structure = np.ones((3, 3, 3), dtype=np.uint8)
+    labeled_mask, num_components = ndlabel(mask_bool, structure=structure)
+
+    largest_diameter_mm = 0.0
+    for component_id in range(1, num_components + 1):
+        coords = np.argwhere(labeled_mask == component_id)
+        if coords.size == 0:
+            continue
+
+        spans_vox = coords.max(axis=0) - coords.min(axis=0) + 1
+        spans_mm = spans_vox * np.asarray(spacing_mm[:3], dtype=np.float64)
+        component_diameter_mm = float(np.max(spans_mm))
+        largest_diameter_mm = max(largest_diameter_mm, component_diameter_mm)
+
+    metrics["count"] = int(num_components)
+    metrics["total_volume_mm3"] = round(total_volume_mm3, 2)
+    metrics["total_volume_cm3"] = round(total_volume_mm3 / 1000.0, 3)
+    metrics["largest_diameter_mm"] = round(largest_diameter_mm, 2)
+
+    if ct_data is not None:
+        hu_mean, hu_std = get_mask_mean_std(mask_bool, ct_data)
+        metrics["hu_mean"] = hu_mean
+        metrics["hu_std"] = hu_std
+
+    return metrics
+
+def is_mask_axially_complete(mask_data):
+    """
+    A structure is considered axially complete only if it does not touch the
+    first or last slice of the volume.
+    """
+    mask_bool = np.asarray(mask_data) > 0
+    if mask_bool.ndim != 3 or not np.any(mask_bool):
+        return False
+
+    z_indices = np.where(mask_bool.sum(axis=(0, 1)) > 0)[0]
+    if len(z_indices) == 0:
+        return False
+
+    return int(z_indices[0]) > 0 and int(z_indices[-1]) < (mask_bool.shape[2] - 1)
+
+def get_structure_completeness(path):
+    """
+    Return completeness metadata for a segmentation file.
+
+    Returns:
+        tuple: (status, mask_bool, nii)
+        status in {"Not available", "Empty", "Incomplete", "Complete", "Error"}
+    """
+    if not path.exists():
+        return "Not available", None, None
+
+    try:
+        mask_data, nii = load_binary_mask(path)
+        if not np.any(mask_data):
+            return "Empty", mask_data, nii
+        if not is_mask_axially_complete(mask_data):
+            return "Incomplete", mask_data, nii
+        return "Complete", mask_data, nii
+    except Exception as ex:
+        print(f"Error evaluating completeness for {path.name}: {ex}")
+        return "Error", None, None
+
+def calculate_all_metrics(case_id, nifti_path, case_output_folder, generate_overlays=True):
     """
     Calculate all clinical metrics for a case.
     
@@ -131,7 +244,7 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder):
         "modality": modality
     }
 
-    # Load original image for density calculation and overlay generation
+    # Load original image for density calculation and optional overlay generation
     ct = nib.load(str(nifti_path)).get_fdata()
 
     # ============================================================
@@ -149,29 +262,223 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder):
     
     for organ_name, filename in organs_map:
         fpath = total_dir / filename
-        
-        # Volume is calculated for all modalities (CT and MR)
-        vol = get_volume_cm3(fpath)
-        results[f"{organ_name}_vol_cm3"] = vol
-        
-        # Hounsfield Units only for CT (not applicable to MR)
-        if modality == "CT":
-            hu_mean, hu_std = get_mean_hu(fpath, ct)
-            results[f"{organ_name}_hu_mean"] = hu_mean
-            results[f"{organ_name}_hu_std"] = hu_std
-            
-            # Liver PDFF calculation based on Pickhardt et al. (120 kVp)
-            # Only calculate if organ is present (vol > 0.1 and hu_mean is not None)
-            if organ_name == "liver" and vol > 0.1 and hu_mean is not None:
-                # Calculate for all cases, and add a tag with the KVP
-                pdff = -0.58 * hu_mean + 38.2
-                pdff = max(0.0, min(100.0, pdff)) # Clamp to 0-100%
-                results[f"{organ_name}_pdff_percent"] = round(pdff, 2)
-                results[f"{organ_name}_pdff_kvp"] = kvp_raw
+        status, organ_mask, organ_nii = get_structure_completeness(fpath)
+        results[f"{organ_name}_analysis_status"] = status
+        results[f"{organ_name}_complete"] = (status == "Complete")
+
+        if status == "Complete":
+            zooms = organ_nii.header.get_zooms()
+            voxel_vol_mm3 = zooms[0] * zooms[1] * zooms[2]
+            vol_mm3 = np.sum(organ_mask) * voxel_vol_mm3
+            vol = round(vol_mm3 / 1000.0, 3)
+            results[f"{organ_name}_vol_cm3"] = vol
+
+            if modality == "CT":
+                hu_mean, hu_std = get_mask_mean_std(organ_mask, ct)
+                results[f"{organ_name}_hu_mean"] = hu_mean
+                results[f"{organ_name}_hu_std"] = hu_std
+
+                if organ_name == "liver" and vol > 0.1 and hu_mean is not None:
+                    pdff = -0.58 * hu_mean + 38.2
+                    pdff = max(0.0, min(100.0, pdff))
+                    results[f"{organ_name}_pdff_percent"] = round(pdff, 2)
+                    results[f"{organ_name}_pdff_kvp"] = kvp_raw
+            else:
+                results[f"{organ_name}_hu_mean"] = None
+                results[f"{organ_name}_hu_std"] = None
         else:
-            # MR: signal intensity varies by sequence, not standardized like HU
+            results[f"{organ_name}_vol_cm3"] = None
             results[f"{organ_name}_hu_mean"] = None
             results[f"{organ_name}_hu_std"] = None
+
+    # ============================================================
+    # STEP 2.5: Renal Stone Burden
+    # ============================================================
+    # Literature and current workflow favor volumetric burden as the primary metric.
+    # We also expose count, largest diameter, laterality, and HU for operational use.
+
+    left_stone_path = find_first_existing_path(case_output_folder, [
+        "total/kidney_stone_left.nii.gz",
+        "total/renal_stone_left.nii.gz",
+        "total/calculus_left.nii.gz",
+        "stones/kidney_stone_left.nii.gz",
+        "stones/renal_stone_left.nii.gz",
+        "urology/kidney_stone_left.nii.gz",
+        "urology/renal_stone_left.nii.gz"
+    ])
+    right_stone_path = find_first_existing_path(case_output_folder, [
+        "total/kidney_stone_right.nii.gz",
+        "total/renal_stone_right.nii.gz",
+        "total/calculus_right.nii.gz",
+        "stones/kidney_stone_right.nii.gz",
+        "stones/renal_stone_right.nii.gz",
+        "urology/kidney_stone_right.nii.gz",
+        "urology/renal_stone_right.nii.gz"
+    ])
+    total_stone_path = find_first_existing_path(case_output_folder, [
+        "total/kidney_stone.nii.gz",
+        "total/kidney_stones.nii.gz",
+        "total/renal_stone.nii.gz",
+        "total/renal_stones.nii.gz",
+        "total/calculus.nii.gz",
+        "stones/kidney_stone.nii.gz",
+        "stones/kidney_stones.nii.gz",
+        "stones/renal_stone.nii.gz",
+        "stones/renal_stones.nii.gz",
+        "urology/kidney_stone.nii.gz",
+        "urology/kidney_stones.nii.gz",
+        "urology/renal_stone.nii.gz",
+        "urology/renal_stones.nii.gz"
+    ])
+
+    left_mask_data = None
+    right_mask_data = None
+    total_mask_data = None
+    kidney_left_mask_data = None
+    kidney_right_mask_data = None
+    stone_spacing_mm = None
+    total_mask_is_derived = False
+
+    stone_defaults = {
+        "renal_stone_count": None,
+        "renal_stone_total_volume_mm3": None,
+        "renal_stone_total_volume_cm3": None,
+        "renal_stone_largest_diameter_mm": None,
+        "renal_stone_hu_mean": None,
+        "renal_stone_hu_std": None,
+        "renal_stone_left_count": None,
+        "renal_stone_left_total_volume_mm3": None,
+        "renal_stone_left_total_volume_cm3": None,
+        "renal_stone_left_largest_diameter_mm": None,
+        "renal_stone_left_hu_mean": None,
+        "renal_stone_left_hu_std": None,
+        "renal_stone_right_count": None,
+        "renal_stone_right_total_volume_mm3": None,
+        "renal_stone_right_total_volume_cm3": None,
+        "renal_stone_right_largest_diameter_mm": None,
+        "renal_stone_right_hu_mean": None,
+        "renal_stone_right_hu_std": None,
+        "renal_stone_bilateral": None,
+        "renal_stone_kidney_left_complete": None,
+        "renal_stone_kidney_right_complete": None,
+        "renal_stone_kidneys_complete": None,
+        "renal_stone_analysis_status": "Not available"
+    }
+    results.update(stone_defaults)
+
+    try:
+        kidney_left_path = total_dir / "kidney_left.nii.gz"
+        kidney_right_path = total_dir / "kidney_right.nii.gz"
+
+        left_kidney_status, kidney_left_mask_data, _ = get_structure_completeness(kidney_left_path)
+        right_kidney_status, kidney_right_mask_data, _ = get_structure_completeness(kidney_right_path)
+        if left_kidney_status != "Not available":
+            results["renal_stone_kidney_left_complete"] = (left_kidney_status == "Complete")
+        if right_kidney_status != "Not available":
+            results["renal_stone_kidney_right_complete"] = (right_kidney_status == "Complete")
+
+        if kidney_left_mask_data is not None and kidney_right_mask_data is not None:
+            results["renal_stone_kidneys_complete"] = bool(
+                results["renal_stone_kidney_left_complete"] and results["renal_stone_kidney_right_complete"]
+            )
+
+        if left_stone_path is not None:
+            nii_left_stone = nib.load(str(left_stone_path))
+            left_mask_data = nii_left_stone.get_fdata() > 0
+            stone_spacing_mm = nii_left_stone.header.get_zooms()
+
+        if right_stone_path is not None:
+            nii_right_stone = nib.load(str(right_stone_path))
+            right_mask_data = nii_right_stone.get_fdata() > 0
+            stone_spacing_mm = stone_spacing_mm or nii_right_stone.header.get_zooms()
+
+        if total_stone_path is not None:
+            nii_total_stone = nib.load(str(total_stone_path))
+            total_mask_data = nii_total_stone.get_fdata() > 0
+            stone_spacing_mm = stone_spacing_mm or nii_total_stone.header.get_zooms()
+
+        left_kidney_complete = results["renal_stone_kidney_left_complete"]
+        right_kidney_complete = results["renal_stone_kidney_right_complete"]
+
+        if left_mask_data is not None and left_kidney_complete is False:
+            left_mask_data = None
+
+        if right_mask_data is not None and right_kidney_complete is False:
+            right_mask_data = None
+
+        if total_mask_data is not None:
+            allowed_total_mask = np.zeros_like(total_mask_data, dtype=bool)
+
+            if kidney_left_mask_data is not None and left_kidney_complete is True and kidney_left_mask_data.shape == total_mask_data.shape:
+                allowed_total_mask |= kidney_left_mask_data
+
+            if kidney_right_mask_data is not None and right_kidney_complete is True and kidney_right_mask_data.shape == total_mask_data.shape:
+                allowed_total_mask |= kidney_right_mask_data
+
+            if np.any(allowed_total_mask):
+                total_mask_data = np.logical_and(total_mask_data, allowed_total_mask)
+            elif left_kidney_complete is False and right_kidney_complete is False:
+                total_mask_data = None
+
+        if left_mask_data is not None and right_mask_data is not None:
+            if left_mask_data.shape == right_mask_data.shape:
+                total_mask_data = np.logical_or(left_mask_data, right_mask_data)
+                total_mask_is_derived = True
+            else:
+                print(f"Warning: Left/right stone masks shape mismatch: {left_mask_data.shape} vs {right_mask_data.shape}")
+        elif total_mask_data is None and left_mask_data is not None:
+            total_mask_data = left_mask_data
+            total_mask_is_derived = True
+        elif total_mask_data is None and right_mask_data is not None:
+            total_mask_data = right_mask_data
+            total_mask_is_derived = True
+
+        masks_available = any(mask is not None for mask in [left_mask_data, right_mask_data, total_mask_data])
+        if masks_available and stone_spacing_mm is not None:
+            if total_mask_data is not None:
+                total_metrics = calculate_stone_mask_metrics(
+                    total_mask_data,
+                    stone_spacing_mm,
+                    ct if modality == "CT" else None
+                )
+                results["renal_stone_count"] = total_metrics["count"]
+                results["renal_stone_total_volume_mm3"] = total_metrics["total_volume_mm3"]
+                results["renal_stone_total_volume_cm3"] = total_metrics["total_volume_cm3"]
+                results["renal_stone_largest_diameter_mm"] = total_metrics["largest_diameter_mm"]
+                results["renal_stone_hu_mean"] = total_metrics["hu_mean"] if modality == "CT" else None
+                results["renal_stone_hu_std"] = total_metrics["hu_std"] if modality == "CT" else None
+            for side_name, side_mask in [("left", left_mask_data), ("right", right_mask_data)]:
+                if side_mask is not None:
+                    side_metrics = calculate_stone_mask_metrics(
+                        side_mask,
+                        stone_spacing_mm,
+                        ct if modality == "CT" else None
+                    )
+                    results[f"renal_stone_{side_name}_count"] = side_metrics["count"]
+                    results[f"renal_stone_{side_name}_total_volume_mm3"] = side_metrics["total_volume_mm3"]
+                    results[f"renal_stone_{side_name}_total_volume_cm3"] = side_metrics["total_volume_cm3"]
+                    results[f"renal_stone_{side_name}_largest_diameter_mm"] = side_metrics["largest_diameter_mm"]
+                    results[f"renal_stone_{side_name}_hu_mean"] = side_metrics["hu_mean"] if modality == "CT" else None
+                    results[f"renal_stone_{side_name}_hu_std"] = side_metrics["hu_std"] if modality == "CT" else None
+            results["renal_stone_bilateral"] = bool(
+                left_mask_data is not None and np.any(left_mask_data) and
+                right_mask_data is not None and np.any(right_mask_data)
+            )
+
+            if left_mask_data is not None and right_mask_data is not None:
+                results["renal_stone_analysis_status"] = "Complete"
+            elif left_kidney_complete is False or right_kidney_complete is False:
+                results["renal_stone_analysis_status"] = "Incomplete kidneys"
+            elif total_stone_path is not None and not total_mask_is_derived:
+                results["renal_stone_analysis_status"] = "Total-only"
+            else:
+                results["renal_stone_analysis_status"] = "Partial"
+        elif left_kidney_complete is False or right_kidney_complete is False:
+            results["renal_stone_analysis_status"] = "Incomplete kidneys"
+
+    except Exception as e:
+        print(f"Error in renal stone burden analysis: {e}")
+        results["renal_stone_analysis_status"] = "Error"
 
  # ============================================================
     # STEP 3: L3 Sarcopenia Analysis
@@ -181,23 +488,26 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder):
     
     vertebra_L3_file = case_output_folder / "total" / "vertebrae_L3.nii.gz"
     muscle_file = case_output_folder / "tissue_types" / "skeletal_muscle.nii.gz"
-    
+    results["L3_analysis_status"] = "Not available"
+
     if vertebra_L3_file.exists():
         try:
-            # Find L3 vertebra slice
-            nii_L3 = nib.load(str(vertebra_L3_file))
-            mask_L3 = nii_L3.get_fdata()
+            l3_status, mask_L3, _ = get_structure_completeness(vertebra_L3_file)
+            results["L3_analysis_status"] = l3_status
+            if l3_status != "Complete":
+                mask_L3 = None
             
-            # Find axial slices containing L3
-            slice_L3_indices = np.where(mask_L3.sum(axis=(0, 1)) > 0)[0]
+            if mask_L3 is not None:
+                # Find axial slices containing L3
+                slice_L3_indices = np.where(mask_L3.sum(axis=(0, 1)) > 0)[0]
             
-            if len(slice_L3_indices) > 0:
+            if mask_L3 is not None and len(slice_L3_indices) > 0:
                 # Use middle slice of L3 vertebra
                 slice_idx = int(slice_L3_indices[len(slice_L3_indices)//2])
                 results["slice_L3"] = slice_idx
                 
                 # Generate L3 overlay image (CT only)
-                if modality == "CT":
+                if modality == "CT" and generate_overlays:
                     try:
                         import matplotlib
                         matplotlib.use('Agg')  # Non-interactive backend
@@ -263,272 +573,237 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder):
                         results["muscle_HU_std"] = None
 
             else:
-                print("Warning: L3 vertebra found but mask is empty.")
+                print(f"Warning: Skipping L3 analysis due to vertebra status: {results['L3_analysis_status']}")
                 
         except Exception as e:
             print(f"Error in L3 analysis: {e}")
+            results["L3_analysis_status"] = "Error"
 
     # ============================================================
     # STEP 4: Cerebral Hemorrhage Analysis
     # ============================================================
-    # Quantify intracranial bleeding if detected
     bleed_file = case_output_folder / "bleed" / "intracerebral_hemorrhage.nii.gz"
-    
+    brain_file = total_dir / "brain.nii.gz"
+    skull_file = total_dir / "skull.nii.gz"
+    brain_status, _, _ = get_structure_completeness(brain_file)
+    results["brain_analysis_status"] = brain_status
+    skull_status, _, _ = get_structure_completeness(skull_file)
+    results["skull_analysis_status"] = skull_status
+    results["hemorrhage_analysis_status"] = "Not available"
+    results["hemorrhage_vol_cm3"] = None
+
     if bleed_file.exists():
         try:
-            # Calculate hemorrhage volume
-            vol_bleed = get_volume_cm3(bleed_file)
-            results["hemorrhage_vol_cm3"] = vol_bleed
-            
-            if vol_bleed > 0:
-                nii_bleed = nib.load(str(bleed_file))
-                mask_bleed = nii_bleed.get_fdata()
-                
-                # Find axial slices containing hemorrhage
-                z_indices = np.where(mask_bleed.sum(axis=(0, 1)) > 0)[0]
-                
-                if len(z_indices) > 0:
-                    # Select representative slices (inferior 15%, center 50%, superior 85%)
-                    n_slices = len(z_indices)
-                    
-                    idx_15 = int(n_slices * 0.15)
-                    idx_50 = int(n_slices * 0.50)
-                    idx_85 = int(n_slices * 0.85)
-                    
-                    # Clamp to valid range
-                    idx_15 = max(0, min(idx_15, n_slices - 1))
-                    idx_50 = max(0, min(idx_50, n_slices - 1))
-                    idx_85 = max(0, min(idx_85, n_slices - 1))
-                    
-                    slices_to_gen = {
-                        "inferior_15": int(z_indices[idx_15]),
-                        "center_50":   int(z_indices[idx_50]),
-                        "superior_85": int(z_indices[idx_85])
-                    }
-                    
-                    # Generate overlay images (CT only)
-                    if modality == "CT":
-                        try:
-                            import matplotlib
-                            matplotlib.use('Agg')
-                            import matplotlib.pyplot as plt
-                            
-                            # Verify CT and hemorrhage mask have matching dimensions
-                            if ct.shape != mask_bleed.shape:
-                                print(f"Warning: Shape mismatch Bleed {mask_bleed.shape} vs CT {ct.shape}. Skipping overlay.")
-                            else:
-                                # Generate overlay for each representative slice
-                                for label, slice_idx in slices_to_gen.items():
-                                    ct_slice = np.rot90(ct[:, :, slice_idx])
-                                    mask_slice = np.rot90(mask_bleed[:, :, slice_idx])
-                                    
-                                    plt.figure(figsize=(8, 8))
-                                    
-                                    # Brain CT windowing (WL=40, WW=80)
-                                    plt.imshow(ct_slice, cmap='gray', vmin=0, vmax=80)
-                                    
-                                    # Overlay hemorrhage in red
-                                    mask_binary = (mask_slice > 0).astype(np.float32)
-                                    
-                                    if np.sum(mask_binary) > 0:
-                                        masked_data = np.ma.masked_where(mask_binary == 0, mask_binary)
-                                        plt.imshow(masked_data, cmap='Reds', alpha=0.7, vmin=0, vmax=1)
-                                    
-                                    plt.axis('off')
-                                    plt.title(f"Hemorrhage {label} (z={slice_idx})")
-                                    plt.tight_layout()
-                                    
-                                    out_img = case_output_folder / f"bleed_overlay_{label}.png"
-                                    plt.savefig(out_img, dpi=150)
-                                    plt.close()
-                                    
-                                results["hemorrhage_analysis_slices"] = slices_to_gen
-                                
-                        except Exception as plot_err:
-                            print(f"Error generating hemorrhage overlay: {plot_err}")
-                            
-        except Exception as e:
-            print(f"Error in hemorrhage analysis: {e}")
-
-    # ============================================================
-    # STEP 5: Bone Mineral Density (BMD) Analysis — L1 Vertebra
-    # ============================================================
-    # Opportunistic osteoporosis screening using CT Hounsfield Units
-    # Method: 2D ROI on central axial slice of L1 (Pickhardt et al. 2013)
-    #   > 160 HU  → Normal
-    #   100–160 HU → Osteopenia
-    #   < 100 HU  → Osteoporosis
-    
-    vertebra_L1_file = total_dir / "vertebrae_L1.nii.gz"
-    
-    if vertebra_L1_file.exists() and modality == "CT":
-        try:
-            from scipy.ndimage import binary_erosion
-            
-            nii_L1 = nib.load(str(vertebra_L1_file))
-            mask_L1 = nii_L1.get_fdata() > 0
-            spacing = nii_L1.header.get_zooms()  # (x_mm, y_mm, z_mm)
-            
-            if ct.shape != mask_L1.shape:
-                print(f"Warning: Shape mismatch L1 {mask_L1.shape} vs CT {ct.shape}. Skipping BMD.")
+            if brain_status != "Complete":
+                results["hemorrhage_analysis_status"] = "Incomplete brain"
             else:
-                # Find central axial slice of L1
-                z_indices = np.where(mask_L1.sum(axis=(0, 1)) > 0)[0]
-                
-                if len(z_indices) > 0:
-                    center_z = int(z_indices[len(z_indices) // 2])
-                    
-                    # Extract 2D mask and CT at central slice
-                    mask_2d = mask_L1[:, :, center_z]
-                    ct_2d = ct[:, :, center_z]
-                    
-                    # 1. 2D erosion to find the vertebral body core (discard posterior elements)
-                    in_plane_spacing = min(spacing[0], spacing[1])
-                    erosion_iters = max(1, int(5.0 / in_plane_spacing))
-                    
-                    eroded_2d = binary_erosion(mask_2d, iterations=erosion_iters)
-                    
-                    # 2. Keep only the largest connected component (vertebral body)
-                    from scipy.ndimage import label as ndlabel, center_of_mass
-                    labeled, num_features = ndlabel(eroded_2d)
-                    if num_features > 1:
-                        component_sizes = [np.sum(labeled == i) for i in range(1, num_features + 1)]
-                        largest = np.argmax(component_sizes) + 1
-                        eroded_2d = (labeled == largest)
-                    
-                    if np.sum(eroded_2d) > 0:
-                        # 3. Calculate centroids to determine anterior direction
-                        full_com_x, full_com_y = center_of_mass(mask_2d)
-                        body_com_x, body_com_y = center_of_mass(eroded_2d)
-                        
-                        # 4. Find bounding box of the vertebral body
-                        x_indices, y_indices = np.where(eroded_2d)
-                        x_min, x_max = x_indices.min(), x_indices.max()
-                        y_min, y_max = y_indices.min(), y_indices.max()
-                        
-                        # Compare X vs Y variances to find the AP axis (usually Y in standard axial)
-                        diff_x = abs(full_com_x - body_com_x)
-                        diff_y = abs(full_com_y - body_com_y)
-                        
-                        # 5. Define oval radii (Increased size to match user visual preference)
-                        # Diameter X = 70% of vertebral body width
-                        # Diameter Y = 40% of vertebral body height
-                        rx = (x_max - x_min) * 0.70 / 2.0
-                        ry = (y_max - y_min) * 0.40 / 2.0
-                        
-                        if diff_y > diff_x:
-                            # AP axis is Y. Opposite direction of full_com from body_com is Anterior.
-                            anterior_is_larger_y = body_com_y > full_com_y
-                            center_x = (x_min + x_max) / 2.0
-                            
-                            if anterior_is_larger_y:
-                                # Offset from anterior edge (25% into the body)
-                                center_y = y_max - (y_max - y_min) * 0.25
-                            else:
-                                center_y = y_min + (y_max - y_min) * 0.25
-                        else:
-                            # AP axis is X.
-                            anterior_is_larger_x = body_com_x > full_com_x
-                            center_y = (y_min + y_max) / 2.0
-                            
-                            if anterior_is_larger_x:
-                                center_x = x_max - (x_max - x_min) * 0.25
-                            else:
-                                center_x = x_min + (x_max - x_min) * 0.25
-                                
-                        # 6. Generate the oval mask mathematically
-                        y_grid, x_grid = np.ogrid[:mask_2d.shape[0], :mask_2d.shape[1]]
-                        # Note: np.ogrid returns y_grid as (N, 1) and x_grid as (1, M)
-                        # np.where(eroded_2d) treats dim 0 as X in our previous extraction, so let's match dimensions
-                        # In numpy array indexing, dim 0 is rows (y_grid), dim 1 is cols (x_grid)
-                        # Wait, x_indices, y_indices = np.where(eroded_2d) means dim 0 is x_indices, dim 1 is y_indices.
-                        # So dim 0 (x) goes with np.ogrid row, dim 1 (y) goes with np.ogrid col.
-                        x_grid_arr, y_grid_arr = np.ogrid[:mask_2d.shape[0], :mask_2d.shape[1]]
-                        
-                        ellipse = ((x_grid_arr - center_x)**2 / rx**2) + ((y_grid_arr - center_y)**2 / ry**2) <= 1
-                        
-                        # Strict intersection with eroded body to ensure no cortical bone is included
-                        roi_mask = ellipse & eroded_2d
-                        
-                        trabecular_voxel_count = int(np.sum(roi_mask))
-                        
-                        if trabecular_voxel_count > 0:
-                            trabecular_hu = ct_2d[roi_mask]
-                            hu_mean = float(np.mean(trabecular_hu))
-                            hu_std = float(np.std(trabecular_hu))
-                            
-                            # Pickhardt classification
-                            if hu_mean > 160:
-                                classification = "Normal"
-                            elif hu_mean >= 100:
-                                classification = "Osteopenia"
-                            else:
-                                classification = "Osteoporose"
-                            
-                            results["L1_trabecular_HU_mean"] = round(hu_mean, 2)
-                            results["L1_trabecular_HU_std"] = round(hu_std, 2)
-                            results["L1_trabecular_voxel_count"] = trabecular_voxel_count
-                            results["L1_bmd_classification"] = classification
-                            
-                            # Generate zoomed overlay image
+                bleed_status, mask_bleed, nii_bleed = get_structure_completeness(bleed_file)
+                results["hemorrhage_analysis_status"] = bleed_status
+
+                if mask_bleed is not None and nii_bleed is not None:
+                    zooms = nii_bleed.header.get_zooms()
+                    voxel_vol_mm3 = zooms[0] * zooms[1] * zooms[2]
+                    results["hemorrhage_vol_cm3"] = round((np.sum(mask_bleed) * voxel_vol_mm3) / 1000.0, 3)
+
+                if bleed_status == "Complete" and results["hemorrhage_vol_cm3"] and results["hemorrhage_vol_cm3"] > 0:
+                    z_indices = np.where(mask_bleed.sum(axis=(0, 1)) > 0)[0]
+                    if len(z_indices) > 0:
+                        n_slices = len(z_indices)
+                        idx_15 = max(0, min(int(n_slices * 0.15), n_slices - 1))
+                        idx_50 = max(0, min(int(n_slices * 0.50), n_slices - 1))
+                        idx_85 = max(0, min(int(n_slices * 0.85), n_slices - 1))
+
+                        slices_to_gen = {
+                            "inferior_15": int(z_indices[idx_15]),
+                            "center_50": int(z_indices[idx_50]),
+                            "superior_85": int(z_indices[idx_85])
+                        }
+
+                        if modality == "CT" and generate_overlays:
                             try:
                                 import matplotlib
                                 matplotlib.use('Agg')
                                 import matplotlib.pyplot as plt
-                                
-                                ct_slice = np.rot90(ct_2d)
-                                roi_slice = np.rot90(roi_mask)
-                                mask_slice = np.rot90(mask_2d)
-                                
-                                # Crop to L1 bounding box with padding
-                                rows = np.where(mask_slice.any(axis=1))[0]
-                                cols = np.where(mask_slice.any(axis=0))[0]
-                                
-                                if len(rows) > 0 and len(cols) > 0:
-                                    r_min_crop, r_max_crop = rows[0], rows[-1]
-                                    c_min_crop, c_max_crop = cols[0], cols[-1]
-                                    
-                                    # Pad by ~0.8x vertebra size for anatomic context
-                                    h = r_max_crop - r_min_crop
-                                    w = c_max_crop - c_min_crop
-                                    pad = int(max(h, w) * 0.8)
-                                    
-                                    r_min_crop = max(0, r_min_crop - pad)
-                                    r_max_crop = min(ct_slice.shape[0], r_max_crop + pad)
-                                    c_min_crop = max(0, c_min_crop - pad)
-                                    c_max_crop = min(ct_slice.shape[1], c_max_crop + pad)
-                                    
-                                    ct_crop = ct_slice[r_min_crop:r_max_crop, c_min_crop:c_max_crop]
-                                    roi_crop = roi_slice[r_min_crop:r_max_crop, c_min_crop:c_max_crop]
-                                    hu_crop = np.where(roi_crop, ct_crop, np.nan)
-                                    
-                                    plt.figure(figsize=(6, 6))
-                                    plt.imshow(ct_crop, cmap='gray', vmin=-250, vmax=1250)
-                                    
-                                    masked_hu = np.ma.masked_where(~roi_crop, hu_crop)
-                                    
-                                    # Use a clear colormap for the oval ROI
-                                    plt.imshow(masked_hu, cmap='cool', alpha=0.8, vmin=0, vmax=300)
-                                    
-                                    plt.axis('off')
-                                    plt.title(f"L1 BMD (Oval ROI) — {classification} ({hu_mean:.0f} HU)")
-                                    plt.tight_layout()
-                                    
-                                    overlay_path = case_output_folder / "L1_BMD_overlay.png"
-                                    plt.savefig(overlay_path, dpi=150, bbox_inches='tight')
-                                    plt.close()
-                                    
+
+                                if ct.shape != mask_bleed.shape:
+                                    print(f"Warning: Shape mismatch Bleed {mask_bleed.shape} vs CT {ct.shape}. Skipping overlay.")
+                                else:
+                                    for label, slice_idx in slices_to_gen.items():
+                                        ct_slice = np.rot90(ct[:, :, slice_idx])
+                                        mask_slice = np.rot90(mask_bleed[:, :, slice_idx])
+
+                                        plt.figure(figsize=(8, 8))
+                                        plt.imshow(ct_slice, cmap='gray', vmin=0, vmax=80)
+
+                                        mask_binary = (mask_slice > 0).astype(np.float32)
+                                        if np.sum(mask_binary) > 0:
+                                            masked_data = np.ma.masked_where(mask_binary == 0, mask_binary)
+                                            plt.imshow(masked_data, cmap='Reds', alpha=0.7, vmin=0, vmax=1)
+
+                                        plt.axis('off')
+                                        plt.title(f"Hemorrhage {label} (z={slice_idx})")
+                                        plt.tight_layout()
+
+                                        out_img = case_output_folder / f"bleed_overlay_{label}.png"
+                                        plt.savefig(out_img, dpi=150)
+                                        plt.close()
+
+                                    results["hemorrhage_analysis_slices"] = slices_to_gen
+
                             except Exception as plot_err:
-                                print(f"Error generating L1 BMD overlay: {plot_err}")
-                        else:
-                            print("Warning: L1 oval ROI resulted in empty mask.")
-                    else:
-                        print("Warning: L1 erosion resulted in empty mask.")
+                                print(f"Error generating hemorrhage overlay: {plot_err}")
+
+        except Exception as e:
+            print(f"Error in hemorrhage analysis: {e}")
+            results["hemorrhage_analysis_status"] = "Error"
+
+    # ============================================================
+    # STEP 5: Bone Mineral Density (BMD) Analysis — L1 Vertebra
+    # ============================================================
+    vertebra_L1_file = total_dir / "vertebrae_L1.nii.gz"
+    results["L1_bmd_analysis_status"] = "Not available"
+
+    if vertebra_L1_file.exists() and modality == "CT":
+        try:
+            from scipy.ndimage import binary_erosion
+
+            l1_status, mask_L1, nii_L1 = get_structure_completeness(vertebra_L1_file)
+            results["L1_bmd_analysis_status"] = l1_status
+
+            if l1_status != "Complete" or mask_L1 is None or nii_L1 is None:
+                print(f"Warning: Skipping BMD due to L1 status: {results['L1_bmd_analysis_status']}")
+            else:
+                spacing = nii_L1.header.get_zooms()
+
+                if ct.shape != mask_L1.shape:
+                    print(f"Warning: Shape mismatch L1 {mask_L1.shape} vs CT {ct.shape}. Skipping BMD.")
+                    results["L1_bmd_analysis_status"] = "Error"
                 else:
-                    print("Warning: L1 mask has no axial slices.")
-                    
+                    z_indices = np.where(mask_L1.sum(axis=(0, 1)) > 0)[0]
+
+                    if len(z_indices) > 0:
+                        center_z = int(z_indices[len(z_indices) // 2])
+                        mask_2d = mask_L1[:, :, center_z]
+                        ct_2d = ct[:, :, center_z]
+
+                        in_plane_spacing = min(spacing[0], spacing[1])
+                        erosion_iters = max(1, int(5.0 / in_plane_spacing))
+                        eroded_2d = binary_erosion(mask_2d, iterations=erosion_iters)
+
+                        from scipy.ndimage import label as ndlabel, center_of_mass
+                        labeled, num_features = ndlabel(eroded_2d)
+                        if num_features > 1:
+                            component_sizes = [np.sum(labeled == i) for i in range(1, num_features + 1)]
+                            largest = np.argmax(component_sizes) + 1
+                            eroded_2d = (labeled == largest)
+
+                        if np.sum(eroded_2d) > 0:
+                            full_com_x, full_com_y = center_of_mass(mask_2d)
+                            body_com_x, body_com_y = center_of_mass(eroded_2d)
+
+                            x_indices, y_indices = np.where(eroded_2d)
+                            x_min, x_max = x_indices.min(), x_indices.max()
+                            y_min, y_max = y_indices.min(), y_indices.max()
+
+                            diff_x = abs(full_com_x - body_com_x)
+                            diff_y = abs(full_com_y - body_com_y)
+
+                            rx = (x_max - x_min) * 0.70 / 2.0
+                            ry = (y_max - y_min) * 0.40 / 2.0
+
+                            if diff_y > diff_x:
+                                anterior_is_larger_y = body_com_y > full_com_y
+                                center_x = (x_min + x_max) / 2.0
+                                if anterior_is_larger_y:
+                                    center_y = y_max - (y_max - y_min) * 0.25
+                                else:
+                                    center_y = y_min + (y_max - y_min) * 0.25
+                            else:
+                                anterior_is_larger_x = body_com_x > full_com_x
+                                center_y = (y_min + y_max) / 2.0
+                                if anterior_is_larger_x:
+                                    center_x = x_max - (x_max - x_min) * 0.25
+                                else:
+                                    center_x = x_min + (x_max - x_min) * 0.25
+
+                            x_grid_arr, y_grid_arr = np.ogrid[:mask_2d.shape[0], :mask_2d.shape[1]]
+                            ellipse = ((x_grid_arr - center_x)**2 / rx**2) + ((y_grid_arr - center_y)**2 / ry**2) <= 1
+                            roi_mask = ellipse & eroded_2d
+
+                            trabecular_voxel_count = int(np.sum(roi_mask))
+                            if trabecular_voxel_count > 0:
+                                trabecular_hu = ct_2d[roi_mask]
+                                hu_mean = float(np.mean(trabecular_hu))
+                                hu_std = float(np.std(trabecular_hu))
+
+                                if hu_mean > 160:
+                                    classification = "Normal"
+                                elif hu_mean >= 100:
+                                    classification = "Osteopenia"
+                                else:
+                                    classification = "Osteoporose"
+
+                                results["L1_trabecular_HU_mean"] = round(hu_mean, 2)
+                                results["L1_trabecular_HU_std"] = round(hu_std, 2)
+                                results["L1_trabecular_voxel_count"] = trabecular_voxel_count
+                                results["L1_bmd_classification"] = classification
+
+                                if generate_overlays:
+                                    try:
+                                        import matplotlib
+                                        matplotlib.use('Agg')
+                                        import matplotlib.pyplot as plt
+
+                                        ct_slice = np.rot90(ct_2d)
+                                        roi_slice = np.rot90(roi_mask)
+                                        mask_slice = np.rot90(mask_2d)
+
+                                        rows = np.where(mask_slice.any(axis=1))[0]
+                                        cols = np.where(mask_slice.any(axis=0))[0]
+
+                                        if len(rows) > 0 and len(cols) > 0:
+                                            r_min_crop, r_max_crop = rows[0], rows[-1]
+                                            c_min_crop, c_max_crop = cols[0], cols[-1]
+
+                                            h = r_max_crop - r_min_crop
+                                            w = c_max_crop - c_min_crop
+                                            pad = int(max(h, w) * 0.8)
+
+                                            r_min_crop = max(0, r_min_crop - pad)
+                                            r_max_crop = min(ct_slice.shape[0], r_max_crop + pad)
+                                            c_min_crop = max(0, c_min_crop - pad)
+                                            c_max_crop = min(ct_slice.shape[1], c_max_crop + pad)
+
+                                            ct_crop = ct_slice[r_min_crop:r_max_crop, c_min_crop:c_max_crop]
+                                            roi_crop = roi_slice[r_min_crop:r_max_crop, c_min_crop:c_max_crop]
+                                            hu_crop = np.where(roi_crop, ct_crop, np.nan)
+
+                                            plt.figure(figsize=(6, 6))
+                                            plt.imshow(ct_crop, cmap='gray', vmin=-250, vmax=1250)
+
+                                            masked_hu = np.ma.masked_where(~roi_crop, hu_crop)
+                                            plt.imshow(masked_hu, cmap='cool', alpha=0.8, vmin=0, vmax=300)
+
+                                            plt.axis('off')
+                                            plt.title(f"L1 BMD (Oval ROI) — {classification} ({hu_mean:.0f} HU)")
+                                            plt.tight_layout()
+
+                                            overlay_path = case_output_folder / "L1_BMD_overlay.png"
+                                            plt.savefig(overlay_path, dpi=150, bbox_inches='tight')
+                                            plt.close()
+
+                                    except Exception as plot_err:
+                                        print(f"Error generating L1 BMD overlay: {plot_err}")
+                            else:
+                                print("Warning: L1 oval ROI resulted in empty mask.")
+                        else:
+                            print("Warning: L1 erosion resulted in empty mask.")
+                    else:
+                        print("Warning: L1 mask has no axial slices.")
+
         except Exception as e:
             print(f"Error in BMD analysis: {e}")
+            results["L1_bmd_analysis_status"] = "Error"
 
     # ============================================================
     # STEP 6: Pulmonary Emphysema Quantification (Lobar)
@@ -544,6 +819,8 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder):
         ("lung_middle_lobe_right", "lung_middle_lobe_right.nii.gz"),
         ("lung_lower_lobe_right", "lung_lower_lobe_right.nii.gz")
     ]
+    for lobe_key, _ in lung_lobes_map:
+        results[f"{lobe_key}_analysis_status"] = "Not available"
     
     # Step 6.1: Validation - Check for completeness
     # Ensure all lobe files exist and are not empty
@@ -560,16 +837,17 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder):
     lobes_complete = True
     for lobe_key, filename in lung_lobes_map:
         fpath = total_dir / filename
-        if not fpath.exists():
+        status, _, _ = get_structure_completeness(fpath)
+        results[f"{lobe_key}_analysis_status"] = status
+        if status != "Complete":
             lobes_complete = False
             break
-        
-        # Check if the volume is above the threshold
+
         vol_cm3 = get_volume_cm3(fpath)
         min_vol = lobe_min_volumes_cm3.get(lobe_key, 0)
         
         if vol_cm3 < min_vol:
-            # print(f"Lobe {lobe_key} volume ({vol_cm3} cm³) is below the minimum threshold ({min_vol} cm³). Marking lungs as incomplete.")
+            results[f"{lobe_key}_analysis_status"] = "Below minimum volume"
             lobes_complete = False
             break
             
@@ -632,7 +910,7 @@ def detect_body_regions(total_dir):
     """
     Analyze segmentation files to identify which body regions are present.
     
-    Regions are detected based on the presence of anatomical structures:
+    Regions are detected based on the presence of complete anatomical structures:
     - head: skull, brain, face
     - neck: cervical vertebrae, trachea, thyroid
     - thorax: lungs, heart, aorta
@@ -665,19 +943,14 @@ def detect_body_regions(total_dir):
     for region, files in regions_map.items():
         is_present = False
         
-        # Check if any characteristic structure for this region exists and is non-empty
+        # A region is only considered present when at least one characteristic
+        # structure is complete, not merely present in a truncated exam.
         for fname in files:
             fpath = total_dir / fname
-            if fpath.exists():
-                try:
-                    # Load mask and check if it contains any segmented voxels
-                    # Using dataobj for efficiency (lazy loading)
-                    nii = nib.load(str(fpath))
-                    if np.sum(nii.dataobj) > 0:
-                        is_present = True
-                        break  # Region confirmed, no need to check other files
-                except:
-                    pass  # Skip files that can't be loaded
+            status, _, _ = get_structure_completeness(fpath)
+            if status == "Complete":
+                is_present = True
+                break
         
         if is_present:
             detected.append(region)

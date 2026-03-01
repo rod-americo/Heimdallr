@@ -40,7 +40,7 @@ export function renderPatients() {
             <td>
                 <div class="actions">
                     <div class="dropdown">
-                        <button class="btn btn-primary">⬇ Downloads</button>
+                        <button class="btn btn-primary dropdown-toggle" type="button" aria-expanded="false">⬇ Downloads</button>
                         <div class="dropdown-content">
                             ${p.has_hemorrhage ? `<a href="/api/patients/${encodeURIComponent(p.case_id)}/download/bleed" download>🔴 Bleed (ZIP)</a>` : ''}
                             <a href="/api/patients/${encodeURIComponent(p.case_id)}/download/tissue_types" download>🧠 Tissue Types (ZIP)</a>
@@ -65,4 +65,40 @@ export function renderPatients() {
             showResults(caseId);
         });
     });
+
+    const closeDropdowns = () => {
+        document.querySelectorAll('.dropdown.open').forEach(dropdown => {
+            dropdown.classList.remove('open');
+            const toggle = dropdown.querySelector('.dropdown-toggle');
+            if (toggle) {
+                toggle.setAttribute('aria-expanded', 'false');
+            }
+        });
+    };
+
+    document.querySelectorAll('.dropdown-toggle').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const dropdown = btn.closest('.dropdown');
+            const shouldOpen = !dropdown.classList.contains('open');
+            closeDropdowns();
+            if (shouldOpen) {
+                dropdown.classList.add('open');
+                btn.setAttribute('aria-expanded', 'true');
+            }
+        });
+    });
+
+    document.querySelectorAll('.dropdown-content').forEach(menu => {
+        menu.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+    });
+
+    if (document.__heimdallrDropdownCloseHandler) {
+        document.removeEventListener('click', document.__heimdallrDropdownCloseHandler);
+    }
+    document.__heimdallrDropdownCloseHandler = closeDropdowns;
+    document.addEventListener('click', document.__heimdallrDropdownCloseHandler);
 }

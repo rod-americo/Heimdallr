@@ -62,6 +62,9 @@ class PatientService:
                         elapsed_seconds = int(int(h) * 3600 + int(m) * 60 + float(s))
                     except Exception:
                         pass
+
+                hemorrhage_vol = results.get("hemorrhage_vol_cm3")
+                has_hemorrhage = isinstance(hemorrhage_vol, (int, float)) and hemorrhage_vol > 0.1
                 
                 patients.append({
                     "case_id": case_id,
@@ -75,7 +78,7 @@ class PatientService:
                     "elapsed_seconds": elapsed_seconds,
                     "has_results": bool(results),
                     "body_regions": results.get("body_regions", []),
-                    "has_hemorrhage": results.get("hemorrhage_vol_cm3", 0.0) > 0.1
+                    "has_hemorrhage": has_hemorrhage
                 })
                 
             # Sort alphabetically by the displayed name (first part of case_id)
