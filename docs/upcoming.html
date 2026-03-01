@@ -359,7 +359,27 @@
             <ul>
                 <li><strong>Backlog table:</strong> what is planned and why.</li>
                 <li><strong>Impact vs Friction:</strong> expected value versus production effort.</li>
+                <li><strong>Repo State:</strong> whether a module is already implemented in the repository, exists only as a prototype, or has not started.</li>
             </ul>
+        </section>
+
+        <section class="grid-2">
+            <article class="panel">
+                <h2>Repo State Legend</h2>
+                <ul>
+                    <li><strong>Implemented:</strong> present in repository workflows today, even if rollout maturity is still limited.</li>
+                    <li><strong>Prototype:</strong> code exists outside the main baseline, usually as an alternative service path or ops utility.</li>
+                    <li><strong>Not Started:</strong> no implementation was verified in the repository.</li>
+                </ul>
+            </article>
+            <article class="panel">
+                <h2>Current Prototypes</h2>
+                <ul>
+                    <li><strong>Segmentation Service API (HTTP):</strong> alternative service-oriented processing path built around `api/totalsegmentator.py`.</li>
+                    <li><strong>Retroactive Cohort Reprocessing Toolkit:</strong> operational scripts for metric backfills and archived-case recalculation.</li>
+                    <li>These are intentionally excluded from the live baseline list but should shape future operational hardening decisions.</li>
+                </ul>
+            </article>
         </section>
 
         <section class="grid-2" id="rank-and-pillar-legend">
@@ -418,7 +438,7 @@
 
         <section class="panel stack" id="prioritized-module-backlog">
             <h2>Prioritized Module Backlog</h2>
-            <p class="tiny">Ordered by pipeline viability and delivery sequence. This table shows future-facing roadmap work, including hardening initiatives for live modules; live-only baseline modules remain on the strategy board. Ranks are shown in the first column, and Pillar Codes map to A-G definitions above.</p>
+            <p class="tiny">Ordered by pipeline viability and delivery sequence. This table shows future-facing roadmap work, including hardening initiatives for live modules; live-only baseline modules with `repoState = implemented` remain on the strategy board unless they have a specific backlog extension. Ranks are shown in the first column, and Pillar Codes map to A-G definitions above.</p>
             <div class="table-wrap">
                 <table data-auto-labels>
                     <thead>

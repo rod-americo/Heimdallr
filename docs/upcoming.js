@@ -1,6 +1,4 @@
 (() => {
-    const liveStatuses = new Set(['mvp-internal', 'validation-ready', 'production-candidate', 'implemented']);
-
     function applyAutoLabels() {
         const tables = document.querySelectorAll('table[data-auto-labels]');
         tables.forEach((table) => {
@@ -18,7 +16,7 @@
         if (!tbody) return;
 
         tbody.innerHTML = rows
-            .filter((row) => Number.isInteger(row.rank) && (row.backlogModule || !liveStatuses.has(row.status)))
+            .filter((row) => Number.isInteger(row.rank) && (row.backlogModule || row.repoState !== 'implemented'))
             .sort((a, b) => a.rank - b.rank)
             .map((row) => `
                 <tr>

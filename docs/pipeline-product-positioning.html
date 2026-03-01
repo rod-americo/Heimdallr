@@ -316,12 +316,56 @@
             color: var(--status-exploratory-text);
         }
 
+        .flag.repo-state.repo-implemented {
+            background: rgba(41, 201, 138, 0.15);
+            color: var(--good);
+        }
+
+        .flag.repo-state.repo-prototype {
+            background: var(--status-poc-bg);
+            color: var(--status-poc-text);
+        }
+
+        .flag.repo-state.repo-not-started {
+            background: var(--status-planned-bg);
+            color: var(--status-planned-text);
+        }
+
         .legend {
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
             margin-top: 10px;
             align-items: center;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+            align-items: center;
+        }
+
+        .filter-label {
+            color: var(--muted);
+            font-size: 0.84rem;
+            font-weight: 600;
+        }
+
+        button.filter-btn {
+            background: var(--bg-card);
+            color: var(--text);
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 8px 12px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        button.filter-btn.active {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px var(--ring);
         }
 
         .legend-label {
@@ -372,13 +416,13 @@
     <main class="wrap">
         <header class="hero">
             <h1>Pipeline Product Positioning</h1>
-            <p class="lead">Positioning of Heimdallr projects across the radiology pipeline: before report, during report, and after report.</p>
+            <p class="lead">Positioning of Heimdallr modules across the radiology pipeline: before report, during report, and after report, with implemented baseline and future backlog shown together.</p>
             <div class="nav-links" data-shared-nav="hero"></div>
         </header>
 
         <section class="panel">
             <h2>Product Line</h2>
-            <p>This page consolidates the product line by workflow stage and delivered value.</p>
+            <p>This page consolidates the product line by workflow stage and delivered value. Cards with `repoState = implemented` represent modules already present in the repository; the remaining cards show future-facing expansion and hardening paths.</p>
             <div class="line-grid">
                 <article class="line-card before">
                     <h3>Before Report</h3>
@@ -413,10 +457,28 @@
                 <span class="flag poc status-caps">POC</span>
                 <span class="flag mvp-internal status-caps">MVP Internal</span>
             </div>
+            <div class="filter-group">
+                <span class="filter-label">Repo State:</span>
+                <button class="filter-btn active" data-group="repo-state" data-filter="all">All</button>
+                <button class="filter-btn status-caps" data-group="repo-state" data-filter="implemented">Implemented</button>
+                <button class="filter-btn status-caps" data-group="repo-state" data-filter="prototype">Prototype</button>
+                <button class="filter-btn status-caps" data-group="repo-state" data-filter="not-started">Not Started</button>
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2>Current Baseline Highlights</h2>
+            <ul>
+                <li><strong>Before report:</strong> DICOM intake, case preparation, queue worker, dashboard/API surface, and de-identification gateway are already implemented.</li>
+                <li><strong>During report:</strong> the current baseline already includes AP chest X-ray assist APIs, TotalSegmentator processing, organ volumetry, liver quant, bone quant, emphysema quant, hemorrhage detection, CTR extraction, and renal stone burden quantification.</li>
+                <li><strong>Prototype utilities:</strong> the repository also contains non-baseline experimental tooling such as the HTTP segmentation service and retroactive cohort reprocessing scripts.</li>
+                <li><strong>After report:</strong> navigation and closure modules remain roadmap work; no post-report continuity stack is yet implemented as a live baseline in this repository.</li>
+            </ul>
         </section>
 
         <section class="panel">
             <h2>Pipeline Positioning Diagram</h2>
+            <p class="small">Cards are grouped by workflow stage. Within each stage, cards with `repoState = implemented` are listed first, followed by roadmap modules.</p>
 
             <div class="pipeline">
                 <article class="stage before">
@@ -448,8 +510,8 @@
         <section class="panel">
             <h2>Strategic Read</h2>
             <ul>
-                <li><strong>Near term:</strong> lock in the before + during blocks to sustain measurable throughput and TAT improvements.</li>
-                <li><strong>Mid term:</strong> promote operational intelligence modules once workflow telemetry is stable and auditable.</li>
+                <li><strong>Near term:</strong> harden the implemented before + during baseline and close validation gaps around the modules that already run in production-like workflows.</li>
+                <li><strong>Mid term:</strong> add operational intelligence modules once workflow telemetry, policy, and audit controls are stable.</li>
                 <li><strong>Long term:</strong> scale post-report navigation and closure modules to capture continuity and financial value.</li>
             </ul>
         </section>

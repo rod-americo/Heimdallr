@@ -8,7 +8,7 @@ Run as independent services:
 
 1. `app.py` (API, dashboard, upload endpoints)
 2. `run.py` (processing worker)
-3. `dicom_listener.py` (DICOM C-STORE intake)
+3. `services/dicom_listener.py` (DICOM C-STORE intake)
 
 ## Baseline Startup
 
@@ -23,7 +23,7 @@ python run.py
 
 # DICOM listener
 source venv/bin/activate
-python dicom_listener.py
+python services/dicom_listener.py
 ```
 
 ## Environment and Config

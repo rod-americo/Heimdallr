@@ -30,7 +30,7 @@ Endpoints:
   POST /process   — Process a NIfTI file through the full segmentation pipeline
   GET  /health    — Readiness probe
 
-Port: 8004 (configurable via TOTALSEGMENTATOR_PORT env var)
+Port: 8005 (configurable via TOTALSEGMENTATOR_PORT env var)
 """
 
 import os
@@ -66,10 +66,11 @@ import config
 import sqlite3
 
 # Import metrics calculation module
+import metrics
 from metrics import calculate_all_metrics
 
 # Configuration
-PORT = int(os.getenv("TOTALSEGMENTATOR_PORT", "8004"))
+PORT = int(os.getenv("TOTALSEGMENTATOR_PORT", "8005"))
 LICENSE = config.TOTALSEGMENTATOR_LICENSE
 
 # Directory paths from config
@@ -209,7 +210,6 @@ def run_segmentation(input_path: Path, output_path: Path, task: str,
             output=output_path,
             task=task,
             fast=use_fast,
-            license_number=LICENSE,
             device="gpu",
             quiet=True,
             verbose=False,
@@ -303,18 +303,22 @@ def process_case(nifti_path: Path, case_id: str) -> Dict[str, Any]:
     # STEP 1.5: Conditional Specialized Analysis
     # ============================================================
     brain_file = case_output / "total" / "brain.nii.gz"
+    brain_status, _, _ = metrics.get_structure_completeness(brain_file)
     if modality == "CT" and brain_file.exists():
         try:
             if brain_file.stat().st_size > 1000:  # Non-empty threshold
-                logger.print("\n[Conditional] Brain detected. Running hemorrhage detection...")
-                bleed_output = case_output / "bleed"
-                bleed_output.mkdir(exist_ok=True)
+                if brain_status == "Complete":
+                    logger.print("\n[Conditional] Brain detected and complete. Running hemorrhage detection...")
+                    bleed_output = case_output / "bleed"
+                    bleed_output.mkdir(exist_ok=True)
 
-                bleed_start = time.time()
-                run_segmentation(nifti_path, bleed_output, "cerebral_bleed",
-                                 fast=False, logger=logger)
-                timings["hemorrhage_detection"] = round(time.time() - bleed_start, 1)
-                logger.print("[Conditional] ✓ Hemorrhage detection complete")
+                    bleed_start = time.time()
+                    run_segmentation(nifti_path, bleed_output, "cerebral_bleed",
+                                     fast=False, logger=logger)
+                    timings["hemorrhage_detection"] = round(time.time() - bleed_start, 1)
+                    logger.print("[Conditional] ✓ Hemorrhage detection complete")
+                else:
+                    logger.print(f"[Conditional] Skipping hemorrhage detection due to brain status: {brain_status}")
         except Exception as e:
             logger.print(f"[Conditional] Error: {e}")
 

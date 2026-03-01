@@ -6,7 +6,7 @@ Heimdallr is an imaging operations pipeline designed to convert incoming radiolo
 
 ## Runtime Components
 
-1. `dicom_listener.py`
+1. `services/dicom_listener.py`
 - DICOM C-STORE intake service (`AE=HEIMDALLR`, default port `11112`)
 - Groups incoming files by study and forwards packaged data to upload endpoint
 
@@ -26,7 +26,8 @@ Heimdallr is an imaging operations pipeline designed to convert incoming radiolo
 
 5. Optional model-assist services
 - `api/medgemma.py`
-- Anthropic flow through server endpoints plus outbound de-identification gateway (`services/deid_gateway.py`)
+- `api/anthropic.py`
+- App-level proxy endpoints route to these services and enforce outbound de-identification via `services/deid_gateway.py` where implemented
 
 6. `api/ctr.py`
    - CTR (Cardiothoracic Ratio / ICT) extraction microservice (default port `8003`)
@@ -45,26 +46,26 @@ Heimdallr is an imaging operations pipeline designed to convert incoming radiolo
 ## Request/Data Flow
 
 ```text
-PACS/Modality (DICOM) --> dicom_listener.py --> POST /upload (app.py)
-                                               |
-                                               v
-                                         core/prepare.py
-                                    (select + convert + persist)
-                                               |
-                                               v
-                                             input/
-                                               |
-                                               v
-                                             run.py
-                                 (segment + metrics + DB update)
-                                               |
-                                               v
-                                       output/<case_id>/
-                                               |
-                               +---------------+----------------+
-                               |                                |
-                               v                                v
-                         Dashboard/API                      Assistive report APIs
+PACS/Modality (DICOM) --> services/dicom_listener.py --> POST /upload (app.py)
+                                                        |
+                                                        v
+                                                  core/prepare.py
+                                             (select + convert + persist)
+                                                        |
+                                                        v
+                                                      input/
+                                                        |
+                                                        v
+                                                      run.py
+                                          (segment + metrics + DB update)
+                                                        |
+                                                        v
+                                                output/<case_id>/
+                                                        |
+                                +-----------------------+----------------------+
+                                |                                              |
+                                v                                              v
+                          Dashboard/API                           Proxy routes to assistive services
 ```
 
 ## External Dependencies
@@ -79,7 +80,7 @@ PACS/Modality (DICOM) --> dicom_listener.py --> POST /upload (app.py)
 
 - Assistive outputs are non-autonomous and require qualified reviewer validation.
 - External model calls should traverse de-identification controls.
-- Production operation expects independent process supervision for `app.py`, `run.py`, and `dicom_listener.py`.
+- Production operation expects independent process supervision for `app.py`, `run.py`, and `services/dicom_listener.py`.
 
 ## Cross-References
 

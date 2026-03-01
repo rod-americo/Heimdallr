@@ -439,6 +439,12 @@
         .top-meta.status.status-production-candidate .dot { background: var(--status-candidate-text); }
         .top-meta.status.status-implemented { color: var(--status-implemented-text); }
         .top-meta.status.status-implemented .dot { background: var(--status-implemented-text); }
+        .top-meta.repo-state.repo-implemented { color: var(--status-validation-text); }
+        .top-meta.repo-state.repo-implemented .dot { background: var(--status-validation-text); }
+        .top-meta.repo-state.repo-prototype { color: var(--status-poc-text); }
+        .top-meta.repo-state.repo-prototype .dot { background: var(--status-poc-text); }
+        .top-meta.repo-state.repo-not-started { color: var(--status-planned-text); }
+        .top-meta.repo-state.repo-not-started .dot { background: var(--status-planned-text); }
         .top-meta.status {
             flex-direction: row-reverse;
         }
@@ -597,7 +603,7 @@
     <div class="wrap">
         <header class="hero">
             <h1>Heimdallr Radiology Pipeline Strategy</h1>
-            <p class="sub">Impact vs implementation friction for upcoming modules across logistics, triage, reporting, de-identification, and patient navigation.</p>
+            <p class="sub">Impact vs implementation friction across live baseline modules and upcoming backlog items spanning logistics, triage, reporting, de-identification, and patient navigation.</p>
             <div class="nav-links" data-shared-nav="hero"></div>
         </header>
 
@@ -623,7 +629,7 @@
                     <span class="status-item"><span class="status-ring" style="border-color:#ffca8d;background:rgba(255,202,141,0.18);"></span><span class="status-caps">Production Candidate</span></span>
                     <span class="status-item"><span class="status-ring" style="border-color:#c6a4ff;background:rgba(198,164,255,0.18);"></span><span class="status-caps">Implemented</span></span>
                 </div>
-                <p class="small" style="margin-top: 8px;">Friction is an implementation-in-production score (integration, validation, compliance, and operational change), not just model difficulty.</p>
+                <p class="small" style="margin-top: 8px;">This matrix includes both implemented baseline modules and roadmap cards. Friction is an implementation-in-production score (integration, validation, compliance, and operational change), not just model difficulty.</p>
             </article>
 
             <article class="panel">
@@ -637,11 +643,13 @@
 
         <section class="panel">
             <h2>What Is Live Today</h2>
+            <p class="small">These cards are already present in the repository baseline and are rendered from `repoState = implemented` in the strategy board dataset.</p>
             <ul id="liveToday" class="live-list"></ul>
         </section>
 
         <section class="panel" style="margin-top: 14px;">
             <h2>Module Explorer</h2>
+            <p class="small">Explorer view for the full strategy board. Live baseline cards sort ahead of future backlog cards.</p>
             <div class="filter-group">
                 <span class="filter-label row-label">Track:</span>
                 <button class="active" data-group="track" data-filter="all">All</button>
@@ -662,6 +670,13 @@
                 <button class="status-caps" data-group="status" data-filter="production-candidate">Production Candidate</button>
                 <button class="status-caps" data-group="status" data-filter="implemented">Implemented</button>
             </div>
+            <div class="filter-group">
+                <span class="filter-label row-label">Repo State:</span>
+                <button class="active" data-group="repo-state" data-filter="all">All</button>
+                <button class="status-caps" data-group="repo-state" data-filter="implemented">Implemented</button>
+                <button class="status-caps" data-group="repo-state" data-filter="prototype">Prototype</button>
+                <button class="status-caps" data-group="repo-state" data-filter="not-started">Not Started</button>
+            </div>
             <div id="cards" class="cards"></div>
         </section>
 
@@ -670,7 +685,9 @@
             <p class="small"><strong>Impact (1-10)</strong>: expected clinical and operational value if deployed safely.</p>
             <p class="small" style="margin-top: 6px;"><strong>Friction (1-10)</strong>: real-world effort to productionize safely, combining technical integration, data quality, clinical validation, governance/compliance, and change management.</p>
             <p class="small" style="margin-top: 6px;"><strong>Navigation</strong>: active follow-up monitoring by clinical service staff, with owner, due date, status tracking, and escalation until closure.</p>
-            <p class="small" style="margin-top: 6px;"><strong>Status</strong>: <span class="status-caps">EXPLORATORY | IN REVIEW → PLANNED → POC → MVP INTERNAL → VALIDATION READY → PRODUCTION CANDIDATE → IMPLEMENTED</span>.</p>
+            <p class="small" style="margin-top: 6px;"><strong>Status</strong>: <span class="status-caps">EXPLORATORY | IN REVIEW | PLANNED | POC | MVP INTERNAL | VALIDATION READY | PRODUCTION CANDIDATE | IMPLEMENTED</span>.</p>
+            <p class="small" style="margin-top: 6px;"><strong>Interpretation rule</strong>: `repoState` indicates code reality (`implemented`, `prototype`, `not-started`), while `status` remains the delivery and operational maturity signal.</p>
+            <p class="small" style="margin-top: 6px;"><strong>Repo State</strong>: `implemented` means present in repository workflows, `prototype` means code exists outside the main baseline, and `not-started` means no implementation was verified in the repo.</p>
             <p class="small" style="margin-top: 10px;"><strong>Horizon Legend</strong>:</p>
             <p class="small" style="margin-top: 6px;"><span class="pill foundation">foundation</span> baseline safety, interoperability, and throughput foundation for production readiness.</p>
             <p class="small" style="margin-top: 6px;"><span class="pill acceleration">acceleration</span> modules that increase clinical/operational performance on top of a stable base.</p>

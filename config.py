@@ -43,6 +43,7 @@ UPLOAD_DIR = BASE_DIR / "uploads"
 NII_DIR = BASE_DIR / "nii"
 OUTPUT_DIR = BASE_DIR / "output"
 INPUT_DIR = BASE_DIR / "input"
+PROCESSING_DIR = BASE_DIR / "processing"
 ERROR_DIR = BASE_DIR / "errors"
 STATIC_DIR = BASE_DIR / "static"
 DATA_DIR = BASE_DIR / "data"
@@ -126,13 +127,13 @@ UPLOADER_DEFAULT_SERVER = os.getenv("HEIMDALLR_UPLOADER_SERVER", "http://thor:80
 # ============================================================
 
 # MedGemma Analysis Service
-MEDGEMMA_SERVICE_URL = os.getenv("MEDGEMMA_SERVICE_URL", "http://localhost:8002/analyze")
+MEDGEMMA_SERVICE_URL = os.getenv("MEDGEMMA_SERVICE_URL", "http://localhost:8004/analyze")
 
 # Anthropic Analysis Service
 ANTHROPIC_SERVICE_URL = os.getenv("ANTHROPIC_SERVICE_URL", "http://localhost:8101/analyze")
 
 # TotalSegmentator Processing Service
-TOTALSEGMENTATOR_SERVICE_URL = os.getenv("TOTALSEGMENTATOR_SERVICE_URL", "http://localhost:8004/process")
+TOTALSEGMENTATOR_SERVICE_URL = os.getenv("TOTALSEGMENTATOR_SERVICE_URL", "http://localhost:8005/process")
 
 
 
@@ -144,7 +145,7 @@ TOTALSEGMENTATOR_SERVICE_URL = os.getenv("TOTALSEGMENTATOR_SERVICE_URL", "http:/
 def ensure_directories():
     """Create all required directories if they don't exist."""
     dirs = [
-        UPLOAD_DIR, NII_DIR, OUTPUT_DIR, INPUT_DIR, ERROR_DIR,
+        UPLOAD_DIR, NII_DIR, OUTPUT_DIR, INPUT_DIR, PROCESSING_DIR, ERROR_DIR,
         STATIC_DIR, DATA_DIR, DB_DIR,
         DICOM_INCOMING_DIR, DICOM_SENT_DIR, DICOM_FAILED_DIR, DICOM_STATE_DIR
     ]
