@@ -25,6 +25,7 @@
 
     const cards = document.getElementById('cards');
     const liveToday = document.getElementById('liveToday');
+    const currentPrototypes = document.getElementById('currentPrototypes');
     const filterButtons = [...document.querySelectorAll('button[data-group][data-filter]')];
     const isMobile = window.matchMedia('(max-width: 760px)').matches;
     const css = getComputedStyle(document.documentElement);
@@ -113,6 +114,18 @@
                 const li = document.createElement('li');
                 li.textContent = `${m.title} (${statusLabel(m.status)}): ${m.note}`;
                 liveToday.appendChild(li);
+            });
+
+        if (!currentPrototypes) return;
+
+        currentPrototypes.innerHTML = '';
+        modules
+            .filter((m) => m.repoState === 'prototype')
+            .sort(compareModules)
+            .forEach((m) => {
+                const li = document.createElement('li');
+                li.textContent = `${m.title} (${statusLabel(m.status)}): ${m.note}`;
+                currentPrototypes.appendChild(li);
             });
     }
 

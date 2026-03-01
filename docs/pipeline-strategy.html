@@ -244,6 +244,12 @@
             min-width: 0;
         }
 
+        .focus-panel {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
         .panel h2 {
             margin: 0 0 12px;
             font-size: 1.05rem;
@@ -632,7 +638,7 @@
                 <p class="small" style="margin-top: 8px;">This matrix includes both implemented baseline modules and roadmap cards. Friction is an implementation-in-production score (integration, validation, compliance, and operational change), not just model difficulty.</p>
             </article>
 
-            <article class="panel">
+            <article class="panel focus-panel">
                 <h2>Focus Split</h2>
                 <div class="chart-box chart-box-sm">
                     <canvas id="focusChart"></canvas>
@@ -643,8 +649,10 @@
 
         <section class="panel">
             <h2>What Is Live Today</h2>
-            <p class="small">These cards are already present in the repository baseline and are rendered from `repoState = implemented` in the strategy board dataset.</p>
+            <p class="small">This section summarizes what already exists in the repository today. The first list reflects the implemented baseline (`repoState = implemented`), and the second list captures current prototypes (`repoState = prototype`).</p>
             <ul id="liveToday" class="live-list"></ul>
+            <p class="small" style="margin-top: 14px;"><strong>Current prototypes</strong></p>
+            <ul id="currentPrototypes" class="live-list"></ul>
         </section>
 
         <section class="panel" style="margin-top: 14px;">
