@@ -396,64 +396,64 @@
         }
 
         .card-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            display: grid;
             gap: 8px;
             margin-bottom: 10px;
         }
 
-        .top-meta {
+        .meta-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .meta-chip {
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            font-size: 0.75rem;
-            font-weight: 700;
-            letter-spacing: 0.01em;
-            text-transform: uppercase;
-        }
-
-        .top-meta .dot {
-            width: 7px;
-            height: 7px;
             border-radius: 999px;
-            display: inline-block;
+            padding: 5px 10px;
+            font-size: 0.73rem;
+            font-weight: 700;
+            line-height: 1.1;
+            border: 1px solid var(--line);
+            background: rgba(15, 23, 42, 0.2);
+            color: var(--text);
+            white-space: nowrap;
         }
 
-        .top-meta.horizon.foundation { color: var(--pill-foundation-text); }
-        .top-meta.horizon.foundation .dot { background: var(--pill-foundation-text); }
-        .top-meta.horizon.acceleration { color: var(--pill-acceleration-text); }
-        .top-meta.horizon.acceleration .dot { background: var(--pill-acceleration-text); }
-        .top-meta.horizon.scaling { color: var(--pill-scaling-text); }
-        .top-meta.horizon.scaling .dot { background: var(--pill-scaling-text); }
-        .top-meta.horizon.innovation { color: var(--pill-innovation-text); }
-        .top-meta.horizon.innovation .dot { background: var(--pill-innovation-text); }
-
-        .top-meta.status.status-planned { color: var(--status-planned-text); }
-        .top-meta.status.status-planned .dot { background: var(--status-planned-text); }
-        .top-meta.status.status-in-review { color: var(--status-consideration-text); }
-        .top-meta.status.status-in-review .dot { background: var(--status-consideration-text); }
-        .top-meta.status.status-exploratory { color: var(--status-exploratory-text); }
-        .top-meta.status.status-exploratory .dot { background: var(--status-exploratory-text); }
-        .top-meta.status.status-poc { color: var(--status-poc-text); }
-        .top-meta.status.status-poc .dot { background: var(--status-poc-text); }
-        .top-meta.status.status-mvp-internal { color: var(--status-mvp-text); }
-        .top-meta.status.status-mvp-internal .dot { background: var(--status-mvp-text); }
-        .top-meta.status.status-validation-ready { color: var(--status-validation-text); }
-        .top-meta.status.status-validation-ready .dot { background: var(--status-validation-text); }
-        .top-meta.status.status-production-candidate { color: var(--status-candidate-text); }
-        .top-meta.status.status-production-candidate .dot { background: var(--status-candidate-text); }
-        .top-meta.status.status-implemented { color: var(--status-implemented-text); }
-        .top-meta.status.status-implemented .dot { background: var(--status-implemented-text); }
-        .top-meta.repo-state.repo-implemented { color: var(--status-validation-text); }
-        .top-meta.repo-state.repo-implemented .dot { background: var(--status-validation-text); }
-        .top-meta.repo-state.repo-prototype { color: var(--status-poc-text); }
-        .top-meta.repo-state.repo-prototype .dot { background: var(--status-poc-text); }
-        .top-meta.repo-state.repo-not-started { color: var(--status-planned-text); }
-        .top-meta.repo-state.repo-not-started .dot { background: var(--status-planned-text); }
-        .top-meta.status {
-            flex-direction: row-reverse;
+        .meta-chip .meta-label {
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
         }
+
+        .meta-chip .meta-value {
+            color: inherit;
+        }
+
+        .meta-chip.horizon.foundation { background: var(--pill-foundation-bg); color: var(--pill-foundation-text); border-color: rgba(56, 189, 248, 0.24); }
+        .meta-chip.horizon.acceleration { background: var(--pill-acceleration-bg); color: var(--pill-acceleration-text); border-color: rgba(245, 158, 11, 0.24); }
+        .meta-chip.horizon.scaling { background: var(--pill-scaling-bg); color: var(--pill-scaling-text); border-color: rgba(74, 222, 128, 0.24); }
+        .meta-chip.horizon.innovation { background: var(--pill-innovation-bg); color: var(--pill-innovation-text); border-color: rgba(168, 85, 247, 0.24); }
+
+        .meta-chip.track.track-ops { background: rgba(125, 211, 252, 0.12); color: #c7e9ff; border-color: rgba(125, 211, 252, 0.24); }
+        .meta-chip.track.track-clinical { background: rgba(253, 230, 138, 0.12); color: #ffe9a8; border-color: rgba(253, 230, 138, 0.24); }
+        .meta-chip.track.track-governance { background: rgba(244, 114, 182, 0.12); color: #f8b4d9; border-color: rgba(244, 114, 182, 0.24); }
+        .meta-chip.track.track-continuity { background: rgba(134, 239, 172, 0.12); color: #bef3cb; border-color: rgba(134, 239, 172, 0.24); }
+
+        .meta-chip.status.status-planned { background: var(--status-planned-bg); color: var(--status-planned-text); border-color: rgba(100, 116, 139, 0.45); }
+        .meta-chip.status.status-in-review { background: var(--status-consideration-bg); color: var(--status-consideration-text); border-color: rgba(243, 169, 82, 0.45); }
+        .meta-chip.status.status-exploratory { background: var(--status-exploratory-bg); color: var(--status-exploratory-text); border-color: rgba(245, 108, 124, 0.45); }
+        .meta-chip.status.status-poc { background: var(--status-poc-bg); color: var(--status-poc-text); border-color: rgba(120, 147, 183, 0.45); }
+        .meta-chip.status.status-mvp-internal { background: var(--status-mvp-bg); color: var(--status-mvp-text); border-color: rgba(57, 208, 255, 0.45); }
+        .meta-chip.status.status-validation-ready { background: var(--status-validation-bg); color: var(--status-validation-text); border-color: rgba(41, 201, 138, 0.45); }
+        .meta-chip.status.status-production-candidate { background: var(--status-candidate-bg); color: var(--status-candidate-text); border-color: rgba(243, 169, 82, 0.45); }
+        .meta-chip.status.status-implemented { background: var(--status-implemented-bg); color: var(--status-implemented-text); border-color: rgba(139, 92, 246, 0.45); }
+
+        .meta-chip.repo-state.repo-implemented { background: rgba(41, 201, 138, 0.12); color: var(--status-validation-text); border-color: rgba(41, 201, 138, 0.35); }
+        .meta-chip.repo-state.repo-prototype { background: rgba(120, 147, 183, 0.14); color: var(--status-poc-text); border-color: rgba(120, 147, 183, 0.35); }
+        .meta-chip.repo-state.repo-not-started { background: rgba(100, 116, 139, 0.12); color: var(--status-planned-text); border-color: rgba(100, 116, 139, 0.35); }
 
         .meta {
             display: flex;
@@ -464,12 +464,6 @@
             margin-bottom: 0;
             flex-wrap: wrap;
             align-items: center;
-        }
-
-        .track {
-            font-size: 0.82rem;
-            color: var(--muted);
-            margin-bottom: 8px;
         }
 
         .pill {
@@ -690,17 +684,13 @@
 
         <section class="panel" style="margin-top: 14px;">
             <h2>Metric Definitions</h2>
-            <p class="small"><strong>Impact (1-10)</strong>: expected clinical and operational value if deployed safely.</p>
-            <p class="small" style="margin-top: 6px;"><strong>Friction (1-10)</strong>: real-world effort to productionize safely, combining technical integration, data quality, clinical validation, governance/compliance, and change management.</p>
-            <p class="small" style="margin-top: 6px;"><strong>Navigation</strong>: active follow-up monitoring by clinical service staff, with owner, due date, status tracking, and escalation until closure.</p>
-            <p class="small" style="margin-top: 6px;"><strong>Status</strong>: <span class="status-caps">EXPLORATORY | IN REVIEW | PLANNED | POC | MVP INTERNAL | VALIDATION READY | PRODUCTION CANDIDATE | IMPLEMENTED</span>.</p>
-            <p class="small" style="margin-top: 6px;"><strong>Interpretation rule</strong>: `repoState` indicates code reality (`implemented`, `prototype`, `not-started`), while `status` remains the delivery and operational maturity signal.</p>
-            <p class="small" style="margin-top: 6px;"><strong>Repo State</strong>: `implemented` means present in repository workflows, `prototype` means code exists outside the main baseline, and `not-started` means no implementation was verified in the repo.</p>
-            <p class="small" style="margin-top: 10px;"><strong>Horizon Legend</strong>:</p>
-            <p class="small" style="margin-top: 6px;"><span class="pill foundation">foundation</span> baseline safety, interoperability, and throughput foundation for production readiness.</p>
-            <p class="small" style="margin-top: 6px;"><span class="pill acceleration">acceleration</span> modules that increase clinical/operational performance on top of a stable base.</p>
-            <p class="small" style="margin-top: 6px;"><span class="pill scaling">scaling</span> clinically validated real-world workflows being operationalized in the Heimdallr pipeline.</p>
-            <p class="small" style="margin-top: 6px;"><span class="pill innovation">innovation</span> long-horizon capabilities with higher uncertainty and strategic upside.</p>
+            <p class="small"><strong>Card header</strong>: each module card shows four chips: <strong>Horizon</strong>, <strong>Track</strong>, <strong>Repo</strong>, and <strong>Status</strong>.</p>
+            <p class="small" style="margin-top: 6px;"><strong>Horizon</strong> expresses delivery horizon: <span class="pill foundation">foundation</span> baseline throughput and safety infrastructure; <span class="pill acceleration">acceleration</span> near-term performance expansion; <span class="pill scaling">scaling</span> broader operational rollout; <span class="pill innovation">innovation</span> longer-horizon strategic bets.</p>
+            <p class="small" style="margin-top: 6px;"><strong>Track</strong> groups modules by portfolio domain: Operations, Clinical Decision Support, Governance and Compliance, or Care Continuity.</p>
+            <p class="small" style="margin-top: 6px;"><strong>Repo</strong> reflects code reality: `implemented` means present in repository workflows, `prototype` means partial or alternative code exists, and `not-started` means no implementation was verified in the repository.</p>
+            <p class="small" style="margin-top: 6px;"><strong>Status</strong> is delivery maturity, independent of code presence: <span class="status-caps">EXPLORATORY | IN REVIEW | PLANNED | POC | MVP INTERNAL | VALIDATION READY | PRODUCTION CANDIDATE | IMPLEMENTED</span>.</p>
+            <p class="small" style="margin-top: 6px;"><strong>Impact (1-10)</strong> measures expected clinical or operational value if deployed safely.</p>
+            <p class="small" style="margin-top: 6px;"><strong>Friction (1-10)</strong> measures real-world effort to productionize safely across integration, validation, governance, and operational change.</p>
             <div class="guide-row">
                 <span class="guide-label">Impact bands:</span>
                 <span class="pill impact-low">1-3 low</span>
