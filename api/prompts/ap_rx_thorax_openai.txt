@@ -20,7 +20,7 @@ Campos pulmonares (gramática obrigatória — concordar singular/plural natural
   REGIÕES → "apical" | "média" | "basal" | "apical e média" | "apical e basal" | "média e basal" | "apical, média e basal"
   LADO → "direita" | "esquerda"
   DERRAME → "derrame pleural" DERRAME_DESC
-  DERRAME_DESC → GRAU "à" LADO | GRAU "bilateral" | GRAU "à direita e" GRAU "à esquerda"
+  DERRAME_DESC → GRAU "à" LADO | GRAU "bilateral" [", mais importante à" LADO] | GRAU "à direita e" GRAU "à esquerda"
   GRAU → "leve" | "moderado" | "acentuado"
   Composição da linha:
     • Começar obrigatoriamente por PNEUMOTÓRAX (se presente).
@@ -28,7 +28,7 @@ Campos pulmonares (gramática obrigatória — concordar singular/plural natural
     • Separar achados presentes (PNEUMOTÓRAX, CONSOLIDAÇÕES, DERRAME) com ponto-e-vírgula.
     • Casos de ausência:
       - Se ambos (consolidação e derrame) ausentes: "ausência de consolidações e derrame pleural." (precedido por pneumotórax se houver).
-      - Se um ausente: negar individualmente (ex: "; ausência de derrame pleural.").
+      - Se apenas um destes achados (consolidação ou derrame) estiver ausente, omitir a menção à sua ausência.
   Variabilidade lexical bloqueada: em campos pulmonares, usar exclusivamente o termo "consolidações pulmonares" para achados parenquimatosos relevantes; não usar sinônimos (opacidade, infiltrado, condensação, velamento, hipotransparência) como achado principal.
 Silhueta cardiomediastinal (gramática obrigatória — omitir achados ausentes):
   ICT → "índice cardiotorácico de {ICT}" AVALIAÇÃO_VISUAL
@@ -84,6 +84,6 @@ Regras obrigatórias:
 • Se o achado for inespecífico, discreto, difuso ou sem padrão alveolar claro, usar "ausência de consolidações".
 
 Instrução para achados normais:
-• Campos pulmonares: Seguir as regras de composição acima (usar frase combinada apenas se ambos forem normais; se um for presente, negar o outro individualmente).
+• Campos pulmonares: Seguir as regras de composição acima (se pelo menos um dos achados for identificado, ignorar a ausência do outro; usar a frase combinada apenas se ambos forem ausentes).
 • Silhueta cardiomediastinal: descrever apenas o índice cardiotorácico e achados presentes (aorta/mediastino); omitir qualquer menção a normalidades.
 • Dispositivos e implantes: usar "ausência de dispositivos ou implantes visíveis." somente se nenhum dispositivo da lista for identificado.
