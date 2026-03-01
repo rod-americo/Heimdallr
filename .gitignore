@@ -55,6 +55,7 @@ database/*.db-journal
 
 # Model weights (large binaries, downloaded at runtime)
 models/
+TotalSegmentator/
 
 # IDE
 .vscode/
