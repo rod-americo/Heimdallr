@@ -277,8 +277,8 @@ function renderResults(results, caseId, metadata = {}) {
                             <span>${component.hu_max?.toFixed(0) || '-'} HU max</span>
                         </div>
                         <div class="triage-overlay-grid">
-                            ${axialUrl ? `<a class="triage-overlay-link" href="${axialUrl}" target="_blank" rel="noopener noreferrer"><img src="${axialUrl}" alt="${escapeHtml(component.component_id)} axial"></a>` : ''}
-                            ${coronalUrl ? `<a class="triage-overlay-link" href="${coronalUrl}" target="_blank" rel="noopener noreferrer"><img src="${coronalUrl}" alt="${escapeHtml(component.component_id)} coronal"></a>` : ''}
+                            ${axialUrl ? `<a class="triage-overlay-link" href="${axialUrl}" target="_blank" rel="noopener noreferrer"><img src="${axialUrl}" alt="${escapeHtml(component.component_id)} axial" style="display:block;width:100%;max-width:100%;height:auto;max-height:220px;object-fit:contain;"></a>` : ''}
+                            ${coronalUrl ? `<a class="triage-overlay-link" href="${coronalUrl}" target="_blank" rel="noopener noreferrer"><img src="${coronalUrl}" alt="${escapeHtml(component.component_id)} coronal" style="display:block;width:100%;max-width:100%;height:auto;max-height:220px;object-fit:contain;"></a>` : ''}
                         </div>
                     </div>
                 `;
@@ -308,12 +308,14 @@ function renderResults(results, caseId, metadata = {}) {
                 </div>
             </div>
             ${componentCards ? `
-                <details class="triage-panel">
-                    <summary>Ver componentes e overlays</summary>
-                    <div class="triage-panel-body">
-                        ${componentCards}
-                    </div>
-                </details>
+                <div class="triage-panel-wrap" style="margin-top: 1.75rem;">
+                    <details class="triage-panel">
+                        <summary>Ver componentes e overlays</summary>
+                        <div class="triage-panel-body">
+                            ${componentCards}
+                        </div>
+                    </details>
+                </div>
             ` : ''}
         `);
     }
