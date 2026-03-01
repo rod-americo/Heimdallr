@@ -462,6 +462,7 @@
         .meta {
             display: flex;
             justify-content: space-between;
+            flex-wrap: nowrap;
             gap: 12px;
             font-size: 0.82rem;
             color: var(--muted);
@@ -471,18 +472,18 @@
             align-items: center;
         }
 
-        @media (max-width: 760px) {
-            .card-top {
-                grid-template-columns: 1fr;
-            }
+        .meta .metric-pill:last-child {
+            margin-left: auto;
+        }
 
+        @media (max-width: 760px) {
             .meta {
-                flex-direction: column;
-                align-items: stretch;
+                flex-direction: row;
+                align-items: center;
             }
 
             .meta-group.right {
-                justify-content: flex-start;
+                justify-content: flex-end;
             }
         }
 
