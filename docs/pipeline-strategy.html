@@ -598,16 +598,20 @@
             }
 
             .card-top {
-                grid-template-columns: 1fr;
+                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
                 align-items: start;
             }
 
             .meta-group.left {
+                flex-direction: column;
+                align-items: flex-start;
                 justify-content: flex-start;
             }
 
             .meta-group.right {
-                justify-content: flex-end;
+                flex-direction: column;
+                align-items: flex-end;
+                justify-content: flex-start;
             }
 
             .meta {
