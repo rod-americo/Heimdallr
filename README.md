@@ -1,103 +1,105 @@
 # Heimdallr
 
-**Radiology Preprocessing Ecosystem for Operational Automation, Clinical Triage, and AI-Assisted Reporting**
+**Radiology preprocessing ecosystem for imaging intake, quantitative analysis, and assistive reporting**
 
-Heimdallr is a production-oriented platform that turns raw imaging intake into structured, actionable clinical intelligence. It connects DICOM ingestion, preprocessing, AI analysis, and report-assist workflows so radiologists can spend less time on logistics and more time on decision-making.
+Heimdallr is a production-oriented radiology pipeline that connects DICOM intake, study preparation, segmentation-driven analytics, and assistive reporting workflows. The repository combines a FastAPI application, a queue worker, a DICOM listener, and optional model-assist microservices.
 
-Named after the all-seeing Norse guardian, Heimdallr watches over every scan and every report, standing at the threshold between raw data and clinical action with relentless vigilance.
+## Current Scope
 
-The project follows a systems approach: instead of a single detection model, Heimdallr is designed as an end-to-end radiology pipeline where each stage contributes to safety, throughput, and continuity of care.
+The repository currently implements three practical layers:
 
-## Core Scope
+1. **Ingestion and preparation**
+   - DICOM C-STORE listener for PACS/modality intake
+   - ZIP upload through the web API and ZIP/folder submission through the CLI uploader
+   - Study preparation, series selection, and DICOM-to-NIfTI conversion
 
-Heimdallr currently focuses on three practical layers:
+2. **Quantitative imaging pipeline**
+   - Queue-based processing from `input/` to `output/`
+   - TotalSegmentator-backed segmentation and derived metrics
+   - Structured case outputs in SQLite plus per-case artifact folders
 
-1. **Operational intake and routing**
-   - DICOM listener for PACS/modality integration
-   - Study grouping, idle detection, and automated upload
-   - Queue-based processing for reliable throughput
+3. **Assistive reporting services**
+   - FastAPI dashboard and patient/result APIs
+   - Proxy endpoints for AP chest X-ray assist flows
+   - Optional standalone services for Anthropic, MedGemma, and CTR extraction
 
-2. **Imaging preprocessing and quantitative analytics**
-   - DICOM to NIfTI conversion and series selection
-   - Segmentation-driven metrics (volume, density, sarcopenia, hemorrhage)
-   - Structured outputs for downstream clinical and data workflows
+Future-facing modules are tracked in [`docs/UPCOMING.md`](docs/UPCOMING.md).
 
-3. **Radiologist assistance interfaces**
-   - FastAPI endpoints and interactive web dashboard
-   - Chest X-ray assistance flow (Anthropic + MedGemma with structured prompting)
-   - Downloadable artifacts for auditability and review
+## Repository Layout
 
-Future-facing capabilities (workflow orchestration, clinical urgency triage, advanced de-identification hardening, patient navigation, and agentic AI) are tracked in [`docs/UPCOMING.md`](docs/UPCOMING.md).
+### Application and pipeline
+- `app.py` - FastAPI entry point for uploads, patient APIs, proxy routes, and static dashboard serving
+- `run.py` - background processing worker for segmentation and metrics
+- `config.py` - centralized paths and runtime configuration
+- `core/prepare.py` - upload preparation, DICOM parsing, series selection, and NIfTI conversion
+- `core/metrics.py` - quantitative extraction and derived metric generation
 
-## Working Definitions
+### Services and clients
+- `services/dicom_listener.py` - DICOM C-STORE SCP with idle-close and automatic upload
+- `services/deid_gateway.py` - outbound de-identification controls for external model calls
+- `services/anthropic_report_builder.py` - narrative/report structuring helpers
+- `clients/uploader.py` - CLI uploader for ZIP files or DICOM folders
 
-- **Friction (1-10)**: implementation-in-production effort, combining technical integration, data quality, clinical validation, governance/compliance, and operational change management.
-- **Navigation**: active monitoring by clinical service staff, with owner, due date, status tracking, and escalation until closure.
+### Optional microservices
+- `api/anthropic.py` - Anthropic-backed AP chest X-ray analysis service
+- `api/medgemma.py` - MedGemma-backed AP chest X-ray analysis service
+- `api/ctr.py` - CTR extraction service based on CXAS
+- `api/totalsegmentator.py` - alternative HTTP processing service for segmentation and metrics
 
-## What Is Implemented Today
+### Storage and outputs
+- `database/schema.sql` - SQLite schema
+- `uploads/` - raw uploaded ZIP payloads
+- `input/` - ready-to-process NIfTI queue
+- `processing/` - claimed in-flight NIfTI jobs
+- `nii/` - archived final NIfTI files
+- `output/<case_id>/` - case artifacts such as `id.json`, `resultados.json`, PNG overlays, and segmentation folders
+- `data/incoming_dicom/` - listener intake staging area
 
-### Ingestion and Preparation
-- `dicom_listener.py`: DICOM C-STORE SCP (`HEIMDALLR`, port `11112`)
-- `uploader.py`: manual/CLI uploads (ZIP or folder)
-- `app.py`: upload API, dashboard API, static web serving
-- `core/prepare.py`: DICOM parsing, series selection, NIfTI conversion via `dcm2niix`
-
-### Processing and Metrics
-- `run.py`: queue worker with parallel case processing
-- `core/metrics.py`: quantitative extraction and derived metrics
-- Segmentation and tissue maps through TotalSegmentator pipeline integration
-
-### Reporting Assistance
-- `app.py`: report-assist endpoints, including Anthropic chest X-ray flow (`/api/anthropic/ap-thorax-xray`)
-- `api/medgemma.py`: dedicated microservice for AP chest X-ray assistant flow
-- `api/medgemma_prompts.py`: prompt templates and structured output helpers
-- `anthropic_report_builder.py`: report-building utilities for narrative output
-- `services/deid_gateway.py`: outbound de-identification gateway (pixel masking + metadata scrubbing, status: `mvp-internal`)
-- `api/ctr.py`: CTR (Cardiothoracic Ratio / ICT) extraction microservice via CXAS (port `8003`)
-
-### Data Layer and Outputs
-- SQLite schema in `database/schema.sql`
-- Per-case output directory with:
-  - `id.json` (study/case metadata)
-  - `resultados.json` (quantitative outputs)
-  - overlays and segmentation artifacts (`.png`, `.nii.gz`)
-
-## Architecture
+## Runtime Topology
 
 ```text
 PACS / Modality (DICOM C-STORE)
             |
             v
-   dicom_listener.py  --->  HTTP /upload  --->  app.py
-                                              |
-                                              v
-                                        core/prepare.py
-                                  (DICOM selection + NIfTI)
-                                              |
-                                              v
-                                           input/
-                                              |
-                                              v
-                                            run.py
-                                   (segmentation + metrics)
-                                              |
-                                              v
-                                           output/
-                                              |
-                                              +--> Dashboard/API (app.py)
-                                              +--> Report assist endpoints
+services/dicom_listener.py
+            |
+            v
+      POST /upload
+            |
+            v
+          app.py
+            |
+            v
+    core/prepare.py
+ (DICOM select + NIfTI)
+            |
+            v
+          input/
+            |
+            v
+          run.py
+            |
+            v
+   output/<case_id>/ + database/dicom.db + nii/
 
-api/medgemma.py runs as an isolated service,
-while Anthropic-backed report flows are orchestrated by app endpoints.
+Optional app.py proxy routes:
+  /api/anthropic/ap-thorax-xray -> api/anthropic.py
+  /api/medgemma/ap-thorax-xray  -> api/medgemma.py
+
+Standalone optional service:
+  api/ctr.py -> POST /extract_ctr
+  api/totalsegmentator.py -> POST /process
 ```
 
 ## Quick Start
 
 ### Prerequisites
+
 - Python `3.10+`
 - `dcm2niix`
-- NVIDIA GPU (recommended for segmentation workloads)
-- Optional for OCR-based de-identification review: `tesseract` binary + `pytesseract` package
+- TotalSegmentator-compatible environment and license key
+- NVIDIA GPU recommended for segmentation and model-assist workloads
+- Optional OCR review support: `pytesseract` package plus system `tesseract`
 
 ### Install
 
@@ -106,213 +108,119 @@ git clone <repository-url>
 cd Heimdallr
 python3 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+venv/bin/pip install -r requirements.txt
 cp .env.example .env
-# edit .env and set TOTALSEGMENTATOR_LICENSE
-# Optional (only if using OCR review in de-identification gateway)
-pip install pytesseract
 ```
 
-`TOTALSEGMENTATOR_LICENSE` is required by `config.py` for pipeline services.
+Set `TOTALSEGMENTATOR_LICENSE` in `.env`. `config.py` raises on import when that variable is missing.
 
-Install `tesseract` system binary (examples):
+Optional OCR dependency:
 
 ```bash
-# macOS (Homebrew)
+venv/bin/pip install pytesseract
+
+# macOS
 brew install tesseract
 
 # Ubuntu/Debian
 sudo apt-get update && sudo apt-get install -y tesseract-ocr
 ```
 
-### Run (separate terminals)
+### Run
+
+Run the baseline services in separate terminals:
 
 ```bash
-# 1) API + Dashboard
+# 1) API + dashboard
 source venv/bin/activate
-python app.py
+venv/bin/python app.py
 
 # 2) Processing worker
 source venv/bin/activate
-python run.py
+venv/bin/python run.py
 
-# 3) Optional: DICOM listener for PACS integration
+# 3) Optional: DICOM listener
 source venv/bin/activate
-python dicom_listener.py
-
-# 4) Optional: CTR extraction service (port 8003)
-source venv/bin/activate
-python api/ctr.py
+venv/bin/python services/dicom_listener.py
 ```
 
-### Preflight Check (optional, recommended)
+Optional assistive services:
 
 ```bash
+# Anthropic proxy target (default app proxy target: http://localhost:8101/analyze)
 source venv/bin/activate
-python -m py_compile app.py run.py dicom_listener.py core/prepare.py
+venv/bin/python api/anthropic.py
+
+# MedGemma proxy target (default service port: 8004)
+source venv/bin/activate
+venv/bin/python api/medgemma.py
+
+# CTR extraction service (default port 8003)
+source venv/bin/activate
+venv/bin/python api/ctr.py
+
+# Alternative HTTP segmentation service (default port 8005)
+source venv/bin/activate
+venv/bin/python api/totalsegmentator.py
 ```
 
 ### Access
+
 - Dashboard: `http://localhost:8001`
-- API docs: `http://localhost:8001/docs`
+- OpenAPI docs: `http://localhost:8001/docs`
+- CTR service health: `http://localhost:8003/health`
+- TotalSegmentator API health: `http://localhost:8005/health`
+
+## Current API Surface
+
+### Upload and dashboard
+- `POST /upload`
+- `GET /`
+- `GET /api/tools/uploader`
+
+### Patients and results
+- `GET /api/patients`
+- `GET /api/patients/{case_id}/results`
+- `GET /api/patients/{case_id}/metadata`
+- `GET /api/patients/{case_id}/nifti`
+- `GET /api/patients/{case_id}/download/{folder_name}`
+- `GET /api/patients/{case_id}/images/{filename}`
+- `PATCH /api/patients/{case_id}/biometrics`
+- `PATCH /api/patients/{case_id}/smi`
+
+### Assistive report proxies
+- `POST /api/anthropic/ap-thorax-xray`
+- `POST /api/medgemma/ap-thorax-xray`
+
+### Standalone optional service
+- CTR service (`:8003`): `POST /extract_ctr`, `GET /health`
+- TotalSegmentator HTTP service (`:8005`): `POST /process`, `GET /health`
+
+See [`docs/API.md`](docs/API.md) for contract notes and examples.
 
 ## Operational Notes
 
-- Configuration is centralized in `config.py` and can be overridden with `HEIMDALLR_*` environment variables.
-- For deployment, run `app.py`, `run.py`, and `dicom_listener.py` as independent services (systemd examples were previously used and can be reintroduced as infrastructure docs if needed).
-- This repository contains active experimentation and production-facing utilities; validate feature toggles before rolling out in clinical environments.
-
-## Licensing and Third-Party Compliance
-
-- Heimdallr is distributed under Apache License 2.0.
-- This project uses **TotalSegmentator**. Commercial usage may require a separate TotalSegmentator license.
-- The CTR extraction module (`api/ctr.py`) is based on **ChestXRayAnatomySegmentation (CXAS)** by Constantin Seibold et al., licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). This integration is used for personal/experimental purposes only; derivatives must carry the same license.
-- The MedGemma Analysis Service (`api/medgemma.py`) uses **Google MedGemma** (`google/medgemma-1.5-4b-it`), governed by the [Health AI Developer Foundations Terms of Use](https://developers.google.com/health-ai-developer-foundations/terms). MedGemma is not an approved medical device.
-- Each institution and deployer is responsible for validating third-party licensing and regulatory compliance before production use.
-- For attributions and notices, see [`NOTICE`](NOTICE).
-
-## Governance Baseline
-
-- Security disclosure policy: [`SECURITY.md`](SECURITY.md)
-- Code ownership map: [`CODEOWNERS`](CODEOWNERS)
-- Change history: [`CHANGELOG.md`](CHANGELOG.md)
-- Architecture reference: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
-- Contribution guide: [`CONTRIBUTING.md`](CONTRIBUTING.md)
-
-## Production Baseline
-
-Minimum production topology:
-
-1. `app.py` (API + dashboard)
-2. `run.py` (processing worker)
-3. `dicom_listener.py` (DICOM intake)
-
-Recommended baseline checks:
-
-1. `http://localhost:8001/docs` responds.
-2. Listener port `11112` is reachable from PACS.
-3. Queue flow `upload -> input/ -> output/` completes for a known study.
-4. GPU capacity is validated for segmentation workloads.
-
-For deployment units, observability, and incident handling runbooks, see [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
-
-## PACS Integration Quick Check
-
-Expected defaults:
-
-- AE Title: `HEIMDALLR`
-- Port: `11112`
-- Protocol: DICOM C-STORE
-
-Connectivity smoke test with DCMTK:
-
-```bash
-dcmsend localhost 11112 -aec HEIMDALLR test.dcm
-```
-
-If tests fail, verify listener process state, firewall rules, and PACS destination configuration.
-
-## API Quick Contracts
-
-Anthropic chest X-ray flow:
-
-```bash
-curl -X POST http://localhost:8001/api/anthropic/ap-thorax-xray \
-  -F "file=@/path/to/image.dcm" \
-  -F "age=45 year old" \
-  -F "identificador=case_123"
-```
-
-MedGemma chest X-ray flow:
-
-```bash
-curl -X POST http://localhost:8001/api/medgemma/ap-thorax-xray \
-  -F "file=@/path/to/image.png" \
-  -F "age=45 year old"
-```
-
-For endpoint coverage and payload conventions, see [`docs/API.md`](docs/API.md).
+- Configuration is centralized in `config.py` and may be overridden with `HEIMDALLR_*` environment variables where supported.
+- The DICOM listener default upload target is `http://127.0.0.1:8001/upload`.
+- The CLI uploader lives at [`clients/uploader.py`](clients/uploader.py) and may also be downloaded from `GET /api/tools/uploader`.
+- The worker claims files from `input/` into `processing/` before segmentation, then archives completed NIfTI files into `nii/`.
+- The app proxy expects the Anthropic and MedGemma services to be running separately if those routes are used.
+- `api/totalsegmentator.py` is an alternative HTTP execution path and is not part of the default `upload -> prepare -> run` baseline.
 
 ## Documentation Map
 
 - Architecture overview: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
-- Strategic roadmap source (Markdown): [`docs/UPCOMING.md`](docs/UPCOMING.md)
-- Strategic roadmap viewer (HTML): [`docs/upcoming.html`](docs/upcoming.html)
-- Operations and deployment runbook: [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
-- API contracts and examples: [`docs/API.md`](docs/API.md)
-- Strategic visual board source: [`docs/pipeline-strategy.html`](docs/pipeline-strategy.html)
-- Motivation and justification guide: [`docs/motivation-justification.html`](docs/motivation-justification.html)
-- Validation stage manual (`validation-ready` and `production-candidate`): [`docs/validation-stage-manual.md`](docs/validation-stage-manual.md)
-- Full research report (HTML): [`docs/radiology-preprocessing-ecosystem-report.html`](docs/radiology-preprocessing-ecosystem-report.html)
-- Full research report (Markdown): [`docs/radiology-preprocessing-ecosystem-report.md`](docs/radiology-preprocessing-ecosystem-report.md)
-- Public docs landing page (GitHub Pages): [https://rod-americo.github.io/Heimdallr/](https://rod-americo.github.io/Heimdallr/)
-- Public strategy board (GitHub Pages): [https://rod-americo.github.io/Heimdallr/pipeline-strategy.html](https://rod-americo.github.io/Heimdallr/pipeline-strategy.html)
-- Public upcoming roadmap (GitHub Pages): [https://rod-americo.github.io/Heimdallr/upcoming.html](https://rod-americo.github.io/Heimdallr/upcoming.html)
-- Public motivation guide (GitHub Pages): [https://rod-americo.github.io/Heimdallr/motivation-justification.html](https://rod-americo.github.io/Heimdallr/motivation-justification.html)
-- Public research report (GitHub Pages): [https://rod-americo.github.io/Heimdallr/radiology-preprocessing-ecosystem-report.html](https://rod-americo.github.io/Heimdallr/radiology-preprocessing-ecosystem-report.html)
+- API contracts: [`docs/API.md`](docs/API.md)
+- Operations runbook: [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
+- Validation stage manual: [`docs/validation-stage-manual.md`](docs/validation-stage-manual.md)
+- Roadmap and future modules: [`docs/UPCOMING.md`](docs/UPCOMING.md)
 
-## GitHub Pages Publishing
+## Governance and Compliance
 
-To publish the HTML strategy board as a rendered page:
+- Security policy: [`SECURITY.md`](SECURITY.md)
+- Contributing guide: [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- Change history: [`CHANGELOG.md`](CHANGELOG.md)
+- Ownership map: [`CODEOWNERS`](CODEOWNERS)
+- Notices and third-party attribution: [`NOTICE`](NOTICE)
 
-1. Open repository settings on GitHub.
-2. Go to `Pages`.
-3. Set source to `Deploy from a branch`.
-4. Select branch `main` and folder `/docs`.
-5. Save and wait for the deployment to complete.
-
-## Strategy and Roadmap
-
-- Strategic backlog source: [`docs/UPCOMING.md`](docs/UPCOMING.md)
-- Strategic backlog viewer: [`docs/upcoming.html`](docs/upcoming.html)
-- Validation gate manual: [`docs/validation-stage-manual.md`](docs/validation-stage-manual.md)
-- Dark-mode strategic planning page (based on your concept): [`docs/pipeline-strategy.html`](docs/pipeline-strategy.html)
-- Motivation and strategic justification page: [`docs/motivation-justification.html`](docs/motivation-justification.html)
-- Full research report page: [`docs/radiology-preprocessing-ecosystem-report.html`](docs/radiology-preprocessing-ecosystem-report.html)
-
-### Current Viable Pipeline Baseline
-
-1. DICOM C-STORE intake listener
-2. Case prep and queue worker
-3. Dashboard and API surface
-4. De-identification gateway
-5. TotalSegmentator core pipeline
-6. L3 muscle area and SMI calculator
-7. Opportunistic bone quantification
-8. CTR extraction (ICT via CXAS)
-
-### Next Viable Roadmap Modules
-
-1. HL7-triggered smart prefetch orchestration
-2. Unified worklist orchestration and fair assignment
-3. De-identification governance hardening and audit controls
-4. Deterministic pseudonymization and secure crosswalk
-5. Follow-up recommendation extraction and navigation trigger creation
-6. Urology navigation pathway with oncology secondary routing
-7. CAC-DRS coronary calcium workflow
-8. AI-assisted urgency flagging with auditable reprioritization
-9. Opportunistic liver steatosis pipeline
-10. Structured report drafting copilot
-11. Patient follow-up navigator
-12. On-prem AI gateway enforcement
-
-## Safety, Compliance, and Clinical Use
-
-Heimdallr is intended as **clinical decision support** infrastructure, not an autonomous diagnostic authority. Any AI-generated text, prioritization signal, or quantitative metric must be reviewed by qualified professionals.
-
-### Test Data Handling
-
-- Test datasets are fully anonymized before use.
-- In the image-conversion test flow, DICOM metadata is intentionally not carried forward, reducing PHI exposure risk in derived files.
-- Test radiographs used in this repository do not contain burned-in PHI overlays.
-
-Current external-call flows enforce a de-identification gateway (`pixel masking + metadata scrubbing`) before outbound model requests.
-For additional governance controls (auditability hardening, model drift controls, and shadow-AI mitigation), see [`docs/UPCOMING.md`](docs/UPCOMING.md).
-
-## License
-
-Apache License 2.0. See [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
-
-### Third-Party Dependencies
-
-This project uses **TotalSegmentator**, which may require a separate commercial license depending on usage context. Users are responsible for independent license compliance.
+Heimdallr is distributed under Apache License 2.0. Third-party components may carry additional licensing or use restrictions, especially TotalSegmentator, CXAS, Anthropic-backed services, and MedGemma-backed services. Review deployment obligations before production use.

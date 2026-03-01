@@ -29,7 +29,7 @@ It is designed to protect delivery quality, clinical safety, and governance as t
 ## Prioritized Module Backlog
 
 Ordered by pipeline viability and delivery sequence.
-Live-only baseline modules remain documented in the strategy board and `README.md`, while this backlog keeps future hardening work that extends already-running modules.
+Modules with `repoState = implemented` remain documented in the strategy board and `README.md`, while this backlog keeps future hardening work that extends already-running modules.
 
 | Rank | Module | Pillar | Impact | Friction | Why now |
 |---|---|---|---:|---:|---|
@@ -58,6 +58,33 @@ Live-only baseline modules remain documented in the strategy board and `README.m
 | 23 | Oncology high-suspicion navigation router | Navigation | 10 | 7 | High clinical-risk routing for ER/inpatient neoplastic suspicion |
 | 24 | Gynecology navigation pathway | Navigation | 9 | 7 | Structured continuity for adnexal/uterine/cervical suspicious findings |
 | 25 | Fracture detection and triage module | Workflow | 9 | 7 | Triage of cases with suspected fractures in trauma/emergency workflows with auditable urgency flags |
+
+## Current Implemented Baseline
+
+The following modules already exist in the repository and are tracked as `repoState = implemented` cards in the strategy board. They are not part of the prioritized backlog table above unless the roadmap item refers to future hardening or expansion work.
+
+- DICOM C-STORE intake listener
+- Case preparation and queue worker
+- Dashboard and API surface
+- De-identification gateway
+- AP chest X-ray assist APIs
+- TotalSegmentator core pipeline
+- Automated organ volumetry
+- Intracranial hemorrhage detection
+- Opportunistic liver quant
+- Opportunistic bone quant
+- Opportunistic emphysema quant
+- CTR extraction (ICT via CXAS)
+- Renal stone burden quantification
+
+## Current Prototypes
+
+The strategy board also tracks repository-level prototypes that are useful for planning but are not part of the live baseline:
+
+- Segmentation Service API (HTTP): alternative service-oriented processing path in `api/totalsegmentator.py`
+- Retroactive Cohort Reprocessing Toolkit: operational scripts for archived-case metric recalculation and backfills
+
+These prototypes should inform hardening and architecture decisions, but they are not counted as live baseline modules.
 
 ## Pillar A: Logistics Automation and Smart Prefetch
 
@@ -108,6 +135,16 @@ Exit criteria (B1-B3):
 
 ## Pillar C: Opportunistic Quantification and Precision Triage
 
+Implemented baseline modules already present in the repository:
+
+- Automated organ volumetry (liver, spleen, kidneys)
+- Opportunistic liver quant (volume, HU, estimated fat-content proxy)
+- Opportunistic bone quant (L1 trabecular HU classification)
+- Opportunistic emphysema quant (lobe-level and whole-lung burden)
+- Intracranial hemorrhage detection with overlays and quantitative outputs
+- CTR extraction (ICT via CXAS)
+- Renal stone burden quantification
+
 ### C1. Opportunistic coronary calcium (CAC-DRS)
 - Opportunistic coronary calcium detection in eligible non-gated chest CT.
 - CAC-DRS-oriented structured classification after opportunistic detection.
@@ -129,6 +166,10 @@ These modules represent clinically validated workflows already seen in real-worl
 - **Prostate MRI longitudinal PI-RADS tracker**: temporal PI-RADS and gland-volume trend monitoring.
 
 ## Pillar D: LLM/VLM Reporting Copilot
+
+Implemented baseline module already present in the repository:
+
+- AP chest X-ray assist APIs (Anthropic and MedGemma-backed flows with proxy integration)
 
 ### D1. Structured report drafting
 - Controlled template generation from findings + quant metrics.
@@ -276,16 +317,40 @@ Horizon legend:
 - **Innovation**: long-horizon capabilities with higher uncertainty and strategic differentiation potential.
 
 ### Horizon 1 - Foundation (Safety + Throughput)
-- A1, A2, B1, E1, E2
+- HL7-triggered prefetch orchestration
+- Bandwidth-aware transfer scheduling
+- Unified worklist orchestration
+- De-identification governance hardening
+- Deterministic pseudonymization + crosswalk
 
 ### Horizon 2 - Clinical Acceleration
-- B2, B3, C1, C2, C4, D1
+- AI-assisted urgency flagging
+- SLA-aware policy engine
+- Opportunistic coronary calcium (CAC-DRS)
+- Structured report drafting copilot
+- Fracture detection and triage module
 
 ### Horizon 3 - Care Continuity at Scale
-- F1, F2, F3, F4, F5, F6, F7, C3, D2, E3
+- Follow-up recommendation extraction
+- Reminder and escalation workflows
+- Outcome tracking and quality reporting
+- Urology navigation pathway
+- General surgery navigation pathway
+- Oncology high-suspicion navigation router
+- Gynecology navigation pathway
+- Patient follow-up navigator
+- On-prem AI gateway enforcement
+- Ambient assistance and hotkeys
 
 ### Horizon 4 - Strategic Innovation
-- D3, G1, G2, G3, G4, G5, G6, G7
+- Drift and hallucination controls
+- Agentic workflow coordination
+- Foundation model fine-tuning layer
+- Temporal imaging intelligence (longitudinal delta engine)
+- Causal triage simulator
+- Synthetic + federated validation sandbox
+- Autonomous follow-up orchestrator (human-gated)
+- Prospective trial mode
 
 ## Top Risk Register
 

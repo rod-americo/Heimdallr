@@ -12,7 +12,8 @@
     "rank": 26,
     "pillarCode": "A",
     "pillar": "Logistics",
-    "whyNow": "Stabilizes front-door ingestion as a prerequisite for all downstream automation"
+    "whyNow": "Stabilizes front-door ingestion as a prerequisite for all downstream automation",
+    "repoState": "implemented"
   },
   {
     "id": 2,
@@ -27,7 +28,8 @@
     "rank": 27,
     "pillarCode": "A",
     "pillar": "Logistics",
-    "whyNow": "Provides deterministic preprocessing throughput for production-scale case flow"
+    "whyNow": "Provides deterministic preprocessing throughput for production-scale case flow",
+    "repoState": "implemented"
   },
   {
     "id": 3,
@@ -42,7 +44,8 @@
     "rank": 28,
     "pillarCode": "B",
     "pillar": "Workflow",
-    "whyNow": "Operational visibility and integration contracts are required for safe rollout and monitoring"
+    "whyNow": "Operational visibility and integration contracts are required for safe rollout and monitoring",
+    "repoState": "implemented"
   },
   {
     "id": 4,
@@ -58,7 +61,8 @@
     "pillarCode": "A",
     "pillar": "Logistics",
     "whyNow": "Immediate throughput win with low clinical risk",
-    "backlogModule": "HL7-triggered prefetch orchestration"
+    "backlogModule": "HL7-triggered prefetch orchestration",
+    "repoState": "not-started"
   },
   {
     "id": 5,
@@ -74,14 +78,15 @@
     "pillarCode": "B",
     "pillar": "Workflow",
     "whyNow": "Reduces queue switching and unfair distribution",
-    "backlogModule": "Unified worklist orchestration"
+    "backlogModule": "Unified worklist orchestration",
+    "repoState": "not-started"
   },
   {
     "id": 6,
     "title": "SLA Policy Engine",
     "track": "ops",
     "horizon": "foundation",
-    "status": "poc",
+    "status": "planned",
     "impact": 6,
     "friction": 4,
     "note": "Breach-risk alerting before read-time failure.",
@@ -89,7 +94,8 @@
     "rank": 29,
     "pillarCode": "B",
     "pillar": "Workflow",
-    "whyNow": "Turns SLA risk into actionable escalation before breaches materialize"
+    "whyNow": "Turns SLA risk into actionable escalation before breaches materialize",
+    "repoState": "not-started"
   },
   {
     "id": 7,
@@ -104,7 +110,8 @@
     "rank": 30,
     "pillarCode": "D",
     "pillar": "Reporting",
-    "whyNow": "Fastest assistive reporting wedge in high-volume chest X-ray workflows"
+    "whyNow": "Fastest assistive reporting wedge in high-volume chest X-ray workflows",
+    "repoState": "implemented"
   },
   {
     "id": 8,
@@ -119,7 +126,8 @@
     "rank": 31,
     "pillarCode": "C",
     "pillar": "Quantification",
-    "whyNow": "Core segmentation backbone required by multiple quantification and triage modules"
+    "whyNow": "Core segmentation backbone required by multiple quantification and triage modules",
+    "repoState": "implemented"
   },
   {
     "id": 9,
@@ -134,37 +142,40 @@
     "rank": 32,
     "pillarCode": "C",
     "pillar": "Quantification",
-    "whyNow": "Delivers structured body-composition signals with immediate analytic utility"
+    "whyNow": "Delivers structured body-composition signals with immediate analytic utility",
+    "repoState": "implemented"
   },
   {
     "id": 10,
     "title": "Automated Organ Volumetry",
     "track": "clinical",
     "horizon": "foundation",
-    "status": "poc",
+    "status": "mvp-internal",
     "impact": 8,
     "friction": 5,
-    "note": "Quantitative organ metrics for reporting and analytics.",
+    "note": "Live per-case liver, spleen, and kidney volumetry exposed in results JSON and the dashboard.",
     "stage": "during",
     "rank": 33,
     "pillarCode": "C",
     "pillar": "Quantification",
-    "whyNow": "Adds reproducible volumetric outputs for reporting and longitudinal analytics"
+    "whyNow": "Adds reproducible volumetric outputs for reporting and longitudinal analytics",
+    "repoState": "implemented"
   },
   {
     "id": 11,
     "title": "Intracranial Hemorrhage Detection",
     "track": "clinical",
     "horizon": "acceleration",
-    "status": "poc",
+    "status": "mvp-internal",
     "impact": 10,
     "friction": 5,
-    "note": "Assistive high-acuity signal in read-time flow.",
+    "note": "Conditional cerebral bleed execution is wired into the active pipeline with quantitative outputs and overlays.",
     "stage": "during",
     "rank": 34,
     "pillarCode": "B",
     "pillar": "Workflow",
-    "whyNow": "High-acuity triage support with direct impact on emergency read prioritization"
+    "whyNow": "High-acuity triage support with direct impact on emergency read prioritization",
+    "repoState": "implemented"
   },
   {
     "id": 12,
@@ -174,45 +185,48 @@
     "status": "planned",
     "impact": 7,
     "friction": 6,
-    "note": "Template-driven report drafting support.",
+    "note": "Single-agent or template-driven drafting layer embedded in the reporting flow before any multi-agent orchestration or post-draft QA gate.",
     "stage": "during",
     "rank": 11,
     "pillarCode": "D",
     "pillar": "Reporting",
-    "whyNow": "Reporting acceleration with strong guardrails",
-    "backlogModule": "Structured report drafting copilot"
+    "whyNow": "Fastest governed reporting layer to ship before introducing agentic orchestration complexity",
+    "backlogModule": "Structured report drafting copilot",
+    "repoState": "not-started"
   },
   {
     "id": 13,
     "title": "Urgency Flagging and Reordering",
     "track": "clinical",
     "horizon": "acceleration",
-    "status": "in-review",
+    "status": "planned",
     "impact": 9,
     "friction": 8,
-    "note": "Queue reprioritization with auditable confidence thresholds.",
+    "note": "Cross-modality worklist reprioritization framework that consumes detector outputs and policy rules; it is not a detector-specific vertical by itself.",
     "stage": "during",
     "rank": 8,
     "pillarCode": "B",
     "pillar": "Workflow",
-    "whyNow": "Improves time-to-open for high-acuity cases",
-    "backlogModule": "AI-assisted urgency flagging"
+    "whyNow": "Creates the shared queue-control layer required before detector-specific triage modules can safely influence workflow",
+    "backlogModule": "AI-assisted urgency flagging",
+    "repoState": "not-started"
   },
   {
     "id": 14,
     "title": "Opportunistic Liver Quant",
     "track": "clinical",
     "horizon": "acceleration",
-    "status": "poc",
+    "status": "mvp-internal",
     "impact": 7,
     "friction": 6,
-    "note": "Steatosis-oriented structured extraction from routine CT.",
+    "note": "Routine CT liver volume, HU, and estimated fat-content outputs are already generated in the live metrics pipeline.",
     "stage": "during",
     "rank": 9,
     "pillarCode": "C",
     "pillar": "Quantification",
     "whyNow": "Population-health insight from existing scans",
-    "backlogModule": "Liver steatosis opportunistic pipeline"
+    "backlogModule": "Liver steatosis opportunistic pipeline",
+    "repoState": "implemented"
   },
   {
     "id": 15,
@@ -228,7 +242,8 @@
     "pillarCode": "C",
     "pillar": "Quantification",
     "whyNow": "Scalable DXA-proxy value from routine CT",
-    "backlogModule": "Osteoporosis opportunistic screening"
+    "backlogModule": "Osteoporosis opportunistic screening",
+    "repoState": "implemented"
   },
   {
     "id": 16,
@@ -244,7 +259,8 @@
     "pillarCode": "C",
     "pillar": "Quantification",
     "whyNow": "High preventive-care value from opportunistic CT workflows",
-    "backlogModule": "Opportunistic coronary calcium (CAC-DRS)"
+    "backlogModule": "Opportunistic coronary calcium (CAC-DRS)",
+    "repoState": "not-started"
   },
   {
     "id": 17,
@@ -259,23 +275,25 @@
     "rank": 44,
     "pillarCode": "C",
     "pillar": "Quantification",
-    "whyNow": "Builds longitudinal neurodegeneration-oriented quantification capability"
+    "whyNow": "Builds longitudinal neurodegeneration-oriented quantification capability",
+    "repoState": "not-started"
   },
   {
     "id": 18,
     "title": "Opportunistic Emphysema Quant",
     "track": "clinical",
     "horizon": "scaling",
-    "status": "poc",
+    "status": "mvp-internal",
     "impact": 5,
     "friction": 7,
-    "note": "LAA%-driven burden trend support.",
+    "note": "Lobar and whole-lung emphysema burden metrics are computed today when lung lobe segmentation is complete.",
     "stage": "during",
     "rank": 36,
     "pillarCode": "C",
     "pillar": "Quantification",
     "whyNow": "Valuable but depends on segmentation throughput",
-    "backlogModule": "Emphysema quantification at scale"
+    "backlogModule": "Emphysema quantification at scale",
+    "repoState": "implemented"
   },
   {
     "id": 19,
@@ -291,7 +309,8 @@
     "pillarCode": "G",
     "pillar": "R&D",
     "whyNow": "Long-horizon orchestration capability",
-    "backlogModule": "Agentic workflow coordination"
+    "backlogModule": "Agentic workflow coordination",
+    "repoState": "not-started"
   },
   {
     "id": 20,
@@ -307,7 +326,8 @@
     "pillarCode": "G",
     "pillar": "R&D",
     "whyNow": "Institution-adapted model performance with controlled governance",
-    "backlogModule": "Foundation model fine-tuning layer"
+    "backlogModule": "Foundation model fine-tuning layer",
+    "repoState": "not-started"
   },
   {
     "id": 21,
@@ -323,7 +343,8 @@
     "pillarCode": "G",
     "pillar": "R&D",
     "whyNow": "Longitudinal change tracking for follow-up-heavy workflows",
-    "backlogModule": "Temporal imaging intelligence (delta engine)"
+    "backlogModule": "Temporal imaging intelligence (delta engine)",
+    "repoState": "not-started"
   },
   {
     "id": 22,
@@ -339,7 +360,8 @@
     "pillarCode": "G",
     "pillar": "R&D",
     "whyNow": "Safe policy simulation before live queue changes",
-    "backlogModule": "Causal triage simulator"
+    "backlogModule": "Causal triage simulator",
+    "repoState": "not-started"
   },
   {
     "id": 23,
@@ -355,7 +377,8 @@
     "pillarCode": "G",
     "pillar": "R&D",
     "whyNow": "Privacy-preserving multi-site validation and benchmarking",
-    "backlogModule": "Synthetic + federated validation sandbox"
+    "backlogModule": "Synthetic + federated validation sandbox",
+    "repoState": "not-started"
   },
   {
     "id": 24,
@@ -371,7 +394,8 @@
     "pillarCode": "G",
     "pillar": "R&D",
     "whyNow": "Strong continuity and financial recovery upside with clinical oversight",
-    "backlogModule": "Autonomous follow-up orchestrator (human-gated)"
+    "backlogModule": "Autonomous follow-up orchestrator (human-gated)",
+    "repoState": "not-started"
   },
   {
     "id": 25,
@@ -387,7 +411,8 @@
     "pillarCode": "G",
     "pillar": "R&D",
     "whyNow": "Embedded publication-grade evidence generation",
-    "backlogModule": "Prospective trial mode"
+    "backlogModule": "Prospective trial mode",
+    "repoState": "not-started"
   },
   {
     "id": 26,
@@ -403,7 +428,8 @@
     "pillarCode": "E",
     "pillar": "Security",
     "whyNow": "Extend an implemented gateway with stronger policy and audit controls",
-    "backlogModule": "De-identification governance hardening"
+    "backlogModule": "De-identification governance hardening",
+    "repoState": "implemented"
   },
   {
     "id": 27,
@@ -418,7 +444,8 @@
     "rank": 12,
     "pillarCode": "F",
     "pillar": "Navigation",
-    "whyNow": "Converts follow-up intent into tracked operational ownership and completion flow"
+    "whyNow": "Converts follow-up intent into tracked operational ownership and completion flow",
+    "repoState": "not-started"
   },
   {
     "id": 28,
@@ -434,7 +461,8 @@
     "pillarCode": "F",
     "pillar": "Navigation",
     "whyNow": "Direct care-continuity impact with clear rule set",
-    "backlogModule": "Urology navigation pathway"
+    "backlogModule": "Urology navigation pathway",
+    "repoState": "not-started"
   },
   {
     "id": 29,
@@ -449,7 +477,8 @@
     "rank": 37,
     "pillarCode": "C",
     "pillar": "Quantification",
-    "whyNow": "High-prevalence longitudinal use case with clear follow-up impact"
+    "whyNow": "High-prevalence longitudinal use case with clear follow-up impact",
+    "repoState": "not-started"
   },
   {
     "id": 30,
@@ -464,7 +493,8 @@
     "rank": 38,
     "pillarCode": "C",
     "pillar": "Quantification",
-    "whyNow": "Enables guideline-aligned longitudinal surveillance and escalation at scale"
+    "whyNow": "Enables guideline-aligned longitudinal surveillance and escalation at scale",
+    "repoState": "not-started"
   },
   {
     "id": 31,
@@ -479,7 +509,8 @@
     "rank": 39,
     "pillarCode": "F",
     "pillar": "Navigation",
-    "whyNow": "Strengthens continuity workflows with measurable urology follow-up burden tracking"
+    "whyNow": "Strengthens continuity workflows with measurable urology follow-up burden tracking",
+    "repoState": "not-started"
   },
   {
     "id": 32,
@@ -494,7 +525,8 @@
     "rank": 40,
     "pillarCode": "F",
     "pillar": "Navigation",
-    "whyNow": "Directly addresses lost-to-follow-up risk from incidental findings in daily practice"
+    "whyNow": "Directly addresses lost-to-follow-up risk from incidental findings in daily practice",
+    "repoState": "not-started"
   },
   {
     "id": 33,
@@ -509,7 +541,8 @@
     "rank": 41,
     "pillarCode": "F",
     "pillar": "Navigation",
-    "whyNow": "Adds structured temporal tracking for a high-value follow-up pathway"
+    "whyNow": "Adds structured temporal tracking for a high-value follow-up pathway",
+    "repoState": "not-started"
   },
   {
     "id": 34,
@@ -525,7 +558,8 @@
     "pillarCode": "F",
     "pillar": "Navigation",
     "whyNow": "Low-friction continuity value for common actionable findings",
-    "backlogModule": "General surgery navigation pathway"
+    "backlogModule": "General surgery navigation pathway",
+    "repoState": "not-started"
   },
   {
     "id": 35,
@@ -541,7 +575,8 @@
     "pillarCode": "F",
     "pillar": "Navigation",
     "whyNow": "High clinical-risk routing for ER/inpatient neoplastic suspicion",
-    "backlogModule": "Oncology high-suspicion navigation router"
+    "backlogModule": "Oncology high-suspicion navigation router",
+    "repoState": "not-started"
   },
   {
     "id": 36,
@@ -557,22 +592,24 @@
     "pillarCode": "F",
     "pillar": "Navigation",
     "whyNow": "Structured continuity for adnexal/uterine/cervical suspicious findings",
-    "backlogModule": "Gynecology navigation pathway"
+    "backlogModule": "Gynecology navigation pathway",
+    "repoState": "not-started"
   },
   {
     "id": 37,
     "title": "Fracture Detection and Triage Module",
     "track": "clinical",
     "horizon": "acceleration",
-    "status": "in-review",
+    "status": "planned",
     "impact": 9,
     "friction": 7,
-    "note": "Assistive fracture prioritization for trauma flows.",
+    "note": "Fracture-specific trauma detector vertical that can feed the broader urgency framework, rather than replacing the queue orchestration layer.",
     "stage": "during",
     "rank": 25,
     "pillarCode": "B",
     "pillar": "Workflow",
-    "whyNow": "Triage of cases with suspected fractures in trauma/emergency workflows with auditable urgency flags"
+    "whyNow": "Triage of cases with suspected fractures in trauma/emergency workflows with auditable urgency flags",
+    "repoState": "not-started"
   },
   {
     "id": 38,
@@ -587,7 +624,8 @@
     "rank": 42,
     "pillarCode": "A",
     "pillar": "Logistics",
-    "whyNow": "Improves reliability in constrained-network environments without clinical workflow disruption"
+    "whyNow": "Improves reliability in constrained-network environments without clinical workflow disruption",
+    "repoState": "not-started"
   },
   {
     "id": 39,
@@ -603,7 +641,8 @@
     "pillarCode": "E",
     "pillar": "Security",
     "whyNow": "Enables traceable privacy-preserving workflows",
-    "backlogModule": "Deterministic pseudonymization + crosswalk"
+    "backlogModule": "Deterministic pseudonymization + crosswalk",
+    "repoState": "not-started"
   },
   {
     "id": 40,
@@ -618,7 +657,8 @@
     "rank": 43,
     "pillarCode": "A",
     "pillar": "Logistics",
-    "whyNow": "Expands interoperability for cloud-native retrieval and viewer-centric workflows"
+    "whyNow": "Expands interoperability for cloud-native retrieval and viewer-centric workflows",
+    "repoState": "not-started"
   },
   {
     "id": 41,
@@ -634,7 +674,8 @@
     "pillarCode": "F",
     "pillar": "Navigation",
     "whyNow": "High value and operationally feasible",
-    "backlogModule": "Follow-up recommendation extraction (NLP)"
+    "backlogModule": "Follow-up recommendation extraction (NLP)",
+    "repoState": "not-started"
   },
   {
     "id": 42,
@@ -650,7 +691,8 @@
     "pillarCode": "E",
     "pillar": "Security",
     "whyNow": "Critical for enterprise deployment maturity",
-    "backlogModule": "On-prem AI gateway enforcement"
+    "backlogModule": "On-prem AI gateway enforcement",
+    "repoState": "not-started"
   },
   {
     "id": 43,
@@ -660,12 +702,13 @@
     "status": "planned",
     "impact": 7,
     "friction": 6,
-    "note": "LVI/MVP: normal vs altered plus assistive attention flag.",
+    "note": "Lightweight chest X-ray preclassification path for normal-vs-altered and attention-flag use, narrower than full urgency orchestration.",
     "stage": "during",
     "rank": 35,
     "pillarCode": "B",
     "pillar": "Workflow",
-    "whyNow": "Low-friction MVP lever with immediate queue-prioritization and time-to-open gains"
+    "whyNow": "Provides a constrained CXR-specific entry point before broader triage orchestration is attempted",
+    "repoState": "not-started"
   },
   {
     "id": 44,
@@ -675,13 +718,14 @@
     "status": "exploratory",
     "impact": 9,
     "friction": 8,
-    "note": "Needed before broad automation trust",
+    "note": "Cross-cutting evaluation, regression, and monitoring framework for reporting models; this is a control layer, not a drafting feature.",
     "stage": "during",
     "rank": 14,
     "pillarCode": "D",
     "pillar": "Reporting",
-    "whyNow": "Needed before broad automation trust",
-    "backlogModule": "Drift/hallucination control framework"
+    "whyNow": "Establishes trust controls that reporting features need before wider automation exposure",
+    "backlogModule": "Drift/hallucination control framework",
+    "repoState": "not-started"
   },
   {
     "id": 45,
@@ -698,7 +742,8 @@
     "pillar": "Quantification",
     "whyNow": "Fastest low-cost path to deployable bone lesion assistive workflow with human review and continuous model improvement",
     "backlogModule": "Bone lesion CT assistive pipeline (TotalSegmentator -> nnU-Net -> MONAI Label)",
-    "obs": "retraining loop and low-cost open stack."
+    "obs": "retraining loop and low-cost open stack.",
+    "repoState": "not-started"
   },
   {
     "id": 46,
@@ -708,13 +753,14 @@
     "status": "exploratory",
     "impact": 9,
     "friction": 7,
-    "note": "Autonomous agent to prioritize studies by urgency (e.g., fractures, hemorrhages), integrating segmentation and history through EHR/HL7.",
+    "note": "Higher-order orchestration agent that combines detector outputs, prior context, and workflow rules across modalities; distinct from single-detector triage cards.",
     "stage": "during",
     "rank": 46,
     "pillarCode": "B",
     "pillar": "Workflow",
-    "whyNow": "Accelerates time-to-read in emergencies, validated in recent simulations.",
-    "backlogModule": "AI triage agent integration"
+    "whyNow": "Defines the long-horizon orchestration layer that sits above detector-specific triage signals and queue policies",
+    "backlogModule": "AI triage agent integration",
+    "repoState": "not-started"
   },
   {
     "id": 47,
@@ -724,13 +770,14 @@
     "status": "exploratory",
     "impact": 8,
     "friction": 8,
-    "note": "Orchestrator with specialized agents (image analysis, context extraction, structured drafting), with auditing and human editing.",
+    "note": "Multi-agent drafting and context-composition layer for complex report assembly; distinct from post-draft QA and recommendation generation.",
     "stage": "during",
     "rank": 47,
     "pillarCode": "D",
     "pillar": "Reporting",
-    "whyNow": "Outperforms isolated LLMs for complex workflows, as seen in multi-agent frameworks.",
-    "backlogModule": "Multi-agent report pipeline"
+    "whyNow": "Targets report-composition complexity that exceeds the scope of a single-agent copilot",
+    "backlogModule": "Multi-agent report pipeline",
+    "repoState": "not-started"
   },
   {
     "id": 48,
@@ -740,13 +787,14 @@
     "status": "exploratory",
     "impact": 9,
     "friction": 7,
-    "note": "Post-draft multi-agent quality gate for factual consistency, image-text alignment, and confidence-scored escalation.",
+    "note": "Post-draft release gate that validates report quality after drafting/orchestration, separate from report generation itself.",
     "stage": "during",
     "rank": 48,
     "pillarCode": "D",
     "pillar": "Reporting",
     "whyNow": "Adds auditable safety controls before broad autonomous reporting adoption.",
-    "backlogModule": "Agentic report quality gate"
+    "backlogModule": "Agentic report quality gate",
+    "repoState": "not-started"
   },
   {
     "id": 49,
@@ -756,13 +804,14 @@
     "status": "exploratory",
     "impact": 8,
     "friction": 8,
-    "note": "Recommendation agent that attaches traceable guideline citations for follow-up and management suggestions.",
+    "note": "Recommendation layer that appends citation-grounded management or follow-up suggestions after findings are already drafted and validated.",
     "stage": "during",
     "rank": 49,
     "pillarCode": "D",
     "pillar": "Reporting",
     "whyNow": "Reduces unsupported recommendations by enforcing citation-backed guidance in complex cases.",
-    "backlogModule": "Guideline-cited recommendation pipeline"
+    "backlogModule": "Guideline-cited recommendation pipeline",
+    "repoState": "not-started"
   },
   {
     "id": 50,
@@ -772,13 +821,14 @@
     "status": "exploratory",
     "impact": 8,
     "friction": 6,
-    "note": "Safety layer for high-risk subtle findings with mandatory fallback routing and conservative escalation logic.",
+    "note": "Safety and fallback layer around triage modules for subtle or failure-prone findings; it constrains triage systems rather than acting as a detector.",
     "stage": "during",
     "rank": 50,
     "pillarCode": "B",
     "pillar": "Workflow",
     "whyNow": "Mitigates undertriage risk in subtle presentations where autonomous urgency models degrade.",
-    "backlogModule": "Subtle-finding triage safeguard"
+    "backlogModule": "Subtle-finding triage safeguard",
+    "repoState": "not-started"
   },
   {
     "id": 51,
@@ -788,13 +838,14 @@
     "status": "exploratory",
     "impact": 9,
     "friction": 6,
-    "note": "Prospective silent-run validation framework to measure clinical impact before affecting live care pathways.",
+    "note": "Pre-production silent-run validation on live workflows to measure behavior before any operational influence is enabled.",
     "stage": "during",
     "rank": 51,
     "pillarCode": "E",
     "pillar": "Security",
     "whyNow": "Creates decision-grade evidence for safety and performance before production influence.",
-    "backlogModule": "Prospective shadow-mode validation"
+    "backlogModule": "Prospective shadow-mode validation",
+    "repoState": "not-started"
   },
   {
     "id": 52,
@@ -804,13 +855,14 @@
     "status": "exploratory",
     "impact": 9,
     "friction": 7,
-    "note": "Continuous subgroup-aware monitoring for drift, bias, and operating-context degradation with automatic rollback triggers.",
+    "note": "Post-deployment continuous monitoring for drift, bias, and context degradation after a module is already influencing workflow.",
     "stage": "during",
     "rank": 52,
     "pillarCode": "E",
     "pillar": "Security",
     "whyNow": "Prevents silent safety degradation as data mix and workflow context evolve over time.",
-    "backlogModule": "Agent drift and bias sentinel"
+    "backlogModule": "Agent drift and bias sentinel",
+    "repoState": "not-started"
   },
   {
     "id": 53,
@@ -825,6 +877,57 @@
     "rank": 53,
     "pillarCode": "C",
     "pillar": "Quantification",
-    "whyNow": "Low-friction quantitative cardiomegaly screening from existing chest X-ray workflows"
+    "whyNow": "Low-friction quantitative cardiomegaly screening from existing chest X-ray workflows",
+    "repoState": "implemented"
+  },
+  {
+    "id": 54,
+    "title": "Renal Stone Burden Quantification",
+    "track": "clinical",
+    "horizon": "foundation",
+    "status": "mvp-internal",
+    "impact": 7,
+    "friction": 4,
+    "note": "Current metrics pipeline computes stone count, total burden, largest diameter, laterality, and HU summaries when stone masks exist.",
+    "stage": "during",
+    "rank": 54,
+    "pillarCode": "C",
+    "pillar": "Quantification",
+    "whyNow": "Turns existing segmentation outputs into actionable structured urology burden metrics",
+    "repoState": "implemented"
+  },
+  {
+    "id": 55,
+    "title": "Segmentation Service API (HTTP)",
+    "track": "ops",
+    "horizon": "foundation",
+    "status": "poc",
+    "impact": 6,
+    "friction": 4,
+    "note": "An alternative HTTP processing service exists in api/totalsegmentator.py with preloaded runtime and health/process endpoints.",
+    "stage": "during",
+    "rank": 55,
+    "pillarCode": "A",
+    "pillar": "Logistics",
+    "whyNow": "Supports service-oriented processing experiments without replacing the current queue-worker baseline",
+    "backlogModule": "Service-oriented segmentation runtime",
+    "repoState": "prototype"
+  },
+  {
+    "id": 56,
+    "title": "Retroactive Cohort Reprocessing Toolkit",
+    "track": "ops",
+    "horizon": "foundation",
+    "status": "poc",
+    "impact": 6,
+    "friction": 3,
+    "note": "Operational scripts already support retroactive metric recalculation and cohort-wide backfills on archived cases.",
+    "stage": "during",
+    "rank": 56,
+    "pillarCode": "B",
+    "pillar": "Workflow",
+    "whyNow": "Provides a low-friction path for backfills, metric corrections, and validation reruns after pipeline changes",
+    "backlogModule": "Retroactive cohort reprocessing toolkit",
+    "repoState": "prototype"
   }
 ]

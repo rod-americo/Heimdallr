@@ -21,11 +21,21 @@ This document summarizes high-value API contracts used in Heimdallr workflows.
 
 ## Core Endpoints
 
+### Upload and Tooling
+
+- `POST /upload`
+- `GET /api/tools/uploader`
+
+`POST /upload` accepts a `.zip` payload and launches `core/prepare.py` asynchronously using the repository virtual environment Python binary.
+
 ### Patients and Results
 
 - `GET /api/patients`
 - `GET /api/patients/{case_id}/results`
 - `GET /api/patients/{case_id}/metadata`
+- `GET /api/patients/{case_id}/nifti`
+- `GET /api/patients/{case_id}/download/{folder_name}`
+- `GET /api/patients/{case_id}/images/{filename}`
 - `PATCH /api/patients/{case_id}/biometrics`
 - `PATCH /api/patients/{case_id}/smi`
 
@@ -57,6 +67,12 @@ curl -X POST http://localhost:8001/api/medgemma/ap-thorax-xray \
 ```
 
 Both endpoints return a `deid` object with gateway details (for example: `metadata_removed`, `pixel_redaction`, `age_coarsened`, `review_required`, `bounding_boxes`).
+
+Proxy notes:
+
+1. `POST /api/anthropic/ap-thorax-xray` forwards to `ANTHROPIC_SERVICE_URL` (default `http://localhost:8101/analyze`).
+2. `POST /api/medgemma/ap-thorax-xray` forwards to `MEDGEMMA_SERVICE_URL` (default `http://localhost:8004/analyze` unless overridden).
+3. Proxy routes surface upstream availability and timeout failures as `503` or `504`.
 
 ### CTR Extraction (standalone service)
 
@@ -109,3 +125,4 @@ When integrating clients:
 2. Validation, timeout, and retry behavior should be enforced by calling clients.
 3. External model calls are routed through the de-identification gateway before outbound requests.
 4. OCR-based review requires `pytesseract` + system `tesseract` installed on the service host.
+5. Upload processing is asynchronous; a successful `/upload` response means preparation started, not that final metrics are already available.

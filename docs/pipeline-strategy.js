@@ -1,6 +1,5 @@
 (() => {
     let modules = [];
-    const liveStatuses = new Set(['mvp-internal', 'validation-ready', 'production-candidate', 'implemented']);
     const stageOrder = {
         before: 0,
         during: 1,
@@ -42,6 +41,7 @@
     const focus4 = css.getPropertyValue('--focus-4').trim();
     let activeTrackFilter = 'all';
     let activeStatusFilter = 'all';
+    let activeRepoStateFilter = 'all';
 
     function frictionBand(v) {
         if (v <= 3) return 'low';
@@ -66,17 +66,24 @@
         return 'Planned';
     }
 
+    function repoStateLabel(v) {
+        if (v === 'implemented') return 'Implemented';
+        if (v === 'prototype') return 'Prototype';
+        return 'Not Started';
+    }
+
     function filterModules() {
         return modules.filter((m) => {
             const trackMatch = activeTrackFilter === 'all' || m.track === activeTrackFilter;
             const statusMatch = activeStatusFilter === 'all' || m.status === activeStatusFilter;
-            return trackMatch && statusMatch;
+            const repoStateMatch = activeRepoStateFilter === 'all' || m.repoState === activeRepoStateFilter;
+            return trackMatch && statusMatch && repoStateMatch;
         });
     }
 
     function compareModules(a, b) {
-        const aIsLive = liveStatuses.has(a.status);
-        const bIsLive = liveStatuses.has(b.status);
+        const aIsLive = a.repoState === 'implemented';
+        const bIsLive = b.repoState === 'implemented';
 
         if (aIsLive !== bIsLive) return aIsLive ? -1 : 1;
 
@@ -100,11 +107,11 @@
     function renderLiveToday() {
         liveToday.innerHTML = '';
         modules
-            .filter((m) => liveStatuses.has(m.status))
+            .filter((m) => m.repoState === 'implemented')
             .sort(compareModules)
             .forEach((m) => {
                 const li = document.createElement('li');
-                li.textContent = `${m.title}: ${m.note}`;
+                li.textContent = `${m.title} (${statusLabel(m.status)}): ${m.note}`;
                 liveToday.appendChild(li);
             });
     }
@@ -118,6 +125,7 @@
             el.innerHTML = `
                 <div class="card-top">
                     <span class="top-meta horizon ${m.horizon}"><span class="dot"></span>${m.horizon}</span>
+                    <span class="top-meta repo-state repo-${m.repoState || 'not-started'}"><span class="dot"></span>${repoStateLabel(m.repoState)}</span>
                     <span class="top-meta status status-${m.status}"><span class="dot"></span>${statusLabel(m.status)}</span>
                 </div>
                 <h3>${m.title}</h3>
@@ -144,6 +152,7 @@
             btn.classList.add('active');
             if (group === 'track') activeTrackFilter = value;
             if (group === 'status') activeStatusFilter = value;
+            if (group === 'repo-state') activeRepoStateFilter = value;
             renderCards();
         });
     });

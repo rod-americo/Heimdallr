@@ -1,29 +1,29 @@
-# Prompts — Versionamento
+# Prompts Versioning
 
-Todos os prompts neste diretório devem ser versionados antes de qualquer modificação.
+All prompts in this directory must be versioned before any modification.
 
-## Regra de versionamento
+## Versioning Rule
 
-Antes de editar um prompt, copiar o arquivo atual para a pasta `versions/` com o seguinte padrão de nome:
+Before editing a prompt, copy the current file into `versions/` using the following naming pattern:
 
+```text
+versions/file_name_YYYYMMDDHHmm.txt
 ```
-versions/nome_do_arquivo_AAAAMMDDHHmm.txt
-```
 
-| Campo | Formato | Exemplo |
+| Field | Format | Example |
 |---|---|---|
-| `AAAA` | Ano com 4 dígitos | 2026 |
-| `MM` | Mês com 2 dígitos | 02 |
-| `DD` | Dia com 2 dígitos | 24 |
-| `HH` | Hora com 2 dígitos (24h) | 10 |
-| `mm` | Minuto com 2 dígitos | 51 |
+| `YYYY` | 4-digit year | 2026 |
+| `MM` | 2-digit month | 02 |
+| `DD` | 2-digit day | 24 |
+| `HH` | 2-digit hour (24h) | 10 |
+| `mm` | 2-digit minute | 51 |
 
-### Exemplo
+### Example
 
-Ao editar `ap_rx_thorax_openai.txt` em 24/02/2026 às 10:51:
+When editing `ap_rx_thorax_openai.txt` on February 24, 2026 at 10:51:
 
-```
+```bash
 cp ap_rx_thorax_openai.txt versions/ap_rx_thorax_openai_202602241051.txt
 ```
 
-A versão anterior fica preservada em `versions/` e o arquivo sem sufixo é sempre a versão **corrente**.
+The previous revision remains preserved in `versions/`, and the filename without a suffix is always the current active version.
