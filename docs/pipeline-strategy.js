@@ -44,6 +44,7 @@
     let activeTrackFilter = 'all';
     let activeStatusFilter = 'all';
     let activeRepoStateFilter = 'all';
+    let heightSyncFrame = null;
 
     function frictionBand(v) {
         if (v <= 3) return 'low';
@@ -180,7 +181,7 @@
             cards.appendChild(el);
         });
 
-        syncCardHeights();
+        scheduleCardHeightSync();
     }
 
     function syncCardHeights() {
@@ -194,6 +195,19 @@
         const maxHeight = Math.max(...renderedCards.map((card) => card.offsetHeight));
         renderedCards.forEach((card) => {
             card.style.minHeight = `${maxHeight}px`;
+        });
+    }
+
+    function scheduleCardHeightSync() {
+        if (heightSyncFrame !== null) {
+            window.cancelAnimationFrame(heightSyncFrame);
+        }
+
+        heightSyncFrame = window.requestAnimationFrame(() => {
+            syncCardHeights();
+            window.setTimeout(syncCardHeights, 80);
+            window.setTimeout(syncCardHeights, 180);
+            heightSyncFrame = null;
         });
     }
 
@@ -358,7 +372,12 @@
             renderLiveToday();
             renderCards();
             initCharts();
-            window.addEventListener('resize', syncCardHeights);
+            window.addEventListener('resize', scheduleCardHeightSync);
+            window.addEventListener('load', scheduleCardHeightSync);
+            window.setTimeout(scheduleCardHeightSync, 150);
+            if (document.fonts && document.fonts.ready) {
+                document.fonts.ready.then(scheduleCardHeightSync).catch(() => {});
+            }
         } catch (error) {
             console.error('Failed to load strategy modules:', error);
         }
