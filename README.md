@@ -204,6 +204,7 @@ See [`docs/API.md`](docs/API.md) for contract notes and examples.
 - The DICOM listener default upload target is `http://127.0.0.1:8001/upload`.
 - The CLI uploader lives at [`clients/uploader.py`](clients/uploader.py) and may also be downloaded from `GET /api/tools/uploader`.
 - The worker claims files from `input/` into `processing/` before segmentation, then archives completed NIfTI files into `nii/`.
+- Retroactive metrics regeneration is available through `venv/bin/python scripts/retroactive_recalculate_metrics.py` with options such as `--case`, `--limit`, `--workers`, and `--skip-overlays`.
 - The app proxy expects the Anthropic and MedGemma services to be running separately if those routes are used.
 - `api/totalsegmentator.py` is an alternative HTTP execution path and is not part of the default `upload -> prepare -> run` baseline.
 

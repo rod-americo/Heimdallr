@@ -89,6 +89,27 @@ Integrity check:
 sqlite3 database/dicom.db "PRAGMA integrity_check;"
 ```
 
+## Retroactive Recalculation
+
+Use the batch recalculation script when derived metrics need to be regenerated from existing case outputs:
+
+```bash
+source venv/bin/activate
+venv/bin/python scripts/retroactive_recalculate_metrics.py --limit 10
+```
+
+Common variants:
+
+- Skip PNG regeneration: `venv/bin/python scripts/retroactive_recalculate_metrics.py --skip-overlays`
+- Process a specific case: `venv/bin/python scripts/retroactive_recalculate_metrics.py --case <case_id>`
+- Parallelize cautiously: `venv/bin/python scripts/retroactive_recalculate_metrics.py --workers 2`
+
+Legacy compatibility wrapper:
+
+```bash
+venv/bin/python scripts/retroactive_emphysema.py
+```
+
 ## Incident Triage Shortlist
 
 1. Validate service process state and restart order (`app -> run -> listener`).
