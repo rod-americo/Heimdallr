@@ -1,7 +1,7 @@
-import { fetchPatients } from './api.js';
-import { setPatients, setFilter } from './state.js';
-import { renderPatients } from './components/PatientTable.js';
-import { closeModal } from './components/ResultsModal.js';
+import { fetchPatients } from './api.js?v=20260301c';
+import { setPatients, setFilter } from './state.js?v=20260301c';
+import { renderPatients } from './components/PatientTable.js?v=20260301c';
+import { closeModal } from './components/ResultsModal.js?v=20260301c';
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -45,7 +45,7 @@ function showError(message) {
     if (tbody) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="7" class="loading text-danger">
+                <td colspan="8" class="loading text-danger">
                     ❌ ${message}
                 </td>
             </tr>

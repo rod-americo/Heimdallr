@@ -287,6 +287,9 @@ def summarize_report(report: dict[str, Any], report_path: Path | None = None, ba
     summary = report.get("summary", {})
     left = next((item for item in kidneys if item.get("mask_name") == "kidney_left"), {})
     right = next((item for item in kidneys if item.get("mask_name") == "kidney_right"), {})
+
+    left_largest = max(left.get("components", []), key=lambda item: float(item.get("volume_mm3", 0.0) or 0.0), default={})
+    right_largest = max(right.get("components", []), key=lambda item: float(item.get("volume_mm3", 0.0) or 0.0), default={})
     missing_masks = report.get("missing_masks", [])
     total_components = int(summary.get("total_components", 0) or 0)
     kidneys_analyzed = int(summary.get("kidneys_analyzed", 0) or 0)
@@ -315,6 +318,12 @@ def summarize_report(report: dict[str, Any], report_path: Path | None = None, ba
         "kidney_stone_triage_right_components": int(right.get("component_count", 0) or 0),
         "kidney_stone_triage_left_volume_mm3": round(float(left.get("stone_volume_mm3", 0.0) or 0.0), 2),
         "kidney_stone_triage_right_volume_mm3": round(float(right.get("stone_volume_mm3", 0.0) or 0.0), 2),
+        "kidney_stone_triage_left_largest_axis_mm": round(float(left_largest.get("largest_axis_mm", 0.0) or 0.0), 2),
+        "kidney_stone_triage_right_largest_axis_mm": round(float(right_largest.get("largest_axis_mm", 0.0) or 0.0), 2),
+        "kidney_stone_triage_left_largest_hu_mean": None if left_largest.get("hu_mean") is None else round(float(left_largest["hu_mean"]), 2),
+        "kidney_stone_triage_right_largest_hu_mean": None if right_largest.get("hu_mean") is None else round(float(right_largest["hu_mean"]), 2),
+        "kidney_stone_triage_left_largest_hu_max": None if left_largest.get("hu_max") is None else round(float(left_largest["hu_max"]), 2),
+        "kidney_stone_triage_right_largest_hu_max": None if right_largest.get("hu_max") is None else round(float(right_largest["hu_max"]), 2),
         "kidney_stone_triage_report_path": report_ref,
     }
 

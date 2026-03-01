@@ -1,7 +1,7 @@
-import { fetchResults, fetchMetadata } from '../api.js';
-import { renderBiometricSection } from './BiometricsCard.js';
-import { renderLiverSection } from './LiverCard.js';
-import { getProgressColor, escapeHtml } from '../utils.js';
+import { fetchResults, fetchMetadata } from '../api.js?v=20260301c';
+import { renderBiometricSection } from './BiometricsCard.js?v=20260301c';
+import { renderLiverSection } from './LiverCard.js?v=20260301c';
+import { getProgressColor, escapeHtml } from '../utils.js?v=20260301c';
 
 export async function showResults(caseId) {
     try {
@@ -57,6 +57,23 @@ function renderResults(results, caseId, metadata = {}) {
     const sections = [];
     const triageReport = results.kidney_stone_triage_report || null;
     const availableImages = new Set(results.images || []);
+    const triageKidneys = triageReport?.kidneys || [];
+
+    const triageLeftKidney = triageKidneys.find(kidney => kidney.mask_name === 'kidney_left') || null;
+    const triageRightKidney = triageKidneys.find(kidney => kidney.mask_name === 'kidney_right') || null;
+
+    const triageLeftComponents = results.kidney_stone_triage_left_components ?? triageLeftKidney?.component_count ?? null;
+    const triageRightComponents = results.kidney_stone_triage_right_components ?? triageRightKidney?.component_count ?? null;
+    const triageLeftVolume = results.kidney_stone_triage_left_volume_mm3 ?? triageLeftKidney?.stone_volume_mm3 ?? null;
+    const triageRightVolume = results.kidney_stone_triage_right_volume_mm3 ?? triageRightKidney?.stone_volume_mm3 ?? null;
+    const triageLeftLargestComponent = triageLeftKidney?.components?.[0] || null;
+    const triageRightLargestComponent = triageRightKidney?.components?.[0] || null;
+    const triageLeftLargestAxis = results.kidney_stone_triage_left_largest_axis_mm ?? triageLeftLargestComponent?.largest_axis_mm ?? null;
+    const triageRightLargestAxis = results.kidney_stone_triage_right_largest_axis_mm ?? triageRightLargestComponent?.largest_axis_mm ?? null;
+    const triageLeftLargestHuMean = results.kidney_stone_triage_left_largest_hu_mean ?? triageLeftLargestComponent?.hu_mean ?? null;
+    const triageRightLargestHuMean = results.kidney_stone_triage_right_largest_hu_mean ?? triageRightLargestComponent?.hu_mean ?? null;
+    const triageLeftLargestHuMax = results.kidney_stone_triage_left_largest_hu_max ?? triageLeftLargestComponent?.hu_max ?? null;
+    const triageRightLargestHuMax = results.kidney_stone_triage_right_largest_hu_max ?? triageRightLargestComponent?.hu_max ?? null;
 
     sections.push(renderBiometricSection(caseId, metadata, results));
 
@@ -282,12 +299,14 @@ function renderResults(results, caseId, metadata = {}) {
     const organCards = organs.map(organ => {
         const vol = results[`${organ.key}_vol_cm3`];
         const hu = results[`${organ.key}_hu_mean`];
+        const maxDiameter = results[`${organ.key}_max_diameter_mm`];
         if (!vol) return '';
 
         return `
             <div class="result-card">
                 <div class="result-label">${organ.icon} ${organ.name}</div>
                 <div class="result-value">${vol.toFixed(1)} <span class="result-unit">cm³</span></div>
+                ${maxDiameter !== null && maxDiameter !== undefined ? `<div class="organ-hu">Maior diâmetro: ${maxDiameter.toFixed(1)} mm</div>` : ''}
                 ${hu !== null && hu !== undefined ? `<div class="organ-hu">${hu.toFixed(1)} HU</div>` : ''}
             </div>
         `;
@@ -308,8 +327,7 @@ function renderResults(results, caseId, metadata = {}) {
     const triageComponents = Number(results.kidney_stone_triage_total_components || 0);
     const triageHasContent = triageReport || triageComponents > 0 || results.kidney_stone_triage_status;
     if (triageHasContent) {
-        const kidneys = triageReport?.kidneys || [];
-        const componentCards = kidneys.flatMap(kidney => {
+        const componentCards = triageKidneys.flatMap(kidney => {
             const sideLabel = kidney.mask_name === 'kidney_left' ? 'Rim Esquerdo' : 'Rim Direito';
             return (kidney.components || []).map(component => {
                 const axialUrl = buildArtifactUrl(caseId, component.axial_overlay_png);
@@ -339,16 +357,20 @@ function renderResults(results, caseId, metadata = {}) {
             <h3 class="section-title">Triage de Cálculos por HU</h3>
             <div class="results-grid">
                 <div class="result-card">
-                    <div class="result-label">Componentes</div>
-                    <div class="result-value">${results.kidney_stone_triage_total_components ?? '-'}</div>
+                    <div class="result-label">Rim Direito</div>
+                    <div class="result-value">${triageRightComponents ?? '-'} <span class="result-unit">componentes</span></div>
+                    <div class="organ-hu">Carga: ${triageRightVolume?.toFixed(1) || '-'} mm³</div>
+                    <div class="organ-hu">Maior eixo: ${triageRightLargestAxis?.toFixed(1) || '-'} mm</div>
+                    <div class="organ-hu">HU méd.: ${triageRightLargestHuMean?.toFixed(1) || '-'}</div>
+                    <div class="organ-hu">HU máx.: ${triageRightLargestHuMax?.toFixed(1) || '-'}</div>
                 </div>
                 <div class="result-card">
-                    <div class="result-label">Carga Heurística</div>
-                    <div class="result-value">${results.kidney_stone_triage_total_volume_mm3?.toFixed(1) || '-'} <span class="result-unit">mm³</span></div>
-                </div>
-                <div class="result-card">
-                    <div class="result-label">Maior Eixo</div>
-                    <div class="result-value">${results.kidney_stone_triage_max_component_axis_mm?.toFixed(1) || '-'} <span class="result-unit">mm</span></div>
+                    <div class="result-label">Rim Esquerdo</div>
+                    <div class="result-value">${triageLeftComponents ?? '-'} <span class="result-unit">componentes</span></div>
+                    <div class="organ-hu">Carga: ${triageLeftVolume?.toFixed(1) || '-'} mm³</div>
+                    <div class="organ-hu">Maior eixo: ${triageLeftLargestAxis?.toFixed(1) || '-'} mm</div>
+                    <div class="organ-hu">HU méd.: ${triageLeftLargestHuMean?.toFixed(1) || '-'}</div>
+                    <div class="organ-hu">HU máx.: ${triageLeftLargestHuMax?.toFixed(1) || '-'}</div>
                 </div>
             </div>
             ${componentCards ? `

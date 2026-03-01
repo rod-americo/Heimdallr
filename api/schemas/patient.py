@@ -10,6 +10,7 @@ class PatientResponse(BaseModel):
     study_date: str
     accession: str
     modality: str
+    prepare_elapsed_seconds: int
     elapsed_seconds: int
     has_results: bool
     body_regions: List[str]

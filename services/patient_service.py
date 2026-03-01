@@ -9,6 +9,16 @@ from config import NII_DIR
 
 logger = logging.getLogger(__name__)
 
+
+def parse_elapsed_seconds(elapsed_str):
+    if not elapsed_str or ":" not in elapsed_str:
+        return 0
+    try:
+        h, m, s = elapsed_str.split(':')
+        return int(int(h) * 3600 + int(m) * 60 + float(s))
+    except Exception:
+        return 0
+
 class PatientService:
     @staticmethod
     def get_all_patients(db: sqlite3.Connection):
@@ -54,14 +64,8 @@ class PatientService:
                 
                 # Elapsed time
                 pipeline = metadata.get("Pipeline", {})
-                elapsed_str = pipeline.get("elapsed_time", "")
-                elapsed_seconds = 0
-                if elapsed_str and ":" in elapsed_str:
-                    try:
-                        h, m, s = elapsed_str.split(':')
-                        elapsed_seconds = int(int(h) * 3600 + int(m) * 60 + float(s))
-                    except Exception:
-                        pass
+                elapsed_seconds = parse_elapsed_seconds(pipeline.get("processing_elapsed_time") or pipeline.get("elapsed_time", ""))
+                prepare_elapsed_seconds = parse_elapsed_seconds(pipeline.get("prepare_elapsed_time", ""))
 
                 hemorrhage_vol = results.get("hemorrhage_vol_cm3")
                 has_hemorrhage = isinstance(hemorrhage_vol, (int, float)) and hemorrhage_vol > 0.1
@@ -75,6 +79,7 @@ class PatientService:
                     "study_date": row["StudyDate"] or metadata.get("StudyDate", ""),
                     "accession": row["AccessionNumber"] or metadata.get("AccessionNumber", ""),
                     "modality": row["Modality"] or metadata.get("Modality", ""),
+                    "prepare_elapsed_seconds": prepare_elapsed_seconds,
                     "elapsed_seconds": elapsed_seconds,
                     "has_results": bool(results),
                     "body_regions": results.get("body_regions", []),

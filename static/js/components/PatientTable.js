@@ -1,6 +1,6 @@
-import { getFilteredPatients, state } from '../state.js';
-import { formatDate, escapeHtml } from '../utils.js';
-import { showResults } from './ResultsModal.js';
+import { getFilteredPatients, state } from '../state.js?v=20260301c';
+import { formatDate, escapeHtml } from '../utils.js?v=20260301c';
+import { showResults } from './ResultsModal.js?v=20260301c';
 
 export function renderPatients() {
     const tbody = document.getElementById('patients-body');
@@ -14,7 +14,7 @@ export function renderPatients() {
         const message = state.patients.length === 0 ? "Nenhum paciente encontrado" : "Nenhum resultado para a busca";
         tbody.innerHTML = `
             <tr>
-                <td colspan="6">
+                <td colspan="8">
                     <div class="empty-state">
                         <div class="empty-state-icon">🔍</div>
                         <h3>${message}</h3>
@@ -34,6 +34,7 @@ export function renderPatients() {
             <td class="patient-name">${escapeHtml(displayName)}</td>
             <td class="date">${formatDate(p.study_date)}</td>
             <td class="accession">${escapeHtml(p.accession)}</td>
+            <td class="processing-time">${p.prepare_elapsed_seconds ? p.prepare_elapsed_seconds + 's' : '-'}</td>
             <td class="processing-time">${p.elapsed_seconds ? p.elapsed_seconds + 's' : '-'}</td>
             <td><span class="modality ${p.modality}">${p.modality || '-'}</span></td>
             <td class="regions">${p.body_regions.map(r => `<span class="region-tag">${r}</span>`).join('')}</td>
@@ -42,6 +43,7 @@ export function renderPatients() {
                     <div class="dropdown">
                         <button class="btn btn-primary dropdown-toggle" type="button" aria-expanded="false">⬇ Downloads</button>
                         <div class="dropdown-content">
+                            <a href="/api/patients/${encodeURIComponent(p.case_id)}/report.pdf" download>📄 Case Report (PDF)</a>
                             ${p.has_hemorrhage ? `<a href="/api/patients/${encodeURIComponent(p.case_id)}/download/bleed" download>🔴 Bleed (ZIP)</a>` : ''}
                             <a href="/api/patients/${encodeURIComponent(p.case_id)}/download/tissue_types" download>🧠 Tissue Types (ZIP)</a>
                             <a href="/api/patients/${encodeURIComponent(p.case_id)}/download/total" download>🦴 Total (ZIP)</a>
