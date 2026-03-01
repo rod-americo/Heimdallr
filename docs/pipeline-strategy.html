@@ -396,9 +396,8 @@
         }
 
         .card-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
             gap: 12px;
             margin-bottom: 14px;
         }
@@ -408,6 +407,7 @@
             flex-wrap: wrap;
             gap: 8px;
             align-items: center;
+            min-width: 0;
         }
 
         .meta-group.right {
@@ -463,7 +463,10 @@
         }
 
         @media (max-width: 760px) {
-            .card-top,
+            .card-top {
+                grid-template-columns: 1fr;
+            }
+
             .meta {
                 flex-direction: column;
                 align-items: stretch;
