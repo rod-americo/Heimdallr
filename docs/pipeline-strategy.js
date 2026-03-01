@@ -166,9 +166,11 @@
                         <span class="meta-chip status status-${m.status}">${statusLabel(m.status)}</span>
                     </div>
                 </div>
-                <h3>${m.title}</h3>
-                <div class="card-body">
-                    <p class="small">${m.note}</p>
+                <div class="card-middle">
+                    <h3>${m.title}</h3>
+                    <div class="card-body">
+                        <p class="small">${m.note}</p>
+                    </div>
                 </div>
                 <div class="meta">
                     <span class="metric-pill impact ${impactBand(m.impact)}">Impact ${m.impact}/10</span>
@@ -176,6 +178,22 @@
                 </div>
             `;
             cards.appendChild(el);
+        });
+
+        syncCardHeights();
+    }
+
+    function syncCardHeights() {
+        const renderedCards = [...cards.querySelectorAll('.card')];
+        if (!renderedCards.length) return;
+
+        renderedCards.forEach((card) => {
+            card.style.minHeight = '';
+        });
+
+        const maxHeight = Math.max(...renderedCards.map((card) => card.offsetHeight));
+        renderedCards.forEach((card) => {
+            card.style.minHeight = `${maxHeight}px`;
         });
     }
 
@@ -340,6 +358,7 @@
             renderLiveToday();
             renderCards();
             initCharts();
+            window.addEventListener('resize', syncCardHeights);
         } catch (error) {
             console.error('Failed to load strategy modules:', error);
         }

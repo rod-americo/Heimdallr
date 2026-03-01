@@ -391,7 +391,7 @@
         }
 
         .card h3 {
-            margin: 0 0 6px;
+            margin: 0;
             font-size: 1rem;
         }
 
@@ -450,6 +450,14 @@
         .meta-chip.repo-state.repo-implemented { background: rgba(41, 201, 138, 0.12); color: var(--status-validation-text); border-color: rgba(41, 201, 138, 0.35); }
         .meta-chip.repo-state.repo-prototype { background: rgba(120, 147, 183, 0.14); color: var(--status-poc-text); border-color: rgba(120, 147, 183, 0.35); }
         .meta-chip.repo-state.repo-not-started { background: rgba(100, 116, 139, 0.12); color: var(--status-planned-text); border-color: rgba(100, 116, 139, 0.35); }
+
+        .card-middle {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 8px;
+        }
 
         .meta {
             display: flex;
@@ -539,10 +547,7 @@
         .metric-pill.friction.high { background: var(--friction-high-bg); color: var(--friction-high-text); }
 
         .card-body {
-            flex: 1;
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
+            margin-bottom: 0;
         }
 
         .guide-row {
