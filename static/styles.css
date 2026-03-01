@@ -398,7 +398,7 @@ td:last-child {
     background: var(--bg-secondary);
     border-radius: var(--radius);
     width: 100%;
-    max-width: 700px;
+    max-width: min(1100px, calc(100vw - 4rem));
     max-height: 85vh;
     overflow: hidden;
     box-shadow: var(--shadow), var(--shadow-glow);
@@ -450,6 +450,7 @@ td:last-child {
 .modal-body {
     padding: 1.5rem;
     overflow-y: auto;
+    overflow-x: hidden;
     max-height: calc(85vh - 70px);
 }
 
@@ -512,6 +513,8 @@ td:last-child {
     border-radius: 10px;
     background: rgba(255, 255, 255, 0.03);
     overflow: hidden;
+    width: 100%;
+    max-width: 100%;
 }
 
 .triage-panel summary {
@@ -543,6 +546,9 @@ td:last-child {
     padding: 0 1rem 1rem;
     display: grid;
     gap: 0.85rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
 }
 
 .triage-component-card {
@@ -576,12 +582,16 @@ td:last-child {
 
 .triage-overlay-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    grid-template-columns: 1fr;
     gap: 0.75rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
 }
 
 .triage-overlay-link {
     display: block;
+    width: 100%;
     border-radius: 8px;
     overflow: hidden;
     border: 1px solid var(--border-subtle);
@@ -592,8 +602,45 @@ td:last-child {
 .triage-overlay-link img {
     width: 100%;
     max-width: 100%;
-    max-height: 220px;
+    max-height: none;
     display: block;
+    object-fit: contain;
+}
+
+.overlay-preview-card {
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    padding: 0.75rem;
+    background: rgba(255, 255, 255, 0.025);
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.overlay-preview-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.overlay-preview-link {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border-subtle);
+    background: #0c1422;
+}
+
+.overlay-preview-link img {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    max-height: none;
     object-fit: contain;
 }
 

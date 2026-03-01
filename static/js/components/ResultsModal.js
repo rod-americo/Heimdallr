@@ -29,9 +29,34 @@ function buildArtifactUrl(caseId, artifactPath) {
     return `/api/patients/${encodeURIComponent(caseId)}/artifacts/${normalized.split('/').map(encodeURIComponent).join('/')}`;
 }
 
+function buildResultImageUrl(caseId, filename) {
+    return `/api/patients/${encodeURIComponent(caseId)}/images/${encodeURIComponent(filename)}`;
+}
+
+function renderOverlayDetails(title, imageUrl, altText) {
+    if (!imageUrl) return '';
+    return `
+        <div class="triage-panel-wrap" style="margin-top: 1.25rem;">
+            <details class="triage-panel">
+                <summary>${title}</summary>
+                <div class="triage-panel-body" style="width:100%;max-width:100%;overflow:hidden;">
+                    <div class="overlay-preview-card" style="width:100%;max-width:100%;min-width:0;">
+                        <div class="overlay-preview-grid" style="width:100%;max-width:100%;min-width:0;">
+                            <a class="overlay-preview-link" href="${imageUrl}" target="_blank" rel="noopener noreferrer" style="display:block;width:100%;max-width:100%;overflow:hidden;">
+                                <img src="${imageUrl}" alt="${escapeHtml(altText)}" style="display:block;width:100%;max-width:100%;height:auto;max-height:none;object-fit:contain;">
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </details>
+        </div>
+    `;
+}
+
 function renderResults(results, caseId, metadata = {}) {
     const sections = [];
     const triageReport = results.kidney_stone_triage_report || null;
+    const availableImages = new Set(results.images || []);
 
     sections.push(renderBiometricSection(caseId, metadata, results));
 
@@ -62,6 +87,9 @@ function renderResults(results, caseId, metadata = {}) {
     }
 
     if (results.SMA_cm2 !== undefined) {
+        const l3OverlayUrl = availableImages.has('L3_overlay.png')
+            ? buildResultImageUrl(caseId, 'L3_overlay.png')
+            : null;
         let sarcopeniaStatusHtml = '';
 
         if (metadata.Height && metadata.Sex) {
@@ -104,10 +132,14 @@ function renderResults(results, caseId, metadata = {}) {
                     <div class="result-value">${results.slice_L3 || '-'}</div>
                 </div>
             </div>
+            ${renderOverlayDetails('Ver overlay', l3OverlayUrl, 'L3 overlay')}
         `);
     }
 
     if (results.L1_bmd_classification) {
+        const l1OverlayUrl = availableImages.has('L1_BMD_overlay.png')
+            ? buildResultImageUrl(caseId, 'L1_BMD_overlay.png')
+            : null;
         const bmdClass = results.L1_bmd_classification;
         let badgeClass = 'badge-success';
         let badgeEmoji = '🟢';
@@ -132,11 +164,9 @@ function renderResults(results, caseId, metadata = {}) {
                     <div class="result-value">${(results.L1_trabecular_voxel_count || 0).toLocaleString()}</div>
                 </div>
             </div>
+            ${renderOverlayDetails('Ver overlay', l1OverlayUrl, 'L1 BMD overlay')}
         `);
     }
-
-    const liverSection = renderLiverSection(results);
-    if (liverSection) sections.push(liverSection);
 
     if (results.lung_analysis_status === "Complete") {
         const lobes = [
@@ -243,83 +273,6 @@ function renderResults(results, caseId, metadata = {}) {
         `);
     }
 
-    const triageComponents = Number(results.kidney_stone_triage_total_components || 0);
-    const triageHasContent = triageReport || triageComponents > 0 || results.kidney_stone_triage_status;
-    if (triageHasContent) {
-        const triageStatusMap = {
-            'Candidates detected': { label: 'Candidatos Detectados', className: 'badge-warning', emoji: '🟡' },
-            'No candidates': { label: 'Sem Candidatos', className: 'badge-success', emoji: '🟢' },
-            'Missing kidney masks': { label: 'Máscaras Ausentes', className: 'badge-danger', emoji: '🔴' },
-            'Error': { label: 'Erro', className: 'badge-danger', emoji: '🔴' }
-        };
-        const triageStatus = triageStatusMap[results.kidney_stone_triage_status] || {
-            label: results.kidney_stone_triage_status || '-',
-            className: 'badge-warning',
-            emoji: '🟡'
-        };
-
-        const kidneys = triageReport?.kidneys || [];
-        const componentCards = kidneys.flatMap(kidney => {
-            const sideLabel = kidney.mask_name === 'kidney_left' ? 'Rim Esquerdo' : 'Rim Direito';
-            return (kidney.components || []).map(component => {
-                const axialUrl = buildArtifactUrl(caseId, component.axial_overlay_png);
-                const coronalUrl = buildArtifactUrl(caseId, component.coronal_overlay_png);
-
-                return `
-                    <div class="triage-component-card">
-                        <div class="triage-component-header">
-                            <strong>${escapeHtml(sideLabel)}</strong>
-                            <span>${escapeHtml(component.component_id)}</span>
-                        </div>
-                        <div class="triage-component-metrics">
-                            <span>${component.volume_mm3?.toFixed(1) || '-'} mm³</span>
-                            <span>${component.largest_axis_mm?.toFixed(1) || '-'} mm</span>
-                            <span>${component.hu_max?.toFixed(0) || '-'} HU max</span>
-                        </div>
-                        <div class="triage-overlay-grid">
-                            ${axialUrl ? `<a class="triage-overlay-link" href="${axialUrl}" target="_blank" rel="noopener noreferrer"><img src="${axialUrl}" alt="${escapeHtml(component.component_id)} axial" style="display:block;width:100%;max-width:100%;height:auto;max-height:220px;object-fit:contain;"></a>` : ''}
-                            ${coronalUrl ? `<a class="triage-overlay-link" href="${coronalUrl}" target="_blank" rel="noopener noreferrer"><img src="${coronalUrl}" alt="${escapeHtml(component.component_id)} coronal" style="display:block;width:100%;max-width:100%;height:auto;max-height:220px;object-fit:contain;"></a>` : ''}
-                        </div>
-                    </div>
-                `;
-            });
-        }).join('');
-
-        sections.push(`
-            <h3 class="section-title">Triage de Cálculos por HU</h3>
-            <div class="results-grid">
-                <div class="result-card">
-                    <div class="result-label">Status do Triage</div>
-                    <div class="result-value">
-                        <span class="status-badge ${triageStatus.className}">${triageStatus.emoji} ${triageStatus.label}</span>
-                    </div>
-                </div>
-                <div class="result-card">
-                    <div class="result-label">Componentes</div>
-                    <div class="result-value">${results.kidney_stone_triage_total_components ?? '-'}</div>
-                </div>
-                <div class="result-card">
-                    <div class="result-label">Carga Heurística</div>
-                    <div class="result-value">${results.kidney_stone_triage_total_volume_mm3?.toFixed(1) || '-'} <span class="result-unit">mm³</span></div>
-                </div>
-                <div class="result-card">
-                    <div class="result-label">Maior Eixo</div>
-                    <div class="result-value">${results.kidney_stone_triage_max_component_axis_mm?.toFixed(1) || '-'} <span class="result-unit">mm</span></div>
-                </div>
-            </div>
-            ${componentCards ? `
-                <div class="triage-panel-wrap" style="margin-top: 1.75rem;">
-                    <details class="triage-panel">
-                        <summary>Ver componentes e overlays</summary>
-                        <div class="triage-panel-body">
-                            ${componentCards}
-                        </div>
-                    </details>
-                </div>
-            ` : ''}
-        `);
-    }
-
     const organs = [
         { key: 'spleen', name: 'Baço', icon: '🩸' },
         { key: 'kidney_right', name: 'Rim Direito', icon: '🫘' },
@@ -349,9 +302,74 @@ function renderResults(results, caseId, metadata = {}) {
         `);
     }
 
+    const liverSection = renderLiverSection(results);
+    if (liverSection) sections.push(liverSection);
+
+    const triageComponents = Number(results.kidney_stone_triage_total_components || 0);
+    const triageHasContent = triageReport || triageComponents > 0 || results.kidney_stone_triage_status;
+    if (triageHasContent) {
+        const kidneys = triageReport?.kidneys || [];
+        const componentCards = kidneys.flatMap(kidney => {
+            const sideLabel = kidney.mask_name === 'kidney_left' ? 'Rim Esquerdo' : 'Rim Direito';
+            return (kidney.components || []).map(component => {
+                const axialUrl = buildArtifactUrl(caseId, component.axial_overlay_png);
+                const coronalUrl = buildArtifactUrl(caseId, component.coronal_overlay_png);
+
+                return `
+                    <div class="triage-component-card">
+                        <div class="triage-component-header">
+                            <strong>${escapeHtml(sideLabel)}</strong>
+                            <span>${escapeHtml(component.component_id)}</span>
+                        </div>
+                        <div class="triage-component-metrics">
+                            <span>${component.volume_mm3?.toFixed(1) || '-'} mm³</span>
+                            <span>${component.largest_axis_mm?.toFixed(1) || '-'} mm</span>
+                            <span>${component.hu_max?.toFixed(0) || '-'} HU max</span>
+                        </div>
+                        <div class="triage-overlay-grid">
+                            ${axialUrl ? `<a class="triage-overlay-link" href="${axialUrl}" target="_blank" rel="noopener noreferrer"><img src="${axialUrl}" alt="${escapeHtml(component.component_id)} axial" style="display:block;width:100%;max-width:100%;height:auto;max-height:none;object-fit:contain;"></a>` : ''}
+                            ${coronalUrl ? `<a class="triage-overlay-link" href="${coronalUrl}" target="_blank" rel="noopener noreferrer"><img src="${coronalUrl}" alt="${escapeHtml(component.component_id)} coronal" style="display:block;width:100%;max-width:100%;height:auto;max-height:none;object-fit:contain;"></a>` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+        }).join('');
+
+        sections.push(`
+            <h3 class="section-title">Triage de Cálculos por HU</h3>
+            <div class="results-grid">
+                <div class="result-card">
+                    <div class="result-label">Componentes</div>
+                    <div class="result-value">${results.kidney_stone_triage_total_components ?? '-'}</div>
+                </div>
+                <div class="result-card">
+                    <div class="result-label">Carga Heurística</div>
+                    <div class="result-value">${results.kidney_stone_triage_total_volume_mm3?.toFixed(1) || '-'} <span class="result-unit">mm³</span></div>
+                </div>
+                <div class="result-card">
+                    <div class="result-label">Maior Eixo</div>
+                    <div class="result-value">${results.kidney_stone_triage_max_component_axis_mm?.toFixed(1) || '-'} <span class="result-unit">mm</span></div>
+                </div>
+            </div>
+            ${componentCards ? `
+                <div class="triage-panel-wrap" style="margin-top: 1.75rem;">
+                    <details class="triage-panel">
+                        <summary>Ver componentes e overlays</summary>
+                        <div class="triage-panel-body">
+                            ${componentCards}
+                        </div>
+                    </details>
+                </div>
+            ` : ''}
+        `);
+    }
+
     if (results.images && results.images.length > 0) {
-        const imageCards = results.images.map(img => {
-            const url = `/api/patients/${encodeURIComponent(caseId)}/images/${encodeURIComponent(img)}`;
+        const deferredImages = new Set(['L3_overlay.png', 'L1_BMD_overlay.png']);
+        const imageCards = results.images
+            .filter(img => !deferredImages.has(img))
+            .map(img => {
+            const url = buildResultImageUrl(caseId, img);
             let label = img.replace(/_/g, ' ').replace('.png', '');
             label = label.charAt(0).toUpperCase() + label.slice(1);
 
@@ -363,12 +381,14 @@ function renderResults(results, caseId, metadata = {}) {
             `;
         }).join('');
 
-        sections.push(`
-            <h3 class="section-title">Visualizações</h3>
-            <div class="results-grid single-col">
-                ${imageCards}
-            </div>
-        `);
+        if (imageCards) {
+            sections.push(`
+                <h3 class="section-title">Visualizações</h3>
+                <div class="results-grid single-col">
+                    ${imageCards}
+                </div>
+            `);
+        }
     }
 
     return sections.join('');
