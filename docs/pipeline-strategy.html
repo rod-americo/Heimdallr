@@ -476,17 +476,6 @@
             margin-left: auto;
         }
 
-        @media (max-width: 760px) {
-            .meta {
-                flex-direction: row;
-                align-items: center;
-            }
-
-            .meta-group.right {
-                justify-content: flex-end;
-            }
-        }
-
         .pill {
             display: inline-block;
             font-size: 0.75rem;
@@ -608,42 +597,36 @@
                 padding: 10px;
             }
 
+            .card-top {
+                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+                align-items: start;
+            }
+
+            .meta-group.left {
+                justify-content: flex-start;
+            }
+
+            .meta-group.right {
+                justify-content: flex-end;
+            }
+
+            .meta {
+                flex-direction: row;
+                align-items: center;
+                justify-content: space-between;
+            }
+
+            .meta .metric-pill {
+                width: auto;
+                flex: 0 0 auto;
+            }
+
             .small {
                 font-size: 0.82rem;
             }
 
             .row-label {
                 flex-basis: 100%;
-            }
-        }
-
-        @media (max-width: 760px) {
-            .card-top {
-                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
-                align-items: start;
-            }
-
-            .meta-group.left {
-                justify-content: flex-start !important;
-            }
-
-            .meta-group.right {
-                justify-content: flex-end !important;
-            }
-
-            .meta {
-                flex-direction: row !important;
-                align-items: center !important;
-                justify-content: space-between !important;
-            }
-
-            .meta .metric-pill {
-                width: auto !important;
-                flex: 0 0 auto !important;
-            }
-
-            .meta .metric-pill:last-child {
-                margin-left: auto !important;
             }
         }
     </style>
