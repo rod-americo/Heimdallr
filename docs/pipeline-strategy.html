@@ -616,6 +616,36 @@
                 flex-basis: 100%;
             }
         }
+
+        @media (max-width: 760px) {
+            .card-top {
+                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+                align-items: start;
+            }
+
+            .meta-group.left {
+                justify-content: flex-start !important;
+            }
+
+            .meta-group.right {
+                justify-content: flex-end !important;
+            }
+
+            .meta {
+                flex-direction: row !important;
+                align-items: center !important;
+                justify-content: space-between !important;
+            }
+
+            .meta .metric-pill {
+                width: auto !important;
+                flex: 0 0 auto !important;
+            }
+
+            .meta .metric-pill:last-child {
+                margin-left: auto !important;
+            }
+        }
     </style>
 </head>
 
