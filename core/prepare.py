@@ -26,6 +26,7 @@ import json
 import re
 import numpy as np
 import datetime
+import time
 from pathlib import Path
 import pydicom
 import sqlite3
@@ -190,6 +191,7 @@ def process_ct_series_concurrency(uid, s_data, case_output_dir, temp_dir):
     Returns candidate dict or None if failed.
     """
     try:
+        series_started = time.perf_counter()
         s_num = s_data["SeriesNumber"]
         files = s_data["files"]
         
@@ -200,16 +202,23 @@ def process_ct_series_concurrency(uid, s_data, case_output_dir, temp_dir):
         nii_path = case_output_dir / nii_filename
         
         # Convert
+        convert_started = time.perf_counter()
         if not convert_series(s_num, files, nii_path, temp_dir):
             return None
+        convert_seconds = round(time.perf_counter() - convert_started, 3)
             
         # Phase Detection
         phase = "unknown"
+        phase_seconds = 0.0
+        phase_detected = False
         if s_data["Modality"] == "CT":
             json_path = case_output_dir / f"contrast_phase_{s_num}.json"
+            phase_started = time.perf_counter()
             phase_data = run_totalseg_phase(nii_path, json_path)
+            phase_seconds = round(time.perf_counter() - phase_started, 3)
             if phase_data:
                 phase = phase_data.get("phase", "unknown")
+                phase_detected = True
         
         # Return result dict
         return {
@@ -218,7 +227,11 @@ def process_ct_series_concurrency(uid, s_data, case_output_dir, temp_dir):
             "path": nii_path,
             "num_slices": len(files),
             "kernel": s_data["ConvolutionKernel"].lower(),
-            "phase": phase
+            "phase": phase,
+            "convert_seconds": convert_seconds,
+            "phase_seconds": phase_seconds,
+            "phase_detected": phase_detected,
+            "series_total_seconds": round(time.perf_counter() - series_started, 3),
         }
     except Exception as e:
         print(f"  [Error] Failed to process series {s_data.get('SeriesNumber')}: {e}")
@@ -283,7 +296,10 @@ def convert_series(series_id, files_list, output_nii_path, temp_dir):
     return True
 
 def process_zip(zip_path):
-    start_time_str = datetime.datetime.now().isoformat()
+    prepare_start_dt = datetime.datetime.now()
+    prepare_start_time_str = prepare_start_dt.isoformat()
+    stage_timings = {}
+    prepare_stats = {}
     zip_path = Path(zip_path)
     if not zip_path.exists():
         print(f"Error: File {zip_path} not found.")
@@ -297,6 +313,7 @@ def process_zip(zip_path):
         extract_dir.mkdir()
         
         # 1. Extract ZIP
+        extract_started = time.perf_counter()
         try:
             print("  Extracting...")
             with zipfile.ZipFile(zip_path, "r") as z:
@@ -304,8 +321,10 @@ def process_zip(zip_path):
         except zipfile.BadZipFile:
              print("Error: Invalid ZIP file.")
              sys.exit(1)
+        stage_timings["extract_zip_seconds"] = round(time.perf_counter() - extract_started, 3)
 
         # 2. Scanning DICOMs
+        scan_started = time.perf_counter()
         print("  Scanning DICOM files...")
         series_map = {}
         
@@ -362,6 +381,11 @@ def process_zip(zip_path):
             print("Error: No valid DICOM series found.")
             # sys.exit(1) # Don't exit, let's see what happens
 
+        stage_timings["scan_dicoms_seconds"] = round(time.perf_counter() - scan_started, 3)
+        prepare_stats["total_series_detected"] = len(series_map)
+        prepare_stats["ct_series_detected"] = sum(1 for s in series_map.values() if s["Modality"] == "CT")
+        prepare_stats["mr_series_detected"] = sum(1 for s in series_map.values() if s["Modality"] == "MR")
+
         # Determine Global Modality
         if found_ct: 
             global_meta["Modality"] = "CT"
@@ -410,6 +434,7 @@ def process_zip(zip_path):
         
         if exam_modality == "MR":
             # --- MR LOGIC: SELECT FIRST, THEN CONVERT ---
+            select_started = time.perf_counter()
             print("  [MR Mode] Analyzing series for selection BEFORE conversion...")
             mr_candidates = []
             
@@ -440,6 +465,9 @@ def process_zip(zip_path):
                 sys.exit(1)
                 
             winner = mr_candidates[0]
+            stage_timings["select_and_convert_seconds"] = round(time.perf_counter() - select_started, 3)
+            prepare_stats["selection_mode"] = "MR"
+            prepare_stats["candidate_series_considered"] = len(mr_candidates)
             print(f"  Selected MR Series: {winner['s_data']['SeriesNumber']} (Slices: {len(winner['s_data']['files'])})")
             
             # Convert ONLY the winner
@@ -458,6 +486,7 @@ def process_zip(zip_path):
 
         else:
             # --- CT LOGIC: CONVERT ALL, PHASE DETECT, THEN SELECT ---
+            select_started = time.perf_counter()
             print("  [CT Mode] Converting all series and running phase detection (Parallel - 3 Threads)...")
             candidates = []
             
@@ -525,6 +554,14 @@ def process_zip(zip_path):
             # -----------------
 
             winner = candidates[0]
+            stage_timings["select_and_convert_seconds"] = round(time.perf_counter() - select_started, 3)
+            prepare_stats["selection_mode"] = "CT"
+            prepare_stats["candidate_series_considered"] = len(candidates)
+            prepare_stats["phase_detection_runs"] = sum(1 for c in candidates if c.get("phase_seconds", 0.0) > 0)
+            prepare_stats["phase_detection_successes"] = sum(1 for c in candidates if c.get("phase_detected"))
+            stage_timings["convert_series_total_seconds"] = round(sum(float(c.get("convert_seconds", 0.0) or 0.0) for c in candidates), 3)
+            stage_timings["phase_detection_total_seconds"] = round(sum(float(c.get("phase_seconds", 0.0) or 0.0) for c in candidates), 3)
+            stage_timings["candidate_series_total_seconds"] = round(sum(float(c.get("series_total_seconds", 0.0) or 0.0) for c in candidates), 3)
             print(f"  Selected CT Series: {winner['series_number']} (Phase: {winner['phase']})")
             final_selected_nii = winner['path']
             
@@ -556,10 +593,18 @@ def process_zip(zip_path):
             print(f"\n  Ready: {dest_input}")
             print(str(dest_input))
 
+            prepare_end_dt = datetime.datetime.now()
+            prepare_elapsed_str = str(prepare_end_dt - prepare_start_dt)
+            stage_timings["total_prepare_seconds"] = round((prepare_end_dt - prepare_start_dt).total_seconds(), 3)
+
             # Enrichment: Add Selection Info to id.json
             output_meta = id_data.copy()
             output_meta["Pipeline"] = {
-                "start_time": start_time_str
+                "prepare_start_time": prepare_start_time_str,
+                "prepare_end_time": prepare_end_dt.isoformat(),
+                "prepare_elapsed_time": prepare_elapsed_str,
+                "prepare_stage_timings_seconds": stage_timings,
+                "prepare_stats": prepare_stats,
             }
             
             selected_info = {
@@ -585,7 +630,23 @@ def process_zip(zip_path):
             with open(case_output_dir / "id.json", "w") as f:
                 json.dump(output_meta, f, indent=2)
 
+            try:
+                study_uid = output_meta.get("StudyInstanceUID")
+                if study_uid:
+                    conn = sqlite3.connect(DB_PATH)
+                    c = conn.cursor()
+                    c.execute(
+                        "UPDATE dicom_metadata SET IdJson = ? WHERE StudyInstanceUID = ?",
+                        (json.dumps(output_meta), study_uid)
+                    )
+                    conn.commit()
+                    conn.close()
+                    print(f"  [DB] id.json updated for {study_uid}")
+            except Exception as e:
+                print(f"  [Warning] Failed to update prepare timing in DB: {e}")
+
             # CLEANUP: Delete generated .nii.gz and phase .jsons in output folder
+            cleanup_started = time.perf_counter()
             print("  Cleaning up intermediate files...")
             for f in case_output_dir.glob("*.nii.gz"):
                 try: f.unlink()
@@ -594,6 +655,7 @@ def process_zip(zip_path):
             for f in case_output_dir.glob("contrast_phase_*.json"):
                 try: f.unlink()
                 except: pass
+            stage_timings["cleanup_seconds"] = round(time.perf_counter() - cleanup_started, 3)
 
         else:
              print("Error: Selection failed.")

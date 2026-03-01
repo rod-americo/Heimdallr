@@ -284,6 +284,7 @@ def process_case(nifti_path):
         return False
 
     try:
+        processing_start_dt = datetime.datetime.now()
         for subdir in ["total", "tissue_types"]:
             p = case_output / subdir
             if p.exists():
@@ -297,7 +298,16 @@ def process_case(nifti_path):
         if id_json_path.exists():
             try:
                 with open(id_json_path, "r") as f:
-                    modality = json.load(f).get("Modality", "CT")
+                    meta = json.load(f)
+                modality = meta.get("Modality", "CT")
+
+                pipeline_data = meta.get("Pipeline", {})
+                pipeline_data["start_time"] = processing_start_dt.isoformat()
+                pipeline_data["processing_start_time"] = processing_start_dt.isoformat()
+                meta["Pipeline"] = pipeline_data
+
+                with open(id_json_path, "w") as f:
+                    json.dump(meta, f, indent=2)
             except Exception:
                 pass
         logger.print(f"Detected modality: {modality}")
@@ -432,15 +442,20 @@ def process_case(nifti_path):
                 start_str = pipeline_data.get("start_time")
                 end_dt = datetime.datetime.now()
                 pipeline_data["end_time"] = end_dt.isoformat()
+                pipeline_data["processing_end_time"] = end_dt.isoformat()
 
                 if start_str:
                     try:
                         start_dt = datetime.datetime.fromisoformat(start_str)
-                        pipeline_data["elapsed_time"] = str(end_dt - start_dt)
+                        elapsed_str = str(end_dt - start_dt)
+                        pipeline_data["elapsed_time"] = elapsed_str
+                        pipeline_data["processing_elapsed_time"] = elapsed_str
                     except Exception:
                         pipeline_data["elapsed_time"] = "Error parsing start_time"
+                        pipeline_data["processing_elapsed_time"] = "Error parsing start_time"
                 else:
                     pipeline_data["elapsed_time"] = "Unknown start_time"
+                    pipeline_data["processing_elapsed_time"] = "Unknown start_time"
 
                 meta["Pipeline"] = pipeline_data
                 with open(id_json_path, "w") as f:

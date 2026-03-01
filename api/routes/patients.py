@@ -7,6 +7,7 @@ import os
 import json
 
 from core.database import get_db
+from core.case_pdf_report import build_case_report
 import config
 from services.patient_service import PatientService
 from api.schemas.patient import PatientListResponse, BiometricData, SMIData
@@ -24,6 +25,22 @@ async def download_nifti(case_id: str):
     if not nii_path.exists():
         raise HTTPException(status_code=404, detail="NIfTI file not found")
     return FileResponse(path=nii_path, filename=f"{case_id}.nii.gz", media_type="application/gzip")
+
+@router.get("/{case_id}/report.pdf")
+async def download_case_report(case_id: str):
+    case_folder = config.OUTPUT_DIR / case_id
+    results_path = case_folder / "resultados.json"
+    id_json_path = case_folder / "id.json"
+
+    if not case_folder.exists() or not results_path.exists() or not id_json_path.exists():
+        raise HTTPException(status_code=404, detail="Case report data not found")
+
+    try:
+        pdf_path = build_case_report(case_folder)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating PDF report: {str(e)}")
+
+    return FileResponse(path=pdf_path, filename=f"{case_id}_report.pdf", media_type="application/pdf")
 
 @router.get("/{case_id}/download/{folder_name}")
 async def download_folder(case_id: str, folder_name: str):

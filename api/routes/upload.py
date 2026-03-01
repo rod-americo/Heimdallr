@@ -1,6 +1,8 @@
 from fastapi import APIRouter, File, UploadFile, HTTPException
 import shutil
 import subprocess
+from datetime import datetime
+from pathlib import Path
 import config
 
 router = APIRouter(tags=["upload"])
@@ -10,7 +12,11 @@ async def upload_file(file: UploadFile = File(...)):
     if not file.filename.lower().endswith(".zip"):
         raise HTTPException(status_code=400, detail="Only .zip files are allowed.")
 
-    file_path = config.UPLOAD_DIR / file.filename
+    upload_name = f"study_{datetime.now().strftime('%Y%m%d%H%M%S')}.zip"
+    file_path = config.UPLOAD_DIR / upload_name
+    if file_path.exists():
+        upload_name = f"study_{datetime.now().strftime('%Y%m%d%H%M%S_%f')}.zip"
+    file_path = config.UPLOAD_DIR / upload_name
     try:
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
@@ -30,7 +36,8 @@ async def upload_file(file: UploadFile = File(...)):
         return {
             "status": "Accepted",
             "message": "File upload accepted. Processing started in background.",
-            "original_file": file.filename
+            "original_file": file.filename,
+            "stored_file": upload_name
         }
     except Exception as e:
         if file_path.exists():

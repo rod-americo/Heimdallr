@@ -30,6 +30,7 @@ import json
 from pathlib import Path
 import sqlite3
 from scipy.ndimage import label as ndlabel
+from scipy.spatial.distance import pdist
 
 def get_volume_cm3(path):
     """Calcula o volume em cm³ de uma máscara NIfTI."""
@@ -105,6 +106,16 @@ def load_binary_mask(path):
     """Load a NIfTI file and return a boolean mask plus the loaded image."""
     nii = nib.load(str(path))
     return nii.get_fdata() > 0, nii
+
+def get_mask_max_euclidean_diameter_mm(mask_data, affine):
+    """Return the maximum Euclidean diameter of a binary mask in millimeters."""
+    mask_bool = np.asarray(mask_data) > 0
+    coords_ijk = np.argwhere(mask_bool)
+    if coords_ijk.shape[0] < 2:
+        return 0.0
+
+    coords_xyz = nib.affines.apply_affine(affine, coords_ijk)
+    return round(float(pdist(coords_xyz, metric="euclidean").max()), 2)
 
 def calculate_stone_mask_metrics(mask_data, spacing_mm, ct_data=None):
     """
@@ -265,6 +276,8 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder, generate_over
         status, organ_mask, organ_nii = get_structure_completeness(fpath)
         results[f"{organ_name}_analysis_status"] = status
         results[f"{organ_name}_complete"] = (status == "Complete")
+        if organ_name in {"kidney_right", "kidney_left"}:
+            results[f"{organ_name}_max_diameter_mm"] = None
 
         if status == "Complete":
             zooms = organ_nii.header.get_zooms()
@@ -272,6 +285,8 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder, generate_over
             vol_mm3 = np.sum(organ_mask) * voxel_vol_mm3
             vol = round(vol_mm3 / 1000.0, 3)
             results[f"{organ_name}_vol_cm3"] = vol
+            if organ_name in {"kidney_right", "kidney_left"}:
+                results[f"{organ_name}_max_diameter_mm"] = get_mask_max_euclidean_diameter_mm(organ_mask, organ_nii.affine)
 
             if modality == "CT":
                 hu_mean, hu_std = get_mask_mean_std(organ_mask, ct)
