@@ -78,12 +78,19 @@ async def get_results(case_id: str, db: sqlite3.Connection = Depends(get_db)):
     try:
         with open(results_path, 'r') as f:
             results = json.load(f)
-            
+
         images = []
         if case_folder.exists():
             for img in case_folder.glob("*.png"):
                 images.append(img.name)
         results["images"] = sorted(images)
+
+        triage_report_path = case_folder / "urology" / "kidney_stone_triage.json"
+        if triage_report_path.exists():
+            with open(triage_report_path, 'r') as f:
+                triage_report = json.load(f)
+            results["kidney_stone_triage_report"] = triage_report
+
         return results
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading results: {str(e)}")
@@ -94,6 +101,18 @@ async def get_result_image(case_id: str, filename: str):
     if not image_path.exists():
         raise HTTPException(status_code=404, detail="Image not found")
     return FileResponse(image_path)
+
+@router.get("/{case_id}/artifacts/{artifact_path:path}")
+async def get_case_artifact(case_id: str, artifact_path: str):
+    case_folder = config.OUTPUT_DIR / case_id
+    artifact = (case_folder / artifact_path).resolve()
+    case_root = case_folder.resolve()
+
+    if case_root not in artifact.parents and artifact != case_root:
+        raise HTTPException(status_code=400, detail="Invalid artifact path")
+    if not artifact.exists() or not artifact.is_file():
+        raise HTTPException(status_code=404, detail="Artifact not found")
+    return FileResponse(artifact)
 
 @router.get("/{case_id}/metadata")
 async def get_metadata(case_id: str, db: sqlite3.Connection = Depends(get_db)):
