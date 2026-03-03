@@ -1,12 +1,12 @@
 /* Extracted from app.js inline styles */
 :root {
-    --text-primary: #f4efe7;
-    --text-secondary: rgba(244, 239, 231, 0.68);
-    --border-subtle: rgba(255, 247, 237, 0.1);
+    --text-primary: #eef1f4;
+    --text-secondary: rgba(238, 241, 244, 0.68);
+    --border-subtle: rgba(255, 255, 255, 0.1);
     --success: #74b879;
-    --warning: #d5a15b;
+    --warning: #c98a3d;
     --danger: #d66d60;
-    --orange: #c28a58;
+    --orange: #9aa3ad;
 }
 
 .text-primary { color: var(--text-primary); }
@@ -95,7 +95,7 @@
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    background: linear-gradient(180deg, rgba(255, 247, 237, 0.04) 0%, rgba(255, 247, 237, 0.02) 100%);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.02) 100%);
     padding: 2rem 1.5rem;
     border-radius: 12px;
     border: 1px solid var(--border-subtle);
@@ -124,7 +124,7 @@
     margin-bottom: 2rem; 
 }
 .lung-svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-.lung-bg { fill: none; stroke: rgba(255, 247, 237, 0.06); stroke-width: 2.5; }
+.lung-bg { fill: none; stroke: rgba(255, 255, 255, 0.06); stroke-width: 2.5; }
 .lung-fill { fill: none; stroke-width: 3.5; stroke-linecap: round; }
 .lung-percentage { 
     position: absolute; 
@@ -134,7 +134,7 @@
     color: var(--text-primary); 
     line-height: 1; 
 }
-.lung-percentage span { font-size: 1.1rem; margin-left: 1px; color: rgba(244, 239, 231, 0.65); }
+.lung-percentage span { font-size: 1.1rem; margin-left: 1px; color: rgba(238, 241, 244, 0.65); }
 .lung-footer { 
     width: 100%; 
     border-top: 1px solid var(--border-subtle); 
@@ -143,16 +143,16 @@
 }
 .lung-footer div { 
     font-size: 0.95rem; 
-    color: rgba(244, 239, 231, 0.68); 
+    color: rgba(238, 241, 244, 0.68); 
     margin-bottom: 0.6rem; 
 }
 .lung-footer span { color: var(--text-primary); font-weight: 700; margin-left: 4px; }
 
 .lobes-card { padding: 1.5rem; background: var(--surface-panel); }
-.lobe-row { margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255, 247, 237, 0.03); }
+.lobe-row { margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.03); }
 .lobe-header { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 0.4rem; color: var(--text-primary); font-weight: 500; }
 .lobe-header span:last-child { font-weight: 600; }
-.lobe-bar-bg { height: 8px; background: rgba(255, 247, 237, 0.05); border-radius: 4px; overflow: hidden; margin-bottom: 0.4rem; }
+.lobe-bar-bg { height: 8px; background: rgba(255, 255, 255, 0.05); border-radius: 4px; overflow: hidden; margin-bottom: 0.4rem; }
 .lobe-bar-fill { height: 100%; }
 .lobe-footer { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-secondary); opacity: 0.8; }
 
