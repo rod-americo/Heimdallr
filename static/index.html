@@ -35,6 +35,12 @@
 
             <div class="controls">
                 <input type="text" id="searchInput" placeholder="🔍 Buscar paciente..." class="search-input">
+                <div class="date-filter" role="group" aria-label="Filtrar por data">
+                    <button type="button" class="date-filter-btn active" data-date-filter="all">TODOS</button>
+                    <button type="button" class="date-filter-btn" data-date-filter="7days">7 dias</button>
+                    <button type="button" class="date-filter-btn" data-date-filter="yesterday">Ontem</button>
+                    <button type="button" class="date-filter-btn" data-date-filter="today">Hoje</button>
+                </div>
             </div>
 
             <div class="table-container">
@@ -80,7 +86,7 @@
         </div>
     </div>
 
-    <script type="module" src="/static/js/app.js?v=20260301e"></script>
+    <script type="module" src="/static/js/app.js?v=20260303a"></script>
     <script>
         // Polyfill the old inline onclick for the modal close button 
         // since we moved close logic to the module system
