@@ -1,6 +1,6 @@
-import { getFilteredPatients, state } from '../state.js?v=20260301e';
-import { formatDate, escapeHtml } from '../utils.js?v=20260301e';
-import { showResults } from './ResultsModal.js?v=20260301e';
+import { getFilteredPatients, state } from '../state.js?v=20260303a';
+import { formatDate, escapeHtml } from '../utils.js?v=20260303a';
+import { showResults } from './ResultsModal.js?v=20260303a';
 
 export function renderPatients() {
     const tbody = document.getElementById('patients-body');
@@ -11,14 +11,15 @@ export function renderPatients() {
     });
 
     if (filtered.length === 0) {
-        const message = state.patients.length === 0 ? "Nenhum paciente encontrado" : "Nenhum resultado para a busca";
+        const hasActiveFilters = Boolean(state.currentFilter) || state.currentDateFilter !== 'all';
+        const message = state.patients.length === 0 ? "Nenhum paciente encontrado" : "Nenhum resultado para os filtros";
         tbody.innerHTML = `
             <tr>
                 <td colspan="8">
                     <div class="empty-state">
                         <div class="empty-state-icon">🔍</div>
                         <h3>${message}</h3>
-                        <p>${state.patients.length === 0 ? "Arquivos NIfTI aparecerão aqui após processamento" : "Tente ajustar o termo pesquisado"}</p>
+                        <p>${state.patients.length === 0 ? "Arquivos NIfTI aparecerão aqui após processamento" : hasActiveFilters ? "Tente ajustar a busca ou o período selecionado" : "Nenhum dado disponível no momento"}</p>
                     </div>
                 </td>
             </tr>

@@ -1,7 +1,7 @@
-import { fetchPatients } from './api.js?v=20260301e';
-import { setPatients, setFilter } from './state.js?v=20260301e';
-import { renderPatients } from './components/PatientTable.js?v=20260301e';
-import { closeModal } from './components/ResultsModal.js?v=20260301e';
+import { fetchPatients } from './api.js?v=20260303a';
+import { setPatients, setFilter, setDateFilter } from './state.js?v=20260303a';
+import { renderPatients } from './components/PatientTable.js?v=20260303a';
+import { closeModal } from './components/ResultsModal.js?v=20260303a';
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -13,6 +13,15 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('searchInput').addEventListener('input', (e) => {
         setFilter(e.target.value);
         renderPatients();
+    });
+
+    document.querySelectorAll('.date-filter-btn').forEach((button) => {
+        button.addEventListener('click', () => {
+            const selectedFilter = button.getAttribute('data-date-filter');
+            setDateFilter(selectedFilter);
+            updateDateFilterButtons(selectedFilter);
+            renderPatients();
+        });
     });
 
     // Close modal on backdrop click
@@ -28,6 +37,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Escape') closeModal();
     });
 });
+
+function updateDateFilterButtons(activeFilter) {
+    document.querySelectorAll('.date-filter-btn').forEach((button) => {
+        button.classList.toggle('active', button.getAttribute('data-date-filter') === activeFilter);
+    });
+}
 
 async function loadData() {
     try {
