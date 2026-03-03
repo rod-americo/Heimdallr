@@ -1,6 +1,6 @@
-import { getFilteredPatients, state } from '../state.js?v=20260301c';
-import { formatDate, escapeHtml } from '../utils.js?v=20260301c';
-import { showResults } from './ResultsModal.js?v=20260301c';
+import { getFilteredPatients, state } from '../state.js?v=20260301e';
+import { formatDate, escapeHtml } from '../utils.js?v=20260301e';
+import { showResults } from './ResultsModal.js?v=20260301e';
 
 export function renderPatients() {
     const tbody = document.getElementById('patients-body');

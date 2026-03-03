@@ -30,7 +30,6 @@ import json
 from pathlib import Path
 import sqlite3
 from scipy.ndimage import label as ndlabel
-from scipy.spatial.distance import pdist
 
 def get_volume_cm3(path):
     """Calcula o volume em cm³ de uma máscara NIfTI."""
@@ -38,12 +37,11 @@ def get_volume_cm3(path):
         return 0.0
     try:
         nii = nib.load(str(path))
-        data = nii.get_fdata()
         zooms = nii.header.get_zooms()
         # Volume do voxel em mm³
         voxel_vol_mm3 = zooms[0] * zooms[1] * zooms[2]
         # Soma váriáveis e converte para cm³
-        vol_mm3 = np.sum(data > 0) * voxel_vol_mm3
+        vol_mm3 = np.count_nonzero(np.asanyarray(nii.dataobj)) * voxel_vol_mm3
         return round(vol_mm3 / 1000.0, 3)
     except Exception as ex:
         print(f"Erro calculando volume {path.name}: {ex}")
@@ -64,7 +62,7 @@ def get_mean_hu(path, ct_data):
         return None, None
     try:
         nii = nib.load(str(path))
-        mask = nii.get_fdata()
+        mask = np.asanyarray(nii.dataobj) > 0
         
         # Ensure mask and CT have matching dimensions
         if mask.shape != ct_data.shape:
@@ -105,17 +103,36 @@ def get_mask_mean_std(mask_data, ct_data):
 def load_binary_mask(path):
     """Load a NIfTI file and return a boolean mask plus the loaded image."""
     nii = nib.load(str(path))
-    return nii.get_fdata() > 0, nii
+    return np.asanyarray(nii.dataobj) > 0, nii
 
 def get_mask_max_euclidean_diameter_mm(mask_data, affine):
-    """Return the maximum Euclidean diameter of a binary mask in millimeters."""
+    """
+    Return a stable major-axis diameter estimate in millimeters.
+
+    The previous implementation used an exact all-pairs distance (`pdist`) over
+    every positive voxel, which is O(n^2) in memory/time and can terminate the
+    process for large organs. Projecting points onto the principal axis keeps
+    the metric clinically useful while remaining linear in the number of voxels.
+    """
     mask_bool = np.asarray(mask_data) > 0
     coords_ijk = np.argwhere(mask_bool)
     if coords_ijk.shape[0] < 2:
         return 0.0
 
-    coords_xyz = nib.affines.apply_affine(affine, coords_ijk)
-    return round(float(pdist(coords_xyz, metric="euclidean").max()), 2)
+    coords_xyz = nib.affines.apply_affine(affine, coords_ijk).astype(np.float32, copy=False)
+    centered = coords_xyz - coords_xyz.mean(axis=0, keepdims=True)
+
+    try:
+        _, _, vh = np.linalg.svd(centered, full_matrices=False)
+    except np.linalg.LinAlgError as ex:
+        print(f"Warning: Falling back to bounding-box diameter estimate: {ex}")
+        mins = coords_xyz.min(axis=0)
+        maxs = coords_xyz.max(axis=0)
+        return round(float(np.linalg.norm(maxs - mins)), 2)
+
+    primary_axis = vh[0]
+    projected = centered @ primary_axis
+    return round(float(projected.max() - projected.min()), 2)
 
 def calculate_stone_mask_metrics(mask_data, spacing_mm, ct_data=None):
     """
@@ -256,7 +273,7 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder, generate_over
     }
 
     # Load original image for density calculation and optional overlay generation
-    ct = nib.load(str(nifti_path)).get_fdata()
+    ct = nib.load(str(nifti_path)).get_fdata(dtype=np.float32)
 
     # ============================================================
     # STEP 2: Abdominal Organ Metrics
@@ -399,17 +416,17 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder, generate_over
 
         if left_stone_path is not None:
             nii_left_stone = nib.load(str(left_stone_path))
-            left_mask_data = nii_left_stone.get_fdata() > 0
+            left_mask_data = np.asanyarray(nii_left_stone.dataobj) > 0
             stone_spacing_mm = nii_left_stone.header.get_zooms()
 
         if right_stone_path is not None:
             nii_right_stone = nib.load(str(right_stone_path))
-            right_mask_data = nii_right_stone.get_fdata() > 0
+            right_mask_data = np.asanyarray(nii_right_stone.dataobj) > 0
             stone_spacing_mm = stone_spacing_mm or nii_right_stone.header.get_zooms()
 
         if total_stone_path is not None:
             nii_total_stone = nib.load(str(total_stone_path))
-            total_mask_data = nii_total_stone.get_fdata() > 0
+            total_mask_data = np.asanyarray(nii_total_stone.dataobj) > 0
             stone_spacing_mm = stone_spacing_mm or nii_total_stone.header.get_zooms()
 
         left_kidney_complete = results["renal_stone_kidney_left_complete"]
@@ -536,7 +553,7 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder, generate_over
                         overlay_mask = None
                         if muscle_file.exists():
                             nii_muscle = nib.load(str(muscle_file))
-                            muscle_data = nii_muscle.get_fdata()
+                            muscle_data = nii_muscle.get_fdata(dtype=np.float32)
                             mask_slice = muscle_data[:, :, slice_idx]
                             overlay_mask = np.rot90(mask_slice)
                         else:
@@ -565,7 +582,7 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder, generate_over
                 # Calculate muscle metrics if segmentation exists
                 if muscle_file.exists():
                     nii_muscle = nib.load(str(muscle_file))
-                    muscle_data = nii_muscle.get_fdata()
+                    muscle_data = nii_muscle.get_fdata(dtype=np.float32)
                     spacing = nii_muscle.header.get_zooms()
                     
                     # Calculate Skeletal Muscle Area (SMA) at L3
@@ -882,7 +899,7 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder, generate_over
             for lobe_name, filename in lung_lobes_map:
                 fpath = total_dir / filename
                 nii_lobe = nib.load(str(fpath))
-                mask_lobe = nii_lobe.get_fdata() > 0
+                mask_lobe = np.asanyarray(nii_lobe.dataobj) > 0
                 
                 if mask_lobe.shape != ct.shape:
                     continue
