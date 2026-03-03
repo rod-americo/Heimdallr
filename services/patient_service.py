@@ -55,6 +55,19 @@ class PatientService:
                 # We can try to extract from IdJson or use a fallback
                 case_id = metadata.get("CaseID", f"{row['PatientName'][:3]}_{row['StudyDate']}_{row['AccessionNumber']}")
                 filename = f"{case_id}.nii.gz"
+                case_folder = config.OUTPUT_DIR / case_id
+
+                # Some legacy or interrupted runs wrote resultados.json to disk but did not
+                # persist CalculationResults back into SQLite. The dashboard should still
+                # expose those cases as having results.
+                if not results:
+                    results_path = case_folder / "resultados.json"
+                    if results_path.exists():
+                        try:
+                            with open(results_path, "r") as f:
+                                results = json.load(f)
+                        except Exception as e:
+                            logger.warning(f"Failed to read resultados.json for {case_id}: {e}")
                 
                 # File size (We might still need to hit the disk for this if not in DB, 
                 # but it's a single stat() call instead of multiple file reads). 

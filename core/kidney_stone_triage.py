@@ -34,7 +34,6 @@ import matplotlib.pyplot as plt
 import nibabel as nib
 import numpy as np
 from scipy import ndimage
-from scipy.spatial.distance import pdist
 
 
 DEFAULT_MASKS = ("kidney_left", "kidney_right")
@@ -67,7 +66,16 @@ def _to_serializable(value: Any) -> Any:
 def _largest_axis_mm(coords_xyz: np.ndarray) -> float:
     if coords_xyz.shape[0] < 2:
         return 0.0
-    return float(pdist(coords_xyz, metric="euclidean").max())
+    centered = coords_xyz - coords_xyz.mean(axis=0, keepdims=True)
+    try:
+        _, _, vh = np.linalg.svd(centered, full_matrices=False)
+    except np.linalg.LinAlgError:
+        mins = coords_xyz.min(axis=0)
+        maxs = coords_xyz.max(axis=0)
+        return float(np.linalg.norm(maxs - mins))
+
+    projected = centered @ vh[0]
+    return float(projected.max() - projected.min())
 
 
 def _principal_axes_mm(coords_xyz: np.ndarray) -> list[float]:

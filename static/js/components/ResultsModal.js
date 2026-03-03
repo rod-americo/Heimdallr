@@ -1,7 +1,15 @@
-import { fetchResults, fetchMetadata } from '../api.js?v=20260301c';
-import { renderBiometricSection } from './BiometricsCard.js?v=20260301c';
-import { renderLiverSection } from './LiverCard.js?v=20260301c';
-import { getProgressColor, escapeHtml } from '../utils.js?v=20260301c';
+import { fetchResults, fetchMetadata } from '../api.js?v=20260301e';
+import { renderBiometricSection } from './BiometricsCard.js?v=20260301e';
+import { renderLiverSection } from './LiverCard.js?v=20260301e';
+import { getProgressColor, escapeHtml } from '../utils.js?v=20260301e';
+
+function hasNumericValue(value) {
+    return typeof value === 'number' && Number.isFinite(value);
+}
+
+function formatFixed(value, digits = 0) {
+    return hasNumericValue(value) ? value.toFixed(digits) : '-';
+}
 
 export async function showResults(caseId) {
     try {
@@ -138,11 +146,11 @@ function renderResults(results, caseId, metadata = {}) {
                 ${sarcopeniaStatusHtml}
                 <div class="result-card">
                     <div class="result-label">Área Muscular (SMA)</div>
-                    <div class="result-value highlight">${results.SMA_cm2.toFixed(2)} <span class="result-unit">cm²</span></div>
+                    <div class="result-value highlight">${formatFixed(results.SMA_cm2, 1)} <span class="result-unit">cm²</span></div>
                 </div>
                 <div class="result-card">
                     <div class="result-label">Densidade Muscular</div>
-                    <div class="result-value">${results.muscle_HU_mean?.toFixed(1) || '-'} <span class="result-unit">HU</span></div>
+                    <div class="result-value">${formatFixed(results.muscle_HU_mean, 0)} <span class="result-unit">HU</span></div>
                 </div>
                 <div class="result-card">
                     <div class="result-label">Fatia L3</div>
@@ -174,7 +182,7 @@ function renderResults(results, caseId, metadata = {}) {
                 </div>
                 <div class="result-card">
                     <div class="result-label">HU Trabecular (L1)</div>
-                    <div class="result-value">${results.L1_trabecular_HU_mean?.toFixed(1) || '-'} ± ${results.L1_trabecular_HU_std?.toFixed(1) || '-'} <span class="result-unit">HU</span></div>
+                    <div class="result-value">${formatFixed(results.L1_trabecular_HU_mean, 0)} ± ${formatFixed(results.L1_trabecular_HU_std, 0)} <span class="result-unit">HU</span></div>
                 </div>
                 <div class="result-card">
                     <div class="result-label">Voxels Analisados</div>
@@ -305,8 +313,8 @@ function renderResults(results, caseId, metadata = {}) {
         return `
             <div class="result-card">
                 <div class="result-label">${organ.icon} ${organ.name}</div>
-                <div class="result-value">${vol.toFixed(1)} <span class="result-unit">cm³</span></div>
-                ${maxDiameter !== null && maxDiameter !== undefined ? `<div class="organ-hu">Maior diâmetro: ${maxDiameter.toFixed(1)} mm</div>` : ''}
+                <div class="result-value">${formatFixed(vol, 0)} <span class="result-unit">cm³</span></div>
+                ${hasNumericValue(maxDiameter) ? `<div class="organ-hu">Maior diâmetro: ${formatFixed(maxDiameter / 10, 1)} cm</div>` : ''}
                 ${hu !== null && hu !== undefined ? `<div class="organ-hu">${hu.toFixed(1)} HU</div>` : ''}
             </div>
         `;
@@ -359,18 +367,18 @@ function renderResults(results, caseId, metadata = {}) {
                 <div class="result-card">
                     <div class="result-label">Rim Direito</div>
                     <div class="result-value">${triageRightComponents ?? '-'} <span class="result-unit">componentes</span></div>
-                    <div class="organ-hu">Carga: ${triageRightVolume?.toFixed(1) || '-'} mm³</div>
                     <div class="organ-hu">Maior eixo: ${triageRightLargestAxis?.toFixed(1) || '-'} mm</div>
                     <div class="organ-hu">HU méd.: ${triageRightLargestHuMean?.toFixed(1) || '-'}</div>
                     <div class="organ-hu">HU máx.: ${triageRightLargestHuMax?.toFixed(1) || '-'}</div>
+                    <div class="organ-hu">Carga: ${triageRightVolume?.toFixed(1) || '-'} mm³</div>
                 </div>
                 <div class="result-card">
                     <div class="result-label">Rim Esquerdo</div>
                     <div class="result-value">${triageLeftComponents ?? '-'} <span class="result-unit">componentes</span></div>
-                    <div class="organ-hu">Carga: ${triageLeftVolume?.toFixed(1) || '-'} mm³</div>
                     <div class="organ-hu">Maior eixo: ${triageLeftLargestAxis?.toFixed(1) || '-'} mm</div>
                     <div class="organ-hu">HU méd.: ${triageLeftLargestHuMean?.toFixed(1) || '-'}</div>
                     <div class="organ-hu">HU máx.: ${triageLeftLargestHuMax?.toFixed(1) || '-'}</div>
+                    <div class="organ-hu">Carga: ${triageLeftVolume?.toFixed(1) || '-'} mm³</div>
                 </div>
             </div>
             ${componentCards ? `

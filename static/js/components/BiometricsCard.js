@@ -1,5 +1,5 @@
-import { escapeHtml } from '../utils.js?v=20260301c';
-import { updateBiometrics, updateSMI } from '../api.js?v=20260301c';
+import { escapeHtml } from '../utils.js?v=20260301e';
+import { updateBiometrics, updateSMI } from '../api.js?v=20260301e';
 
 export function renderBiometricSection(caseId, metadata, results) {
     const weight = metadata.Weight || null;

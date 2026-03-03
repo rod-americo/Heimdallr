@@ -11,7 +11,7 @@ export function renderLiverSection(results) {
         liverCards.push(`
             <div class="result-card liver-card">
                 <div class="result-label liver-label">Volume Total do Fígado</div>
-                <div class="result-value liver-vol">${liverVol.toFixed(1)} <span class="result-unit">cm³</span></div>
+                <div class="result-value liver-vol">${liverVol.toFixed(0)} <span class="result-unit">cm³</span></div>
                 ${liverHU !== null && liverHU !== undefined ? `<div class="liver-hu">Densidade Média: ${liverHU.toFixed(1)} HU</div>` : ''}
             </div>
         `);
