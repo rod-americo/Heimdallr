@@ -36,6 +36,7 @@ import io
 import os
 import shutil
 import signal
+import subprocess
 import sys
 import time
 import zipfile
@@ -45,19 +46,7 @@ from typing import Dict, Optional
 
 import requests
 from pydicom.dataset import Dataset
-from pynetdicom import AE, evt
-from pynetdicom.sop_class import (
-    CTImageStorage,
-    MRImageStorage,
-    EnhancedCTImageStorage,
-    EnhancedMRImageStorage,
-    SecondaryCaptureImageStorage,
-    UltrasoundImageStorage,
-    DigitalXRayImageStorageForPresentation,
-    DigitalXRayImageStorageForProcessing,
-    ComputedRadiographyImageStorage,
-    PositronEmissionTomographyImageStorage,
-)
+from pynetdicom import AE, AllStoragePresentationContexts, evt
 
 # Import centralized configuration
 import sys
@@ -184,6 +173,19 @@ def upload_zip(zip_bytes: bytes, upload_url: str, token: Optional[str], timeout:
     return requests.post(upload_url, headers=headers, files=files, timeout=timeout)
 
 
+def launch_prepare_subprocess(zip_path: Path, python_cmd: str, prepare_script: Path) -> subprocess.Popen:
+    """
+    Launch prepare.py asynchronously for a staged ZIP file.
+    """
+    return subprocess.Popen(
+        [python_cmd, str(prepare_script), str(zip_path)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        close_fds=True,
+        start_new_session=True,
+    )
+
+
 class HeimdallrDicomListener:
     """
     DICOM C-STORE SCP with automatic study completion and upload.
@@ -208,6 +210,10 @@ class HeimdallrDicomListener:
         upload_timeout: int,
         upload_retries: int,
         upload_backoff: int,
+        handoff_mode: str,
+        prepare_script: Path,
+        prepare_python: str,
+        upload_staging_dir: Path,
     ) -> None:
         """
         Initialize DICOM listener.
@@ -223,6 +229,10 @@ class HeimdallrDicomListener:
             upload_timeout: HTTP request timeout
             upload_retries: Number of upload attempts
             upload_backoff: Seconds between retry attempts
+            handoff_mode: Delivery mode for completed studies ("local_prepare" or "http_upload")
+            prepare_script: Path to prepare.py (used in local_prepare mode)
+            prepare_python: Python executable used to launch prepare.py
+            upload_staging_dir: Directory where ZIPs are staged for local_prepare handoff
         """
         self.incoming_dir = incoming_dir
         self.sent_dir = sent_dir
@@ -236,13 +246,17 @@ class HeimdallrDicomListener:
         self.upload_timeout = upload_timeout
         self.upload_retries = upload_retries
         self.upload_backoff = upload_backoff
+        self.handoff_mode = handoff_mode
+        self.prepare_script = prepare_script
+        self.prepare_python = prepare_python
+        self.upload_staging_dir = upload_staging_dir
 
         # Active studies being received
         self.studies: Dict[str, StudyState] = {}
         self._stop = False
 
         # Ensure all directories exist
-        for p in (incoming_dir, sent_dir, failed_dir, state_dir):
+        for p in (incoming_dir, sent_dir, failed_dir, state_dir, upload_staging_dir):
             safe_mkdir(p)
 
     def stop(self) -> None:
@@ -291,7 +305,12 @@ class HeimdallrDicomListener:
             # Return success status
             return 0x0000
             
-        except Exception:
+        except Exception as e:
+            try:
+                sop_class_uid = str(getattr(getattr(event, "file_meta", None), "MediaStorageSOPClassUID", "unknown"))
+            except Exception:
+                sop_class_uid = "unknown"
+            print(f"✗ C-STORE handling error (SOP Class: {sop_class_uid}): {e}")
             # Unexpected error: return processing failure status
             return 0xA700
 
@@ -319,23 +338,33 @@ class HeimdallrDicomListener:
                 # Create ZIP archive
                 zip_bytes = zip_study(st.path)
 
-                # Attempt upload with retries
+                # Attempt handoff with retries
                 ok = False
                 last_exc: Optional[Exception] = None
                 
                 for attempt in range(1, self.upload_retries + 1):
                     try:
-                        resp = upload_zip(
-                            zip_bytes, 
-                            self.upload_url, 
-                            self.upload_token, 
-                            self.upload_timeout
-                        )
-                        
-                        if 200 <= resp.status_code < 300:
+                        if self.handoff_mode == "local_prepare":
+                            staged_name = f"study_{time.strftime('%Y%m%d%H%M%S')}_{study_uid}.zip"
+                            staged_zip = self.upload_staging_dir / staged_name
+                            staged_zip.write_bytes(zip_bytes)
+                            launch_prepare_subprocess(
+                                zip_path=staged_zip,
+                                python_cmd=self.prepare_python,
+                                prepare_script=self.prepare_script,
+                            )
                             ok = True
                             break
                         else:
+                            resp = upload_zip(
+                                zip_bytes,
+                                self.upload_url,
+                                self.upload_token,
+                                self.upload_timeout
+                            )
+                            if 200 <= resp.status_code < 300:
+                                ok = True
+                                break
                             # Server returned error: wait and retry
                             time.sleep(self.upload_backoff)
                             
@@ -358,7 +387,10 @@ class HeimdallrDicomListener:
                     # Remove from active studies
                     self.studies.pop(study_uid, None)
                     
-                    print(f"✓ Study {study_uid} uploaded successfully")
+                    if self.handoff_mode == "local_prepare":
+                        print(f"✓ Study {study_uid} handed off to prepare.py")
+                    else:
+                        print(f"✓ Study {study_uid} uploaded successfully")
                     
                 else:
                     # Upload failed: save to failed directory for manual review
@@ -368,7 +400,7 @@ class HeimdallrDicomListener:
                     # Remove from active studies (keep raw DICOM for investigation)
                     self.studies.pop(study_uid, None)
                     
-                    print(f"✗ Study {study_uid} upload failed after {self.upload_retries} attempts")
+                    print(f"✗ Study {study_uid} handoff failed after {self.upload_retries} attempts")
                     if last_exc:
                         print(f"  Last error: {last_exc}")
                         
@@ -378,9 +410,11 @@ class HeimdallrDicomListener:
 
 def build_ae(ae_title: str) -> AE:
     """
-    Build DICOM Application Entity with supported SOP classes.
+    Build DICOM Application Entity with All Storage presentation contexts.
     
-    Configures which DICOM modalities/image types can be received.
+    This makes the listener permissive to image and non-image storage SOP
+    classes (e.g., encapsulated PDF/SR), reducing association rejections due
+    to unsupported abstract syntaxes.
     
     Args:
         ae_title: DICOM AE title for this listener
@@ -390,22 +424,9 @@ def build_ae(ae_title: str) -> AE:
     """
     ae = AE(ae_title=ae_title)
 
-    # Add support for common imaging modalities
-    storage_sop_classes = [
-        CTImageStorage,                              # CT scans
-        EnhancedCTImageStorage,                      # Enhanced CT
-        MRImageStorage,                              # MR scans
-        EnhancedMRImageStorage,                      # Enhanced MR
-        SecondaryCaptureImageStorage,                # Screenshots, derived images
-        UltrasoundImageStorage,                      # Ultrasound
-        ComputedRadiographyImageStorage,             # CR (computed radiography)
-        DigitalXRayImageStorageForPresentation,      # DX presentation
-        DigitalXRayImageStorageForProcessing,        # DX processing
-        PositronEmissionTomographyImageStorage,      # PET scans
-    ]
-    
-    for sop in storage_sop_classes:
-        ae.add_supported_context(sop)
+    # Accept all Storage SOP classes (images and non-images).
+    for context in AllStoragePresentationContexts:
+        ae.add_supported_context(context.abstract_syntax, context.transfer_syntax)
 
     return ae
 
@@ -434,6 +455,22 @@ def main() -> int:
     ap.add_argument("--upload-timeout", type=int, default=config.DICOM_UPLOAD_TIMEOUT, help="Upload timeout (seconds)")
     ap.add_argument("--upload-retries", type=int, default=config.DICOM_UPLOAD_RETRIES, help="Upload retry attempts")
     ap.add_argument("--upload-backoff", type=int, default=config.DICOM_UPLOAD_BACKOFF, help="Retry backoff (seconds)")
+    ap.add_argument(
+        "--handoff-mode",
+        choices=["local_prepare", "http_upload"],
+        default=config.DICOM_HANDOFF_MODE,
+        help="How to deliver completed studies: local_prepare (default) or http_upload",
+    )
+    ap.add_argument(
+        "--prepare-script",
+        default=str(config.PREPARE_SCRIPT),
+        help="Path to prepare.py for local_prepare mode",
+    )
+    ap.add_argument(
+        "--prepare-python",
+        default=config.DICOM_PREPARE_PYTHON,
+        help="Python executable used to launch prepare.py in local_prepare mode",
+    )
     
     args = ap.parse_args()
 
@@ -449,6 +486,10 @@ def main() -> int:
         upload_timeout=args.upload_timeout,
         upload_retries=args.upload_retries,
         upload_backoff=args.upload_backoff,
+        handoff_mode=args.handoff_mode,
+        prepare_script=Path(args.prepare_script),
+        prepare_python=args.prepare_python,
+        upload_staging_dir=Path(config.UPLOAD_DIR),
     )
 
     # Setup signal handlers for graceful shutdown
@@ -469,7 +510,12 @@ def main() -> int:
     print(f"Heimdallr DICOM Listener started")
     print(f"  AE Title: {args.ae}")
     print(f"  Port: {args.port}")
-    print(f"  Upload URL: {args.upload_url}")
+    print(f"  Handoff mode: {args.handoff_mode}")
+    if args.handoff_mode == "http_upload":
+        print(f"  Upload URL: {args.upload_url}")
+    else:
+        print(f"  Prepare script: {args.prepare_script}")
+        print(f"  Prepare python: {args.prepare_python}")
     print(f"  Idle timeout: {args.idle_seconds}s")
     print(f"Waiting for DICOM connections...")
 

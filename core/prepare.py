@@ -123,6 +123,22 @@ def init_and_insert_db(metadata):
         except: pass
         try: c.execute("ALTER TABLE dicom_metadata ADD COLUMN PatientSex TEXT")
         except: pass
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS processing_queue (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                case_id TEXT NOT NULL UNIQUE,
+                input_path TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                claimed_at TIMESTAMP,
+                finished_at TIMESTAMP,
+                error TEXT
+            )
+        ''')
+        c.execute('''
+            CREATE INDEX IF NOT EXISTS idx_processing_queue_status_created
+            ON processing_queue(status, created_at)
+        ''')
 
         # Upsert (Only initial fields)
         c.execute('''
@@ -146,6 +162,44 @@ def init_and_insert_db(metadata):
         
     except Exception as e:
         print(f"  [Error] DB Insert failed: {e}")
+
+
+def enqueue_case_for_processing(case_id, input_path):
+    """
+    Enqueue case for immediate processing dispatch by run.py.
+    Uses UPSERT to make enqueue idempotent and refresh stale entries.
+    """
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS processing_queue (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                case_id TEXT NOT NULL UNIQUE,
+                input_path TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                claimed_at TIMESTAMP,
+                finished_at TIMESTAMP,
+                error TEXT
+            )
+        ''')
+        c.execute('''
+            INSERT INTO processing_queue (case_id, input_path, status)
+            VALUES (?, ?, 'pending')
+            ON CONFLICT(case_id) DO UPDATE SET
+                input_path = excluded.input_path,
+                status = 'pending',
+                created_at = CURRENT_TIMESTAMP,
+                claimed_at = NULL,
+                finished_at = NULL,
+                error = NULL
+        ''', (str(case_id), str(input_path)))
+        conn.commit()
+        conn.close()
+        print(f"  [DB] Processing queue updated for case {case_id}")
+    except Exception as e:
+        print(f"  [Warning] Failed to enqueue case {case_id}: {e}")
 
 def extract_full_dicom_metadata(ds):
     """
@@ -590,6 +644,7 @@ def process_zip(zip_path):
         if final_selected_nii and final_selected_nii.exists():
             dest_input = INPUT_DIR / f"{case_id}.nii.gz"
             shutil.copy(str(final_selected_nii), str(dest_input))
+            enqueue_case_for_processing(case_id, dest_input)
             print(f"\n  Ready: {dest_input}")
             print(str(dest_input))
 

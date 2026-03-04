@@ -33,11 +33,12 @@ import threading
 import sys
 import time
 import datetime
+import tempfile
 import concurrent.futures  # For parallel case processing
 from pathlib import Path
 
-# Import metrics calculation modules
-from core import kidney_stone_triage, metrics
+# Import metrics helpers and triage
+from core import kidney_stone_triage, metrics as legacy_metrics
 
 # Import centralized configuration
 import config
@@ -94,6 +95,258 @@ class PipelineLogger:
             self.log_file.write(f"\nFinished: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
             self.log_file.close()
             self.log_file = None
+
+
+def ensure_processing_queue_table():
+    """Ensure processing queue table/index exist for immediate dispatch flow."""
+    conn = sqlite3.connect(config.DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS processing_queue (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            case_id TEXT NOT NULL UNIQUE,
+            input_path TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            claimed_at TIMESTAMP,
+            finished_at TIMESTAMP,
+            error TEXT
+        )
+        """
+    )
+    c.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_processing_queue_status_created
+        ON processing_queue(status, created_at)
+        """
+    )
+    conn.commit()
+    conn.close()
+
+
+def claim_next_pending_queue_item():
+    """
+    Atomically claim a pending queue item.
+
+    Returns:
+        tuple|None: (queue_id, case_id, input_path) or None when queue is empty.
+    """
+    conn = sqlite3.connect(config.DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("BEGIN IMMEDIATE")
+        c.execute(
+            """
+            SELECT id, case_id, input_path
+            FROM processing_queue
+            WHERE status = 'pending'
+            ORDER BY created_at ASC, id ASC
+            LIMIT 1
+            """
+        )
+        row = c.fetchone()
+        if not row:
+            conn.commit()
+            return None
+
+        queue_id, case_id, input_path = row
+        c.execute(
+            """
+            UPDATE processing_queue
+            SET status = 'claimed',
+                claimed_at = CURRENT_TIMESTAMP,
+                error = NULL
+            WHERE id = ? AND status = 'pending'
+            """,
+            (queue_id,)
+        )
+        if c.rowcount != 1:
+            conn.rollback()
+            return None
+
+        conn.commit()
+        return queue_id, case_id, input_path
+    finally:
+        conn.close()
+
+
+def mark_queue_item_done(queue_id):
+    """Mark queue item as done."""
+    conn = sqlite3.connect(config.DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        """
+        UPDATE processing_queue
+        SET status = 'done',
+            finished_at = CURRENT_TIMESTAMP,
+            error = NULL
+        WHERE id = ?
+        """,
+        (queue_id,)
+    )
+    conn.commit()
+    conn.close()
+
+
+def mark_queue_item_error(queue_id, error_message):
+    """Mark queue item as error with a truncated message."""
+    conn = sqlite3.connect(config.DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        """
+        UPDATE processing_queue
+        SET status = 'error',
+            finished_at = CURRENT_TIMESTAMP,
+            error = ?
+        WHERE id = ?
+        """,
+        (str(error_message)[:2000], queue_id)
+    )
+    conn.commit()
+    conn.close()
+
+
+METRICS_MODULE_SPECS = {
+    "body_regions": {
+        "script": "metrics/metric_body_regions.py",
+        "needs_nifti": False,
+        "supports_overlays": False,
+    },
+    "abdominal_organs": {
+        "script": "metrics/metric_abdominal_organs.py",
+        "needs_nifti": True,
+        "supports_overlays": False,
+    },
+    "renal_stone_burden": {
+        "script": "metrics/metric_renal_stone_burden.py",
+        "needs_nifti": True,
+        "supports_overlays": False,
+    },
+    "l3_sarcopenia": {
+        "script": "metrics/metric_l3_sarcopenia.py",
+        "needs_nifti": True,
+        "supports_overlays": True,
+    },
+    "cerebral_hemorrhage": {
+        "script": "metrics/metric_cerebral_hemorrhage.py",
+        "needs_nifti": True,
+        "supports_overlays": True,
+    },
+    "l1_bmd": {
+        "script": "metrics/metric_l1_bmd.py",
+        "needs_nifti": True,
+        "supports_overlays": True,
+    },
+    "emphysema": {
+        "script": "metrics/metric_emphysema.py",
+        "needs_nifti": True,
+        "supports_overlays": False,
+    },
+}
+
+
+def calculate_metrics_from_modules(case_id, nifti_path, case_output, logger):
+    """
+    Execute configured metric scripts in parallel and merge outputs.
+    """
+    selected_modules = list(config.METRICS_MODULES)
+    if not selected_modules:
+        logger.print("[Metrics] No modules configured. Falling back to legacy core.metrics.")
+        return legacy_metrics.calculate_all_metrics(
+            case_id,
+            nifti_path,
+            case_output,
+            generate_overlays=config.METRICS_ENABLE_OVERLAYS,
+        )
+
+    unknown = [m for m in selected_modules if m not in METRICS_MODULE_SPECS]
+    if unknown:
+        logger.print(f"[Metrics] Unknown module(s) {unknown}. Falling back to legacy core.metrics.")
+        return legacy_metrics.calculate_all_metrics(
+            case_id,
+            nifti_path,
+            case_output,
+            generate_overlays=config.METRICS_ENABLE_OVERLAYS,
+        )
+
+    metrics_python = Path(config.METRICS_PYTHON)
+    if not metrics_python.exists():
+        logger.print(f"[Metrics] METRICS_PYTHON not found ({metrics_python}). Falling back to legacy core.metrics.")
+        return legacy_metrics.calculate_all_metrics(
+            case_id,
+            nifti_path,
+            case_output,
+            generate_overlays=config.METRICS_ENABLE_OVERLAYS,
+        )
+
+    logger.print(f"[Metrics] Modules: {', '.join(selected_modules)}")
+    logger.print(f"[Metrics] Overlays enabled: {'yes' if config.METRICS_ENABLE_OVERLAYS else 'no'}")
+
+    with tempfile.TemporaryDirectory(prefix=f"metrics_{case_id}_", dir=str(case_output)) as tmpdir:
+        shared_results = Path(tmpdir) / "results.json"
+        procs = []
+
+        for module_name in selected_modules:
+            spec = METRICS_MODULE_SPECS[module_name]
+            script_path = BASE_DIR / spec["script"]
+            if not script_path.exists():
+                logger.print(f"[Metrics] Metric script missing ({script_path}). Falling back to legacy core.metrics.")
+                return legacy_metrics.calculate_all_metrics(
+                    case_id,
+                    nifti_path,
+                    case_output,
+                    generate_overlays=config.METRICS_ENABLE_OVERLAYS,
+                )
+
+            cmd = [
+                str(metrics_python),
+                str(script_path),
+                "--case-output-folder",
+                str(case_output),
+                "--case-id",
+                case_id,
+                "--results-path",
+                str(shared_results),
+            ]
+            if spec["needs_nifti"]:
+                cmd.extend(["--nifti-path", str(nifti_path)])
+            if config.METRICS_ENABLE_OVERLAYS and spec["supports_overlays"]:
+                cmd.append("--generate-overlays")
+
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            procs.append((module_name, cmd, proc))
+
+        failures = []
+        for module_name, cmd, proc in procs:
+            _, stderr = proc.communicate()
+            if proc.returncode != 0:
+                failures.append(
+                    {
+                        "module": module_name,
+                        "returncode": proc.returncode,
+                        "command": " ".join(cmd),
+                        "stderr_tail": (stderr or "")[-1200:],
+                    }
+                )
+
+        if failures:
+            raise RuntimeError(f"Metric module execution failed: {json.dumps(failures, ensure_ascii=False)}")
+
+        if not shared_results.exists():
+            return {"case_id": case_id}
+
+        with open(shared_results, "r", encoding="utf-8") as f:
+            merged = json.load(f)
+        if not isinstance(merged, dict):
+            raise RuntimeError("Metrics merged output is not a JSON object")
+        merged.setdefault("case_id", case_id)
+        return merged
 
 
 
@@ -341,7 +594,7 @@ def process_case(nifti_path):
             logger.print(f"  → Logs: {log_dir.relative_to(OUTPUT_DIR)}/")
 
         brain_file = case_output / "total" / "brain.nii.gz"
-        brain_status, _, _ = metrics.get_structure_completeness(brain_file)
+        brain_status, _, _ = legacy_metrics.get_structure_completeness(brain_file)
         if modality == "CT" and brain_file.exists():
             try:
                 if brain_file.stat().st_size > 1000:
@@ -394,7 +647,7 @@ def process_case(nifti_path):
             logger.print("Calculating metrics...")
 
         json_path = case_output / "resultados.json"
-        metrics_data = metrics.calculate_all_metrics(case_id, nifti_path, case_output)
+        metrics_data = calculate_metrics_from_modules(case_id, nifti_path, case_output, logger)
         metrics_data.update(kidney_stone_triage_summary)
         with open(json_path, "w") as f:
             json.dump(metrics_data, f, indent=2)
@@ -539,6 +792,7 @@ def main():
     Supports up to 3 simultaneous cases for optimal resource utilization.
     """
     print("Starting input/ directory monitoring...")
+    ensure_processing_queue_table()
     
     max_cases = config.MAX_PARALLEL_CASES  # Maximum concurrent cases from config
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_cases)
@@ -546,19 +800,53 @@ def main():
     processing_files = set()  # Track files currently being processed
     lock = threading.Lock()    # Thread-safe access to processing_files
     
-    def on_complete(fut, f_path):
+    def on_complete(fut, f_path, queue_id=None):
         """Callback when a case finishes processing."""
         with lock:
             if f_path in processing_files:
                 processing_files.discard(f_path)
         try:
-            fut.result()  # Raise exception if case failed
+            ok = fut.result()  # Raise exception if case failed
+            if queue_id is not None:
+                if ok:
+                    mark_queue_item_done(queue_id)
+                else:
+                    mark_queue_item_error(queue_id, "Case finished with failure return status")
         except Exception as e:
+            if queue_id is not None:
+                mark_queue_item_error(queue_id, e)
             print(f"Error in case processing thread {f_path.name}: {e}")
 
     try:
         while True:
             try:
+                # Priority path: consume explicit queue signals first.
+                while True:
+                    with lock:
+                        if len(processing_files) >= max_cases:
+                            break
+                    queue_item = claim_next_pending_queue_item()
+                    if not queue_item:
+                        break
+
+                    queue_id, _, input_path_str = queue_item
+                    input_path = Path(input_path_str)
+                    if not input_path.is_absolute():
+                        input_path = INPUT_DIR / input_path.name
+
+                    if not input_path.exists():
+                        mark_queue_item_error(queue_id, f"Input file not found: {input_path}")
+                        continue
+
+                    with lock:
+                        if input_path in processing_files:
+                            mark_queue_item_error(queue_id, f"Input file already in processing set: {input_path.name}")
+                            continue
+                        print(f"Submitting queued case: {input_path.name}")
+                        processing_files.add(input_path)
+                        future = executor.submit(process_case, input_path)
+                        future.add_done_callback(lambda fut, p=input_path, qid=queue_id: on_complete(fut, p, qid))
+
                 # List all NIfTI files in input directory
                 current_files = sorted(list(INPUT_DIR.glob("*.nii.gz")))
                 
@@ -584,7 +872,7 @@ def main():
                         print(f"Submitting new case: {f.name}")
                         processing_files.add(f)
                         future = executor.submit(process_case, f)
-                        future.add_done_callback(lambda fut, p=f: on_complete(fut, p))
+                        future.add_done_callback(lambda fut, p=f: on_complete(fut, p, None))
             
                 time.sleep(config.PROCESSING_SCAN_INTERVAL)
                 

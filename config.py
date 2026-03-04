@@ -39,6 +39,13 @@ BASE_DIR = Path(__file__).resolve().parent
 env_path = BASE_DIR / ".env"
 load_dotenv(dotenv_path=env_path)
 
+
+def _parse_csv_env(name: str, default: str) -> list[str]:
+    """Parse comma-separated env var into a normalized list."""
+    raw = os.getenv(name, default)
+    parts = [p.strip() for p in raw.split(",")]
+    return [p for p in parts if p]
+
 UPLOAD_DIR = BASE_DIR / "uploads"
 NII_DIR = BASE_DIR / "nii"
 OUTPUT_DIR = BASE_DIR / "output"
@@ -95,6 +102,8 @@ DICOM_UPLOAD_TOKEN = os.getenv("HEIMDALLR_UPLOAD_TOKEN")  # Optional bearer toke
 DICOM_UPLOAD_TIMEOUT = int(os.getenv("HEIMDALLR_UPLOAD_TIMEOUT", "120"))
 DICOM_UPLOAD_RETRIES = int(os.getenv("HEIMDALLR_UPLOAD_RETRIES", "3"))
 DICOM_UPLOAD_BACKOFF = int(os.getenv("HEIMDALLR_UPLOAD_BACKOFF", "5"))  # Seconds between retries
+DICOM_HANDOFF_MODE = os.getenv("HEIMDALLR_DICOM_HANDOFF_MODE", "local_prepare")  # local_prepare | http_upload
+DICOM_PREPARE_PYTHON = os.getenv("HEIMDALLR_DICOM_PREPARE_PYTHON", str(BASE_DIR / "venv" / "bin" / "python"))
 
 # ============================================================
 # PROCESSING CONFIGURATION (run.py)
@@ -114,6 +123,14 @@ PROCESSING_SCAN_INTERVAL = int(os.getenv("HEIMDALLR_PROCESSING_SCAN_INTERVAL", "
 
 # Logging configuration
 VERBOSE_CONSOLE = os.getenv("HEIMDALLR_VERBOSE_CONSOLE", "false").lower() == "true"  # False = logs to files, True = logs to console
+
+# Metrics modules execution (metrics/*.py)
+METRICS_MODULES = _parse_csv_env(
+    "HEIMDALLR_METRICS_MODULES",
+    "body_regions,abdominal_organs,renal_stone_burden,l3_sarcopenia,cerebral_hemorrhage,l1_bmd,emphysema",
+)
+METRICS_ENABLE_OVERLAYS = os.getenv("HEIMDALLR_METRICS_ENABLE_OVERLAYS", "true").lower() == "true"
+METRICS_PYTHON = os.getenv("HEIMDALLR_METRICS_PYTHON", str(BASE_DIR / "venv" / "bin" / "python"))
 
 # ============================================================
 # UPLOADER CLIENT CONFIGURATION (uploader.py)
