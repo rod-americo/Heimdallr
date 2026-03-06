@@ -250,6 +250,9 @@ def analyze_kidneys(
         components.sort(key=lambda item: item["volume_mm3"], reverse=True)
         total_components += len(components)
         total_stone_volume_mm3 += sum(item["volume_mm3"] for item in components)
+        stone_voxel_count = sum(item["voxel_count"] for item in components)
+        stone_volume_mm3 = sum(item["volume_mm3"] for item in components)
+
         kidneys.append(
             {
                 "mask_name": mask_name,
@@ -258,9 +261,9 @@ def analyze_kidneys(
                 "kidney_volume_ml": float(kidney_mask.sum() * voxel_volume_mm3 / 1000.0),
                 "kidney_hu_mean": float(kidney_values.mean()) if kidney_values.size else None,
                 "kidney_hu_max": float(kidney_values.max()) if kidney_values.size else None,
-                "stone_voxel_count": int(dense_mask.sum()),
-                "stone_volume_mm3": float(dense_mask.sum() * voxel_volume_mm3),
-                "stone_volume_ml": float(dense_mask.sum() * voxel_volume_mm3 / 1000.0),
+                "stone_voxel_count": stone_voxel_count,
+                "stone_volume_mm3": float(stone_volume_mm3),
+                "stone_volume_ml": float(stone_volume_mm3 / 1000.0),
                 "component_count": len(components),
                 "components": components,
             }
