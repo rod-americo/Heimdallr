@@ -304,22 +304,26 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder, generate_over
             results[f"{organ_name}_vol_cm3"] = vol
             if organ_name in {"kidney_right", "kidney_left"}:
                 results[f"{organ_name}_max_diameter_mm"] = get_mask_max_euclidean_diameter_mm(organ_mask, organ_nii.affine)
-
-            if modality == "CT":
-                hu_mean, hu_std = get_mask_mean_std(organ_mask, ct)
-                results[f"{organ_name}_hu_mean"] = hu_mean
-                results[f"{organ_name}_hu_std"] = hu_std
-
-                if organ_name == "liver" and vol > 0.1 and hu_mean is not None:
-                    pdff = -0.58 * hu_mean + 38.2
-                    pdff = max(0.0, min(100.0, pdff))
-                    results[f"{organ_name}_pdff_percent"] = round(pdff, 2)
-                    results[f"{organ_name}_pdff_kvp"] = kvp_raw
-            else:
-                results[f"{organ_name}_hu_mean"] = None
-                results[f"{organ_name}_hu_std"] = None
         else:
             results[f"{organ_name}_vol_cm3"] = None
+
+        # Liver attenuation and steatosis estimation remain useful even when
+        # the liver is axially truncated, so only volume depends on completeness.
+        if modality == "CT" and organ_name == "liver" and status in {"Complete", "Incomplete"} and organ_mask is not None:
+            hu_mean, hu_std = get_mask_mean_std(organ_mask, ct)
+            results[f"{organ_name}_hu_mean"] = hu_mean
+            results[f"{organ_name}_hu_std"] = hu_std
+
+            if hu_mean is not None:
+                pdff = -0.58 * hu_mean + 38.2
+                pdff = max(0.0, min(100.0, pdff))
+                results[f"{organ_name}_pdff_percent"] = round(pdff, 2)
+                results[f"{organ_name}_pdff_kvp"] = kvp_raw
+        elif status == "Complete" and modality == "CT":
+            hu_mean, hu_std = get_mask_mean_std(organ_mask, ct)
+            results[f"{organ_name}_hu_mean"] = hu_mean
+            results[f"{organ_name}_hu_std"] = hu_std
+        else:
             results[f"{organ_name}_hu_mean"] = None
             results[f"{organ_name}_hu_std"] = None
 
