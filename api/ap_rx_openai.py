@@ -41,7 +41,7 @@ load_dotenv()
 # User requested port 8002 specifically
 PORT = int(os.getenv("OPENAI_API_PORT", "8002"))
 API_KEY = os.getenv("OPENAI_API_KEY")
-MODEL = os.getenv("OPENAI_MODEL", "gpt-5.2") # Default to gpt-5.2 per user preference
+MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4") # Default to gpt-5.4 per user preference
 DATA_DIR = config.DATA_DIR / "dataset/ap_rx_openai"
 
 if not API_KEY:
