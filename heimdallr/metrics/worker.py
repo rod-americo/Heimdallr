@@ -24,6 +24,8 @@ JOB_MODULES = {
     "bone_health_l1_volumetric": "heimdallr.metrics.jobs.bone_health_l1_volumetric",
     "vertebral_fracture_screen": "heimdallr.metrics.jobs.vertebral_fracture_screen",
     "opportunistic_osteoporosis_composite": "heimdallr.metrics.jobs.opportunistic_osteoporosis_composite",
+    "body_fat_abdominal_volumes": "heimdallr.metrics.jobs.body_fat_abdominal_volumes",
+    "body_fat_l3_slice": "heimdallr.metrics.jobs.body_fat_l3_slice",
 }
 
 settings.ensure_directories()
@@ -222,6 +224,10 @@ def _payload_summary(payload: dict) -> str:
         measurement.get("skeletal_muscle_area_cm2"),
         measurement.get("l1_trabecular_hu_mean"),
         measurement.get("bone_health_l1_volumetric_trabecular_hu_mean"),
+        measurement.get("aggregate", {}).get("visceral_proxy_volume_cm3")
+        if isinstance(measurement.get("aggregate"), dict)
+        else None,
+        measurement.get("visceral_proxy_area_cm2"),
         measurement.get("opportunistic_osteoporosis_composite"),
         measurement.get("overall_suspicion"),
         measurement.get("job_status"),

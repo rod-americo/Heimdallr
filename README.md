@@ -21,7 +21,7 @@ The repository currently implements three practical layers:
 3. **Assistive reporting services**
    - FastAPI dashboard and patient/result APIs
    - Proxy endpoints for AP chest X-ray assist flows
-   - Optional standalone services for Anthropic, MedGemma, and CTR extraction
+   - Optional standalone services for CTR extraction
 
 Future-facing modules are tracked in [`docs/UPCOMING.md`](docs/UPCOMING.md).
 
@@ -43,13 +43,9 @@ Future-facing modules are tracked in [`docs/UPCOMING.md`](docs/UPCOMING.md).
 - `heimdallr/metrics/` - resident metrics worker plus standalone job modules
 - `services/dicom_listener.py` - legacy listener path superseded by `heimdallr/intake/`
 - `services/deid_gateway.py` - outbound de-identification controls for external model calls
-- `services/anthropic_report_builder.py` - narrative/report structuring helpers
 - `clients/uploader.py` - CLI uploader for ZIP files or DICOM folders
 
 ### Optional microservices
-- `api/anthropic.py` - Anthropic-backed AP chest X-ray analysis service
-- `api/medgemma.py` - MedGemma-backed AP chest X-ray analysis service
-- `api/ctr.py` - CTR extraction service based on CXAS
 - `api/totalsegmentator.py` - alternative HTTP processing service for segmentation and metrics
 
 ### Storage and outputs
@@ -91,12 +87,9 @@ heimdallr.metrics
             v
  runtime/studies/<case_id> + database/dicom.db
 
-Optional app.py proxy routes:
-  /api/anthropic/ap-thorax-xray -> api/anthropic.py
-  /api/medgemma/ap-thorax-xray  -> api/medgemma.py
 
-Standalone optional service:
-  api/ctr.py -> POST /extract_ctr
+
+Standlone optional service:
   api/totalsegmentator.py -> POST /process
 ```
 
@@ -167,18 +160,6 @@ source .venv/bin/activate
 Optional assistive services:
 
 ```bash
-# Anthropic proxy target (default app proxy target: http://localhost:8101/analyze)
-source .venv/bin/activate
-.venv/bin/python api/anthropic.py
-
-# MedGemma proxy target (default service port: 8004)
-source .venv/bin/activate
-.venv/bin/python api/medgemma.py
-
-# CTR extraction service (default port 8003)
-source .venv/bin/activate
-.venv/bin/python api/ctr.py
-
 # Alternative HTTP segmentation service (default port 8005)
 source .venv/bin/activate
 .venv/bin/python api/totalsegmentator.py
@@ -193,7 +174,6 @@ The TUI refreshes automatically and reads directly from `runtime/`, `database/di
 - Dashboard: `http://localhost:8001`
 - TUI dashboard: `.venv/bin/python -m heimdallr.tui`
 - OpenAPI docs: `http://localhost:8001/docs`
-- CTR service health: `http://localhost:8003/health`
 - TotalSegmentator API health: `http://localhost:8005/health`
 
 ## Current API Surface
@@ -213,12 +193,7 @@ The TUI refreshes automatically and reads directly from `runtime/`, `database/di
 - `PATCH /api/patients/{case_id}/biometrics`
 - `PATCH /api/patients/{case_id}/smi`
 
-### Assistive report proxies
-- `POST /api/anthropic/ap-thorax-xray`
-- `POST /api/medgemma/ap-thorax-xray`
-
 ### Standalone optional service
-- CTR service (`:8003`): `POST /extract_ctr`, `GET /health`
 - TotalSegmentator HTTP service (`:8005`): `POST /process`, `GET /health`
 
 See [`docs/API.md`](docs/API.md) for contract notes and examples.
@@ -230,7 +205,6 @@ See [`docs/API.md`](docs/API.md) for contract notes and examples.
 - The CLI uploader lives at [`clients/uploader.py`](clients/uploader.py) and may also be downloaded from `GET /api/tools/uploader`.
 - The processing worker claims studies from `runtime/queue/pending/` into `runtime/queue/active/` before segmentation and persists outputs under `runtime/studies/<case_id>/`.
 - Retroactive metrics regeneration is available through `venv/bin/python scripts/retroactive_recalculate_metrics.py` with options such as `--case`, `--limit`, `--workers`, and `--skip-overlays`.
-- The app proxy expects the Anthropic and MedGemma services to be running separately if those routes are used.
 - `api/totalsegmentator.py` is an alternative HTTP execution path and is not part of the default `upload -> prepare -> processing -> metrics` baseline.
 
 ## Documentation Map

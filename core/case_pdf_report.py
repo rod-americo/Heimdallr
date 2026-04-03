@@ -164,70 +164,6 @@ def _fmt_components(value) -> str:
     return f"{int(value)}"
 
 
-def _first_numeric(results: dict, keys: list[str]):
-    for key in keys:
-        value = results.get(key)
-        try:
-            if value is not None:
-                return float(value)
-        except Exception:
-            continue
-    return None
-
-
-def _first_string(results: dict, keys: list[str]) -> str | None:
-    for key in keys:
-        value = results.get(key)
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-    return None
-
-
-def _abdominal_fat_summary(results: dict) -> dict | None:
-    visceral = _first_numeric(results, [
-        "vat_volume_cm3",
-        "visceral_fat_volume_cm3",
-        "torso_fat_volume_cm3",
-        "abdominal_visceral_fat_volume_cm3",
-    ])
-    subcutaneous = _first_numeric(results, [
-        "sat_volume_cm3",
-        "subcutaneous_fat_volume_cm3",
-        "abdominal_subcutaneous_fat_volume_cm3",
-    ])
-    ratio = _first_numeric(results, [
-        "vat_sat_ratio",
-        "visceral_to_subcutaneous_ratio",
-    ])
-    qc_status = _first_string(results, [
-        "vat_sat_qc_status",
-        "abdominal_fat_qc_status",
-        "fat_qc_status",
-        "tissue_types_qc_status",
-        "abdominal_fat_analysis_status",
-    ])
-    coverage_complete = results.get("vat_sat_coverage_complete")
-
-    if all(value is None for value in (visceral, subcutaneous, ratio, qc_status)) and coverage_complete is None:
-        return None
-
-    if qc_status:
-        qc_label = qc_status
-    elif coverage_complete is True:
-        qc_label = "Complete"
-    elif coverage_complete is False:
-        qc_label = "Incomplete"
-    else:
-        qc_label = "-"
-
-    return {
-        "qc_label": qc_label,
-        "visceral": visceral,
-        "subcutaneous": subcutaneous,
-        "ratio": ratio,
-    }
-
-
 def _safe_json(path: Path) -> dict:
     if not path.exists():
         return {}
@@ -401,15 +337,6 @@ def build_case_report(case_folder: Path, output_path: Path | None = None) -> Pat
         ("L1 BMD class", str(results.get("L1_bmd_classification", "-"))),
     ], left_x, left_y, col_width)
     left_y += 16
-    abdominal_fat = _abdominal_fat_summary(results)
-    if abdominal_fat:
-        left_y = _draw_card(draw, "Abdominal Fat (VAT/SAT)", [
-            ("QC status", abdominal_fat["qc_label"]),
-            ("Visceral fat", _fmt_number(abdominal_fat["visceral"], "cm3")),
-            ("Subcutaneous fat", _fmt_number(abdominal_fat["subcutaneous"], "cm3")),
-            ("VAT/SAT ratio", _fmt_number(abdominal_fat["ratio"], None, 2)),
-        ], left_x, left_y, col_width, fill="#fffaf2", outline="#ead7b7")
-        left_y += 16
     left_y = _draw_card(draw, "Liver and Organs", [
         ("Liver volume", _fmt_number(results.get("liver_vol_cm3"), "cm3")),
         ("Liver mean HU", _fmt_number(results.get("liver_hu_mean"), "HU")),
@@ -467,15 +394,6 @@ def build_case_report(case_folder: Path, output_path: Path | None = None) -> Pat
         ("Hemorrhage volume", _fmt_number(results.get("hemorrhage_vol_cm3"), "cm3")),
     ]
     y = _draw_section(draw, "Thoracic and Neuro", lung_rows, MARGIN, y, PAGE_WIDTH - (2 * MARGIN))
-
-    abdominal_fat = _abdominal_fat_summary(results)
-    if abdominal_fat:
-        y = _draw_section(draw, "Abdominal Fat (VAT/SAT)", [
-            ("QC status", abdominal_fat["qc_label"]),
-            ("Visceral fat", _fmt_number(abdominal_fat["visceral"], "cm3")),
-            ("Subcutaneous fat", _fmt_number(abdominal_fat["subcutaneous"], "cm3")),
-            ("VAT/SAT ratio", _fmt_number(abdominal_fat["ratio"], None, 2)),
-        ], MARGIN, y, PAGE_WIDTH - (2 * MARGIN))
 
     stone_rows = [
         ("Stone burden status", str(results.get("renal_stone_analysis_status", "-"))),

@@ -19,7 +19,6 @@ Heimdallr Metrics Calculation Module (metrics.py)
 Calculates clinical metrics from segmentation masks:
 - Organ volumes (liver, spleen, kidneys)
 - Hounsfield Unit densities (CT only)
-- Abdominal fat compartment volumetry (VAT/SAT proxy)
 - L3 sarcopenia metrics (Skeletal Muscle Area, muscle HU)
 - Cerebral hemorrhage quantification
 - Overlay image generation
@@ -31,8 +30,6 @@ import json
 from pathlib import Path
 import sqlite3
 from scipy.ndimage import label as ndlabel
-
-FAT_COMPARTMENT_LEVELS = ["T12", "L1", "L2", "L3", "L4", "L5"]
 
 def get_volume_cm3(path):
     """Calcula o volume em cm³ de uma máscara NIfTI."""
@@ -142,271 +139,6 @@ def load_binary_mask(path):
     nii = nib.load(str(path))
     return np.asanyarray(nii.dataobj) > 0, nii
 
-
-def get_mask_z_bounds(mask_data):
-    """Return inclusive z bounds for a binary mask."""
-    mask_bool = np.asarray(mask_data) > 0
-    if mask_bool.ndim != 3 or not np.any(mask_bool):
-        return None
-    z_indices = np.where(mask_bool.sum(axis=(0, 1)) > 0)[0]
-    if len(z_indices) == 0:
-        return None
-    return int(z_indices[0]), int(z_indices[-1])
-
-
-def find_longest_contiguous_levels(levels, ordered_levels):
-    """Return the longest contiguous ordered block found in levels."""
-    level_set = set(levels)
-    best_block = []
-    current_block = []
-
-    for level in ordered_levels:
-        if level in level_set:
-            current_block.append(level)
-        else:
-            if len(current_block) > len(best_block):
-                best_block = current_block[:]
-            current_block = []
-
-    if len(current_block) > len(best_block):
-        best_block = current_block[:]
-
-    return best_block
-
-
-def calculate_fat_mask_volume_in_slices(mask_data, voxel_volume_mm3, z_start, z_end):
-    """Calculate a mask volume constrained to an inclusive axial slice range."""
-    slab_mask = np.asarray(mask_data)[:, :, z_start : z_end + 1] > 0
-    voxel_count = int(np.count_nonzero(slab_mask))
-    volume_cm3 = round((voxel_count * voxel_volume_mm3) / 1000.0, 3)
-    return volume_cm3, voxel_count
-
-
-def render_fat_compartment_overview_png(output_path, aggregate, slab_rows):
-    """Render a compact slab-by-slab fat compartment overview figure."""
-    try:
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-    except Exception as ex:
-        print(f"Warning: Could not import matplotlib for fat overview: {ex}")
-        return
-
-    labels = [row["level"] for row in slab_rows]
-    sat_vals = [row["subcutaneous_fat_vol_cm3"] for row in slab_rows]
-    vat_vals = [row["visceral_fat_vol_cm3"] for row in slab_rows]
-    colors = ["#1f77b4" if row["status"] == "Complete" else "#9ca3af" for row in slab_rows]
-
-    x = np.arange(len(labels))
-    width = 0.38
-
-    fig, (ax0, ax1) = plt.subplots(
-        2,
-        1,
-        figsize=(10, 8),
-        gridspec_kw={"height_ratios": [1, 2]},
-    )
-
-    def _fmt_num(value, digits=1):
-        if value is None:
-            return "-"
-        return f"{value:.{digits}f}"
-
-    summary_lines = [
-        f"Status: {aggregate.get('analysis_status', '-')}",
-        f"Measured region: {aggregate.get('measured_region', '-')}",
-        f"Complete region: {'yes' if aggregate.get('region_complete') else 'no'}",
-        f"VAT/Torso fat: {_fmt_num(aggregate.get('visceral_fat_vol_cm3'))} cm3",
-        f"SAT/Subcutaneous fat: {_fmt_num(aggregate.get('subcutaneous_fat_vol_cm3'))} cm3",
-        f"Ratio VAT/SAT: {_fmt_num(aggregate.get('visceral_to_subcutaneous_ratio'), 3)}",
-    ]
-    ax0.axis("off")
-    ax0.text(
-        0.01,
-        0.95,
-        "\n".join(summary_lines),
-        va="top",
-        ha="left",
-        family="monospace",
-        fontsize=11,
-    )
-
-    ax1.bar(x - width / 2, vat_vals, width=width, label="VAT proxy (torso_fat)", color="#ef4444")
-    ax1.bar(x + width / 2, sat_vals, width=width, label="SAT (subcutaneous_fat)", color=colors)
-    ax1.set_xticks(x)
-    ax1.set_xticklabels(labels)
-    ax1.set_ylabel("Volume (cm3)")
-    ax1.set_title("Abdominal fat compartments by vertebral slab")
-    ax1.legend()
-    ax1.grid(axis="y", alpha=0.2)
-
-    fig.tight_layout()
-    fig.savefig(output_path, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-
-
-def calculate_abdominal_fat_compartments(case_output_folder, total_dir, tissue_types_dir, generate_overlays=True):
-    """
-    Quantify abdominal VAT/SAT proxy using vertebral slabs from T12 to L5.
-
-    The tissue_types task exposes `torso_fat` and `subcutaneous_fat`. For the
-    operational metric, `torso_fat` is treated as the visceral compartment
-    proxy, while preserving the source label in the detailed payload.
-    """
-    defaults = {
-        "abdominal_fat_analysis_status": "Not available",
-        "abdominal_fat_qc_status": "Not available",
-        "abdominal_fat_measurement_region": None,
-        "abdominal_fat_region_complete": None,
-        "abdominal_visceral_fat_vol_cm3": None,
-        "abdominal_visceral_fat_volume_cm3": None,
-        "abdominal_subcutaneous_fat_vol_cm3": None,
-        "abdominal_subcutaneous_fat_volume_cm3": None,
-        "abdominal_visceral_to_subcutaneous_ratio": None,
-        "visceral_to_subcutaneous_ratio": None,
-        "vat_sat_coverage_complete": None,
-        "abdominal_fat_artifact_json": None,
-        "abdominal_fat_overlay_png": None,
-        "abdominal_fat_compartments": None,
-    }
-
-    sat_path = tissue_types_dir / "subcutaneous_fat.nii.gz"
-    vat_path = tissue_types_dir / "torso_fat.nii.gz"
-    if not sat_path.exists() or not vat_path.exists():
-        return defaults
-
-    try:
-        sat_mask, sat_nii = load_binary_mask(sat_path)
-        vat_mask, vat_nii = load_binary_mask(vat_path)
-        if sat_mask.shape != vat_mask.shape:
-            defaults["abdominal_fat_analysis_status"] = "Error"
-            return defaults
-
-        voxel_volume_mm3 = float(np.prod(sat_nii.header.get_zooms()[:3]))
-        slab_rows = []
-        detailed_slabs = {}
-        complete_levels = []
-        measurable_levels = []
-
-        for level in FAT_COMPARTMENT_LEVELS:
-            vertebra_path = total_dir / f"vertebrae_{level}.nii.gz"
-            status, vertebra_mask, _ = get_structure_completeness(vertebra_path)
-            z_bounds = get_mask_z_bounds(vertebra_mask) if vertebra_mask is not None else None
-
-            slab_payload = {
-                "status": status,
-                "z_start": None,
-                "z_end": None,
-                "height_slices": 0,
-                "visceral_fat_vol_cm3": None,
-                "subcutaneous_fat_vol_cm3": None,
-                "visceral_to_subcutaneous_ratio": None,
-            }
-
-            if z_bounds is not None:
-                z_start, z_end = z_bounds
-                vat_vol_cm3, vat_voxels = calculate_fat_mask_volume_in_slices(vat_mask, voxel_volume_mm3, z_start, z_end)
-                sat_vol_cm3, sat_voxels = calculate_fat_mask_volume_in_slices(sat_mask, voxel_volume_mm3, z_start, z_end)
-                ratio = round(vat_vol_cm3 / sat_vol_cm3, 4) if sat_vol_cm3 > 0 else None
-                slab_payload.update({
-                    "z_start": z_start,
-                    "z_end": z_end,
-                    "height_slices": int(z_end - z_start + 1),
-                    "visceral_fat_vol_cm3": vat_vol_cm3,
-                    "subcutaneous_fat_vol_cm3": sat_vol_cm3,
-                    "visceral_to_subcutaneous_ratio": ratio,
-                    "visceral_voxel_count": vat_voxels,
-                    "subcutaneous_voxel_count": sat_voxels,
-                })
-                measurable_levels.append(level)
-                slab_rows.append({"level": level, **slab_payload})
-
-            if status == "Complete":
-                complete_levels.append(level)
-
-            detailed_slabs[level] = slab_payload
-
-        if not measurable_levels:
-            return defaults
-
-        preferred_levels = find_longest_contiguous_levels(complete_levels, FAT_COMPARTMENT_LEVELS)
-        aggregate_uses_incomplete = False
-        if not preferred_levels:
-            preferred_levels = find_longest_contiguous_levels(measurable_levels, FAT_COMPARTMENT_LEVELS)
-            aggregate_uses_incomplete = True
-
-        if not preferred_levels:
-            return defaults
-
-        block_starts = [detailed_slabs[level]["z_start"] for level in preferred_levels]
-        block_ends = [detailed_slabs[level]["z_end"] for level in preferred_levels]
-        z_start = min(block_starts)
-        z_end = max(block_ends)
-        vat_vol_cm3, vat_voxels = calculate_fat_mask_volume_in_slices(vat_mask, voxel_volume_mm3, z_start, z_end)
-        sat_vol_cm3, sat_voxels = calculate_fat_mask_volume_in_slices(sat_mask, voxel_volume_mm3, z_start, z_end)
-        ratio = round(vat_vol_cm3 / sat_vol_cm3, 4) if sat_vol_cm3 > 0 else None
-        region_complete = preferred_levels == FAT_COMPARTMENT_LEVELS and not aggregate_uses_incomplete
-        analysis_status = "Complete" if region_complete else "Partial"
-        measured_region = f"{preferred_levels[0]}-{preferred_levels[-1]}"
-
-        aggregate = {
-            "analysis_status": analysis_status,
-            "measured_region": measured_region,
-            "region_complete": region_complete,
-            "z_start": z_start,
-            "z_end": z_end,
-            "height_slices": int(z_end - z_start + 1),
-            "visceral_fat_vol_cm3": vat_vol_cm3,
-            "subcutaneous_fat_vol_cm3": sat_vol_cm3,
-            "visceral_to_subcutaneous_ratio": ratio,
-            "visceral_voxel_count": vat_voxels,
-            "subcutaneous_voxel_count": sat_voxels,
-            "used_incomplete_levels": aggregate_uses_incomplete,
-        }
-
-        detail = {
-            "source_masks": {
-                "visceral_proxy_mask": "torso_fat",
-                "subcutaneous_mask": "subcutaneous_fat",
-            },
-            "levels_requested": FAT_COMPARTMENT_LEVELS,
-            "levels_complete": complete_levels,
-            "levels_measurable": measurable_levels,
-            "aggregate": aggregate,
-            "slabs": detailed_slabs,
-        }
-
-        artifact_dir = ensure_metric_artifact_dir(case_output_folder, "abdominal_fat_compartments")
-        artifact_json_path = artifact_dir / "result.json"
-        with open(artifact_json_path, "w", encoding="utf-8") as f:
-            json.dump(detail, f, indent=2)
-
-        overview_png_path = case_output_folder / "fat_compartments_overview.png"
-        if generate_overlays:
-            render_fat_compartment_overview_png(overview_png_path, aggregate, slab_rows)
-
-        defaults.update({
-            "abdominal_fat_analysis_status": analysis_status,
-            "abdominal_fat_qc_status": analysis_status,
-            "abdominal_fat_measurement_region": measured_region,
-            "abdominal_fat_region_complete": region_complete,
-            "abdominal_visceral_fat_vol_cm3": vat_vol_cm3,
-            "abdominal_visceral_fat_volume_cm3": vat_vol_cm3,
-            "abdominal_subcutaneous_fat_vol_cm3": sat_vol_cm3,
-            "abdominal_subcutaneous_fat_volume_cm3": sat_vol_cm3,
-            "abdominal_visceral_to_subcutaneous_ratio": ratio,
-            "visceral_to_subcutaneous_ratio": ratio,
-            "vat_sat_coverage_complete": region_complete,
-            "abdominal_fat_artifact_json": str(artifact_json_path.relative_to(case_output_folder)),
-            "abdominal_fat_overlay_png": overview_png_path.name if generate_overlays else None,
-            "abdominal_fat_compartments": detail,
-        })
-        return defaults
-
-    except Exception as ex:
-        print(f"Error in abdominal fat compartment analysis: {ex}")
-        defaults["abdominal_fat_analysis_status"] = "Error"
-        return defaults
 
 def get_mask_max_euclidean_diameter_mm(mask_data, affine):
     """
@@ -821,20 +553,7 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder, generate_over
         results["renal_stone_analysis_status"] = "Error"
 
     # ============================================================
-    # STEP 3: Abdominal Fat Compartment Analysis
-    # ============================================================
-    if modality == "CT":
-        results.update(
-            calculate_abdominal_fat_compartments(
-                case_output_folder=case_output_folder,
-                total_dir=total_dir,
-                tissue_types_dir=tissue_types_dir,
-                generate_overlays=generate_overlays,
-            )
-        )
-
-    # ============================================================
-    # STEP 4: L3 Sarcopenia Analysis
+    # STEP 3: L3 Sarcopenia Analysis
     # ============================================================
     # Calculate Skeletal Muscle Area (SMA) and muscle density at L3 vertebra
     # L3 is a standard landmark for body composition assessment
@@ -933,7 +652,7 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder, generate_over
             results["L3_analysis_status"] = "Error"
 
     # ============================================================
-    # STEP 5: Cerebral Hemorrhage Analysis
+    # STEP 4: Cerebral Hemorrhage Analysis
     # ============================================================
     bleed_dir = resolve_artifact_dir(case_output_folder, "bleed")
     bleed_file = bleed_dir / "intracerebral_hemorrhage.nii.gz"
@@ -1012,7 +731,7 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder, generate_over
             results["hemorrhage_analysis_status"] = "Error"
 
     # ============================================================
-    # STEP 6: Bone Mineral Density (BMD) Analysis — L1 Vertebra
+    # STEP 5: Bone Mineral Density (BMD) Analysis — L1 Vertebra
     # ============================================================
     vertebra_L1_file = total_dir / "vertebrae_L1.nii.gz"
     results["L1_bmd_analysis_status"] = "Not available"
@@ -1160,7 +879,7 @@ def calculate_all_metrics(case_id, nifti_path, case_output_folder, generate_over
             results["L1_bmd_analysis_status"] = "Error"
 
     # ============================================================
-    # STEP 7: Pulmonary Emphysema Quantification (Lobar)
+    # STEP 6: Pulmonary Emphysema Quantification (Lobar)
     # ============================================================
     # Quantify emphysema using the "Density Mask" method (< -950 HU)
     # Calculated per lung lobe segmented by TotalSegmentator.
