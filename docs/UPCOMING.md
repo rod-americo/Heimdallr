@@ -1,97 +1,81 @@
 # UPCOMING
 
-**Planned capabilities for Heimdallr's radiology preprocessing ecosystem**
+**Planned operational capabilities for Heimdallr's radiological infrastructure**
 
-This roadmap tracks features that are intentionally **not fully implemented yet**.
-It is designed to protect delivery quality, clinical safety, and governance as the platform scales.
+This roadmap tracks features that are intentionally **not fully implemented yet** in the open-source operational layer. Modules classified as proprietary clinical intelligence, navigation, assistive reporting, or workflow orchestration are tracked in the **Asha** repository.
+
+> **Scope boundary** — Heimdallr concentrates on ingestion, transport, interoperability, normalization, deterministic quantification, de-identification, observability, and operational surfaces. Anything requiring clinical semantic interpretation, prioritization heuristics, or proprietary intelligence belongs to Asha.
 
 ## Why This File Exists
 
-- Align engineering, clinical, and governance priorities.
-- Prevent rushed releases in high-risk clinical workflows.
-- Keep scope explicit for contributors and partners.
-- Turn strategy into auditable implementation steps.
+- Align engineering priorities for the open-source infrastructure layer.
+- Prevent scope creep from proprietary intelligence concerns.
+- Keep the operational backlog explicit for contributors.
+- Turn infrastructure strategy into auditable implementation steps.
 
 ## Working Definitions
 
-- **Friction (1-10)**: implementation-in-production effort, combining integration complexity, data quality constraints, validation burden, compliance/governance controls, and operational change management.
-- **Impact (1-10)**: expected clinical/operational value once adopted in real workflows.
-- **Navigation**: active monitoring by a service team that owns each flagged patient until closure (`pending -> scheduled -> completed` or escalated).
+- **Friction (1–10)**: implementation-in-production effort, combining integration complexity, data quality constraints, validation burden, and operational change management.
+- **Impact (1–10)**: expected operational value once adopted in real workflows.
 
 ## Guardrails (Non-Negotiable)
 
-1. **Human-in-the-loop first**: AI prioritizes and drafts; clinicians decide.
-2. **Privacy by design**: de-identification and least-privilege are mandatory for any external AI call.
-3. **Workflow over isolated models**: optimize end-to-end throughput and follow-up completion.
-4. **Measured delivery**: every module must ship with KPIs, logs, and rollback.
-5. **Reproducibility**: deterministic outputs for the same input/version set.
+1. **Deterministic outputs**: same input + same version = same result.
+2. **Privacy by design**: de-identification and least-privilege are mandatory for any external call.
+3. **Measured delivery**: every module must ship with KPIs, logs, and rollback.
+4. **No clinical intelligence here**: if a feature interprets, prioritizes, recommends, or drafts — it belongs in Asha.
+5. **Cloud-native**: no `.env` files, no hardcoded secrets. Configuration via `HEIMDALLR_*` env vars and JSON profiles.
 
 ## Prioritized Module Backlog
 
 Ordered by pipeline viability and delivery sequence.
-Modules with `repoState = implemented` remain documented in the strategy board and `README.md`, while this backlog keeps future hardening work that extends already-running modules.
 
 | Rank | Module | Pillar | Impact | Friction | Why now |
 |---|---|---|---:|---:|---|
-| 1 | HL7-triggered prefetch orchestration | Logistics | 8 | 4 | Immediate throughput win with low clinical risk |
-| 2 | Unified worklist orchestration | Workflow | 7 | 5 | Reduces queue switching and unfair distribution |
-| 3 | De-identification governance hardening | Security | 10 | 5 | Extend an implemented gateway with stronger policy and audit controls |
-| 4 | Deterministic pseudonymization + crosswalk | Security | 7 | 5 | Enables traceable privacy-preserving workflows |
-| 5 | Follow-up recommendation extraction (NLP) | Navigation | 8 | 6 | High value and operationally feasible |
-| 6 | Urology navigation pathway | Navigation | 8 | 6 | Direct care-continuity impact with clear rule set |
-| 7 | Opportunistic coronary calcium (CAC-DRS) | Quantification | 7 | 6 | High preventive-care value from opportunistic CT workflows |
-| 8 | AI-assisted urgency flagging | Workflow | 9 | 8 | Improves time-to-open for high-acuity cases |
-| 9 | Liver steatosis opportunistic pipeline | Quantification | 7 | 6 | Population-health insight from existing scans |
-| 10 | Osteoporosis opportunistic screening | Quantification | 6 | 6 | Scalable DXA-proxy value from routine CT |
-| 11 | Structured report drafting copilot | Reporting | 7 | 6 | Reporting acceleration with strong guardrails |
-| 12 | Patient follow-up navigator | Navigation | 8 | 5 | Converts follow-up intent into tracked operational ownership and completion flow |
-| 13 | On-prem AI gateway enforcement | Security | 7 | 5 | Critical for enterprise deployment maturity |
-| 14 | Drift/hallucination control framework | Reporting | 9 | 8 | Needed before broad automation trust |
-| 15 | Agentic workflow coordination | R&D | 8 | 9 | Long-horizon orchestration capability |
-| 16 | Foundation model fine-tuning layer | R&D | 9 | 9 | Institution-adapted model performance with controlled governance |
-| 17 | Temporal imaging intelligence (delta engine) | R&D | 9 | 8 | Longitudinal change tracking for follow-up-heavy workflows |
-| 18 | Causal triage simulator | R&D | 8 | 8 | Safe policy simulation before live queue changes |
-| 19 | Synthetic + federated validation sandbox | R&D | 8 | 8 | Privacy-preserving multi-site validation and benchmarking |
-| 20 | Autonomous follow-up orchestrator (human-gated) | R&D | 9 | 8 | Strong continuity and financial recovery upside with clinical oversight |
-| 21 | Prospective trial mode | R&D | 8 | 7 | Embedded publication-grade evidence generation |
-| 22 | General surgery navigation pathway | Navigation | 7 | 5 | Low-friction continuity value for common actionable findings |
-| 23 | Oncology high-suspicion navigation router | Navigation | 10 | 7 | High clinical-risk routing for ER/inpatient neoplastic suspicion |
-| 24 | Gynecology navigation pathway | Navigation | 9 | 7 | Structured continuity for adnexal/uterine/cervical suspicious findings |
-| 25 | Fracture detection and triage module | Workflow | 9 | 7 | Triage of cases with suspected fractures in trauma/emergency workflows with auditable urgency flags |
+| 1 | HL7-triggered prefetch orchestration | Interoperability | 8 | 4 | Immediate throughput win with low risk |
+| 2 | DICOMweb-native transport layer | Interoperability | 7 | 5 | Standards-based retrieval for modern viewers |
+| 3 | De-identification governance hardening | Security | 10 | 5 | Extend existing gateway with stronger policy and audit |
+| 4 | Deterministic pseudonymization + crosswalk | Security | 7 | 5 | Traceable privacy-preserving workflows |
+| 5 | On-prem AI gateway enforcement | Security | 7 | 5 | Enterprise deployment maturity |
+| 6 | Opportunistic coronary calcium (CAC-DRS) | Quantification | 7 | 6 | Preventive-care value from opportunistic CT |
+| 7 | Liver steatosis opportunistic pipeline | Quantification | 7 | 6 | Population-health insight from existing scans |
+| 8 | Bandwidth-aware transfer scheduling | Interoperability | 6 | 4 | Reliability for constrained network links |
+| 9 | Worklist data aggregation (operational part) | Orchestration | 7 | 5 | Normalized feed for downstream consumers |
+| 10 | SLA clock tracking (operational part) | Orchestration | 6 | 4 | Timer-based breach tracking and audit log |
+| 11 | Fracture detection — morphometric module | Quantification | 7 | 6 | Deterministic fracture morphometry from segmentation |
+| 12 | Kidney stone longitudinal quantification | Quantification | 6 | 5 | Time-series burden tracking (deterministic part only) |
 
 ## Current Implemented Baseline
 
-The following modules already exist in the repository and are tracked as `repoState = implemented` cards in the strategy board. They are not part of the prioritized backlog table above unless the roadmap item refers to future hardening or expansion work.
+The following modules are live in the repository:
 
-- DICOM C-STORE intake listener
-- Case preparation and queue worker
-- Dashboard and API surface
-- De-identification gateway
-- AP chest X-ray assist APIs
-- TotalSegmentator core pipeline
-- Automated organ volumetry
-- Intracranial hemorrhage detection
-- Opportunistic liver quant
-- Opportunistic bone quant
-- Opportunistic emphysema quant
-- CTR extraction (ICT via CXAS)
+- DICOM C-STORE intake listener (`heimdallr.intake`)
+- Case preparation and queue worker (`heimdallr.prepare`)
+- Processing worker with TotalSegmentator orchestration (`heimdallr.processing`)
+- Post-segmentation metrics engine with job-based modules (`heimdallr.metrics`)
+- FastAPI control plane with dashboard and patient API (`heimdallr.control_plane`)
+- Operations TUI (`heimdallr.tui`)
+- De-identification gateway (`services/deid_gateway.py`)
+- Automated organ volumetry (liver, spleen, kidneys)
+- L3 skeletal muscle area and sarcopenia metrics
+- L1 trabecular HU-based and volumetric BMD estimation
+- Vertebral fracture morphometric screening
+- Opportunistic osteoporosis composite scoring
+- Body fat abdominal volumes and L3-level composition
 - Renal stone burden quantification
 
 ## Current Prototypes
 
-The strategy board also tracks repository-level prototypes that are useful for planning but are not part of the live baseline:
+- Retroactive cohort reprocessing toolkit: operational scripts for archived-case metric recalculation and backfills
 
-- Segmentation Service API (HTTP): alternative service-oriented processing path in `api/totalsegmentator.py`
-- Retroactive Cohort Reprocessing Toolkit: operational scripts for archived-case metric recalculation and backfills
+---
 
-These prototypes should inform hardening and architecture decisions, but they are not counted as live baseline modules.
-
-## Pillar A: Logistics Automation and Smart Prefetch
+## Pillar A: Interoperability and Transport
 
 ### A1. HL7-triggered prefetch orchestration
-- Trigger jobs from ADT/ORM events.
-- Retrieve priors with modality/body-region/time relevance.
-- Ensure priors are ready before first open.
+- Parse ADT/ORM messages for scheduled study events.
+- Trigger prior retrieval with modality/body-region/time relevance.
+- Ensure priors are staged before first open.
 
 Exit criteria:
 - >90% prior availability for eligible studies.
@@ -112,259 +96,148 @@ Exit criteria:
 Exit criteria:
 - Feature parity on key retrieval paths across DIMSE and DICOMweb.
 
-## Pillar B: Workflow Orchestration and Clinical Triage
+---
 
-### B1. Unified worklist orchestration
-- Single assignment engine across PACS/RIS sources.
-- Rules: license scope, subspecialty, availability, fairness.
-- "Go-to-next" mode with preloaded context.
+## Pillar B: De-identification and API Security
 
-### B2. AI-assisted urgency flagging
-- Integrate emergency detectors for reprioritization.
-- Confidence thresholds + full audit trail.
-- Assistive only (never autonomous diagnosis).
-
-### B3. SLA-aware policy engine
-- Encode contractual windows and breach risk signals.
-- Escalation paths for urgent pending/unassigned studies.
-
-Exit criteria (B1-B3):
-- Lower queue switching and lower workload variance.
-- Reduced time-to-open for urgent studies.
-- Near-zero untracked SLA breaches.
-
-## Pillar C: Opportunistic Quantification and Precision Triage
-
-Implemented baseline modules already present in the repository:
-
-- Automated organ volumetry (liver, spleen, kidneys)
-- Opportunistic liver quant (volume, HU, estimated fat-content proxy)
-- Opportunistic bone quant (L1 trabecular HU classification)
-- Opportunistic emphysema quant (lobe-level and whole-lung burden)
-- Intracranial hemorrhage detection with overlays and quantitative outputs
-- CTR extraction (ICT via CXAS)
-- Renal stone burden quantification
-
-### C1. Opportunistic coronary calcium (CAC-DRS)
-- Opportunistic coronary calcium detection in eligible non-gated chest CT.
-- CAC-DRS-oriented structured classification after opportunistic detection.
-- Pre-report block with category, confidence, and recommendation text.
-- Governance note: this module targets CAC-DRS workflows, not Agatston scoring pipelines.
-
-Exit criteria (C1):
-- Deterministic repeated-run consistency.
-- Structured outputs consumable by reporting and analytics.
-
-## Scaling Modules (Clinical Real-World Workflows)
-
-These modules represent clinically validated workflows already seen in real-world practice, being operationalized into Heimdallr pipeline products:
-
-- **Lung nodule longitudinal tracker**: serial growth analysis and interval-aware follow-up triggers.
-- **Aortic aneurysm surveillance pipeline**: longitudinal diameter monitoring with escalation rules.
-- **Kidney stone burden longitudinal module**: time-series burden tracking integrated with urology navigation.
-- **Incidental findings closure engine**: operational closure from report mention to documented follow-up outcome.
-- **Prostate MRI longitudinal PI-RADS tracker**: temporal PI-RADS and gland-volume trend monitoring.
-
-## Pillar D: LLM/VLM Reporting Copilot
-
-Implemented baseline module already present in the repository:
-
-- AP chest X-ray assist APIs (Anthropic and MedGemma-backed flows with proxy integration)
-
-### D1. Structured report drafting
-- Controlled template generation from findings + quant metrics.
-- Radiologist style presets and macro-aware output.
-
-### D2. Ambient assistance and hotkeys
-- Low-latency text refinement in reporting environments.
-- Prompt profiles by exam type.
-
-### D3. Drift and hallucination controls
-- Shadow-mode evaluation.
-- Version pinning and regression packs.
-- Red-team prompts + fail-safe fallback.
-
-Exit criteria:
-- Measured speed-up without hidden factual drift.
-- Versioned prompt/model QA logs for traceability.
-
-## Pillar E: De-identification and API Security
-
-### E1. Multimodal PHI removal pipeline
-- **Implemented baseline (status: mvp-internal)**: DICOM metadata redaction + pixel-level burned-text removal before external calls.
+### B1. De-identification governance hardening
+- **Implemented baseline (status: mvp-internal)**: DICOM metadata redaction + pixel-level burned-text removal.
 - Expand OCR-assisted masking coverage for edge overlay/annotation patterns.
+- Tamper-evident audit trail for redaction decisions.
 
-### E2. Deterministic pseudonymization + secure crosswalk
+### B2. Deterministic pseudonymization + secure crosswalk
 - Salted tokenization for stable pseudonyms.
 - Encrypted, access-controlled crosswalk separation.
+- Key rotation and lifecycle management.
 
-### E3. On-prem AI gateway enforcement
+### B3. On-prem AI gateway enforcement
 - **Implemented baseline (status: mvp-internal)**: external inference requests pass through de-identification checks.
-- Pending hardening: tamper-evident logs, policy attestations, and stricter outbound controls.
+- Hardening: tamper-evident logs, policy attestations, and stricter outbound controls.
+- Rate limiting and circuit breaker for external model calls.
 
 Exit criteria:
 - No direct PHI in external LLM/VLM payloads.
 - Auditable inference trail for compliance review.
 
-## Pillar F: Patient Navigation and Closing the Loop
+---
 
-### F1. Follow-up recommendation extraction
-- NLP extraction from finalized reports.
-- Due date + modality + urgency structured tasking.
+## Pillar C: Opportunistic Quantification
 
-### F2. Reminder and escalation workflows
-- Notifications to ordering teams and navigation staff.
-- Dashboards for pending/overdue/completed queues.
+Extends the existing deterministic measurement pipeline. All modules produce structured numerical outputs from segmentation masks — no clinical interpretation or recommendation generation.
 
-### F3. Outcome tracking and quality reporting
-- Completion/adherence metrics.
-- Quality framework support and reimbursement reporting hooks.
-
-### F4. Urology navigation pathway (pre-report + post-report)
-
-Pre-report support:
-- Detect and structure candidate findings for navigation handoff.
-- Normalize measurement units and threshold logic.
-
-Post-report routing:
-- Open navigation tasks for the following findings:
-  - Renal stones `>= 0.7 cm`
-  - Simple renal cysts `> 10 cm`
-  - Bosniak `III/IV` cysts
-  - Solid renal nodules (any size)
-  - Solid adrenal nodules `> 3 cm`
-  - Solid ureteral nodules
-  - Ureteropelvic junction stenosis
-  - Ureteral stones
-  - Solid or vegetative bladder lesions (any size)
-  - Prostate findings: PI-RADS `3-5`, or volume `> 70 g`, or `> 40 g` with outlet obstruction signs
-  - Solid testicular lesions (any size)
-- Secondary routing rule: if neoplasm suspicion exists, also route to Oncology Navigation.
+### C1. Opportunistic coronary calcium (CAC-DRS)
+- Opportunistic coronary calcium detection in eligible non-gated chest CT.
+- CAC-DRS-oriented structured classification from segmentation output.
+- Structured output block with category and confidence score.
+- Governance note: this module targets CAC-DRS deterministic scoring, not Agatston pipelines.
 
 Exit criteria:
-- Service ownership assigned for 100% of eligible navigable findings.
-- Reduced lost-to-follow-up for urology-sensitive findings.
+- Deterministic repeated-run consistency.
+- Structured outputs consumable by downstream consumers.
 
-### F5. General surgery navigation pathway
-- Route navigable findings to General Surgery Navigation:
-  - Cholelithiasis
-  - Abdominal wall hernias
-- Ensure owner assignment, due dates, and escalation states until closure.
+### C2. Liver steatosis quantification
+- Extend existing liver HU/volume metrics with fat-fraction proxy estimation.
+- Deterministic output from segmentation masks — no clinical interpretation.
 
-### F6. Oncology high-suspicion navigation router
-- Objective: flag all suspicious or potentially neoplastic findings in ER and inpatient populations.
-- Automatically open Oncology Navigation tasks with urgency-aware routing.
-- Preserve bidirectional linkage with source report and downstream follow-up events.
+### C3. Fracture detection — morphometric module
+- Deterministic vertebral height ratio measurements from segmentation masks.
+- Genant-grade-style morphometric output.
+- Structured numerical output only — triage logic and urgency flagging belong to Asha.
 
-### F7. Gynecology navigation pathway
+### C4. Kidney stone burden longitudinal quantification
+- Time-series stone burden tracking from serial segmentations.
+- Deterministic volume/count comparisons across studies.
+- Navigation and urology routing intelligence belong to Asha.
 
-Ovary and adnexa:
-- Solid or predominantly solid ovarian masses.
-- Complex cystic lesions with suspicious components (solid tissue, vegetations, thick/irregular septa, papillary projections).
-- Ascites.
-- Peritoneal/omental/retroperitoneal implants.
-- Pelvic or retroperitoneal suspicious adenopathy.
-- Adnexal lesions classified as O-RADS 4.
+---
 
-Uterus:
-- Endometrial masses with suspicious morphology (heterogeneity, irregular margins, myometrial invasion).
-- Endometrial thickening in postmenopausal patients (`> 5 mm` without hormone replacement), especially when heterogeneous.
-- Lesions with serosal, parametrial, or adjacent-structure invasion.
-- Bulky cervical masses or extension to vagina/parametria.
+## Pillar D: Operational Orchestration (Heimdallr scope only)
 
-Cervix:
-- Infiltrative or irregular cervical lesions.
-- Suspicious pelvic or retroperitoneal lymphadenopathy.
+These modules provide the **operational substrate** for intelligence consumers. Heimdallr provides the data feeds, queues, clocks, and audit trails. The assignment intelligence, routing logic, and escalation decisions are consumed/supplied by Asha.
 
-Additional:
-- Findings suspicious for endometriosis requiring structured gynecology follow-up.
+### D1. Worklist data aggregation
+- Normalize study metadata from PACS/RIS sources into a unified feed.
+- Expose `GET /api/worklist/pending` with standardized schema.
+- Generic capacity-based assignment queue mechanics.
+- Fairness constraints (round-robin, capacity limits) as configurable policy.
 
-## Pillar G: Disruptive and Long-Horizon R&D
+### D2. SLA clock tracking
+- SLA window data model with configurable contractual deadlines.
+- Breach timestamp tracking and state machine (`active → warning → breached`).
+- Timer-based alerts and audit log of SLA state transitions.
+- Emit `sla.breach_imminent` events for downstream consumers.
 
-### G1. Agentic workflow coordination
-- Multi-step agents for prep, triage, and handoff orchestration.
+### D3. Reminder dispatch infrastructure
+- Timer-based reminder queue for pending follow-up tasks.
+- Notification dispatch via configured channels (webhook, email).
+- Audit logging of reminder state transitions.
+- Intelligence for *who* gets escalated and *when* belongs to Asha.
 
-### G2. Foundation model fine-tuning layer
-- Governance-controlled adaptation of VLM/LLM models to institutional data.
-- Versioned evaluation packs, safety gates, and rollback paths.
+### D4. Outcome state tracking
+- Completion/adherence counters for follow-up tasks.
+- Generic reporting data store with configurable state machine.
+- Audit trail of state transitions.
+- Quality framework interpretation and reimbursement logic belong to Asha.
 
-### G3. Temporal imaging intelligence (longitudinal delta engine)
-- Structured deltas across prior/current exams (volume, attenuation, growth/atrophy trajectories).
-- Explicit confidence and stability flags for longitudinal interpretation support.
+---
 
-### G4. Causal triage simulator
-- Offline simulation of triage/worklist policies before production rollout.
-- Compare SLA, workload fairness, and critical-case latency under multiple assignment strategies.
+## Delivery Horizons
 
-### G5. Synthetic + federated validation sandbox
-- Privacy-preserving validation across institutions without raw-image centralization.
-- Fused module: combines federated development and synthetic-data benchmarking in a single validation pipeline.
-
-### G6. Autonomous follow-up orchestrator (human-gated)
-- AI proposes follow-up tasks, deadlines, and routing, but requires human approval for activation.
-- Built-in escalation logic for high-risk overdue recommendations.
-
-### G7. Prospective trial mode
-- Native support for trial cohorts, intervention arms, and endpoint capture.
-- Operational logs designed for publication-grade reproducibility.
-
-## Suggested Delivery Horizons
-
-Horizon legend:
-- **Foundation**: baseline safety, interoperability, and throughput capabilities required before broader automation.
-- **Acceleration**: modules that increase clinical/operational performance on top of a stable foundation.
-- **Scaling**: clinically validated real-world workflows being operationalized as repeatable pipeline modules.
-- **Innovation**: long-horizon capabilities with higher uncertainty and strategic differentiation potential.
-
-### Horizon 1 - Foundation (Safety + Throughput)
+### Horizon 1 — Foundation (Safety + Throughput)
 - HL7-triggered prefetch orchestration
 - Bandwidth-aware transfer scheduling
-- Unified worklist orchestration
+- DICOMweb-native transport layer
 - De-identification governance hardening
 - Deterministic pseudonymization + crosswalk
 
-### Horizon 2 - Clinical Acceleration
-- AI-assisted urgency flagging
-- SLA-aware policy engine
+### Horizon 2 — Quantification Expansion
 - Opportunistic coronary calcium (CAC-DRS)
-- Structured report drafting copilot
-- Fracture detection and triage module
+- Liver steatosis quantification
+- Osteoporosis screening hardening (already implemented)
+- Fracture morphometric module
+- Kidney stone longitudinal quantification
 
-### Horizon 3 - Care Continuity at Scale
-- Follow-up recommendation extraction
-- Reminder and escalation workflows
-- Outcome tracking and quality reporting
-- Urology navigation pathway
-- General surgery navigation pathway
-- Oncology high-suspicion navigation router
-- Gynecology navigation pathway
-- Patient follow-up navigator
-- On-prem AI gateway enforcement
-- Ambient assistance and hotkeys
+### Horizon 3 — Operational Substrate
+- Worklist data aggregation
+- SLA clock tracking
+- Reminder dispatch infrastructure
+- Outcome state tracking
+- On-prem AI gateway enforcement hardening
 
-### Horizon 4 - Strategic Innovation
-- Drift and hallucination controls
-- Agentic workflow coordination
-- Foundation model fine-tuning layer
-- Temporal imaging intelligence (longitudinal delta engine)
-- Causal triage simulator
-- Synthetic + federated validation sandbox
-- Autonomous follow-up orchestrator (human-gated)
-- Prospective trial mode
+---
+
+## Boundary Contracts with Asha
+
+Heimdallr's operational substrate exposes data, events, and APIs. Asha consumes them to apply intelligence. The boundary is:
+
+| Heimdallr provides | Asha consumes and decides |
+|---|---|
+| Normalized worklist feed | Assignment intelligence, subspecialty routing |
+| SLA clock state + breach events | Risk-weighted escalation, predictive breach actions |
+| Reminder dispatch queue | Escalation intelligence, recipient selection |
+| Outcome state counters | Quality framework interpretation, performance insights |
+| Deterministic quantification outputs | Clinical interpretation, navigation routing, report drafting |
+| De-identified payloads | LLM/VLM inference, semantic extraction |
+| Morphometric fracture measurements | Triage urgency classification, auditable flags |
+| Longitudinal stone burden deltas | Urology navigation routing |
+
+> Asha capabilities tracked in Asha's own roadmap: [`~/Asha/docs/ROADMAP.md`](https://github.com/rod-americo/Asha)
+
+---
 
 ## Top Risk Register
 
-1. Regulatory variance across LGPD/GDPR/HIPAA-like environments.
-2. PACS/RIS/EHR integration heterogeneity and legacy constraints.
-3. Model/API drift and vendor-side behavior changes.
-4. GPU capacity bottlenecks for segmentation-heavy modules.
-5. Clinical adoption risk without explicit governance ownership.
+1. PACS/RIS/EHR integration heterogeneity and legacy constraints.
+2. GPU capacity bottlenecks for segmentation-heavy modules.
+3. Regulatory variance across LGPD/GDPR/HIPAA-like environments.
+4. DICOMweb adoption variance across vendor implementations.
+5. Scope creep: intelligence features migrating into the infrastructure layer.
 
 ## Platform Definition of Done
 
 A module is production-ready only when it includes:
 - Functional implementation with rollback path.
-- Clinical safety boundaries and reviewer accountability.
 - Security/privacy controls aligned with data class.
 - Monitoring dashboards, logs, and runbooks.
 - Validation datasets and acceptance metrics documented.
+- Deterministic output verification for the same input/version set.
