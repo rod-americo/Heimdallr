@@ -11,97 +11,6 @@ function formatFixed(value, digits = 0) {
     return hasNumericValue(value) ? value.toFixed(digits) : '-';
 }
 
-function firstNumericResult(results, keys) {
-    for (const key of keys) {
-        const value = results?.[key];
-        if (hasNumericValue(value)) return value;
-    }
-    return null;
-}
-
-function firstStringResult(results, keys) {
-    for (const key of keys) {
-        const value = results?.[key];
-        if (typeof value === 'string' && value.trim()) return value;
-    }
-    return null;
-}
-
-function renderAbdominalFatSection(results) {
-    const visceralVolume = firstNumericResult(results, [
-        'vat_volume_cm3',
-        'visceral_fat_volume_cm3',
-        'torso_fat_volume_cm3',
-        'abdominal_visceral_fat_volume_cm3'
-    ]);
-    const subcutaneousVolume = firstNumericResult(results, [
-        'sat_volume_cm3',
-        'subcutaneous_fat_volume_cm3',
-        'abdominal_subcutaneous_fat_volume_cm3'
-    ]);
-    const ratio = firstNumericResult(results, [
-        'vat_sat_ratio',
-        'visceral_to_subcutaneous_ratio'
-    ]);
-    const qcStatus = firstStringResult(results, [
-        'vat_sat_qc_status',
-        'abdominal_fat_qc_status',
-        'fat_qc_status',
-        'tissue_types_qc_status',
-        'abdominal_fat_analysis_status'
-    ]);
-    const coverageComplete = results?.vat_sat_coverage_complete;
-    const hasData = visceralVolume !== null || subcutaneousVolume !== null || ratio !== null || qcStatus !== null || coverageComplete !== undefined;
-
-    if (!hasData) return '';
-
-    let qcBadgeClass = 'badge-warning';
-    let qcEmoji = '🟡';
-    let qcLabel = qcStatus || 'Parcial';
-    if (qcStatus) {
-        const normalized = qcStatus.toLowerCase();
-        if (normalized.includes('complete') || normalized.includes('ok') || normalized.includes('done')) {
-            qcBadgeClass = 'badge-success';
-            qcEmoji = '🟢';
-        } else if (normalized.includes('error') || normalized.includes('fail') || normalized.includes('incomplete')) {
-            qcBadgeClass = 'badge-danger';
-            qcEmoji = '🔴';
-        }
-    } else if (coverageComplete === true) {
-        qcBadgeClass = 'badge-success';
-        qcEmoji = '🟢';
-        qcLabel = 'Completo';
-    } else if (coverageComplete === false) {
-        qcBadgeClass = 'badge-danger';
-        qcEmoji = '🔴';
-        qcLabel = 'Cobertura incompleta';
-    }
-
-    return `
-        <h3 class="section-title">Gordura Abdominal (VAT/SAT)</h3>
-        <div class="results-grid">
-            <div class="result-card">
-                <div class="result-label">Status QC</div>
-                <div class="result-value">
-                    <span class="status-badge ${qcBadgeClass}">${qcEmoji} ${escapeHtml(qcLabel)}</span>
-                </div>
-            </div>
-            <div class="result-card">
-                <div class="result-label">Gordura Visceral</div>
-                <div class="result-value">${formatFixed(visceralVolume, 1)} <span class="result-unit">cm³</span></div>
-            </div>
-            <div class="result-card">
-                <div class="result-label">Gordura Subcutânea</div>
-                <div class="result-value">${formatFixed(subcutaneousVolume, 1)} <span class="result-unit">cm³</span></div>
-            </div>
-            <div class="result-card">
-                <div class="result-label">Razão VAT/SAT</div>
-                <div class="result-value">${formatFixed(ratio, 2)}</div>
-            </div>
-        </div>
-    `;
-}
-
 export async function showResults(caseId) {
     try {
         const [results, metadata] = await Promise.all([
@@ -419,9 +328,6 @@ function renderResults(results, caseId, metadata = {}) {
             </div>
         `);
     }
-
-    const abdominalFatSection = renderAbdominalFatSection(results);
-    if (abdominalFatSection) sections.push(abdominalFatSection);
 
     const liverSection = renderLiverSection(results);
     if (liverSection) sections.push(liverSection);

@@ -8,7 +8,6 @@ from fastapi.staticfiles import StaticFiles
 from ..shared import settings
 from .routers.dashboard import router as dashboard_router
 from .routers.patients import router as patients_router
-from .routers.proxy import router as proxy_router
 from .routers.upload import router as upload_router
 
 
@@ -20,7 +19,6 @@ def create_app() -> FastAPI:
     app.include_router(dashboard_router)
     app.include_router(upload_router)
     app.include_router(patients_router)
-    app.include_router(proxy_router)
 
     if settings.STATIC_DIR.exists():
         app.mount("/static", StaticFiles(directory=settings.STATIC_DIR), name="static")
