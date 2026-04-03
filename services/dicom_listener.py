@@ -55,7 +55,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from heimdallr.shared import settings as config
 
 DICOM_PREPARE_PYTHON = str(config.BASE_DIR / "venv" / "bin" / "python")
-PREPARE_SCRIPT = config.BASE_DIR / "core" / "prepare.py"
+PREPARE_MODULE = "heimdallr.prepare"
 
 
 @dataclass
@@ -176,12 +176,12 @@ def upload_zip(zip_bytes: bytes, upload_url: str, token: Optional[str], timeout:
     return requests.post(upload_url, headers=headers, files=files, timeout=timeout)
 
 
-def launch_prepare_subprocess(zip_path: Path, python_cmd: str, prepare_script: Path) -> subprocess.Popen:
+def launch_prepare_subprocess(zip_path: Path, python_cmd: str, prepare_module: str) -> subprocess.Popen:
     """
-    Launch prepare.py asynchronously for a staged ZIP file.
+    Launch heimdallr.prepare asynchronously for a staged ZIP file.
     """
     return subprocess.Popen(
-        [python_cmd, str(prepare_script), str(zip_path)],
+        [python_cmd, "-m", prepare_module, str(zip_path)],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         close_fds=True,
@@ -214,7 +214,7 @@ class HeimdallrDicomListener:
         upload_retries: int,
         upload_backoff: int,
         handoff_mode: str,
-        prepare_script: Path,
+        prepare_module: str,
         prepare_python: str,
         upload_staging_dir: Path,
     ) -> None:
@@ -233,7 +233,7 @@ class HeimdallrDicomListener:
             upload_retries: Number of upload attempts
             upload_backoff: Seconds between retry attempts
             handoff_mode: Delivery mode for completed studies ("local_prepare" or "http_upload")
-            prepare_script: Path to prepare.py (used in local_prepare mode)
+            prepare_module: Modular prepare package (e.g. heimdallr.prepare)
             prepare_python: Python executable used to launch prepare.py
             upload_staging_dir: Directory where ZIPs are staged for local_prepare handoff
         """
@@ -250,7 +250,7 @@ class HeimdallrDicomListener:
         self.upload_retries = upload_retries
         self.upload_backoff = upload_backoff
         self.handoff_mode = handoff_mode
-        self.prepare_script = prepare_script
+        self.prepare_module = prepare_module
         self.prepare_python = prepare_python
         self.upload_staging_dir = upload_staging_dir
 
@@ -354,7 +354,7 @@ class HeimdallrDicomListener:
                             launch_prepare_subprocess(
                                 zip_path=staged_zip,
                                 python_cmd=self.prepare_python,
-                                prepare_script=self.prepare_script,
+                                prepare_module=self.prepare_module,
                             )
                             ok = True
                             break
@@ -465,14 +465,14 @@ def main() -> int:
         help="How to deliver completed studies: local_prepare (default) or http_upload",
     )
     ap.add_argument(
-        "--prepare-script",
-        default=str(PREPARE_SCRIPT),
-        help="Path to prepare.py for local_prepare mode",
+        "--prepare-module",
+        default=PREPARE_MODULE,
+        help="Modular prepare package for local_prepare mode",
     )
     ap.add_argument(
         "--prepare-python",
         default=DICOM_PREPARE_PYTHON,
-        help="Python executable used to launch prepare.py in local_prepare mode",
+        help="Python executable used to launch the prepare module in local_prepare mode",
     )
     
     args = ap.parse_args()
@@ -490,7 +490,7 @@ def main() -> int:
         upload_retries=args.upload_retries,
         upload_backoff=args.upload_backoff,
         handoff_mode=args.handoff_mode,
-        prepare_script=Path(args.prepare_script),
+        prepare_module=args.prepare_module,
         prepare_python=args.prepare_python,
         upload_staging_dir=Path(config.UPLOAD_DIR),
     )
@@ -517,7 +517,7 @@ def main() -> int:
     if args.handoff_mode == "http_upload":
         print(f"  Upload URL: {args.upload_url}")
     else:
-        print(f"  Prepare script: {args.prepare_script}")
+        print(f"  Prepare module: {args.prepare_module}")
         print(f"  Prepare python: {args.prepare_python}")
     print(f"  Idle timeout: {args.idle_seconds}s")
     print(f"Waiting for DICOM connections...")
