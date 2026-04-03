@@ -13,7 +13,9 @@
     "pillarCode": "A",
     "pillar": "Logistics",
     "whyNow": "Stabilizes front-door ingestion as a prerequisite for all downstream automation",
-    "repoState": "implemented"
+    "repoState": "implemented",
+    "belongsTo": "Heimdallr",
+    "classificationConfidence": "high"
   },
   {
     "id": 2,
@@ -29,7 +31,9 @@
     "pillarCode": "A",
     "pillar": "Logistics",
     "whyNow": "Provides deterministic preprocessing throughput for production-scale case flow",
-    "repoState": "implemented"
+    "repoState": "implemented",
+    "belongsTo": "Heimdallr",
+    "classificationConfidence": "high"
   },
   {
     "id": 3,
@@ -45,7 +49,9 @@
     "pillarCode": "B",
     "pillar": "Workflow",
     "whyNow": "Operational visibility and integration contracts are required for safe rollout and monitoring",
-    "repoState": "implemented"
+    "repoState": "implemented",
+    "belongsTo": "Heimdallr",
+    "classificationConfidence": "high"
   },
   {
     "id": 4,
@@ -62,7 +68,9 @@
     "pillar": "Logistics",
     "whyNow": "Immediate throughput win with low clinical risk",
     "backlogModule": "HL7-triggered prefetch orchestration",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Heimdallr",
+    "classificationConfidence": "high"
   },
   {
     "id": 5,
@@ -79,7 +87,9 @@
     "pillar": "Workflow",
     "whyNow": "Reduces queue switching and unfair distribution",
     "backlogModule": "Unified worklist orchestration",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Heimdallr",
+    "classificationConfidence": "high"
   },
   {
     "id": 6,
@@ -95,7 +105,9 @@
     "pillarCode": "B",
     "pillar": "Workflow",
     "whyNow": "Turns SLA risk into actionable escalation before breaches materialize",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Heimdallr",
+    "classificationConfidence": "high"
   },
   {
     "id": 7,
@@ -111,7 +123,9 @@
     "pillarCode": "D",
     "pillar": "Reporting",
     "whyNow": "Fastest assistive reporting wedge in high-volume chest X-ray workflows",
-    "repoState": "implemented"
+    "repoState": "implemented",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 8,
@@ -127,7 +141,9 @@
     "pillarCode": "C",
     "pillar": "Quantification",
     "whyNow": "Core segmentation backbone required by multiple quantification and triage modules",
-    "repoState": "implemented"
+    "repoState": "implemented",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 9,
@@ -143,7 +159,9 @@
     "pillarCode": "C",
     "pillar": "Quantification",
     "whyNow": "Delivers structured body-composition signals with immediate analytic utility",
-    "repoState": "implemented"
+    "repoState": "implemented",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 10,
@@ -159,7 +177,9 @@
     "pillarCode": "C",
     "pillar": "Quantification",
     "whyNow": "Adds reproducible volumetric outputs for reporting and longitudinal analytics",
-    "repoState": "implemented"
+    "repoState": "implemented",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 11,
@@ -175,7 +195,9 @@
     "pillarCode": "B",
     "pillar": "Workflow",
     "whyNow": "High-acuity triage support with direct impact on emergency read prioritization",
-    "repoState": "implemented"
+    "repoState": "implemented",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 12,
@@ -192,7 +214,9 @@
     "pillar": "Reporting",
     "whyNow": "Fastest governed reporting layer to ship before introducing agentic orchestration complexity",
     "backlogModule": "Structured report drafting copilot",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 13,
@@ -209,7 +233,9 @@
     "pillar": "Workflow",
     "whyNow": "Creates the shared queue-control layer required before detector-specific triage modules can safely influence workflow",
     "backlogModule": "AI-assisted urgency flagging",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "medium"
   },
   {
     "id": 14,
@@ -226,7 +252,9 @@
     "pillar": "Quantification",
     "whyNow": "Population-health insight from existing scans",
     "backlogModule": "Liver steatosis opportunistic pipeline",
-    "repoState": "implemented"
+    "repoState": "implemented",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 15,
@@ -243,7 +271,9 @@
     "pillar": "Quantification",
     "whyNow": "Scalable DXA-proxy value from routine CT",
     "backlogModule": "Osteoporosis opportunistic screening",
-    "repoState": "implemented"
+    "repoState": "implemented",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 16,
@@ -260,7 +290,9 @@
     "pillar": "Quantification",
     "whyNow": "High preventive-care value from opportunistic CT workflows",
     "backlogModule": "Opportunistic coronary calcium (CAC-DRS)",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 17,
@@ -276,7 +308,9 @@
     "pillarCode": "C",
     "pillar": "Quantification",
     "whyNow": "Builds longitudinal neurodegeneration-oriented quantification capability",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 18,
@@ -293,7 +327,9 @@
     "pillar": "Quantification",
     "whyNow": "Valuable but depends on segmentation throughput",
     "backlogModule": "Emphysema quantification at scale",
-    "repoState": "implemented"
+    "repoState": "implemented",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 19,
@@ -310,7 +346,9 @@
     "pillar": "R&D",
     "whyNow": "Long-horizon orchestration capability",
     "backlogModule": "Agentic workflow coordination",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "medium"
   },
   {
     "id": 20,
@@ -327,7 +365,9 @@
     "pillar": "R&D",
     "whyNow": "Institution-adapted model performance with controlled governance",
     "backlogModule": "Foundation model fine-tuning layer",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 21,
@@ -344,7 +384,9 @@
     "pillar": "R&D",
     "whyNow": "Longitudinal change tracking for follow-up-heavy workflows",
     "backlogModule": "Temporal imaging intelligence (delta engine)",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 22,
@@ -361,7 +403,9 @@
     "pillar": "R&D",
     "whyNow": "Safe policy simulation before live queue changes",
     "backlogModule": "Causal triage simulator",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Heimdallr",
+    "classificationConfidence": "medium"
   },
   {
     "id": 23,
@@ -378,7 +422,9 @@
     "pillar": "R&D",
     "whyNow": "Privacy-preserving multi-site validation and benchmarking",
     "backlogModule": "Synthetic + federated validation sandbox",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Heimdallr",
+    "classificationConfidence": "medium"
   },
   {
     "id": 24,
@@ -395,7 +441,9 @@
     "pillar": "R&D",
     "whyNow": "Strong continuity and financial recovery upside with clinical oversight",
     "backlogModule": "Autonomous follow-up orchestrator (human-gated)",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "medium"
   },
   {
     "id": 25,
@@ -412,7 +460,9 @@
     "pillar": "R&D",
     "whyNow": "Embedded publication-grade evidence generation",
     "backlogModule": "Prospective trial mode",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Heimdallr",
+    "classificationConfidence": "medium"
   },
   {
     "id": 26,
@@ -429,7 +479,9 @@
     "pillar": "Security",
     "whyNow": "Extend an implemented gateway with stronger policy and audit controls",
     "backlogModule": "De-identification governance hardening",
-    "repoState": "implemented"
+    "repoState": "implemented",
+    "belongsTo": "Heimdallr",
+    "classificationConfidence": "high"
   },
   {
     "id": 27,
@@ -445,7 +497,9 @@
     "pillarCode": "F",
     "pillar": "Navigation",
     "whyNow": "Converts follow-up intent into tracked operational ownership and completion flow",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "medium"
   },
   {
     "id": 28,
@@ -462,7 +516,9 @@
     "pillar": "Navigation",
     "whyNow": "Direct care-continuity impact with clear rule set",
     "backlogModule": "Urology navigation pathway",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 29,
@@ -478,7 +534,9 @@
     "pillarCode": "C",
     "pillar": "Quantification",
     "whyNow": "High-prevalence longitudinal use case with clear follow-up impact",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 30,
@@ -494,7 +552,9 @@
     "pillarCode": "C",
     "pillar": "Quantification",
     "whyNow": "Enables guideline-aligned longitudinal surveillance and escalation at scale",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 31,
@@ -510,7 +570,9 @@
     "pillarCode": "F",
     "pillar": "Navigation",
     "whyNow": "Strengthens continuity workflows with measurable urology follow-up burden tracking",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 32,
@@ -526,7 +588,9 @@
     "pillarCode": "F",
     "pillar": "Navigation",
     "whyNow": "Directly addresses lost-to-follow-up risk from incidental findings in daily practice",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "medium"
   },
   {
     "id": 33,
@@ -542,7 +606,9 @@
     "pillarCode": "F",
     "pillar": "Navigation",
     "whyNow": "Adds structured temporal tracking for a high-value follow-up pathway",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 34,
@@ -559,7 +625,9 @@
     "pillar": "Navigation",
     "whyNow": "Low-friction continuity value for common actionable findings",
     "backlogModule": "General surgery navigation pathway",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "medium"
   },
   {
     "id": 35,
@@ -576,7 +644,9 @@
     "pillar": "Navigation",
     "whyNow": "High clinical-risk routing for ER/inpatient neoplastic suspicion",
     "backlogModule": "Oncology high-suspicion navigation router",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 36,
@@ -593,7 +663,9 @@
     "pillar": "Navigation",
     "whyNow": "Structured continuity for adnexal/uterine/cervical suspicious findings",
     "backlogModule": "Gynecology navigation pathway",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 37,
@@ -609,7 +681,9 @@
     "pillarCode": "B",
     "pillar": "Workflow",
     "whyNow": "Triage of cases with suspected fractures in trauma/emergency workflows with auditable urgency flags",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 38,
@@ -625,7 +699,9 @@
     "pillarCode": "A",
     "pillar": "Logistics",
     "whyNow": "Improves reliability in constrained-network environments without clinical workflow disruption",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Heimdallr",
+    "classificationConfidence": "high"
   },
   {
     "id": 39,
@@ -642,7 +718,9 @@
     "pillar": "Security",
     "whyNow": "Enables traceable privacy-preserving workflows",
     "backlogModule": "Deterministic pseudonymization + crosswalk",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Heimdallr",
+    "classificationConfidence": "high"
   },
   {
     "id": 40,
@@ -658,7 +736,9 @@
     "pillarCode": "A",
     "pillar": "Logistics",
     "whyNow": "Expands interoperability for cloud-native retrieval and viewer-centric workflows",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Heimdallr",
+    "classificationConfidence": "high"
   },
   {
     "id": 41,
@@ -675,7 +755,9 @@
     "pillar": "Navigation",
     "whyNow": "High value and operationally feasible",
     "backlogModule": "Follow-up recommendation extraction (NLP)",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 42,
@@ -692,7 +774,9 @@
     "pillar": "Security",
     "whyNow": "Critical for enterprise deployment maturity",
     "backlogModule": "On-prem AI gateway enforcement",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Heimdallr",
+    "classificationConfidence": "medium"
   },
   {
     "id": 43,
@@ -708,7 +792,9 @@
     "pillarCode": "B",
     "pillar": "Workflow",
     "whyNow": "Provides a constrained CXR-specific entry point before broader triage orchestration is attempted",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 44,
@@ -725,7 +811,9 @@
     "pillar": "Reporting",
     "whyNow": "Establishes trust controls that reporting features need before wider automation exposure",
     "backlogModule": "Drift/hallucination control framework",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "medium"
   },
   {
     "id": 45,
@@ -743,7 +831,9 @@
     "whyNow": "Fastest low-cost path to deployable bone lesion assistive workflow with human review and continuous model improvement",
     "backlogModule": "Bone lesion CT assistive pipeline (TotalSegmentator -> nnU-Net -> MONAI Label)",
     "obs": "retraining loop and low-cost open stack.",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 46,
@@ -760,7 +850,9 @@
     "pillar": "Workflow",
     "whyNow": "Defines the long-horizon orchestration layer that sits above detector-specific triage signals and queue policies",
     "backlogModule": "AI triage agent integration",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 47,
@@ -777,7 +869,9 @@
     "pillar": "Reporting",
     "whyNow": "Targets report-composition complexity that exceeds the scope of a single-agent copilot",
     "backlogModule": "Multi-agent report pipeline",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 48,
@@ -794,7 +888,9 @@
     "pillar": "Reporting",
     "whyNow": "Adds auditable safety controls before broad autonomous reporting adoption.",
     "backlogModule": "Agentic report quality gate",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "medium"
   },
   {
     "id": 49,
@@ -811,7 +907,9 @@
     "pillar": "Reporting",
     "whyNow": "Reduces unsupported recommendations by enforcing citation-backed guidance in complex cases.",
     "backlogModule": "Guideline-cited recommendation pipeline",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 50,
@@ -828,7 +926,9 @@
     "pillar": "Workflow",
     "whyNow": "Mitigates undertriage risk in subtle presentations where autonomous urgency models degrade.",
     "backlogModule": "Subtle-finding triage safeguard",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Asha",
+    "classificationConfidence": "medium"
   },
   {
     "id": 51,
@@ -845,7 +945,9 @@
     "pillar": "Security",
     "whyNow": "Creates decision-grade evidence for safety and performance before production influence.",
     "backlogModule": "Prospective shadow-mode validation",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Heimdallr",
+    "classificationConfidence": "medium"
   },
   {
     "id": 52,
@@ -862,7 +964,9 @@
     "pillar": "Security",
     "whyNow": "Prevents silent safety degradation as data mix and workflow context evolve over time.",
     "backlogModule": "Agent drift and bias sentinel",
-    "repoState": "not-started"
+    "repoState": "not-started",
+    "belongsTo": "Heimdallr",
+    "classificationConfidence": "medium"
   },
   {
     "id": 53,
@@ -878,7 +982,9 @@
     "pillarCode": "C",
     "pillar": "Quantification",
     "whyNow": "Low-friction quantitative cardiomegaly screening from existing chest X-ray workflows",
-    "repoState": "implemented"
+    "repoState": "implemented",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 54,
@@ -894,7 +1000,9 @@
     "pillarCode": "C",
     "pillar": "Quantification",
     "whyNow": "Turns existing segmentation outputs into actionable structured urology burden metrics",
-    "repoState": "implemented"
+    "repoState": "implemented",
+    "belongsTo": "Asha",
+    "classificationConfidence": "high"
   },
   {
     "id": 55,
@@ -911,7 +1019,9 @@
     "pillar": "Logistics",
     "whyNow": "Supports service-oriented processing experiments without replacing the current queue-worker baseline",
     "backlogModule": "Service-oriented segmentation runtime",
-    "repoState": "prototype"
+    "repoState": "prototype",
+    "belongsTo": "Heimdallr",
+    "classificationConfidence": "high"
   },
   {
     "id": 56,
@@ -928,6 +1038,8 @@
     "pillar": "Workflow",
     "whyNow": "Provides a low-friction path for backfills, metric corrections, and validation reruns after pipeline changes",
     "backlogModule": "Retroactive cohort reprocessing toolkit",
-    "repoState": "prototype"
+    "repoState": "prototype",
+    "belongsTo": "Heimdallr",
+    "classificationConfidence": "high"
   }
 ]
