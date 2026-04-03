@@ -13,6 +13,22 @@ Run as independent services:
 5. `python -m heimdallr.intake` (DICOM C-STORE intake)
 6. `python -m heimdallr.tui` (optional operational dashboard)
 
+## Repository File Map
+
+### Core Package (`heimdallr/`)
+- `control_plane/`: FastAPI application, routers, and static serving.
+- `intake/gateway.py`: DICOM reception and study spooling.
+- `prepare/worker.py`: Series discovery and DICOM-to-NIfTI conversion.
+- `processing/worker.py`: Core segmentation worker logic.
+- `metrics/worker.py`: Post-segmentation derived metrics execution.
+- `shared/settings.py`: Centralized runtime settings and binary paths.
+
+### Configuration and Data
+- `config/`: Pipeline JSON profiles and series selection rules.
+- `database/schema.sql`: SQLite schema for state management.
+- `static/`: Frontend dashboard assets.
+
+
 ## Baseline Startup
 
 ```bash
@@ -48,6 +64,31 @@ export HEIMDALLR_AE_TITLE="HEIMDALLR"
 export HEIMDALLR_DICOM_PORT="11114"
 export HEIMDALLR_IDLE_SECONDS="30"
 ```
+
+## End-to-End Pipeline Flow
+
+1. **Intake**: Study arrives via DICOM C-STORE (`intake`) or manual `POST /upload`.
+2. **Spooling**: Files are stored in `runtime/intake/uploads/`.
+3. **Preparation**: `prepare` worker extracts ZIP, selects the best series using `config/series_selection.json`, converts to NIfTI via `dcm2niix`, and creates `metadata/id.json`.
+4. **Processing**: `processing` worker claims the case, runs segmentation (e.g., TotalSegmentator), and archives results in `runtime/studies/<CaseID>/derived/`.
+5. **Metrics**: `metrics` worker executes derived calculations (volumetry, density) and updates `metadata/resultados.json`.
+6. **Delivery**: Dashboard and APIs serve the final structured data and images.
+
+## Data Contracts
+
+### `metadata/id.json`
+Contains study-level metadata, CaseID, and series selection audit trail.
+
+### `metadata/resultados.json`
+The primary output for clinical consumption. Includes:
+- `modality` and `body_regions`.
+- Organ volumetry and quantification.
+- Derived metrics (attenuation, indices).
+- Metadata for post-processing jobs.
+
+### SQLite (`database/dicom.db`)
+Central state for all studies, tracking pipeline stage, patient demographics, and calculated summaries.
+
 
 ## OCR De-identification Dependency
 
@@ -125,9 +166,21 @@ venv/bin/python scripts/retroactive_emphysema.py
 
 1. Validate service process state and restart order (`control_plane -> prepare -> processing -> metrics -> intake`).
 2. Check PACS destination configuration and network reachability.
-3. Inspect `runtime/queue/`, `runtime/studies/`, and `runtime/intake/` for stuck or failed studies.
-4. Verify model/API credentials and quota for report-assist flows.
-5. Confirm data storage permissions for intake and output paths.
+3. Inspect `runtime/intake/` and `runtime/studies/` for stuck or failed studies.
+4. Confirm data storage permissions for the `runtime/` directory.
+
+## Maintenance Playbook
+
+- **Adjusting endpoints**: Edit the relevant router under `heimdallr/control_plane/routers/`.
+- **Changing series selection**: Update `config/series_selection.json`.
+- **Adding a clinical metric**: Add a job under `heimdallr/metrics/jobs/` and register it in the pipeline config.
+- **Improving intake logic**: Edit `heimdallr/intake/gateway.py`.
+
+## Checklist Before Changes
+- Confirm impact on `id.json` and `resultados.json` consistency.
+- Verify that `runtime/` path permissions are preserved.
+- Test the full automated chain: `intake -> prepare -> processing -> metrics`.
+
 
 ## Incident Severity Model (Suggested)
 

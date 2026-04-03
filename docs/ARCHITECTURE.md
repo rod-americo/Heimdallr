@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Heimdallr is an imaging operations pipeline designed to convert incoming radiology studies into structured outputs and assistive reporting artifacts.
+Heimdallr is an imaging operations pipeline designed to convert incoming radiology studies into structured outputs and operational insights.
 
 ## Runtime Components
 
@@ -13,7 +13,7 @@ The repository is currently transitioning from script-oriented entrypoints to a 
 - Owns the DICOM ingress gateway runtime
 
 2. `heimdallr/control_plane/`
-- FastAPI service for upload intake, dashboard data, and assistive-report endpoints
+- FastAPI service for upload intake, dashboard data, and status endpoints
 - App factory lives in `heimdallr/control_plane/app.py`
 
 3. `heimdallr/prepare/`
@@ -33,16 +33,6 @@ The repository is currently transitioning from script-oriented entrypoints to a 
 - Consumes `metrics_queue` for post-segmentation derived jobs
 - Runs modular jobs such as bone-health screening and vertebral fracture heuristics
 
-7. Optional model-assist services
-- `api/medgemma.py`
-- `api/anthropic.py`
-- App-level proxy endpoints route to these services and enforce outbound de-identification via `services/deid_gateway.py` where implemented
-
-8. `api/ctr.py`
-   - CTR (Cardiothoracic Ratio / ICT) extraction microservice (default port `8003`)
-   - Based on ChestXRayAnatomySegmentation (CXAS) by Constantin Seibold et al. (CC BY-NC-SA 4.0)
-   - Loads CXAS UNet_ResNet50 model at startup, exposes `POST /extract_ctr`
-
 ## Data and Storage
 
 - Intake staging: `runtime/intake/uploads/`, `runtime/intake/uploads_failed/`
@@ -54,33 +44,31 @@ The repository is currently transitioning from script-oriented entrypoints to a 
 ## Request/Data Flow
 
 ```text
-PACS/Modality (DICOM) --> heimdallr/intake --> POST /upload (heimdallr/control_plane)
-                                                        |
-                                                        v
-                                                  heimdallr/prepare
-                                             (select + convert + persist)
-                                                        |
-                                                        v
-                                               processing_queue
-                                                        |
-                                                        v
-                                              heimdallr/processing
-                                        (segment + baseline metrics + DB update)
-                                                        |
-                                                        v
-                                                 metrics_queue
-                                                        |
-                                                        v
-                                               heimdallr/metrics
-                                        (derived jobs + job artifacts)
-                                                        |
-                                                        v
-                                           runtime/studies/<case_id>/
-                                                        |
-                                +-----------------------+----------------------+
-                                |                                              |
-                                v                                              v
-                          Dashboard/API                           Proxy routes to assistive services
+PACS/Modality (DICOM) --> heimdallr/intake --> /upload (heimdallr/control_plane)
+                                                         |
+                                                         v
+                                                   heimdallr/prepare
+                                              (select + convert + persist)
+                                                         |
+                                                         v
+                                                processing_queue
+                                                         |
+                                                         v
+                                               heimdallr/processing
+                                         (segment + baseline metrics + DB update)
+                                                         |
+                                                         v
+                                                  metrics_queue
+                                                         |
+                                                         v
+                                                heimdallr/metrics
+                                         (derived jobs + job artifacts)
+                                                         |
+                                                         v
+                                            runtime/studies/<case_id>/
+                                                         |
+                                                         v
+                                                   Dashboard/API
 ```
 
 ## External Dependencies
@@ -88,13 +76,11 @@ PACS/Modality (DICOM) --> heimdallr/intake --> POST /upload (heimdallr/control_p
 - Python 3.10+
 - `dcm2niix`
 - TotalSegmentator runtime in `.venv-totalseg`
-- CXAS (ChestXRayAnatomySegmentation) — CC BY-NC-SA 4.0, for CTR extraction
 - Optional OCR: `pytesseract` + `tesseract` system binary
 
 ## Operational Boundaries
 
-- Assistive outputs are non-autonomous and require qualified reviewer validation.
-- External model calls should traverse de-identification controls.
+- Assistive outputs are operational results and require clinical validation before use.
 - Production operation expects independent process supervision for the control plane, processing worker, and intake gateway runtimes.
 
 ## Cross-References
