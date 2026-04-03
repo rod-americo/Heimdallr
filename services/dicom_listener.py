@@ -52,7 +52,10 @@ from pynetdicom import AE, AllStoragePresentationContexts, evt
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-import config
+from heimdallr.shared import settings as config
+
+DICOM_PREPARE_PYTHON = str(config.BASE_DIR / "venv" / "bin" / "python")
+PREPARE_SCRIPT = config.BASE_DIR / "core" / "prepare.py"
 
 
 @dataclass
@@ -463,12 +466,12 @@ def main() -> int:
     )
     ap.add_argument(
         "--prepare-script",
-        default=str(config.PREPARE_SCRIPT),
+        default=str(PREPARE_SCRIPT),
         help="Path to prepare.py for local_prepare mode",
     )
     ap.add_argument(
         "--prepare-python",
-        default=config.DICOM_PREPARE_PYTHON,
+        default=DICOM_PREPARE_PYTHON,
         help="Python executable used to launch prepare.py in local_prepare mode",
     )
     

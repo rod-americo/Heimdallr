@@ -50,10 +50,6 @@ from tempfile import NamedTemporaryFile
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request, Body
 from pydantic import BaseModel, Field
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
 
 # Ensure virtual environment binaries are in PATH
 os.environ["PATH"] = str(Path(sys.executable).parent) + os.pathsep + os.environ["PATH"]
@@ -62,7 +58,7 @@ os.environ["PATH"] = str(Path(sys.executable).parent) + os.pathsep + os.environ[
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 # Import centralized configuration
-import config
+from heimdallr.shared import settings as config
 import sqlite3
 from core import kidney_stone_triage
 
@@ -77,7 +73,7 @@ LICENSE = config.TOTALSEGMENTATOR_LICENSE
 # Directory paths from config
 BASE_DIR = config.BASE_DIR
 OUTPUT_DIR = config.OUTPUT_DIR
-NII_DIR = config.NII_DIR
+NII_DIR = BASE_DIR / "nii"
 ERROR_DIR = config.ERROR_DIR
 
 

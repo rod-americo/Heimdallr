@@ -11,7 +11,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-import config
+from heimdallr.shared import settings as config
 from core.metrics import calculate_all_metrics
 
 
@@ -140,7 +140,7 @@ def main():
     args = parser.parse_args()
 
     output_dir = Path(config.OUTPUT_DIR)
-    nii_archive = Path(config.NII_DIR)
+    nii_archive = Path(config.BASE_DIR / "nii")
     db_path = Path(config.DB_PATH)
 
     cases = iter_case_folders(output_dir, selected_cases=args.cases)

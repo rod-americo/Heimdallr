@@ -111,8 +111,7 @@ git clone <repository-url>
 cd Heimdallr
 python3 -m venv .venv
 source .venv/bin/activate
-.venv/bin/pip install -r requirements.txt
-cp .env.example .env
+.venv/bin/pip install -r requirements/requirements.txt
 ```
 
 For licensed TotalSegmentator tasks such as `tissue_types`, register the license once in the dedicated TotalSegmentator environment instead of exposing it in the service command line:
