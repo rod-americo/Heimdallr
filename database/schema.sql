@@ -27,9 +27,13 @@ CREATE TABLE IF NOT EXISTS dicom_metadata (
     JsonDump TEXT,              -- Basic metadata from prepare.py (legacy)
     DicomMetadata TEXT,         -- Full DICOM tags from selected series
     CalculationResults TEXT,    -- Computed metrics from run.py/metrics.py
+    PatientSex TEXT,
+    Weight REAL,
+    Height REAL,
+    SMI REAL,
     
     -- Timestamps
-    ProcessedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ProcessedAt TIMESTAMP
 );
 
 -- ============================================================
@@ -41,7 +45,22 @@ CREATE TABLE IF NOT EXISTS processing_queue (
     case_id TEXT NOT NULL UNIQUE,
     input_path TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP,
+    claimed_at TIMESTAMP,
+    finished_at TIMESTAMP,
+    error TEXT
+);
+
+-- ============================================================
+-- Metrics Queue: Post-segmentation derived measurements
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS metrics_queue (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id TEXT NOT NULL UNIQUE,
+    input_path TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at TIMESTAMP,
     claimed_at TIMESTAMP,
     finished_at TIMESTAMP,
     error TEXT
@@ -57,6 +76,7 @@ CREATE INDEX IF NOT EXISTS idx_study_date ON dicom_metadata(StudyDate);
 CREATE INDEX IF NOT EXISTS idx_modality ON dicom_metadata(Modality);
 CREATE INDEX IF NOT EXISTS idx_processed_at ON dicom_metadata(ProcessedAt);
 CREATE INDEX IF NOT EXISTS idx_processing_queue_status_created ON processing_queue(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_metrics_queue_status_created ON metrics_queue(status, created_at);
 
 -- ============================================================
 -- Schema Notes

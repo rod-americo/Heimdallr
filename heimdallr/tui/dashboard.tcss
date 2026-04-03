@@ -1,0 +1,62 @@
+Screen {
+    background: #08111f;
+    color: #e2e8f0;
+}
+
+#shell {
+    layout: vertical;
+    padding: 1 2;
+    background: #0f172a;
+}
+
+#radar {
+    height: 7;
+    margin-bottom: 1;
+}
+
+#flow {
+    height: 7;
+    margin-bottom: 1;
+}
+
+#signal-row {
+    height: 10;
+    margin-bottom: 1;
+}
+
+#table-wrap {
+    height: 1fr;
+    border: tall #1e293b;
+    background: #0b1220;
+    padding: 0 1 1 1;
+}
+
+#pulse,
+#alerts,
+#spotlight {
+    width: 1fr;
+    height: 100%;
+    margin-right: 1;
+}
+
+#spotlight {
+    width: 1.6fr;
+}
+
+#pulse {
+    width: 1.2fr;
+}
+
+#alerts {
+    width: 1.2fr;
+}
+
+#alerts,
+#spotlight {
+    margin-right: 0;
+}
+
+#cases {
+    height: 100%;
+    background: #08111f;
+}

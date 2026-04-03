@@ -21,6 +21,8 @@ from typing import Dict, Optional
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileSystemEvent
 
+from heimdallr.shared import settings
+
 WATCH_DIR = Path.home() / "Temp" / "HEIMDALLR"
 PYTHON = Path.home() / "Heimdallr" / "venv" / "bin" / "python"
 UPLOADER = Path.home() / "Heimdallr" / "clients" / "uploader.py"
@@ -32,7 +34,7 @@ LOG_FILE = Path("/tmp/watch_heimdallr_py.log")
 
 
 def ts() -> str:
-    return time.strftime("%Y-%m-%d %H:%M:%S")
+    return settings.local_timestamp()
 
 
 def log(msg: str) -> None:

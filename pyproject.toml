@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "heimdallr"
+version = "0.1.0"
+description = "Operational radiology control plane and processing pipeline."
+requires-python = ">=3.10"
+
+[project.scripts]
+heimdallr-tui = "heimdallr.tui.__main__:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["heimdallr*"]
+
+[tool.setuptools.package-data]
+heimdallr = ["tui/*.tcss"]

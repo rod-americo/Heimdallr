@@ -6,35 +6,46 @@ This document provides a baseline for operating Heimdallr in production-like env
 
 Run as independent services:
 
-1. `app.py` (API, dashboard, upload endpoints)
-2. `run.py` (processing worker)
-3. `services/dicom_listener.py` (DICOM C-STORE intake)
+1. `python -m heimdallr.control_plane` (API, dashboard, upload endpoints)
+2. `python -m heimdallr.prepare` (study preparation watchdog)
+3. `python -m heimdallr.processing` (segmentation/processing worker)
+4. `python -m heimdallr.metrics` (post-segmentation derived metrics worker)
+5. `python -m heimdallr.intake` (DICOM C-STORE intake)
+6. `python -m heimdallr.tui` (optional operational dashboard)
 
 ## Baseline Startup
 
 ```bash
 # API + Dashboard
 source venv/bin/activate
-python app.py
+python -m heimdallr.control_plane
+
+# Prepare worker
+source venv/bin/activate
+python -m heimdallr.prepare
 
 # Processing worker
 source venv/bin/activate
-python run.py
+python -m heimdallr.processing
+
+# Metrics worker
+source venv/bin/activate
+python -m heimdallr.metrics
 
 # DICOM listener
 source venv/bin/activate
-python services/dicom_listener.py
+python -m heimdallr.intake
 ```
 
 ## Environment and Config
 
-Configuration is centralized in `config.py` and can be overridden via `HEIMDALLR_*` environment variables.
+Configuration is centralized in `heimdallr/shared/settings.py` plus the pipeline JSON profiles under `config/`, and can be overridden via `HEIMDALLR_*` environment variables.
 
 Common examples:
 
 ```bash
 export HEIMDALLR_AE_TITLE="HEIMDALLR"
-export HEIMDALLR_DICOM_PORT="11112"
+export HEIMDALLR_DICOM_PORT="11114"
 export HEIMDALLR_IDLE_SECONDS="30"
 ```
 
@@ -53,20 +64,20 @@ If OCR dependencies are not installed, the gateway reports `ocr_available=false`
 Expected defaults:
 
 - AE Title: `HEIMDALLR`
-- Port: `11112`
+- Port: `11114`
 - Protocol: DICOM C-STORE
 
 Quick smoke test using DCMTK:
 
 ```bash
-dcmsend localhost 11112 -aec HEIMDALLR test.dcm
+dcmsend localhost 11114 -aec HEIMDALLR test.dcm
 ```
 
 ## Health and Monitoring Checks
 
 1. `http://localhost:8001/docs` responds.
-2. Listener accepts inbound C-STORE on port `11112`.
-3. Queue path `upload -> input/ -> output/` completes for a known study.
+2. Listener accepts inbound C-STORE on port `11114`.
+3. Queue path `upload -> prepare -> processing -> metrics` completes for a known study.
 4. GPU capacity is available for segmentation processing.
 
 ## Backup and Restore (SQLite)
@@ -112,9 +123,9 @@ venv/bin/python scripts/retroactive_emphysema.py
 
 ## Incident Triage Shortlist
 
-1. Validate service process state and restart order (`app -> run -> listener`).
+1. Validate service process state and restart order (`control_plane -> prepare -> processing -> metrics -> intake`).
 2. Check PACS destination configuration and network reachability.
-3. Inspect `input/`, `output/`, and `errors/` for stuck or failed cases.
+3. Inspect `runtime/queue/`, `runtime/studies/`, and `runtime/intake/` for stuck or failed studies.
 4. Verify model/API credentials and quota for report-assist flows.
 5. Confirm data storage permissions for intake and output paths.
 

@@ -6,61 +6,76 @@ Heimdallr is an imaging operations pipeline designed to convert incoming radiolo
 
 ## Runtime Components
 
-1. `services/dicom_listener.py`
-- DICOM C-STORE intake service (`AE=HEIMDALLR`, default port `11112`)
-- Groups incoming files by study and forwards packaged data to upload endpoint
+The repository is currently transitioning from script-oriented entrypoints to a modular package layout under `heimdallr/`.
 
-2. `app.py`
+1. `heimdallr/intake/`
+- DICOM C-STORE intake service (`AE=HEIMDALLR`, default port `11114`)
+- Owns the DICOM ingress gateway runtime
+
+2. `heimdallr/control_plane/`
 - FastAPI service for upload intake, dashboard data, and assistive-report endpoints
-- Serves static frontend from `static/`
+- App factory lives in `heimdallr/control_plane/app.py`
 
-3. `core/prepare.py`
+3. `heimdallr/prepare/`
 - Validates uploaded study package
 - Selects target series and converts DICOM to NIfTI (`dcm2niix`)
-- Persists initial metadata to SQLite
+- Owns the study preparation worker runtime
 
-4. `run.py`
-- Watches `input/` queue for NIfTI jobs
-- Executes segmentation pipeline and derived metrics extraction
-- Writes outputs to `output/<case_id>/` and updates database fields
+4. `heimdallr/processing/`
+- Claims prepared studies from `processing_queue`
+- Executes segmentation pipeline and baseline processing metrics
+- Writes outputs to `runtime/studies/<case_id>/` and updates database fields
 
-5. Optional model-assist services
+5. `heimdallr/shared/`
+- Shared settings, request dependencies, and schemas used across the control plane and workers
+
+6. `heimdallr/metrics/`
+- Consumes `metrics_queue` for post-segmentation derived jobs
+- Runs modular jobs such as bone-health screening and vertebral fracture heuristics
+
+7. Optional model-assist services
 - `api/medgemma.py`
 - `api/anthropic.py`
 - App-level proxy endpoints route to these services and enforce outbound de-identification via `services/deid_gateway.py` where implemented
 
-6. `api/ctr.py`
+8. `api/ctr.py`
    - CTR (Cardiothoracic Ratio / ICT) extraction microservice (default port `8003`)
    - Based on ChestXRayAnatomySegmentation (CXAS) by Constantin Seibold et al. (CC BY-NC-SA 4.0)
    - Loads CXAS UNet_ResNet50 model at startup, exposes `POST /extract_ctr`
 
 ## Data and Storage
 
-- Queue/input: `input/`
-- Final NIfTI archive: `nii/`
-- Outputs and artifacts: `output/<case_id>/`
-- Errors: `errors/`
-- Raw intake: `uploads/`, `data/incoming_dicom/`
+- Intake staging: `runtime/intake/uploads/`, `runtime/intake/uploads_failed/`
+- DICOM ingress staging: `runtime/intake/dicom/`
+- Queue state: `runtime/queue/pending/`, `runtime/queue/active/`, `runtime/queue/failed/`
+- Study outputs and artifacts: `runtime/studies/<case_id>/`
 - Database: `database/dicom.db` (`database/schema.sql`)
 
 ## Request/Data Flow
 
 ```text
-PACS/Modality (DICOM) --> services/dicom_listener.py --> POST /upload (app.py)
+PACS/Modality (DICOM) --> heimdallr/intake --> POST /upload (heimdallr/control_plane)
                                                         |
                                                         v
-                                                  core/prepare.py
+                                                  heimdallr/prepare
                                              (select + convert + persist)
                                                         |
                                                         v
-                                                      input/
+                                               processing_queue
                                                         |
                                                         v
-                                                      run.py
-                                          (segment + metrics + DB update)
+                                              heimdallr/processing
+                                        (segment + baseline metrics + DB update)
                                                         |
                                                         v
-                                                output/<case_id>/
+                                                 metrics_queue
+                                                        |
+                                                        v
+                                               heimdallr/metrics
+                                        (derived jobs + job artifacts)
+                                                        |
+                                                        v
+                                           runtime/studies/<case_id>/
                                                         |
                                 +-----------------------+----------------------+
                                 |                                              |
@@ -72,7 +87,7 @@ PACS/Modality (DICOM) --> services/dicom_listener.py --> POST /upload (app.py)
 
 - Python 3.10+
 - `dcm2niix`
-- TotalSegmentator license (`TOTALSEGMENTATOR_LICENSE`)
+- TotalSegmentator runtime in `.venv-totalseg`
 - CXAS (ChestXRayAnatomySegmentation) — CC BY-NC-SA 4.0, for CTR extraction
 - Optional OCR: `pytesseract` + `tesseract` system binary
 
@@ -80,7 +95,7 @@ PACS/Modality (DICOM) --> services/dicom_listener.py --> POST /upload (app.py)
 
 - Assistive outputs are non-autonomous and require qualified reviewer validation.
 - External model calls should traverse de-identification controls.
-- Production operation expects independent process supervision for `app.py`, `run.py`, and `services/dicom_listener.py`.
+- Production operation expects independent process supervision for the control plane, processing worker, and intake gateway runtimes.
 
 ## Cross-References
 

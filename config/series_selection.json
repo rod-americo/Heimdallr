@@ -1,0 +1,28 @@
+{
+  "default_profile": "ct_default",
+  "profiles": {
+    "ct_default": {
+      "required": {
+        "modality": "CT",
+        "min_slices": 120
+      },
+      "phase_priority": [
+        "native"
+      ],
+      "text_hints": {
+        "description_avoid": [
+          "mip",
+          "bone",
+          "lung",
+          "scout",
+          "topogram"
+        ],
+        "kernel_avoid": [
+          "bone",
+          "lung",
+          "sharp"
+        ]
+      }
+    }
+  }
+}
