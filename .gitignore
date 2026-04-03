@@ -1,6 +1,8 @@
 # Python
 .DS_Store
 __pycache__/
+.pycache_local/
+.tmp/
 *.pyc
 *.pyo
 *.pyd
