@@ -1,43 +1,43 @@
 # Heimdallr Agentic Guidelines
 
-Este repositório é manipulado de forma frequente e autônoma por Agentes de IA e ferramentas de AI-Coding (Gemini, Claude, Cursor, Copilot, etc.). Para conter alucinações arquiteturais e preservar a engenharia empregada, **leia e siga religiosamente estas regras antes de realizar qualquer modificação no código.**
+This repository is frequently and autonomously manipulated by AI Agents and AI-Coding tools (Gemini, Claude, Cursor, Copilot, etc.). To prevent architectural hallucinations and preserve the applied engineering, **read and strictly follow these rules before making any code modifications.**
 
 > [!CAUTION]
-> Ao longo da história do projeto, este repositório sofreu diversas divisões e purgas. Sob nenhuma circunstância reconstrua serviços antigos que foram apagados ou realocados!
+> Throughout its history, this project underwent several splits and purges. Under no circumstances should you reconstruct old services that were deleted or relocated!
 
-## 1. Escopo de Domínio e Divisão de Repositórios
+## 1. Domain Scope and Repository Divide
 
-O `Heimdallr` é estrita e exclusivamente focado na **infraestrutura open-source de MLOps de Imagem Radiológica**. Ele é a fundação para a escuta (C-STORE), processamento de pipelines de formato (DICOM → NIfTI), cálculos determinísticos de volumes orgânicos, processamento TotalSegmentator, além de interfaces métricas de banco.
+`Heimdallr` is strictly and exclusively focused on the **open-source Radiological Image MLOps infrastructure**. It is the foundation for listening (C-STORE), format processing pipelines (DICOM → NIfTI), deterministic calculations of organic volumes, TotalSegmentator processing, and metric database interfaces.
 
-**O que NÃO Pertence ao Heimdallr:**
-*   Serviços proprietários de suporte clínico e laudos redigidos;
-*   Engenharia de Prompting para LLMs (OpenAI, Anthropic, MedGemma);
-*   Camadas de inteligência ou conversão assistida avançada de imagens para essas APIs.
+**What Does NOT Belong in Heimdallr:**
+*   Proprietary clinical support services and finalized reports drafting;
+*   Prompt Engineering for LLMs (OpenAI, Anthropic, MedGemma);
+*   Intelligence layers or advanced assisted image conversion routines for those APIs.
 
-**Agentes:** Caso você seja instruído a lidar com LLMs, NLP ou rotinas "inteligentes" para os laudos finais, **PARE**. O domínio dessas atividades pertence universalmente ao repositório cliente arquitetado como **`Asha`**.
+**Agents:** If you are instructed to deal with LLMs, NLP, or "intelligent" routines for final reports, **STOP**. The domain of these activities belongs universally to the client repository architected as **`Asha`**.
 
-## 2. Paradigmas Cloud-Native / 12-Factor App
+## 2. Cloud-Native Paradigms / 12-Factor App
 
-*   **Zero `.env` files**: Nunca crie, espere encontrar ou instale dependências atreladas ao `python-dotenv`. A arquitetura foi refatorada sob a óptica cloud-native. Valores sensíveis (como `TOTALSEGMENTATOR_LICENSE`) serão lidos pelo `os.getenv` através de injeção externa do Sistema Hospedeiro, Launchd/Systemd ou Docker, e **nunca** de um artifício `.env`.
-*   **Importação Limpa e Json Settings**: Nunca recrie nem busque os legados `app.py`, `run.py` ou `config.py` soltos na raiz. Toda base de configurações nativa e compartilhamentos da biblioteca reside sob os modulares dentro do pacote `heimdallr/` ou nos arquivos JSON em `config/`.
+*   **Zero `.env` files**: Never create, expect to find, or install dependencies related to `python-dotenv`. The architecture was refactored with a cloud-native mindset. Sensitive values (like `TOTALSEGMENTATOR_LICENSE`) will be read via `os.getenv` through external injection from the Host System, Launchd/Systemd, or Docker, and **never** from an `.env` artifact.
+*   **Clean Imports and JSON Settings**: Never recreate or look for the legacy `app.py`, `run.py`, or `config.py` files scattered in the root. The entire native configuration base and shared libraries live under modular components inside the `heimdallr/` package or in JSON files within `config/`.
 
-## 3. Diretrizes de Commits
+## 3. Commit Guidelines
 
-Sempre formule mensagens de commit na linguagem `EN-US` e valendo as marcações semânticas restritas: *(uso no modo imperativo).*
-Formato: `type(scope): summary`
+Always write commit messages in `EN-US` using strict semantic markings: *(use imperative mood).*
+Format: `type(scope): summary`
 
-**Tipos Reconhecidos (Allowed Types):**
-*   `feat`: Funcionalidades estritas
-*   `fix`: Quebras ou comportamentos imprevisíveis
-*   `docs`: Exclusivo para material na raiz (Markdown)
-*   `refactor`: Ajuste limpo interno (arquitetural)
-*   `test`: Verificações e scripts isolados de provas  
-*   `chore`: Atualizações de versão ou ambiente em `requirements/`
+**Allowed Types:**
+*   `feat`: Strict new features
+*   `fix`: Breakages or unpredictable behaviors
+*   `docs`: Exclusive for root material (Markdown)
+*   `refactor`: Clean internal (architectural) adjustments
+*   `test`: Verifications and isolated proof scripts
+*   `chore`: Tooling, versioning, or environment updates in `requirements/`
 *   *(perf, ci, build, revert).*
 
 > [!WARNING]
-> Mantenha os Subjects limitados a *72 caracteres* e em hipótese remota anexe informações PHI/PII nos commits do Git.
+> Keep subject lines limited to *72 characters* and under no circumstances attach PHI/PII information into Git commits.
 
-## 4. Manipulação de Diretórios
-*   **Limpeza da Raiz**: O ecossistema está polido com as normas da comunidade em `.github` (Contributes, Owners, Securities).
-*   Não recrie rastros transitórios como `.tmp`, `.pycache_local` ou pastas de filas em disco soltas na raiz (ex: `/output/`, `/data/`). Pastas automáticas devem estar devidamente silenciadas no `.gitignore`.
+## 4. Directory Handling
+*   **Root Cleanliness**: The ecosystem is polished with community standards residing in `.github` (CODEOWNERS, CONTRIBUTING, SECURITY).
+*   Do not recreate transient traces like `.tmp`, `.pycache_local` or loose queue folders in the root (e.g., `/output/`, `/data/`). Auto-generated folders must be properly silenced in `.gitignore`.
