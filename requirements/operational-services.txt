@@ -1,0 +1,17 @@
+# Minimal dependencies for Heimdallr operational services:
+# - control plane (FastAPI/HTTP upload/dashboard)
+# - DICOM intake listener
+
+fastapi
+uvicorn
+httpx
+python-multipart
+requests
+pydicom
+pynetdicom
+python-dotenv
+Pillow
+rich
+textual
+
+numpy

@@ -22,7 +22,7 @@ Stores DICOM metadata and calculation results for all processed studies.
 | `JsonDump` | TEXT | Basic metadata JSON from prepare.py |
 | `DicomMetadata` | TEXT | Complete DICOM tags JSON from selected series |
 | `CalculationResults` | TEXT | Computed metrics JSON (volumes, densities, etc.) |
-| `ProcessedAt` | TIMESTAMP | When study was first processed |
+| `ProcessedAt` | TIMESTAMP | When study was first processed (America/Sao_Paulo) |
 
 ### Indexes
 

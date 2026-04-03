@@ -1,0 +1,31 @@
+{
+  "default_profile": "ct_native_segmentation_only",
+  "profiles": {
+    "ct_native_segmentation_only": {
+      "required": {
+        "modality": "CT",
+        "selected_phase": [
+          "native"
+        ]
+      },
+      "tasks": [
+        {
+          "name": "total",
+          "enabled": true,
+          "output_dir": "artifacts/total",
+          "extra_args": [
+            "--fast"
+          ],
+          "license_required": false
+        },
+        {
+          "name": "tissue_types",
+          "enabled": true,
+          "output_dir": "artifacts/tissue_types",
+          "extra_args": [],
+          "license_required": true
+        }
+      ]
+    }
+  }
+}

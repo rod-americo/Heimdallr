@@ -1,0 +1,10 @@
+{
+  "dicom_listener": {
+    "idle_seconds": 10,
+    "scan_seconds": 5
+  },
+  "prepare_watchdog": {
+    "scan_interval_seconds": 2,
+    "stable_age_seconds": 2
+  }
+}

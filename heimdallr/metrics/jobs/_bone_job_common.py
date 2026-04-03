@@ -1,0 +1,222 @@
+#!/usr/bin/env python3
+"""Shared helpers for opportunistic bone-health metric jobs."""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+from typing import Any
+
+import matplotlib
+
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
+import nibabel as nib
+import numpy as np
+
+from heimdallr.shared.paths import (
+    study_artifacts_dir,
+    study_dir,
+    study_id_json,
+    study_metadata_json,
+    study_nifti,
+    study_results_json,
+)
+
+
+def parse_args(description: str) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument("--case-id", required=True, help="Study case identifier.")
+    parser.add_argument(
+        "--job-config-json",
+        default="{}",
+        help="JSON object with job-level configuration.",
+    )
+    return parser.parse_args()
+
+
+def load_job_config(raw_json: str) -> dict[str, Any]:
+    try:
+        parsed = json.loads(raw_json)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"Invalid --job-config-json payload: {exc}") from exc
+    if not isinstance(parsed, dict):
+        raise RuntimeError("Job configuration must be a JSON object")
+    return parsed
+
+
+def read_json(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def load_case_json_bundle(case_id: str) -> dict[str, Any]:
+    return {
+        "id_json": read_json(study_id_json(case_id)),
+        "metadata_json": read_json(study_metadata_json(case_id)),
+        "results_json": read_json(study_results_json(case_id)),
+    }
+
+
+def resolve_canonical_nifti(case_id: str) -> Path | None:
+    canonical = study_nifti(case_id)
+    if canonical.exists():
+        return canonical
+
+    series_dir = study_dir(case_id) / "derived" / "series"
+    if not series_dir.exists():
+        return None
+    candidates = sorted(series_dir.glob("*.nii.gz"))
+    return candidates[0] if candidates else None
+
+
+def load_nifti_mask(mask_path: Path) -> tuple[nib.Nifti1Image, np.ndarray]:
+    image = nib.load(str(mask_path))
+    return image, np.asarray(image.get_fdata(), dtype=np.float32) > 0
+
+
+def load_ct_volume(ct_path: Path) -> tuple[nib.Nifti1Image, np.ndarray]:
+    image = nib.load(str(ct_path))
+    return image, np.asarray(image.get_fdata(), dtype=np.float32)
+
+
+def mask_complete(mask: np.ndarray) -> bool:
+    mask_bool = np.asarray(mask, dtype=bool)
+    if mask_bool.ndim != 3 or not np.any(mask_bool):
+        return False
+    z_indices = np.where(mask_bool.sum(axis=(0, 1)) > 0)[0]
+    if len(z_indices) == 0:
+        return False
+    return int(z_indices[0]) > 0 and int(z_indices[-1]) < (mask_bool.shape[2] - 1)
+
+
+def center_slice_index(mask: np.ndarray) -> int | None:
+    z_indices = np.where(np.asarray(mask, dtype=bool).sum(axis=(0, 1)) > 0)[0]
+    if len(z_indices) == 0:
+        return None
+    return int(z_indices[len(z_indices) // 2])
+
+
+def build_l1_axial_roi(mask_l1: np.ndarray, spacing_mm: tuple[float, float, float]) -> tuple[np.ndarray | None, dict[str, Any]]:
+    from scipy.ndimage import binary_erosion, center_of_mass, label as ndlabel
+
+    center_z = center_slice_index(mask_l1)
+    if center_z is None:
+        return None, {"status": "empty_mask"}
+
+    mask_2d = np.asarray(mask_l1[:, :, center_z], dtype=bool)
+    in_plane_spacing = min(float(spacing_mm[0]), float(spacing_mm[1]))
+    erosion_iters = max(1, int(5.0 / max(in_plane_spacing, 1e-6)))
+    eroded_2d = binary_erosion(mask_2d, iterations=erosion_iters)
+
+    labeled, num_features = ndlabel(eroded_2d)
+    if num_features > 1:
+        component_sizes = [np.sum(labeled == i) for i in range(1, num_features + 1)]
+        largest = int(np.argmax(component_sizes)) + 1
+        eroded_2d = labeled == largest
+
+    if not np.any(eroded_2d):
+        return None, {"status": "empty_eroded_mask", "slice_index": center_z}
+
+    full_com_x, full_com_y = center_of_mass(mask_2d)
+    body_com_x, body_com_y = center_of_mass(eroded_2d)
+
+    x_indices, y_indices = np.where(eroded_2d)
+    x_min, x_max = int(x_indices.min()), int(x_indices.max())
+    y_min, y_max = int(y_indices.min()), int(y_indices.max())
+
+    diff_x = abs(float(full_com_x) - float(body_com_x))
+    diff_y = abs(float(full_com_y) - float(body_com_y))
+
+    rx = max((x_max - x_min) * 0.70 / 2.0, 1.0)
+    ry = max((y_max - y_min) * 0.40 / 2.0, 1.0)
+
+    if diff_y > diff_x:
+        anterior_is_larger_y = body_com_y > full_com_y
+        center_x = (x_min + x_max) / 2.0
+        center_y = y_max - (y_max - y_min) * 0.25 if anterior_is_larger_y else y_min + (y_max - y_min) * 0.25
+    else:
+        anterior_is_larger_x = body_com_x > full_com_x
+        center_y = (y_min + y_max) / 2.0
+        center_x = x_max - (x_max - x_min) * 0.25 if anterior_is_larger_x else x_min + (x_max - x_min) * 0.25
+
+    x_grid, y_grid = np.ogrid[:mask_2d.shape[0], :mask_2d.shape[1]]
+    ellipse = ((x_grid - center_x) ** 2 / rx**2) + ((y_grid - center_y) ** 2 / ry**2) <= 1
+    roi_mask = np.asarray(ellipse & eroded_2d, dtype=bool)
+    if not np.any(roi_mask):
+        return None, {"status": "empty_roi_mask", "slice_index": center_z}
+
+    return roi_mask, {
+        "status": "ok",
+        "slice_index": center_z,
+        "roi_center_xy": {"x": round(float(center_x), 2), "y": round(float(center_y), 2)},
+        "roi_radius_xy": {"x": round(float(rx), 2), "y": round(float(ry), 2)},
+    }
+
+
+def save_png_overlay(
+    ct_slice: np.ndarray,
+    overlay_mask: np.ndarray,
+    output_path: Path,
+    title: str,
+    summary_lines: list[str],
+    mask_outline: np.ndarray | None = None,
+    overlay_cmap: str = "cool",
+    vmin: float = -250.0,
+    vmax: float = 1250.0,
+) -> None:
+    rotated_ct = np.rot90(np.asarray(ct_slice, dtype=np.float32))
+    rotated_overlay = np.rot90(np.asarray(overlay_mask, dtype=bool))
+    rotated_outline = np.rot90(np.asarray(mask_outline, dtype=bool)) if mask_outline is not None else None
+
+    fig, ax = plt.subplots(figsize=(7, 7))
+    ax.imshow(rotated_ct, cmap="gray", vmin=vmin, vmax=vmax, interpolation="nearest")
+
+    if rotated_overlay.any():
+        masked = np.ma.masked_where(~rotated_overlay, rotated_overlay.astype(np.uint8))
+        ax.imshow(masked, cmap=overlay_cmap, alpha=0.55, interpolation="nearest")
+        ax.contour(rotated_overlay, levels=[0.5], colors=["#66e0ff"], linewidths=1.1)
+
+    if rotated_outline is not None and rotated_outline.any():
+        ax.contour(rotated_outline, levels=[0.5], colors=["#ffd166"], linewidths=0.9)
+
+    ax.set_title(title, fontsize=13)
+    ax.text(
+        0.03,
+        0.97,
+        "\n".join(summary_lines),
+        transform=ax.transAxes,
+        ha="left",
+        va="top",
+        fontsize=10,
+        color="white",
+        bbox={
+            "boxstyle": "round,pad=0.4",
+            "facecolor": "black",
+            "alpha": 0.55,
+            "edgecolor": "none",
+        },
+    )
+    ax.axis("off")
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=180, bbox_inches="tight", pad_inches=0.05)
+    plt.close(fig)
+
+
+def metric_output_dir(case_id: str, metric_key: str) -> tuple[Path, Path, Path]:
+    case_dir = study_dir(case_id)
+    metric_dir = study_artifacts_dir(case_id) / "metrics" / metric_key
+    metric_dir.mkdir(parents=True, exist_ok=True)
+    return case_dir, metric_dir, metric_dir / "result.json"
+
+
+def write_payload(result_path: Path, payload: dict[str, Any]) -> None:
+    result_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+

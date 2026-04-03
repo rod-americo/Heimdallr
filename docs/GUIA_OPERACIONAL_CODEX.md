@@ -7,31 +7,34 @@ This document summarizes the architecture, flows, and most likely edit points so
 - Primary stack: Python, FastAPI, SQLite, and a static HTML/CSS/JS frontend.
 - Domain: radiology pipeline with CT/MR preprocessing and TotalSegmentator-based analysis.
 - Main intake paths:
-  - DICOM listener at [`services/dicom_listener.py`](../services/dicom_listener.py) via C-STORE on port `11112` by default
+  - DICOM listener runtime at [`heimdallr/intake/gateway.py`](../heimdallr/intake/gateway.py) via C-STORE on port `11114` by default
   - Manual upload through [`clients/uploader.py`](../clients/uploader.py) or `POST /upload`
 - Orchestration:
-  - [`app.py`](../app.py) receives ZIP uploads and launches [`core/prepare.py`](../core/prepare.py)
-  - [`core/prepare.py`](../core/prepare.py) converts DICOM to NIfTI and places jobs in `input/`
-  - [`run.py`](../run.py) monitors `input/` and processes claimed jobs from `processing/`
-  - [`core/metrics.py`](../core/metrics.py) computes derived metrics and writes `resultados.json`
-- Per-case outputs live in `output/<CaseID>/` and typically include `id.json`, `resultados.json`, masks, logs, and overlays.
+  - [`heimdallr/control_plane/app.py`](../heimdallr/control_plane/app.py) receives ZIP uploads into `runtime/intake/uploads/`
+  - [`heimdallr/prepare/worker.py`](../heimdallr/prepare/worker.py) converts DICOM to NIfTI and persists prepared studies under `runtime/studies/`
+  - [`heimdallr/processing/worker.py`](../heimdallr/processing/worker.py) monitors the processing queue and runs segmentation
+  - [`heimdallr/metrics/worker.py`](../heimdallr/metrics/worker.py) executes post-segmentation derived metrics jobs
+- Per-case outputs now live in `runtime/studies/<CaseID>/` and typically include `metadata/id.json`, `metadata/resultados.json`, `artifacts/`, `derived/`, and `logs/`.
 
 ## 2. File Map
 
 ### API and backend
-- [`app.py`](../app.py): upload entry point, REST endpoints, dashboard root, and static serving
-- [`config.py`](../config.py): centralized configuration and environment variable handling
-- [`api/routes/upload.py`](../api/routes/upload.py): `POST /upload`
-- [`api/routes/patients.py`](../api/routes/patients.py): patient/result/download endpoints
-- [`api/routes/proxy.py`](../api/routes/proxy.py): proxy routes for assistive X-ray services
+- [`app.py`](../app.py): compatibility wrapper for the control plane package
+- [`heimdallr/control_plane/app.py`](../heimdallr/control_plane/app.py): app factory, router wiring, and static serving
+- [`heimdallr/control_plane/routers/upload.py`](../heimdallr/control_plane/routers/upload.py): `POST /upload`
+- [`heimdallr/control_plane/routers/patients.py`](../heimdallr/control_plane/routers/patients.py): patient/result/download endpoints
+- [`heimdallr/control_plane/routers/proxy.py`](../heimdallr/control_plane/routers/proxy.py): proxy routes for assistive X-ray services
+- [`heimdallr/shared/settings.py`](../heimdallr/shared/settings.py): centralized runtime settings, paths, and binary resolution
 
 ### Intake and preparation
-- [`services/dicom_listener.py`](../services/dicom_listener.py): DICOM reception, study grouping, idle close, ZIP upload with retry
-- [`core/prepare.py`](../core/prepare.py): series selection, DICOM-to-NIfTI conversion, metadata persistence, queue creation
+- [`heimdallr/intake/gateway.py`](../heimdallr/intake/gateway.py): DICOM reception, study grouping, idle close, and upload/spool handoff
+- [`heimdallr/prepare/worker.py`](../heimdallr/prepare/worker.py): series discovery, DICOM-to-NIfTI conversion, metadata persistence, queue creation
 
 ### Processing
-- [`run.py`](../run.py): background worker, TotalSegmentator task execution, retry handling, archival
-- [`core/metrics.py`](../core/metrics.py): clinical and quantitative metric logic, JSON output generation
+- [`run.py`](../run.py): compatibility wrapper for the processing runtime
+- [`heimdallr/processing/worker.py`](../heimdallr/processing/worker.py): segmentation worker, queue claiming, archival, and metrics enqueue
+- [`heimdallr/metrics/worker.py`](../heimdallr/metrics/worker.py): post-segmentation metrics worker
+- [`core/metrics.py`](../core/metrics.py): legacy monolithic metric implementation still used by transitional flows
 
 ### Frontend
 - `static/index.html`
@@ -46,20 +49,20 @@ This document summarizes the architecture, flows, and most likely edit points so
 ## 3. End-to-End Flow
 
 1. A study arrives through the DICOM listener or the manual upload path.
-2. `POST /upload` stores the ZIP in `uploads/` and launches `core/prepare.py` in the background.
-3. `core/prepare.py`:
+2. `POST /upload` stores the ZIP in `runtime/intake/uploads/` for the prepare worker.
+3. `heimdallr/prepare/worker.py`:
    - extracts the ZIP
    - reads DICOM files and selects the best series
    - converts the selected series with `dcm2niix`
-   - writes `output/<case>/id.json`
-   - places the final NIfTI at `input/<case>.nii.gz`
+   - writes `runtime/studies/<case>/metadata/id.json`
+   - updates the processing queue in SQLite
    - inserts or updates metadata in `database/dicom.db`
-4. `run.py` claims the NIfTI into `processing/` and executes:
-   - segmentation tasks such as `total`, `tissue_types`, and conditional `cerebral_bleed`
-   - metric generation through `core/metrics.py`
-   - SQLite updates (`CalculationResults`, `IdJson`, biometrics when available)
-   - final archive move into `nii/`
-5. The dashboard and patient APIs read from SQLite and per-case output folders.
+4. `heimdallr/processing/worker.py` claims the queued study and executes:
+   - segmentation tasks such as `total` and `tissue_types`
+   - archival of the canonical NIfTI into `runtime/studies/<case>/derived/`
+   - enqueue of the post-segmentation metrics stage
+5. `heimdallr/metrics/worker.py` runs the configured metrics jobs and merges their outputs into `metadata/resultados.json`.
+6. The dashboard and patient APIs read from SQLite and the per-case runtime folders.
 
 ## 4. Important Data Contracts
 
@@ -68,7 +71,8 @@ This document summarizes the architecture, flows, and most likely edit points so
 - `CaseID`
 - `ClinicalName`
 - `Pipeline`
-- `SelectedSeries`
+- `AvailableSeries`
+- `Pipeline.series_selection`
 
 ### `resultados.json`
 - `modality`
@@ -77,6 +81,7 @@ This document summarizes the architecture, flows, and most likely edit points so
 - density metrics for CT workflows
 - sarcopenia-related outputs
 - hemorrhage-related outputs when applicable
+- `metrics.<job_name>` entries for post-segmentation derived jobs
 
 ### SQLite table `dicom_metadata`
 - key: `StudyInstanceUID`
@@ -99,32 +104,34 @@ This document summarizes the architecture, flows, and most likely edit points so
 ## 6. Dependencies and Operational Requirements
 
 - Python `3.10+`
-- `dcm2niix` installed on the host
-- `TOTALSEGMENTATOR_LICENSE` set in `.env`
+- `dcm2niix` available either from the host or the bundled `bin/`
+- TotalSegmentator runtime available through the dedicated `.venv-totalseg`
 - CUDA-capable GPU recommended for throughput
 - Optional OCR support: `pytesseract` plus system `tesseract`
+- Operational UI support: `rich` and `textual` in the service environment
 
 ## 7. Attention Points and Technical Risks
 
-- [`config.py`](../config.py) requires `TOTALSEGMENTATOR_LICENSE`; imports fail without it.
-- [`core/prepare.py`](../core/prepare.py) exits hard on several preparation failures, which directly affects intake.
-- [`run.py`](../run.py) processes multiple cases in parallel and contains retry logic for TotalSegmentator config race conditions.
+- The repository is in a live migration from flat scripts to the `heimdallr/` package layout; some legacy entrypoints still exist as wrappers.
+- The operational `.venv` and the scientific `.venv-totalseg` have different dependency surfaces; do not assume scientific modules exist in the operational environment.
+- [`heimdallr/prepare/worker.py`](../heimdallr/prepare/worker.py) remains a critical handoff point for intake and queue consistency.
+- [`heimdallr/processing/worker.py`](../heimdallr/processing/worker.py) processes multiple cases in parallel and coordinates queue state with SQLite.
 - Frontend biometric workflows depend on the patient endpoints and the presence of the relevant metrics in `resultados.json`.
-- Older environments may need schema migration for `Weight`, `Height`, and `SMI` fields.
+- Older environments may need schema migration for `Weight`, `Height`, `SMI`, and the new `metrics_queue`.
 - The app proxy configuration and the MedGemma service default port are not aligned by default; verify environment overrides before enabling that flow.
 
 ## 8. Quick Playbook by Request Type
 
 - "Create or adjust an endpoint":
-  - edit [`app.py`](../app.py) and the relevant router under `api/routes/`
+  - edit the relevant router under `heimdallr/control_plane/routers/`
 - "Change series selection criteria":
-  - edit [`core/prepare.py`](../core/prepare.py)
+  - edit [`config/series_selection.json`](../config/series_selection.json) and, when needed, [`heimdallr/prepare/worker.py`](../heimdallr/prepare/worker.py)
 - "Add a clinical metric":
-  - edit [`core/metrics.py`](../core/metrics.py); `run.py` handles persistence flow
+  - edit the metric job under `heimdallr/metrics/jobs/` and its helpers under `heimdallr/processing/`
 - "Adjust pipeline execution":
-  - edit [`run.py`](../run.py)
+  - edit [`heimdallr/processing/worker.py`](../heimdallr/processing/worker.py) and the JSON pipeline configs under `config/`
 - "Improve PACS or DICOM intake":
-  - edit [`services/dicom_listener.py`](../services/dicom_listener.py) and [`config.py`](../config.py)
+  - edit [`heimdallr/intake/gateway.py`](../heimdallr/intake/gateway.py) and [`heimdallr/shared/settings.py`](../heimdallr/shared/settings.py)
 - "Change UI behavior":
   - edit files under `static/`
 
@@ -132,15 +139,18 @@ This document summarizes the architecture, flows, and most likely edit points so
 
 In separate terminals:
 
-1. `source venv/bin/activate && venv/bin/python app.py`
-2. `source venv/bin/activate && venv/bin/python run.py`
-3. `source venv/bin/activate && venv/bin/python services/dicom_listener.py`
+1. `source .venv/bin/activate && .venv/bin/python -m heimdallr.control_plane`
+2. `source .venv/bin/activate && .venv/bin/python -m heimdallr.prepare`
+3. `source .venv/bin/activate && .venv/bin/python -m heimdallr.processing`
+4. `source .venv/bin/activate && .venv/bin/python -m heimdallr.metrics`
+5. `source .venv/bin/activate && .venv/bin/python -m heimdallr.intake`
+6. `source .venv/bin/activate && .venv/bin/python -m heimdallr.tui`
 
 Optional:
 
-4. `source venv/bin/activate && venv/bin/python api/anthropic.py`
-5. `source venv/bin/activate && venv/bin/python api/medgemma.py`
-6. `source venv/bin/activate && venv/bin/python api/ctr.py`
+7. `source .venv/bin/activate && .venv/bin/python api/anthropic.py`
+8. `source .venv/bin/activate && .venv/bin/python api/medgemma.py`
+9. `source .venv/bin/activate && .venv/bin/python api/ctr.py`
 
 Dashboard: `http://localhost:8001`  
 API docs: `http://localhost:8001/docs`
@@ -155,4 +165,4 @@ API docs: `http://localhost:8001/docs`
 - Verify compatibility across CT and MR paths when relevant.
 - Confirm that `id.json` and `resultados.json` remain consistent.
 - Avoid breaking the automated intake chain:
-  `DICOM listener -> /upload -> prepare -> run`
+  `intake -> /upload -> prepare -> processing -> metrics`

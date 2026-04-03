@@ -2,7 +2,7 @@
 
 **Radiology preprocessing ecosystem for imaging intake, quantitative analysis, and assistive reporting**
 
-Heimdallr is a production-oriented radiology pipeline that connects DICOM intake, study preparation, segmentation-driven analytics, and assistive reporting workflows. The repository combines a FastAPI application, a queue worker, a DICOM listener, and optional model-assist microservices.
+Heimdallr is a production-oriented radiology pipeline that connects DICOM intake, study preparation, segmentation-driven analytics, and assistive reporting workflows. The repository is now being reorganized around a modular package layout that separates the operational control plane, intake, preparation, processing, and shared platform concerns.
 
 ## Current Scope
 
@@ -14,7 +14,7 @@ The repository currently implements three practical layers:
    - Study preparation, series selection, and DICOM-to-NIfTI conversion
 
 2. **Quantitative imaging pipeline**
-   - Queue-based processing from `input/` to `output/`
+   - Queue-based processing from the runtime queue into per-study runtime folders
    - TotalSegmentator-backed segmentation and derived metrics
    - Structured case outputs in SQLite plus per-case artifact folders
 
@@ -27,15 +27,21 @@ Future-facing modules are tracked in [`docs/UPCOMING.md`](docs/UPCOMING.md).
 
 ## Repository Layout
 
-### Application and pipeline
-- `app.py` - FastAPI entry point for uploads, patient APIs, proxy routes, and static dashboard serving
-- `run.py` - background processing worker for segmentation and metrics
-- `config.py` - centralized paths and runtime configuration
-- `core/prepare.py` - upload preparation, DICOM parsing, series selection, and NIfTI conversion
+### Modular package
+- `heimdallr/control_plane/` - operational API and dashboard app factory plus routers
+- `heimdallr/intake/` - intake gateway entrypoints for DICOM ingress
+- `heimdallr/prepare/` - study preparation worker entrypoints
+- `heimdallr/processing/` - background processing worker runtime
+- `heimdallr/shared/` - shared settings, dependencies, and schemas
+
+### Transitional entrypoints
+- `app.py` - top-level wrapper around `heimdallr.control_plane.app`
+- `run.py` - top-level wrapper around `heimdallr.processing.worker`
 - `core/metrics.py` - quantitative extraction and derived metric generation
 
 ### Services and clients
-- `services/dicom_listener.py` - DICOM C-STORE SCP with idle-close and automatic upload
+- `heimdallr/metrics/` - resident metrics worker plus standalone job modules
+- `services/dicom_listener.py` - legacy listener path superseded by `heimdallr/intake/`
 - `services/deid_gateway.py` - outbound de-identification controls for external model calls
 - `services/anthropic_report_builder.py` - narrative/report structuring helpers
 - `clients/uploader.py` - CLI uploader for ZIP files or DICOM folders
@@ -48,12 +54,12 @@ Future-facing modules are tracked in [`docs/UPCOMING.md`](docs/UPCOMING.md).
 
 ### Storage and outputs
 - `database/schema.sql` - SQLite schema
-- `uploads/` - raw uploaded ZIP payloads
-- `input/` - ready-to-process NIfTI queue
-- `processing/` - claimed in-flight NIfTI jobs
-- `nii/` - archived final NIfTI files
-- `output/<case_id>/` - case artifacts such as `id.json`, `resultados.json`, PNG overlays, and segmentation folders
-- `data/incoming_dicom/` - listener intake staging area
+- `runtime/intake/uploads/` - raw uploaded ZIP payloads waiting for prepare
+- `runtime/queue/pending/` - queued processing inputs
+- `runtime/queue/active/` - claimed in-flight processing inputs
+- `runtime/queue/failed/` - failed processing inputs
+- `runtime/studies/<case_id>/` - case artifacts such as `metadata/id.json`, `metadata/resultados.json`, `artifacts/`, `derived/`, and `logs/`
+- `runtime/intake/dicom/incoming/` - listener intake staging area
 
 ## Runtime Topology
 
@@ -61,26 +67,29 @@ Future-facing modules are tracked in [`docs/UPCOMING.md`](docs/UPCOMING.md).
 PACS / Modality (DICOM C-STORE)
             |
             v
-services/dicom_listener.py
+heimdallr.intake
             |
             v
       POST /upload
             |
             v
-          app.py
+heimdallr.control_plane
             |
             v
-    core/prepare.py
+heimdallr.prepare
  (DICOM select + NIfTI)
             |
             v
-          input/
+ runtime/queue/pending
             |
             v
-          run.py
+heimdallr.processing
             |
             v
-   output/<case_id>/ + database/dicom.db + nii/
+heimdallr.metrics
+            |
+            v
+ runtime/studies/<case_id> + database/dicom.db
 
 Optional app.py proxy routes:
   /api/anthropic/ap-thorax-xray -> api/anthropic.py
@@ -97,7 +106,8 @@ Standalone optional service:
 
 - Python `3.10+`
 - `dcm2niix`
-- TotalSegmentator-compatible environment and license key
+- TotalSegmentator-compatible environment
+- TotalSegmentator license registered in the dedicated `.venv-totalseg` when licensed tasks are enabled
 - NVIDIA GPU recommended for segmentation and model-assist workloads
 - Optional OCR review support: `pytesseract` package plus system `tesseract`
 
@@ -106,18 +116,24 @@ Standalone optional service:
 ```bash
 git clone <repository-url>
 cd Heimdallr
-python3 -m venv venv
-source venv/bin/activate
-venv/bin/pip install -r requirements.txt
+python3 -m venv .venv
+source .venv/bin/activate
+.venv/bin/pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Set `TOTALSEGMENTATOR_LICENSE` in `.env`. `config.py` raises on import when that variable is missing.
+For licensed TotalSegmentator tasks such as `tissue_types`, register the license once in the dedicated TotalSegmentator environment instead of exposing it in the service command line:
+
+```bash
+/path/to/Heimdallr/.venv-totalseg/bin/totalseg_set_license -l YOUR_LICENSE_KEY
+```
+
+This is the preferred deployment model because the license is stored in the TotalSegmentator runtime itself and does not need to appear in `systemd`/`skuld` service definitions.
 
 Optional OCR dependency:
 
 ```bash
-venv/bin/pip install pytesseract
+.venv/bin/pip install pytesseract
 
 # macOS
 brew install tesseract
@@ -132,41 +148,50 @@ Run the baseline services in separate terminals:
 
 ```bash
 # 1) API + dashboard
-source venv/bin/activate
-venv/bin/python app.py
+source .venv/bin/activate
+.venv/bin/python -m heimdallr.control_plane
 
 # 2) Processing worker
-source venv/bin/activate
-venv/bin/python run.py
+source .venv/bin/activate
+.venv/bin/python -m heimdallr.processing
 
 # 3) Optional: DICOM listener
-source venv/bin/activate
-venv/bin/python services/dicom_listener.py
+source .venv/bin/activate
+.venv/bin/python -m heimdallr.intake
+
+# 4) Operations TUI
+source .venv/bin/activate
+.venv/bin/python -m heimdallr.tui
 ```
 
 Optional assistive services:
 
 ```bash
 # Anthropic proxy target (default app proxy target: http://localhost:8101/analyze)
-source venv/bin/activate
-venv/bin/python api/anthropic.py
+source .venv/bin/activate
+.venv/bin/python api/anthropic.py
 
 # MedGemma proxy target (default service port: 8004)
-source venv/bin/activate
-venv/bin/python api/medgemma.py
+source .venv/bin/activate
+.venv/bin/python api/medgemma.py
 
 # CTR extraction service (default port 8003)
-source venv/bin/activate
-venv/bin/python api/ctr.py
+source .venv/bin/activate
+.venv/bin/python api/ctr.py
 
 # Alternative HTTP segmentation service (default port 8005)
-source venv/bin/activate
-venv/bin/python api/totalsegmentator.py
+source .venv/bin/activate
+.venv/bin/python api/totalsegmentator.py
 ```
+
+The top-level commands `.venv/bin/python app.py` and `.venv/bin/python run.py` continue to resolve to the package runtimes, but the package modules under `heimdallr/` are now the primary execution surface.
+
+The TUI refreshes automatically and reads directly from `runtime/`, `database/dicom.db`, and the host process table. Use `q` to quit, `r` to force refresh, and `p` to pause live updates.
 
 ### Access
 
 - Dashboard: `http://localhost:8001`
+- TUI dashboard: `.venv/bin/python -m heimdallr.tui`
 - OpenAPI docs: `http://localhost:8001/docs`
 - CTR service health: `http://localhost:8003/health`
 - TotalSegmentator API health: `http://localhost:8005/health`
@@ -200,13 +225,13 @@ See [`docs/API.md`](docs/API.md) for contract notes and examples.
 
 ## Operational Notes
 
-- Configuration is centralized in `config.py` and may be overridden with `HEIMDALLR_*` environment variables where supported.
+- Runtime configuration is centralized in `heimdallr/shared/settings.py` plus the JSON profiles under `config/`, and may be overridden with `HEIMDALLR_*` environment variables where supported.
 - The DICOM listener default upload target is `http://127.0.0.1:8001/upload`.
 - The CLI uploader lives at [`clients/uploader.py`](clients/uploader.py) and may also be downloaded from `GET /api/tools/uploader`.
-- The worker claims files from `input/` into `processing/` before segmentation, then archives completed NIfTI files into `nii/`.
+- The processing worker claims studies from `runtime/queue/pending/` into `runtime/queue/active/` before segmentation and persists outputs under `runtime/studies/<case_id>/`.
 - Retroactive metrics regeneration is available through `venv/bin/python scripts/retroactive_recalculate_metrics.py` with options such as `--case`, `--limit`, `--workers`, and `--skip-overlays`.
 - The app proxy expects the Anthropic and MedGemma services to be running separately if those routes are used.
-- `api/totalsegmentator.py` is an alternative HTTP execution path and is not part of the default `upload -> prepare -> run` baseline.
+- `api/totalsegmentator.py` is an alternative HTTP execution path and is not part of the default `upload -> prepare -> processing -> metrics` baseline.
 
 ## Documentation Map
 

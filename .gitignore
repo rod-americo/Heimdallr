@@ -16,7 +16,7 @@ ENV/
 .venv-totalseg/
 
 # Local metrics scripts workspace
-metrics/
+/metrics/
 _abdominal_fat_self_test/
 _osteoporosis_self_test/
 
