@@ -18,40 +18,10 @@ env/
 ENV/
 .venv-totalseg/
 
-# Local metrics scripts workspace
-/metrics/
-_abdominal_fat_self_test/
-_osteoporosis_self_test/
+# Modular Runtime Storage (All data, logs, and transient states)
+runtime/
 
-# Data Directories (keep structure, ignore content)
-input/
-!input/.gitkeep
-
-nii/
-!nii/.gitkeep
-
-output/
-!output/.gitkeep
-
-uploads/
-!uploads/.gitkeep
-
-errors/
-!errors/.gitkeep
-
-# DICOM Listener Data
-_ap_rxays_png/
-data/dataset/
-data/incoming_dicom/
-data/sent/
-data/failed/
-data/state/
-!data/incoming_dicom/.gitkeep
-!data/sent/.gitkeep
-!data/failed/.gitkeep
-!data/state/.gitkeep
-
-# Database (keep schema and docs, ignore database file)
+# Database (Keep schema and docs, ignore database file)
 database/*.db
 database/*.db-journal
 !database/schema.sql
@@ -61,8 +31,9 @@ database/*.db-journal
 *.nii.gz
 *.dcm
 *.zip
+*.log
 
-# Model weights (large binaries, downloaded at runtime)
+# Model Weights and Large Binaries
 models/
 TotalSegmentator/
 
@@ -77,32 +48,5 @@ TotalSegmentator/
 .DS_Store
 Thumbs.db
 
-# Future features
+# Documentation / Project
 upcoming_features.md
-
-# Prompts
-*.local.prompt.md
-api/prompts/_out/
-
-# Modular runtime state
-runtime/
-
-# Private working docs
-docs/commercial/*.docx
-
-# Commercial docs generated artifacts
-docs/commercial/generated/*
-!docs/commercial/generated/.gitkeep
-docs/commercial/generated/**/*.pdf
-docs/commercial/generated/**/*.docx
-docs/commercial/generated/**/*.xlsx
-docs/commercial/generated/**/*.csv
-docs/commercial/generated/**/*.pptx
-
-# Commercial docs source (private/internal only)
-docs/commercial/*.md
-docs/commercial/OOP/*
-# Local service logs
-*.log
-docs/commercial/matriz-valor-financeiro.md
-docs/plano-180-dias-10-10.md
