@@ -13,9 +13,12 @@ __pycache__/
 venv/
 env/
 ENV/
+.venv-totalseg/
 
 # Local metrics scripts workspace
 metrics/
+_abdominal_fat_self_test/
+_osteoporosis_self_test/
 
 # Data Directories (keep structure, ignore content)
 input/
@@ -76,6 +79,13 @@ upcoming_features.md
 
 # Prompts
 *.local.prompt.md
+api/prompts/_out/
+
+# Modular runtime state
+runtime/
+
+# Private working docs
+docs/commercial/*.docx
 
 # Commercial docs generated artifacts
 docs/commercial/generated/*
