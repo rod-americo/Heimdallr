@@ -9,10 +9,6 @@ import sys
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-try:
-    from dotenv import load_dotenv
-except ImportError:  # pragma: no cover
-    load_dotenv = None
 
 
 def _parse_csv_env(name: str, default: str) -> list[str]:
@@ -59,8 +55,6 @@ DEFAULT_METRICS_PYTHON = str(
     else Path(sys.executable)
 )
 
-if load_dotenv is not None:
-    load_dotenv(dotenv_path=BASE_DIR / ".env")
 
 
 RUNTIME_DIR = BASE_DIR / "runtime"

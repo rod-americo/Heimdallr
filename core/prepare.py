@@ -39,9 +39,8 @@ os.environ["PATH"] = str(Path(sys.executable).parent) + os.pathsep + os.environ[
 # CONFIGURATIONS
 # ============================================================
 
-# Add root directory to sys.path so config can be imported
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-import config
+from heimdallr.shared import settings as config
 
 INPUT_DIR = config.INPUT_DIR
 OUTPUT_BASE_DIR = config.OUTPUT_DIR

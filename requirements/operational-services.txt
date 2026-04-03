@@ -9,7 +9,7 @@ python-multipart
 requests
 pydicom
 pynetdicom
-python-dotenv
+
 Pillow
 rich
 textual
