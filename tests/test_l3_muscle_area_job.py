@@ -2,10 +2,20 @@ import unittest
 
 import numpy as np
 
-from heimdallr.metrics.jobs.l3_muscle_area import render_overlay_rgb, sagittal_plane_from_mask
+from heimdallr.metrics.jobs.l3_muscle_area import (
+    centered_slab_bounds,
+    render_overlay_rgb,
+    sagittal_plane_from_mask,
+    sagittal_slab_from_mask,
+)
 
 
 class TestL3MuscleAreaJob(unittest.TestCase):
+    def test_centered_slab_bounds_prefers_odd_slice_count(self):
+        start, end = centered_slab_bounds(center_index=10, axis_len=40, spacing_mm=1.0, slab_thickness_mm=3.0)
+
+        self.assertEqual((start, end), (9, 12))
+
     def test_sagittal_plane_from_mask_prefers_narrower_lateral_span(self):
         mask = np.zeros((12, 18, 10), dtype=bool)
         mask[4:7, 3:13, 2:8] = True
@@ -16,6 +26,27 @@ class TestL3MuscleAreaJob(unittest.TestCase):
         self.assertEqual(index, 5)
         self.assertEqual(plane.shape, (18, 10))
         self.assertTrue(plane.any())
+
+    def test_sagittal_slab_from_mask_projects_three_millimeter_slab(self):
+        image = np.zeros((12, 18, 10), dtype=np.float32)
+        mask = np.zeros_like(image, dtype=bool)
+        mask[4:7, 3:13, 2:8] = True
+
+        _, plane_index, axis = sagittal_plane_from_mask(mask)
+        sagittal_ct, sagittal_mask, slab_bounds, lateral_spacing = sagittal_slab_from_mask(
+            image_data=image,
+            mask=mask,
+            plane_index=plane_index,
+            axis=axis,
+            spacing_mm=(1.0, 1.0, 2.5),
+            slab_thickness_mm=3.0,
+        )
+
+        self.assertEqual(slab_bounds, (4, 7))
+        self.assertEqual(lateral_spacing, 1.0)
+        self.assertEqual(sagittal_ct.shape, (18, 10))
+        self.assertEqual(sagittal_mask.shape, (18, 10))
+        self.assertTrue(sagittal_mask.any())
 
     def test_render_overlay_rgb_returns_combined_axial_and_sagittal_image(self):
         image = np.linspace(-200.0, 250.0, num=24 * 20 * 16, dtype=np.float32).reshape((24, 20, 16))
