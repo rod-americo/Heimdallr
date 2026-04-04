@@ -24,6 +24,14 @@ LOCAL_TZ = ZoneInfo(settings.TIMEZONE)
 JOB_NAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 JOB_MODULE_PREFIX = "heimdallr.metrics.jobs."
 
+# Metrics job resolution is intentionally convention-based so operational
+# changes live in config/metrics_pipeline.json instead of this worker:
+# - jobs[].name="l3_muscle_area" -> heimdallr.metrics.jobs.l3_muscle_area
+# - jobs[].module may override the module path, but only inside the
+#   heimdallr.metrics.jobs namespace.
+# This means toggling or parameterizing jobs in the JSON does not require a
+# worker restart; only changes to this worker module itself do.
+
 settings.ensure_directories()
 
 
@@ -213,6 +221,19 @@ def _run_job(case_id: str, job: dict, log_dir: Path) -> dict:
 
 
 def _resolve_job_module_name(job: dict) -> str:
+    """Resolve a configured metrics job to an importable module path.
+
+    Keep new jobs under `heimdallr.metrics.jobs` and prefer matching the
+    filename to `jobs[].name` in config/metrics_pipeline.json. For example:
+
+    1. Create `heimdallr/metrics/jobs/my_new_job.py`
+    2. Add `{ "name": "my_new_job", ... }` to the metrics profile JSON
+    3. The worker will resolve it automatically without further code changes
+
+    `jobs[].module` remains available for rare cases where the JSON name should
+    not match the module filename, but the override is restricted to the same
+    namespace to keep execution deterministic.
+    """
     job_name = str(job.get("name", "") or "").strip()
     if not JOB_NAME_PATTERN.fullmatch(job_name):
         raise RuntimeError(f"Metrics job name is invalid: {job_name or '<empty>'}")
