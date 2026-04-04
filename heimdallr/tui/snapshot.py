@@ -621,7 +621,9 @@ def _load_studies(studies_dir: Path) -> dict[str, dict[str, Any]]:
             "accession_number": payload.get("AccessionNumber", ""),
             "study_date": payload.get("StudyDate", ""),
             "prepare_elapsed": pipeline.get("prepare_elapsed_time", ""),
-            "segmentation_elapsed": pipeline.get("segmentation_elapsed_time", ""),
+            "segmentation_elapsed": pipeline.get("segmentation_elapsed_time")
+            or pipeline.get("processing_elapsed_time")
+            or "",
             "total_elapsed": pipeline.get("elapsed_time", ""),
             "selected_series": len(payload.get("AvailableSeries", [])),
             "discarded_series": len(payload.get("DiscardedSeries", [])),
