@@ -186,15 +186,15 @@ def init_and_insert_db(metadata):
         print(f"  [Error] DB Insert failed: {e}")
 
 
-def enqueue_case_for_processing(case_id):
+def enqueue_case_for_segmentation(case_id):
     """
-    Enqueue the prepared study for downstream processing dispatch.
+    Enqueue the prepared study for downstream segmentation dispatch.
     """
     try:
         conn = db_connect()
-        store.enqueue_case(conn, case_id, str(study_dir(case_id)))
+        store.enqueue_segmentation_case(conn, case_id, str(study_dir(case_id)))
         conn.close()
-        print(f"  [DB] Processing queue updated for case {case_id}")
+        print(f"  [DB] Segmentation queue updated for case {case_id}")
     except Exception as e:
         print(f"  [Warning] Failed to enqueue case {case_id}: {e}")
 
@@ -421,7 +421,7 @@ def process_zip(zip_path):
     if not zip_path.exists():
         raise FileNotFoundError(f"File {zip_path} not found.")
 
-    print(f"Processing {zip_path.name}...")
+    print(f"Segmentation {zip_path.name}...")
 
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_dir = Path(temp_dir)
@@ -637,7 +637,7 @@ def process_zip(zip_path):
                 raise PrepareError("No valid MR candidates.")
                 
             stage_timings["select_and_convert_seconds"] = round(time.perf_counter() - select_started, 3)
-            prepare_stats["selection_mode"] = "deferred_to_processing"
+            prepare_stats["selection_mode"] = "deferred_to_segmentation"
             prepare_stats["candidate_series_considered"] = len(mr_candidates)
             converted_candidates = []
             for candidate in mr_candidates:
@@ -699,7 +699,7 @@ def process_zip(zip_path):
             if not candidates:
                  raise PrepareError("No valid CT series converted.")
             stage_timings["select_and_convert_seconds"] = round(time.perf_counter() - select_started, 3)
-            prepare_stats["selection_mode"] = "deferred_to_processing"
+            prepare_stats["selection_mode"] = "deferred_to_segmentation"
             prepare_stats["candidate_series_considered"] = len(candidates)
             prepare_stats["phase_detection_runs"] = sum(1 for c in candidates if c.get("phase_seconds", 0.0) > 0)
             prepare_stats["phase_detection_successes"] = sum(1 for c in candidates if c.get("phase_detected"))
@@ -747,7 +747,7 @@ def process_zip(zip_path):
 
         # 5. Final Handover & Metadata Enrichment
         if available_series:
-            enqueue_case_for_processing(case_id)
+            enqueue_case_for_segmentation(case_id)
             print(f"\n  Ready: {study_dir(case_id)}")
             print(str(study_dir(case_id)))
 

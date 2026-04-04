@@ -1,4 +1,4 @@
-"""Module entrypoint for the processing worker."""
+"""Module entrypoint for the segmentation worker."""
 
 from .worker import main
 

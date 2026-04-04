@@ -51,7 +51,7 @@ The following modules are live in the repository:
 
 - DICOM C-STORE intake listener (`heimdallr.intake`)
 - Case preparation and queue worker (`heimdallr.prepare`)
-- Processing worker with TotalSegmentator orchestration (`heimdallr.processing`)
+- Segmentation worker with TotalSegmentator orchestration (`heimdallr.segmentation`)
 - Post-segmentation metrics engine with job-based modules (`heimdallr.metrics`)
 - FastAPI control plane with dashboard and patient API (`heimdallr.control_plane`)
 - Operations TUI (`heimdallr.tui`)

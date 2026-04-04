@@ -19,7 +19,7 @@ msgid "app.title"
 msgstr "Heimdallr TUI"
 
 msgid "app.subtitle"
-msgstr "Intake · Preparo · Processamento"
+msgstr "Intake · Preparo · Segmentação"
 
 msgid "app.table.patient"
 msgstr "Paciente"
@@ -33,8 +33,8 @@ msgstr "Fila"
 msgid "app.table.prepare"
 msgstr "Preparo"
 
-msgid "app.table.process"
-msgstr "Processamento"
+msgid "app.table.segment"
+msgstr "Segmentação"
 
 msgid "app.table.updated"
 msgstr "Atualizado"
@@ -108,8 +108,8 @@ msgstr "ativo"
 msgid "app.avg_prepare"
 msgstr "média preparo {value}"
 
-msgid "app.avg_process"
-msgstr "média processamento {value}"
+msgid "app.avg_segment"
+msgstr "média segmentação {value}"
 
 msgid "app.pulse.title"
 msgstr "Pulso"
@@ -168,8 +168,8 @@ msgstr "Fila"
 msgid "app.case.prepare"
 msgstr "Preparo"
 
-msgid "app.case.process"
-msgstr "Processamento"
+msgid "app.case.segment"
+msgstr "Segmentação"
 
 msgid "app.case.total"
 msgstr "Total"
@@ -195,8 +195,8 @@ msgstr "Intake"
 msgid "service.prepare"
 msgstr "Preparo"
 
-msgid "service.processing"
-msgstr "Processamento"
+msgid "service.segmentation"
+msgstr "Segmentação"
 
 msgid "stage_state.flow"
 msgstr "FLUXO"
@@ -228,8 +228,8 @@ msgstr "Preparado"
 msgid "case.stage.queued"
 msgstr "Na fila"
 
-msgid "case.stage.processing"
-msgstr "Processando"
+msgid "case.stage.segmentation"
+msgstr "Segmentação"
 
 msgid "case.stage.failed"
 msgstr "Falha"
@@ -244,7 +244,7 @@ msgid "snapshot.service.no_pressure"
 msgstr "Nenhuma pressão no pipeline detectada."
 
 msgid "snapshot.service.backlog_without_worker"
-msgstr "Há backlog, mas nenhum processo worker correspondente foi encontrado."
+msgstr "Há backlog, mas nenhum worker de segmentação correspondente foi encontrado."
 
 msgid "snapshot.service.running"
 msgstr "ativo"
@@ -271,7 +271,7 @@ msgid "snapshot.prepare.note.studies_prepared"
 msgstr "{count} estudos já têm id.json e contexto de preparo"
 
 msgid "snapshot.prepare.note.studies_staged"
-msgstr "{count} estudos preparados estão prontos para processamento"
+msgstr "{count} estudos preparados estão prontos para segmentação"
 
 msgid "snapshot.prepare.note.candidate_series"
 msgstr "{count} séries candidatas entre os casos preparados"
@@ -282,38 +282,38 @@ msgstr "{count} uploads parecem estar dentro do preparo agora"
 msgid "snapshot.prepare.note.oldest_waiting"
 msgstr "Caso preparado mais antigo aguardando: {age}"
 
-msgid "snapshot.process.note.queued"
-msgstr "{count} na fila da tabela de processamento ou da pasta pending"
+msgid "snapshot.segmentation.note.queued"
+msgstr "{count} na fila da tabela de segmentação ou da pasta pending"
 
-msgid "snapshot.process.note.active"
+msgid "snapshot.segmentation.note.active"
 msgstr "{count} em execução na fila active"
 
-msgid "snapshot.process.note.completed"
+msgid "snapshot.segmentation.note.completed"
 msgstr "{count} casos concluídos com resultados"
 
-msgid "snapshot.process.note.failed"
+msgid "snapshot.segmentation.note.failed"
 msgstr "{count} casos marcados como falha"
 
-msgid "snapshot.process.note.queue_states"
+msgid "snapshot.segmentation.note.queue_states"
 msgstr "Estados da fila: {value}"
 
-msgid "snapshot.process.note.oldest_pressure"
-msgstr "Pressão de processamento mais antiga: {age}"
+msgid "snapshot.segmentation.note.oldest_pressure"
+msgstr "Pressão de segmentação mais antiga: {age}"
 
 msgid "snapshot.alert.intake_failures"
 msgstr "O intake tem {count} falhas retidas."
 
-msgid "snapshot.alert.processing_backlog_no_worker"
-msgstr "Há backlog de processamento, mas o worker de processamento não foi detectado."
+msgid "snapshot.alert.segmentation_backlog_no_worker"
+msgstr "Há backlog de segmentação, mas o worker de segmentação não foi detectado."
 
 msgid "snapshot.alert.queue_errors"
-msgstr "{count} item(ns) da fila de processamento estão em erro."
+msgstr "{count} item(ns) da fila de segmentação estão em erro."
 
 msgid "snapshot.alert.intake_backlog_old"
 msgstr "O backlog de intake tem mais de 15 minutos."
 
-msgid "snapshot.alert.processing_old"
-msgstr "A pressão de processamento tem mais de 30 minutos."
+msgid "snapshot.alert.segmentation_old"
+msgstr "A pressão de segmentação tem mais de 30 minutos."
 
 msgid "snapshot.alert.no_blocking"
 msgstr "Nenhuma condição de bloqueio detectada no snapshot atual."
@@ -325,7 +325,7 @@ msgid "snapshot.case.signal.segmentation_metrics"
 msgstr "segmentação + métricas"
 
 msgid "snapshot.case.signal.waiting_slot"
-msgstr "aguardando slot de processamento"
+msgstr "aguardando slot de segmentação"
 
 msgid "snapshot.case.signal.series_ready"
 msgstr "{count} séries prontas"

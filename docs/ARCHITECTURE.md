@@ -21,9 +21,9 @@ The repository is currently transitioning from script-oriented entrypoints to a 
 - Selects target series and converts DICOM to NIfTI (`dcm2niix`)
 - Owns the study preparation worker runtime
 
-4. `heimdallr/processing/`
-- Claims prepared studies from `processing_queue`
-- Executes segmentation pipeline and baseline processing metrics
+4. `heimdallr/segmentation/`
+- Claims prepared studies from `segmentation_queue`
+- Executes segmentation pipeline and baseline segmentation metrics
 - Writes outputs to `runtime/studies/<case_id>/` and updates database fields
 
 5. `heimdallr/shared/`
@@ -55,10 +55,10 @@ PACS/Modality (DICOM) --> heimdallr/intake --> /upload (heimdallr/control_plane)
                                               (select + convert + persist)
                                                          |
                                                          v
-                                                processing_queue
+                                                segmentation_queue
                                                          |
                                                          v
-                                               heimdallr/processing
+                                                heimdallr.segmentation
                                          (segment + baseline metrics + DB update)
                                                          |
                                                          v
@@ -92,7 +92,7 @@ PACS/Modality (DICOM) --> heimdallr/intake --> /upload (heimdallr/control_plane)
 ## Operational Boundaries
 
 - Assistive outputs are operational results and require clinical validation before use.
-- Production operation expects independent process supervision for the control plane, prepare worker, processing worker, metrics worker, intake gateway, and DICOM egress runtimes.
+- Production operation expects independent process supervision for the control plane, prepare worker, segmentation worker, metrics worker, intake gateway, and DICOM egress runtimes.
 
 ## Cross-References
 

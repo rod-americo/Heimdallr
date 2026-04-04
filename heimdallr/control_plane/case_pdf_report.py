@@ -294,8 +294,8 @@ def build_case_report(case_folder: Path, output_path: Path | None = None) -> Pat
         ("Modality", metadata.get("Modality", "-")),
         ("Series", str(selected_series.get("SeriesNumber", "-"))),
         ("Phase", str(selected_phase)),
-        ("T Pre-Proc", pipeline.get("prepare_elapsed_time", "-")),
-        ("T Proc", pipeline.get("processing_elapsed_time") or pipeline.get("elapsed_time", "-")),
+        ("T Prep", pipeline.get("prepare_elapsed_time", "-")),
+        ("T Seg", pipeline.get("segmentation_elapsed_time") or pipeline.get("elapsed_time", "-")),
     ]
     summary_cols = 4
     summary_cell = (PAGE_WIDTH - 2 * MARGIN - 24) // summary_cols
@@ -384,7 +384,7 @@ def build_case_report(case_folder: Path, output_path: Path | None = None) -> Pat
     bottom_y = max(left_y, right_y) + 20
     _draw_card(draw, "Technical Timing", [
         ("Prepare", pipeline.get("prepare_elapsed_time", "-")),
-        ("Processing", pipeline.get("processing_elapsed_time") or pipeline.get("elapsed_time", "-")),
+        ("Segmentation", pipeline.get("segmentation_elapsed_time") or pipeline.get("elapsed_time", "-")),
         ("Prepare stats", json.dumps(pipeline.get("prepare_stats", {}), ensure_ascii=True)),
         ("Prepare stage timings", json.dumps(pipeline.get("prepare_stage_timings_seconds", {}), ensure_ascii=True)),
     ], MARGIN, bottom_y, PAGE_WIDTH - 2 * MARGIN, fill="#f8fafc")

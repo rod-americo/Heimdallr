@@ -12,7 +12,7 @@ from heimdallr.metrics.jobs._bone_job_common import (
     read_json,
     write_payload,
 )
-from heimdallr.processing.bone_health import build_opportunistic_osteoporosis_composite, classify_l1_hu
+from heimdallr.segmentation.bone_health import build_opportunistic_osteoporosis_composite, classify_l1_hu
 from heimdallr.shared.paths import study_dir, study_results_json
 
 
@@ -101,4 +101,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

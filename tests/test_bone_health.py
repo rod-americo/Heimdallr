@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from heimdallr.processing.bone_health import (
+from heimdallr.segmentation.bone_health import (
     build_bone_health_qc_flags,
     build_opportunistic_osteoporosis_composite,
     calculate_mask_hu_statistics,
@@ -127,4 +127,3 @@ class TestBoneHealthHelpers(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
