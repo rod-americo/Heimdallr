@@ -26,13 +26,14 @@ from heimdallr.metrics.jobs._bone_job_common import (
 from heimdallr.metrics.jobs._dicom_secondary_capture import create_secondary_capture_from_rgb
 from heimdallr.metrics.jobs._parenchymal_overlay_text import (
     build_overlay_text,
+    derivation_description,
     resolve_artifact_locale,
+    series_description,
 )
 from heimdallr.shared.paths import study_metadata_json
 
 
 TARGET_SLICE_THICKNESS_MM = 5.0
-SERIES_DESCRIPTION = "Heimdallr Parenchymal Organ Overlay 5 mm"
 SERIES_NUMBER = 9105
 WINDOW_MIN = -160.0
 WINDOW_MAX = 240.0
@@ -43,6 +44,26 @@ ORGAN_DEFINITIONS = [
     ("kidney_right", "Right kidney", "kidney_right.nii.gz", (91, 214, 114)),
     ("kidney_left", "Left kidney", "kidney_left.nii.gz", (255, 214, 64)),
 ]
+
+
+def _load_overlay_font(size: int) -> ImageFont.ImageFont:
+    candidates = [
+        "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/Library/Fonts/Arial Unicode.ttf",
+        "/Library/Fonts/Arial.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+    ]
+    for candidate in candidates:
+        path = Path(candidate)
+        if not path.exists():
+            continue
+        try:
+            return ImageFont.truetype(str(path), size=size)
+        except OSError:
+            continue
+    return ImageFont.load_default()
 
 
 def _load_case_metadata(case_id: str, case_dir: Path) -> dict[str, Any]:
@@ -159,14 +180,18 @@ def _render_slice_rgb(
 
     image = Image.fromarray(rgb, mode="RGB")
     draw = ImageDraw.Draw(image, mode="RGBA")
-    font = ImageFont.load_default()
+    title_font = _load_overlay_font(size=20)
+    body_font = _load_overlay_font(size=18)
 
+    line_heights: list[int] = []
     max_width = 0
-    for line in summary_lines:
+    for idx, line in enumerate(summary_lines):
+        font = title_font if idx == 0 else body_font
         bbox = draw.textbbox((0, 0), line, font=font)
         max_width = max(max_width, bbox[2] - bbox[0])
+        line_heights.append((bbox[3] - bbox[1]) + (8 if idx == 0 else 6))
     box_width = min(image.width - 20, max_width + 24)
-    box_height = _legend_height(len(summary_lines))
+    box_height = 18 + sum(line_heights) + 8
     draw.rounded_rectangle(
         (10, 10, 10 + box_width, 10 + box_height),
         radius=8,
@@ -175,9 +200,10 @@ def _render_slice_rgb(
 
     y = 18
     for idx, line in enumerate(summary_lines):
+        font = title_font if idx == 0 else body_font
         fill = (255, 255, 255, 255) if idx == 0 else (235, 235, 235, 255)
         draw.text((20, y), line, font=font, fill=fill)
-        y += 20
+        y += line_heights[idx]
 
     return np.asarray(image, dtype=np.uint8)
 
@@ -259,8 +285,8 @@ def main() -> int:
             if mask is not None:
                 union_mask |= np.asarray(mask, dtype=bool)
 
-        export_indices = np.where(union_mask.sum(axis=(0, 1)) > 0)[0].tolist()
-        if not export_indices:
+        occupied_indices = np.where(union_mask.sum(axis=(0, 1)) > 0)[0].tolist()
+        if not occupied_indices:
             payload["status"] = "skipped"
             payload["measurement"] = {
                 "job_status": "empty_resampled_overlay",
@@ -270,6 +296,9 @@ def main() -> int:
             write_payload(result_path, payload)
             print(json.dumps(payload, indent=2))
             return 0
+        export_start = max(0, int(occupied_indices[0]) - 1)
+        export_end = min(int(resampled_ct.shape[2]) - 1, int(occupied_indices[-1]) + 1)
+        export_indices = list(range(export_start, export_end + 1))
 
         artifacts = {
             "result_json": str(result_path.relative_to(case_dir)),
@@ -290,9 +319,6 @@ def main() -> int:
                     if slice_mask.any():
                         masks_for_slice.append((slice_mask, color))
 
-                if not masks_for_slice:
-                    continue
-
                 summary_lines = build_overlay_text(
                     organ_measurements=organ_measurements,
                     locale=artifact_locale,
@@ -305,13 +331,10 @@ def main() -> int:
                         dicom_path,
                         case_metadata,
                         series_instance_uid=series_instance_uid,
-                        series_description=SERIES_DESCRIPTION,
+                        series_description=series_description(artifact_locale),
                         series_number=SERIES_NUMBER,
                         instance_number=output_idx,
-                        derivation_description=(
-                            "5 mm axial reconstruction with parenchymal-organ overlays "
-                            "(liver, spleen, pancreas, right kidney, left kidney)"
-                        ),
+                        derivation_description=derivation_description(artifact_locale),
                     )
                     dicom_exports.append(
                         {
