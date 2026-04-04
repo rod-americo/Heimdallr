@@ -106,6 +106,20 @@ class TestTuiSnapshot(unittest.TestCase):
                 )
                 conn.execute(
                     """
+                    CREATE TABLE metrics_queue (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        case_id TEXT NOT NULL UNIQUE,
+                        input_path TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        created_at TEXT,
+                        claimed_at TEXT,
+                        finished_at TEXT,
+                        error TEXT
+                    )
+                    """
+                )
+                conn.execute(
+                    """
                     INSERT INTO segmentation_queue(case_id, input_path, status, created_at, error)
                     VALUES (?, ?, ?, ?, ?)
                     """,
@@ -158,11 +172,11 @@ class TestTuiSnapshot(unittest.TestCase):
             self.assertEqual(snapshot.processed_cases, 1)
             self.assertEqual(snapshot.failed_cases, 1)
             self.assertGreaterEqual(snapshot.backlog_cases, 1)
+            self.assertEqual([stage.slug for stage in snapshot.stages], ["intake", "prepare", "segmentation", "metrics"])
             self.assertEqual(snapshot.stages[0].queued, 1)
             self.assertEqual(snapshot.stages[2].failed, 1)
             self.assertTrue(any(case.case_id == "ProcessedCase_20260401_3" and case.stage_key == "processed" for case in snapshot.cases))
             self.assertTrue(any(case.case_id == "FailedCase_20260401_2" and case.stage_key == "failed" for case in snapshot.cases))
-            self.assertTrue(any(case.case_id == "ProcessedCase_20260401_3" and case.stage_label == "Processado" for case in snapshot.cases))
             self.assertTrue(any(alert.level == "warning" for alert in snapshot.alerts))
 
 

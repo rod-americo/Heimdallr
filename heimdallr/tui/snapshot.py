@@ -94,6 +94,7 @@ class CaseOverview:
     updated_at: datetime | None
     prepare_elapsed: str
     segmentation_elapsed: str
+    metrics_elapsed: str
     total_elapsed: str
     selected_series: int
     discarded_series: int
@@ -121,6 +122,7 @@ class DashboardSnapshot:
     failed_cases: int
     avg_prepare_seconds: float | None
     avg_segmentation_seconds: float | None
+    avg_metrics_seconds: float | None
 
 
 def build_snapshot(
@@ -133,7 +135,8 @@ def build_snapshot(
     db_path = db_path or settings.DB_PATH
     generated_at = datetime.now(LOCAL_TZ)
 
-    queue_rows = _load_segmentation_queue(db_path)
+    segmentation_queue_rows = _load_segmentation_queue(db_path)
+    metrics_queue_rows = _load_metrics_queue(db_path)
     metadata_rows = _load_metadata_rows(db_path)
     process_scan = _scan_system_processes()
     study_entries = _load_studies(layout.studies_dir)
@@ -149,6 +152,7 @@ def build_snapshot(
     case_map: dict[str, dict[str, Any]] = {}
     prepare_samples: list[float] = []
     segmentation_samples: list[float] = []
+    metrics_samples: list[float] = []
 
     for row in metadata_rows:
         case_id = _case_id_from_metadata_row(row)
@@ -173,6 +177,7 @@ def build_snapshot(
                 "study_date": study.get("study_date") or case["study_date"],
                 "prepare_elapsed": study.get("prepare_elapsed") or case["prepare_elapsed"],
                 "segmentation_elapsed": study.get("segmentation_elapsed") or case["segmentation_elapsed"],
+                "metrics_elapsed": study.get("metrics_elapsed") or case["metrics_elapsed"],
                 "total_elapsed": study.get("total_elapsed") or case["total_elapsed"],
                 "selected_series": study.get("selected_series", case["selected_series"]),
                 "discarded_series": study.get("discarded_series", case["discarded_series"]),
@@ -189,29 +194,54 @@ def build_snapshot(
         segmentation_seconds = _duration_to_seconds(study.get("segmentation_elapsed", ""))
         if segmentation_seconds is not None:
             segmentation_samples.append(segmentation_seconds)
+        metrics_seconds = _duration_to_seconds(study.get("metrics_elapsed", ""))
+        if metrics_seconds is not None:
+            metrics_samples.append(metrics_seconds)
 
-    queue_status_counts: dict[str, int] = {}
-    queue_pending_times: list[datetime] = []
+    segmentation_queue_status_counts: dict[str, int] = {}
+    metrics_queue_status_counts: dict[str, int] = {}
+    segmentation_queue_pending_times: list[datetime] = []
     segmentation_claim_times: list[datetime] = []
+    metrics_queue_pending_times: list[datetime] = []
+    metrics_claim_times: list[datetime] = []
 
-    for row in queue_rows:
+    for row in segmentation_queue_rows:
         case_id = row["case_id"]
         case = case_map.setdefault(case_id, _empty_case(case_id))
-        case["queue_status"] = row["status"]
+        case["segmentation_queue_status"] = row["status"]
         case["error"] = row["error"] or case["error"]
         case["updated_at"] = _max_datetime(
             case["updated_at"],
             _parse_datetime(row["finished_at"]) or _parse_datetime(row["claimed_at"]) or _parse_datetime(row["created_at"]),
         )
-        queue_status_counts[row["status"]] = queue_status_counts.get(row["status"], 0) + 1
+        segmentation_queue_status_counts[row["status"]] = segmentation_queue_status_counts.get(row["status"], 0) + 1
         if row["status"] == "pending":
             created_at = _parse_datetime(row["created_at"])
             if created_at is not None:
-                queue_pending_times.append(created_at)
+                segmentation_queue_pending_times.append(created_at)
         if row["status"] == "claimed":
             claimed_at = _parse_datetime(row["claimed_at"])
             if claimed_at is not None:
                 segmentation_claim_times.append(claimed_at)
+
+    for row in metrics_queue_rows:
+        case_id = row["case_id"]
+        case = case_map.setdefault(case_id, _empty_case(case_id))
+        case["metrics_queue_status"] = row["status"]
+        case["error"] = row["error"] or case["error"]
+        case["updated_at"] = _max_datetime(
+            case["updated_at"],
+            _parse_datetime(row["finished_at"]) or _parse_datetime(row["claimed_at"]) or _parse_datetime(row["created_at"]),
+        )
+        metrics_queue_status_counts[row["status"]] = metrics_queue_status_counts.get(row["status"], 0) + 1
+        if row["status"] == "pending":
+            created_at = _parse_datetime(row["created_at"])
+            if created_at is not None:
+                metrics_queue_pending_times.append(created_at)
+        if row["status"] == "claimed":
+            claimed_at = _parse_datetime(row["claimed_at"])
+            if claimed_at is not None:
+                metrics_claim_times.append(claimed_at)
 
     pending_case_ids = {_case_id_from_nifti(path) for path in pending_files}
     active_case_ids = {_case_id_from_nifti(path) for path in active_files}
@@ -250,30 +280,40 @@ def build_snapshot(
         pending_case_ids=pending_case_ids,
         active_case_ids=active_case_ids,
         failed_case_ids=failed_case_ids,
-        queue_status_counts=queue_status_counts,
-        queue_pending_times=queue_pending_times,
+        queue_status_counts=segmentation_queue_status_counts,
+        queue_pending_times=segmentation_queue_pending_times,
         segmentation_claim_times=segmentation_claim_times,
         services=process_scan,
         now=generated_at,
     )
+    metrics_stage = _build_metrics_stage(
+        cases=cases,
+        queue_status_counts=metrics_queue_status_counts,
+        queue_pending_times=metrics_queue_pending_times,
+        metrics_claim_times=metrics_claim_times,
+        services=process_scan,
+        now=generated_at,
+    )
 
-    services = _build_services(process_scan, cases, intake_stage, prepare_stage, segmentation_stage)
+    services = _build_services(process_scan, cases, intake_stage, prepare_stage, segmentation_stage, metrics_stage)
     alerts = _build_alerts(
         services=services,
         intake_stage=intake_stage,
         prepare_stage=prepare_stage,
         segmentation_stage=segmentation_stage,
-        queue_status_counts=queue_status_counts,
+        metrics_stage=metrics_stage,
+        segmentation_queue_status_counts=segmentation_queue_status_counts,
+        metrics_queue_status_counts=metrics_queue_status_counts,
     )
 
     processed_cases = sum(1 for case in cases if case.stage_key == "processed")
     failed_cases = sum(1 for case in cases if case.stage_key == "failed")
-    backlog_cases = sum(1 for case in cases if case.stage_key in {"queued", "prepared", "segmentation"})
+    backlog_cases = sum(1 for case in cases if case.stage_key in {"queued", "prepared", "segmentation", "metrics"})
 
     return DashboardSnapshot(
         generated_at=generated_at,
         services=services,
-        stages=[intake_stage, prepare_stage, segmentation_stage],
+        stages=[intake_stage, prepare_stage, segmentation_stage, metrics_stage],
         cases=cases,
         alerts=alerts,
         total_cases=len(cases),
@@ -282,6 +322,7 @@ def build_snapshot(
         failed_cases=failed_cases,
         avg_prepare_seconds=_safe_mean(prepare_samples),
         avg_segmentation_seconds=_safe_mean(segmentation_samples),
+        avg_metrics_seconds=_safe_mean(metrics_samples),
     )
 
 
@@ -291,16 +332,19 @@ def _build_services(
     intake_stage: StageMetrics,
     prepare_stage: StageMetrics,
     segmentation_stage: StageMetrics,
+    metrics_stage: StageMetrics,
 ) -> list[ServiceStatus]:
     case_by_stage = {
         "intake": intake_stage,
         "prepare": prepare_stage,
         "segmentation": segmentation_stage,
+        "metrics": metrics_stage,
     }
     labels = {
         "intake": service_label("intake"),
         "prepare": service_label("prepare"),
         "segmentation": service_label("segmentation"),
+        "metrics": service_label("metrics"),
     }
     statuses: list[ServiceStatus] = []
     for slug, processes in process_scan.items():
@@ -458,13 +502,64 @@ def _build_segmentation_stage(
     )
 
 
+def _build_metrics_stage(
+    *,
+    cases: list[CaseOverview],
+    queue_status_counts: dict[str, int],
+    queue_pending_times: list[datetime],
+    metrics_claim_times: list[datetime],
+    services: dict[str, list[dict[str, str]]],
+    now: datetime,
+) -> StageMetrics:
+    queued_cases = [case for case in cases if case.stage_key == "metrics" and case.queue_status_key == "pending"]
+    active_cases = [case for case in cases if case.stage_key == "metrics" and case.queue_status_key == "claimed"]
+    completed = [case for case in cases if case.stage_key == "processed"]
+    failed_cases = [case for case in cases if case.stage_key == "failed" and case.queue_status_key in {"error", "claimed"}]
+    oldest = _oldest_pending_from_timestamps(queue_pending_times + metrics_claim_times, now)
+    state = "flow"
+    if failed_cases:
+        state = "warning"
+    if (queued_cases or active_cases) and not services["metrics"]:
+        state = "blocked"
+    notes = [
+        tui("snapshot.metrics.note.queued", count=len(queued_cases)),
+        tui("snapshot.metrics.note.active", count=len(active_cases)),
+        tui("snapshot.metrics.note.completed", count=len(completed)),
+        tui("snapshot.metrics.note.failed", count=len(failed_cases)),
+    ]
+    if queue_status_counts:
+        notes.append(
+            tui(
+                "snapshot.metrics.note.queue_states",
+                value=", ".join(
+                    f"{queue_status_label(status)}={count}" for status, count in sorted(queue_status_counts.items())
+                ),
+            )
+        )
+    if oldest is not None:
+        notes.append(tui("snapshot.metrics.note.oldest_pressure", age=_friendly_age(oldest)))
+    return StageMetrics(
+        slug="metrics",
+        label=service_label("metrics"),
+        state=state,
+        queued=queue_status_counts.get("pending", 0),
+        active=queue_status_counts.get("claimed", 0),
+        completed=len(completed),
+        failed=queue_status_counts.get("error", 0),
+        oldest_age_seconds=oldest,
+        notes=notes,
+    )
+
+
 def _build_alerts(
     *,
     services: list[ServiceStatus],
     intake_stage: StageMetrics,
     prepare_stage: StageMetrics,
     segmentation_stage: StageMetrics,
-    queue_status_counts: dict[str, int],
+    metrics_stage: StageMetrics,
+    segmentation_queue_status_counts: dict[str, int],
+    metrics_queue_status_counts: dict[str, int],
 ) -> list[AlertItem]:
     alerts: list[AlertItem] = []
     services_by_slug = {service.slug: service for service in services}
@@ -473,12 +568,18 @@ def _build_alerts(
         alerts.append(AlertItem("warning", tui("snapshot.alert.intake_failures", count=intake_stage.failed)))
     if segmentation_stage.queued and not services_by_slug["segmentation"].running:
         alerts.append(AlertItem("warning", tui("snapshot.alert.segmentation_backlog_no_worker")))
-    if queue_status_counts.get("error"):
-        alerts.append(AlertItem("warning", tui("snapshot.alert.queue_errors", count=queue_status_counts["error"])))
+    if metrics_stage.queued and not services_by_slug["metrics"].running:
+        alerts.append(AlertItem("warning", tui("snapshot.alert.metrics_backlog_no_worker")))
+    if segmentation_queue_status_counts.get("error"):
+        alerts.append(AlertItem("warning", tui("snapshot.alert.segmentation_queue_errors", count=segmentation_queue_status_counts["error"])))
+    if metrics_queue_status_counts.get("error"):
+        alerts.append(AlertItem("warning", tui("snapshot.alert.metrics_queue_errors", count=metrics_queue_status_counts["error"])))
     if intake_stage.oldest_age_seconds and intake_stage.oldest_age_seconds > 900:
         alerts.append(AlertItem("warning", tui("snapshot.alert.intake_backlog_old")))
     if segmentation_stage.oldest_age_seconds and segmentation_stage.oldest_age_seconds > 1800:
         alerts.append(AlertItem("warning", tui("snapshot.alert.segmentation_old")))
+    if metrics_stage.oldest_age_seconds and metrics_stage.oldest_age_seconds > 1800:
+        alerts.append(AlertItem("warning", tui("snapshot.alert.metrics_old")))
     if not alerts:
         alerts.append(AlertItem("ok", tui("snapshot.alert.no_blocking")))
     return alerts
@@ -487,7 +588,7 @@ def _build_alerts(
 def _finalize_case(case: dict[str, Any]) -> CaseOverview:
     stage_key = _derive_stage_key(case)
     signal = _derive_case_signal(case, stage_key)
-    queue_status_key = case["queue_status"] or ""
+    queue_status_key = _display_queue_status_key(case, stage_key)
     updated_at = case["updated_at"]
     sort_timestamp = updated_at.timestamp() if updated_at is not None else 0.0
     return CaseOverview(
@@ -504,6 +605,7 @@ def _finalize_case(case: dict[str, Any]) -> CaseOverview:
         updated_at=updated_at,
         prepare_elapsed=_display_duration(case["prepare_elapsed"]),
         segmentation_elapsed=_display_duration(case["segmentation_elapsed"]),
+        metrics_elapsed=_display_duration(case["metrics_elapsed"]),
         total_elapsed=_display_duration(case["total_elapsed"] or case["segmentation_elapsed"] or case["prepare_elapsed"]),
         selected_series=case["selected_series"],
         discarded_series=case["discarded_series"],
@@ -514,14 +616,19 @@ def _finalize_case(case: dict[str, Any]) -> CaseOverview:
 
 
 def _derive_stage_key(case: dict[str, Any]) -> str:
-    queue_status = case["queue_status"]
-    if case["has_results"] or queue_status == "done":
+    segmentation_queue_status = case["segmentation_queue_status"]
+    metrics_queue_status = case["metrics_queue_status"]
+    metrics_started = bool(case.get("metrics_started"))
+    metrics_finished = bool(case.get("metrics_finished"))
+    if case["has_results"] or metrics_queue_status == "done" or metrics_finished:
         return "processed"
-    if queue_status == "error" or case["failed_file"] or case["has_error_log"]:
+    if metrics_queue_status in {"pending", "claimed"} or (metrics_started and not metrics_finished):
+        return "metrics"
+    if segmentation_queue_status == "error" or metrics_queue_status == "error" or case["failed_file"] or case["has_error_log"]:
         return "failed"
-    if queue_status == "claimed" or case["active_file"]:
+    if segmentation_queue_status == "claimed" or case["active_file"]:
         return "segmentation"
-    if queue_status == "pending" or case["pending_file"]:
+    if segmentation_queue_status == "pending" or case["pending_file"]:
         return "queued"
     if case["path"] is not None:
         return "prepared"
@@ -533,6 +640,8 @@ def _derive_case_signal(case: dict[str, Any], stage_key: str) -> str:
         return _truncate(case["error"], 52)
     if stage_key == "processed":
         return tui("snapshot.case.signal.results_ready")
+    if stage_key == "metrics":
+        return tui("snapshot.case.signal.metrics_running")
     if stage_key == "segmentation":
         return tui("snapshot.case.signal.segmentation_metrics")
     if stage_key == "queued":
@@ -542,6 +651,14 @@ def _derive_case_signal(case: dict[str, Any], stage_key: str) -> str:
     return tui("snapshot.case.signal.awaiting_metadata")
 
 
+def _display_queue_status_key(case: dict[str, Any], stage_key: str) -> str:
+    if stage_key in {"metrics", "processed"} and case["metrics_queue_status"]:
+        return case["metrics_queue_status"]
+    if case["segmentation_queue_status"]:
+        return case["segmentation_queue_status"]
+    return ""
+
+
 def _empty_case(case_id: str) -> dict[str, Any]:
     return {
         "case_id": case_id,
@@ -549,11 +666,15 @@ def _empty_case(case_id: str) -> dict[str, Any]:
         "modality": "",
         "accession_number": "",
         "study_date": "",
-        "queue_status": "",
+        "segmentation_queue_status": "",
+        "metrics_queue_status": "",
         "updated_at": None,
         "prepare_elapsed": "",
         "segmentation_elapsed": "",
+        "metrics_elapsed": "",
         "total_elapsed": "",
+        "metrics_started": False,
+        "metrics_finished": False,
         "selected_series": 0,
         "discarded_series": 0,
         "path": None,
@@ -572,6 +693,22 @@ def _load_segmentation_queue(db_path: Path) -> list[dict[str, Any]]:
     query = """
         SELECT case_id, status, created_at, claimed_at, finished_at, error
         FROM segmentation_queue
+        ORDER BY COALESCE(finished_at, claimed_at, created_at) DESC
+    """
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            return [dict(row) for row in conn.execute(query).fetchall()]
+    except sqlite3.DatabaseError:
+        return []
+
+
+def _load_metrics_queue(db_path: Path) -> list[dict[str, Any]]:
+    if not db_path.exists():
+        return []
+    query = """
+        SELECT case_id, status, created_at, claimed_at, finished_at, error
+        FROM metrics_queue
         ORDER BY COALESCE(finished_at, claimed_at, created_at) DESC
     """
     try:
@@ -624,7 +761,10 @@ def _load_studies(studies_dir: Path) -> dict[str, dict[str, Any]]:
             "segmentation_elapsed": pipeline.get("segmentation_elapsed_time")
             or pipeline.get("processing_elapsed_time")
             or "",
+            "metrics_elapsed": pipeline.get("metrics_elapsed_time", ""),
             "total_elapsed": pipeline.get("elapsed_time", ""),
+            "metrics_started": bool(pipeline.get("metrics_start_time")),
+            "metrics_finished": bool(pipeline.get("metrics_end_time")),
             "selected_series": len(payload.get("AvailableSeries", [])),
             "discarded_series": len(payload.get("DiscardedSeries", [])),
             "updated_at": _latest_mtime([id_json_path, results_path if results_path.exists() else None, log_error if log_error.exists() else None]),
@@ -670,7 +810,7 @@ def _collect_runtime_items(directory: Path) -> list[Path]:
 
 
 def _scan_system_processes() -> dict[str, list[dict[str, str]]]:
-    groups = {"intake": [], "prepare": [], "segmentation": []}
+    groups = {"intake": [], "prepare": [], "segmentation": [], "metrics": []}
     try:
         result = subprocess.run(
             ["ps", "-axo", "pid=,etime=,command="],
@@ -704,6 +844,7 @@ def _service_patterns() -> dict[str, tuple[str, ...]]:
         "intake": ("-m heimdallr.intake", "heimdallr/intake", "services/dicom_listener.py"),
         "prepare": ("-m heimdallr.prepare", "heimdallr/prepare", "prepare/worker.py"),
         "segmentation": ("-m heimdallr.segmentation", "heimdallr/segmentation", "/run.py", " run.py"),
+        "metrics": ("-m heimdallr.metrics", "heimdallr/metrics", "metrics/worker.py"),
     }
 
 
