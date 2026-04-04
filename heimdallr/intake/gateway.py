@@ -393,7 +393,7 @@ class HeimdallrDicomListener:
             except Exception:
                 sop_class_uid = "unknown"
             print(f"✗ C-STORE handling error (SOP Class: {sop_class_uid}): {e}")
-            # Unexpected error: return processing failure status
+            # Unexpected error: return segmentation failure status
             return 0xA700
 
     def scan_and_flush(self) -> None:

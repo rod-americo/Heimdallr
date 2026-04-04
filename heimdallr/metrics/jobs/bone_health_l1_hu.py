@@ -21,7 +21,7 @@ from heimdallr.metrics.jobs._bone_job_common import (
     save_png_overlay,
     write_payload,
 )
-from heimdallr.processing.bone_health import (
+from heimdallr.segmentation.bone_health import (
     build_bone_health_qc_flags,
     calculate_mask_hu_statistics,
     classify_l1_hu,
@@ -164,4 +164,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -24,8 +24,8 @@ from heimdallr.metrics.jobs._bone_job_common import (
     resolve_canonical_nifti,
     write_payload,
 )
-from heimdallr.processing.bone_health import extract_study_technique_context
-from heimdallr.processing.vertebral_fracture import screen_vertebral_fracture
+from heimdallr.segmentation.bone_health import extract_study_technique_context
+from heimdallr.segmentation.vertebral_fracture import screen_vertebral_fracture
 from heimdallr.shared.paths import study_artifacts_dir
 
 

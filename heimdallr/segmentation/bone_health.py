@@ -17,7 +17,7 @@
 
 The helpers in this module are intentionally pure and operate on numpy arrays
 and plain mappings only. They are designed to be integrated into the existing
-metrics pipeline without forcing changes in the rest of the processing stack.
+metrics pipeline without forcing changes in the rest of the segmentation stack.
 """
 
 from __future__ import annotations

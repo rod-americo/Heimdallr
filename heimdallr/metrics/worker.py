@@ -301,7 +301,7 @@ def _enqueue_case_dicom_exports(
     return enqueued
 
 
-def process_case_metrics(case_input: Path) -> bool:
+def segment_case_metrics(case_input: Path) -> bool:
     case_id = case_input.name
     log_dir = study_logs_dir(case_id)
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -384,12 +384,12 @@ def main() -> int:
     print("Starting metrics queue monitoring...")
     ensure_metrics_queue_table()
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-    processing_cases = set()
+    segmentation_cases = set()
     lock = threading.Lock()
 
     def on_complete(fut, case_path: Path, queue_id: int | None = None):
         with lock:
-            processing_cases.discard(case_path)
+            segmentation_cases.discard(case_path)
         try:
             ok = fut.result()
             if queue_id is not None:
@@ -406,7 +406,7 @@ def main() -> int:
         while True:
             try:
                 with lock:
-                    busy = len(processing_cases) >= 1
+                    busy = len(segmentation_cases) >= 1
                 if not busy:
                     queue_item = claim_next_pending_metrics_queue_item()
                     if queue_item:
@@ -416,8 +416,8 @@ def main() -> int:
                             mark_metrics_queue_item_error(queue_id, f"Input path not found: {case_path}")
                         else:
                             with lock:
-                                processing_cases.add(case_path)
-                            future = executor.submit(process_case_metrics, case_path)
+                                segmentation_cases.add(case_path)
+                            future = executor.submit(segment_case_metrics, case_path)
                             future.add_done_callback(
                                 lambda fut, p=case_path, qid=queue_id: on_complete(fut, p, qid)
                             )

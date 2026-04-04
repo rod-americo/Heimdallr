@@ -39,10 +39,10 @@ CREATE TABLE IF NOT EXISTS dicom_metadata (
 );
 
 -- ============================================================
--- Processing Queue: Immediate Dispatch Signaling
+-- Segmentation Queue: Immediate Dispatch Signaling
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS processing_queue (
+CREATE TABLE IF NOT EXISTS segmentation_queue (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     case_id TEXT NOT NULL UNIQUE,
     input_path TEXT NOT NULL,
@@ -103,7 +103,7 @@ CREATE INDEX IF NOT EXISTS idx_accession ON dicom_metadata(AccessionNumber);
 CREATE INDEX IF NOT EXISTS idx_study_date ON dicom_metadata(StudyDate);
 CREATE INDEX IF NOT EXISTS idx_modality ON dicom_metadata(Modality);
 CREATE INDEX IF NOT EXISTS idx_processed_at ON dicom_metadata(ProcessedAt);
-CREATE INDEX IF NOT EXISTS idx_processing_queue_status_created ON processing_queue(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_segmentation_queue_status_created ON segmentation_queue(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_metrics_queue_status_created ON metrics_queue(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_dicom_egress_queue_status_next_attempt ON dicom_egress_queue(status, next_attempt_at, created_at);
 

@@ -24,7 +24,7 @@ heimdallr.prepare         ← series enumeration, phase detection, DICOM → NIf
 runtime/queue/pending/
       │ claimed
       ▼
-heimdallr.processing      ← TotalSegmentator segmentation (parallel tasks)
+heimdallr.segmentation      ← TotalSegmentator segmentation (parallel tasks)
       │ masks
       ▼
 heimdallr.metrics         ← deterministic derived measurements (job-based)
@@ -40,7 +40,7 @@ runtime/studies/<case_id>/ + database/dicom.db
 
 1. **Ingestion** — DICOM C-STORE listener that groups instances by study, applies idle timeout, and hands off completed studies as ZIP payloads (local spool or HTTP upload).
 
-2. **Preparation** — Watchdog-based worker that unpacks uploads, enumerates series, detects contrast phase via TotalSegmentator, converts DICOM to NIfTI with `dcm2niix`, and queues the selected series for processing.
+2. **Preparation** — Watchdog-based worker that unpacks uploads, enumerates series, detects contrast phase via TotalSegmentator, converts DICOM to NIfTI with `dcm2niix`, and queues the selected series for segmentation.
 
 3. **Segmentation** — Profile-driven TotalSegmentator execution with retry logic, support for licensed tasks (`tissue_types`), and parallel task scheduling.
 
@@ -75,7 +75,7 @@ Heimdallr/
 │   │   └── gateway.py            #   HeimdallrDicomListener SCP
 │   ├── prepare/                  # Study preparation worker
 │   │   └── worker.py             #   ZIP unpack, phase detect, NIfTI convert
-│   ├── processing/               # Segmentation pipeline worker
+│   ├── segmentation/             # Segmentation pipeline worker
 │   │   ├── worker.py             #   TotalSegmentator orchestration
 │   │   ├── metrics.py            #   Legacy monolithic metrics (volumes, densities)
 │   │   ├── body_fat.py           #   Body composition analysis
@@ -110,7 +110,7 @@ Heimdallr/
 │   ├── dicom_egress.json         #   Outbound DICOM destinations
 │   └── presentation.json         #   Patient name display profiles
 ├── database/                     # Persistent storage
-│   ├── schema.sql                #   SQLite schema (dicom_metadata, processing/metrics/egress queues)
+│   ├── schema.sql                #   SQLite schema (dicom_metadata, segmentation/metrics/egress queues)
 │   └── README.md                 #   Schema documentation
 ├── bin/                          # Bundled platform binaries
 │   ├── darwin-arm64/dcm2niix     #   macOS ARM
@@ -184,8 +184,8 @@ Start the baseline services in separate terminals:
 # 1) Control Plane — API + dashboard (default :8001)
 .venv/bin/python -m heimdallr.control_plane
 
-# 2) Processing Worker — segmentation pipeline
-.venv/bin/python -m heimdallr.processing
+# 2) Segmentation Worker — segmentation pipeline
+.venv/bin/python -m heimdallr.segmentation
 
 # 3) Metrics Worker — post-segmentation measurements
 .venv/bin/python -m heimdallr.metrics
@@ -247,7 +247,7 @@ Key environment variables:
 | `HEIMDALLR_DICOM_EGRESS_CONFIG` | `config/dicom_egress.json` | Outbound DICOM destination config |
 | `HEIMDALLR_AE_TITLE` | `HEIMDALLR` | DICOM Application Entity title |
 | `HEIMDALLR_TIMEZONE` | `America/Sao_Paulo` | Operational timezone |
-| `HEIMDALLR_MAX_PARALLEL_CASES` | `3` | Concurrent processing slots |
+| `HEIMDALLR_MAX_PARALLEL_CASES` | `3` | Concurrent segmentation slots |
 | `HEIMDALLR_DICOM_HANDOFF_MODE` | `local_prepare` | `local_prepare` or `http_upload` |
 | `HEIMDALLR_METRICS_MODULES` | *(see settings.py)* | Comma-separated enabled metrics |
 | `TOTALSEGMENTATOR_LICENSE` | — | TotalSegmentator license key |

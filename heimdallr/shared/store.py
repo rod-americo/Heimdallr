@@ -51,6 +51,15 @@ def ensure_schema(conn: sqlite3.Connection | None = None) -> None:
     if conn is None:
         conn = connect()
     cursor = conn.cursor()
+    existing_tables = {
+        row[0]
+        for row in cursor.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()
+    }
+    if "processing_queue" in existing_tables and "segmentation_queue" not in existing_tables:
+        cursor.execute("ALTER TABLE processing_queue RENAME TO segmentation_queue")
+        existing_tables.discard("processing_queue")
+        existing_tables.add("segmentation_queue")
+    cursor.execute("DROP INDEX IF EXISTS idx_processing_queue_status_created")
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS dicom_metadata (
@@ -76,7 +85,7 @@ def ensure_schema(conn: sqlite3.Connection | None = None) -> None:
     )
     cursor.execute(
         """
-        CREATE TABLE IF NOT EXISTS processing_queue (
+        CREATE TABLE IF NOT EXISTS segmentation_queue (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             case_id TEXT NOT NULL UNIQUE,
             input_path TEXT NOT NULL,
@@ -90,8 +99,8 @@ def ensure_schema(conn: sqlite3.Connection | None = None) -> None:
     )
     cursor.execute(
         """
-        CREATE INDEX IF NOT EXISTS idx_processing_queue_status_created
-        ON processing_queue(status, created_at)
+        CREATE INDEX IF NOT EXISTS idx_segmentation_queue_status_created
+        ON segmentation_queue(status, created_at)
         """
     )
     cursor.execute(
@@ -232,12 +241,12 @@ def upsert_intake_metadata(
     conn.commit()
 
 
-def enqueue_case(conn: sqlite3.Connection, case_id: str, input_path: str) -> None:
+def enqueue_segmentation_case(conn: sqlite3.Connection, case_id: str, input_path: str) -> None:
     ensure_schema(conn)
     created_at = _now_local_timestamp()
     conn.execute(
         """
-        INSERT INTO processing_queue (case_id, input_path, status, created_at)
+        INSERT INTO segmentation_queue (case_id, input_path, status, created_at)
         VALUES (?, ?, 'pending', ?)
         ON CONFLICT(case_id) DO UPDATE SET
             input_path = excluded.input_path,
@@ -344,7 +353,7 @@ def enqueue_dicom_export(
     conn.commit()
 
 
-def claim_next_pending_queue_item(conn: sqlite3.Connection) -> tuple[int, str, str] | None:
+def claim_next_pending_segmentation_queue_item(conn: sqlite3.Connection) -> tuple[int, str, str] | None:
     ensure_schema(conn)
     claimed_at = _now_local_timestamp()
     cursor = conn.cursor()
@@ -352,7 +361,7 @@ def claim_next_pending_queue_item(conn: sqlite3.Connection) -> tuple[int, str, s
     cursor.execute(
         """
         SELECT id, case_id, input_path
-        FROM processing_queue
+        FROM segmentation_queue
         WHERE status = 'pending'
         ORDER BY created_at ASC, id ASC
         LIMIT 1
@@ -366,7 +375,7 @@ def claim_next_pending_queue_item(conn: sqlite3.Connection) -> tuple[int, str, s
     queue_id, case_id, input_path = row
     cursor.execute(
         """
-        UPDATE processing_queue
+        UPDATE segmentation_queue
         SET status = 'claimed',
             claimed_at = ?,
             error = NULL
@@ -470,11 +479,11 @@ def claim_next_pending_dicom_egress_queue_item(
     return row
 
 
-def mark_queue_item_done(conn: sqlite3.Connection, queue_id: int) -> None:
+def mark_segmentation_queue_item_done(conn: sqlite3.Connection, queue_id: int) -> None:
     finished_at = _now_local_timestamp()
     conn.execute(
         """
-        UPDATE processing_queue
+        UPDATE segmentation_queue
         SET status = 'done',
             finished_at = ?,
             error = NULL
@@ -516,11 +525,11 @@ def mark_dicom_egress_queue_item_done(conn: sqlite3.Connection, queue_id: int) -
     conn.commit()
 
 
-def mark_queue_item_error(conn: sqlite3.Connection, queue_id: int, error_message: Any) -> None:
+def mark_segmentation_queue_item_error(conn: sqlite3.Connection, queue_id: int, error_message: Any) -> None:
     finished_at = _now_local_timestamp()
     conn.execute(
         """
-        UPDATE processing_queue
+        UPDATE segmentation_queue
         SET status = 'error',
             finished_at = ?,
             error = ?

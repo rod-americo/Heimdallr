@@ -32,7 +32,7 @@ Operational dispatch is tracked in three queue tables:
 
 | Table | Purpose |
 |-------|---------|
-| `processing_queue` | Prepared studies waiting for segmentation/processing |
+| `segmentation_queue` | Prepared studies waiting for segmentation |
 | `metrics_queue` | Processed studies waiting for post-segmentation metrics |
 | `dicom_egress_queue` | Generated DICOM artifacts waiting for outbound C-STORE delivery |
 

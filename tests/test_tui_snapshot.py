@@ -41,7 +41,7 @@ class TestTuiSnapshot(unittest.TestCase):
                         "StudyDate": "20260401",
                         "Pipeline": {
                             "prepare_elapsed_time": "0:00:08.000000",
-                            "processing_elapsed_time": "0:02:03.000000",
+                            "segmentation_elapsed_time": "0:02:03.000000",
                             "elapsed_time": "0:02:11.000000",
                         },
                         "AvailableSeries": [{}, {}],
@@ -77,7 +77,7 @@ class TestTuiSnapshot(unittest.TestCase):
             with sqlite3.connect(db_path) as conn:
                 conn.execute(
                     """
-                    CREATE TABLE processing_queue (
+                    CREATE TABLE segmentation_queue (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         case_id TEXT NOT NULL UNIQUE,
                         input_path TEXT NOT NULL,
@@ -106,14 +106,14 @@ class TestTuiSnapshot(unittest.TestCase):
                 )
                 conn.execute(
                     """
-                    INSERT INTO processing_queue(case_id, input_path, status, created_at, error)
+                    INSERT INTO segmentation_queue(case_id, input_path, status, created_at, error)
                     VALUES (?, ?, ?, ?, ?)
                     """,
                     ("QueuedCase_20260401_1", str(pending / "QueuedCase_20260401_1.nii.gz"), "pending", "2026-04-02 09:00:00", ""),
                 )
                 conn.execute(
                     """
-                    INSERT INTO processing_queue(case_id, input_path, status, created_at, finished_at, error)
+                    INSERT INTO segmentation_queue(case_id, input_path, status, created_at, finished_at, error)
                     VALUES (?, ?, ?, ?, ?, ?)
                     """,
                     ("FailedCase_20260401_2", str(failed / "FailedCase_20260401_2.nii.gz"), "error", "2026-04-02 08:00:00", "2026-04-02 08:10:00", "segmentation crashed"),

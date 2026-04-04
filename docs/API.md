@@ -26,7 +26,7 @@ This document summarizes high-value API contracts used in Heimdallr workflows.
 - `POST /upload`
 - `GET /api/tools/uploader`
 
-`POST /upload` accepts a `.zip` payload and launches `core/prepare.py` asynchronously using the repository virtual environment Python binary.
+`POST /upload` accepts a `.zip` payload and launches the `heimdallr.prepare` worker flow asynchronously using the repository virtual environment Python binary.
 
 ### Patients and Results
 
@@ -40,11 +40,10 @@ This document summarizes high-value API contracts used in Heimdallr workflows.
 - `PATCH /api/patients/{case_id}/smi`
 
 ## Common Response Semantics
-## Common Response Semantics
 
 - `2xx`: request accepted/processed
 - `4xx`: invalid input, unsupported file, not found, or contract violation
-- `5xx`: internal processing failure or dependency failure
+- `5xx`: internal segmentation failure or dependency failure
 
 When integrating clients:
 
@@ -54,4 +53,4 @@ When integrating clients:
 
 1. API outputs are assistive and must not be used as autonomous diagnosis.
 2. Validation, timeout, and retry behavior should be enforced by calling clients.
-3. Upload processing is asynchronous; a successful `/upload` response means preparation started, not that final metrics are already available.
+3. Upload handling is asynchronous; a successful `/upload` response means preparation started, not that final metrics are already available.

@@ -30,7 +30,7 @@ class RichPanel(Static):
 
 
 class HeimdallrDashboardApp(App[None]):
-    """Operational cockpit for intake, prepare, and processing flow."""
+    """Operational cockpit for intake, prepare, and segmentation flow."""
 
     AUTO_FOCUS = "#cases"
     BINDINGS = [
@@ -79,7 +79,7 @@ class HeimdallrDashboardApp(App[None]):
             tui("app.table.stage"),
             tui("app.table.queue"),
             tui("app.table.prepare"),
-            tui("app.table.process"),
+            tui("app.table.segment"),
             tui("app.table.updated"),
             tui("app.table.signal"),
         )
@@ -166,7 +166,7 @@ class HeimdallrDashboardApp(App[None]):
             self._metric_panel(tui("app.metric.failures"), str(self.snapshot.failed_cases), "#ef4444", tui("app.metric.attention")),
         )
         avg_prepare = _seconds_to_clock(self.snapshot.avg_prepare_seconds)
-        avg_processing = _seconds_to_clock(self.snapshot.avg_processing_seconds)
+        avg_segmentation = _seconds_to_clock(self.snapshot.avg_segmentation_seconds)
         meta = Table.grid(expand=True)
         meta.add_column()
         meta.add_column()
@@ -180,7 +180,7 @@ class HeimdallrDashboardApp(App[None]):
         )
         meta.add_row(
             Text(tui("app.avg_prepare", value=avg_prepare), style="#94a3b8"),
-            Text(tui("app.avg_process", value=avg_processing), style="#94a3b8", justify="right"),
+            Text(tui("app.avg_segment", value=avg_segmentation), style="#94a3b8", justify="right"),
         )
         self.query_one("#pulse", RichPanel).set_renderable(
             Panel(
@@ -259,7 +259,7 @@ class HeimdallrDashboardApp(App[None]):
                 case.stage_label,
                 case.queue_status,
                 case.prepare_elapsed,
-                case.processing_elapsed,
+                case.segmentation_elapsed,
                 updated,
                 case.signal,
                 key=case.case_id,
@@ -277,7 +277,7 @@ class HeimdallrDashboardApp(App[None]):
         timeline.add_row(Text(tui("app.case.stage"), style="#94a3b8"), Text(case.stage_label, style="bold #f8fafc"))
         timeline.add_row(Text(tui("app.case.queue"), style="#94a3b8"), Text(case.queue_status, style="#e2e8f0"))
         timeline.add_row(Text(tui("app.case.prepare"), style="#94a3b8"), Text(case.prepare_elapsed, style="#e2e8f0"))
-        timeline.add_row(Text(tui("app.case.process"), style="#94a3b8"), Text(case.processing_elapsed, style="#e2e8f0"))
+        timeline.add_row(Text(tui("app.case.segment"), style="#94a3b8"), Text(case.segmentation_elapsed, style="#e2e8f0"))
         timeline.add_row(Text(tui("app.case.total"), style="#94a3b8"), Text(case.total_elapsed, style="#e2e8f0"))
         timeline.add_row(
             Text(tui("app.case.series"), style="#94a3b8"),

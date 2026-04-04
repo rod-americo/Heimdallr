@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from heimdallr.processing.body_fat import (
+from heimdallr.segmentation.body_fat import (
     build_abdominal_slabs,
     calculate_body_fat_distribution,
     compute_l3_slice_fat_areas,

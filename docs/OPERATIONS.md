@@ -8,7 +8,7 @@ Run as independent services:
 
 1. `python -m heimdallr.control_plane` (API, dashboard, upload endpoints)
 2. `python -m heimdallr.prepare` (study preparation watchdog)
-3. `python -m heimdallr.processing` (segmentation/processing worker)
+3. `python -m heimdallr.segmentation` (segmentation/segmentation worker)
 4. `python -m heimdallr.metrics` (post-segmentation derived metrics worker)
 5. `python -m heimdallr.intake` (DICOM C-STORE intake)
 6. `python -m heimdallr.dicom_egress` (outbound DICOM artifact delivery)
@@ -20,7 +20,7 @@ Run as independent services:
 - `control_plane/`: FastAPI application, routers, and static serving.
 - `intake/gateway.py`: DICOM reception and study spooling.
 - `prepare/worker.py`: Series discovery and DICOM-to-NIfTI conversion.
-- `processing/worker.py`: Core segmentation worker logic.
+- `segmentation/worker.py`: Core segmentation worker logic.
 - `metrics/worker.py`: Post-segmentation derived metrics execution.
 - `dicom_egress/worker.py`: Queue-driven outbound C-STORE dispatcher.
 - `shared/settings.py`: Centralized runtime settings and binary paths.
@@ -42,9 +42,9 @@ python -m heimdallr.control_plane
 source venv/bin/activate
 python -m heimdallr.prepare
 
-# Processing worker
+# Segmentation worker
 source venv/bin/activate
-python -m heimdallr.processing
+python -m heimdallr.segmentation
 
 # Metrics worker
 source venv/bin/activate
@@ -77,7 +77,7 @@ export HEIMDALLR_DICOM_EGRESS_CONFIG="config/dicom_egress.json"
 1. **Intake**: Study arrives via DICOM C-STORE (`intake`) or manual `POST /upload`.
 2. **Spooling**: Files are stored in `runtime/intake/uploads/`.
 3. **Preparation**: `prepare` worker extracts ZIP, selects the best series using `config/series_selection.json`, converts to NIfTI via `dcm2niix`, and creates `metadata/id.json`.
-4. **Processing**: `processing` worker claims the case, runs segmentation (e.g., TotalSegmentator), and archives results in `runtime/studies/<CaseID>/derived/`.
+4. **Segmentation**: `segmentation` worker claims the case, runs segmentation (e.g., TotalSegmentator), and archives results in `runtime/studies/<CaseID>/derived/`.
 5. **Metrics**: `metrics` worker executes derived calculations (volumetry, density) and updates `metadata/resultados.json`.
 6. **DICOM Egress**: `metrics` enqueues generated DICOM artifacts into `dicom_egress_queue`, and `dicom_egress` delivers them to configured remote SCP destinations.
 7. **Delivery**: Dashboard and APIs serve the final structured data and images.
@@ -92,13 +92,13 @@ The primary output for clinical consumption. Includes:
 - `modality` and `body_regions`.
 - Organ volumetry and quantification.
 - Derived metrics (attenuation, indices).
-- Metadata for post-processing jobs.
+- Metadata for post-segmentation jobs.
 
 ### SQLite (`database/dicom.db`)
 Central state for all studies, tracking pipeline stage, patient demographics, and calculated summaries.
 
 Queue tables include:
-- `processing_queue`
+- `segmentation_queue`
 - `metrics_queue`
 - `dicom_egress_queue`
 
@@ -131,9 +131,9 @@ dcmsend localhost 11114 -aec HEIMDALLR test.dcm
 
 1. `http://localhost:8001/docs` responds.
 2. Listener accepts inbound C-STORE on port `11114`.
-3. Queue path `upload -> prepare -> processing -> metrics` completes for a known study.
+3. Queue path `upload -> prepare -> segmentation -> metrics` completes for a known study.
 4. If outbound delivery is enabled, `dicom_egress_queue` drains and the remote SCP accepts C-STORE.
-5. GPU capacity is available for segmentation processing.
+5. GPU capacity is available for segmentation workloads.
 
 ## Backup and Restore (SQLite)
 
@@ -178,7 +178,7 @@ venv/bin/python scripts/retroactive_emphysema.py
 
 ## Incident Triage Shortlist
 
-1. Validate service process state and restart order (`control_plane -> prepare -> processing -> metrics -> dicom_egress -> intake`).
+1. Validate service process state and restart order (`control_plane -> prepare -> segmentation -> metrics -> dicom_egress -> intake`).
 2. Check PACS destination configuration and network reachability.
 3. Inspect `runtime/intake/` and `runtime/studies/` for stuck or failed studies.
 4. Confirm data storage permissions for the `runtime/` directory.
@@ -194,12 +194,12 @@ venv/bin/python scripts/retroactive_emphysema.py
 ## Checklist Before Changes
 - Confirm impact on `id.json` and `resultados.json` consistency.
 - Verify that `runtime/` path permissions are preserved.
-- Test the full automated chain: `intake -> prepare -> processing -> metrics -> dicom_egress`.
+- Test the full automated chain: `intake -> prepare -> segmentation -> metrics -> dicom_egress`.
 
 
 ## Incident Severity Model (Suggested)
 
-- `SEV-1`: complete intake/processing outage or confirmed data exposure risk
+- `SEV-1`: complete intake/segmentation outage or confirmed data exposure risk
 - `SEV-2`: degraded throughput, repeated failed studies, or unstable report-assist path
 - `SEV-3`: isolated case failure without systemic impact
 

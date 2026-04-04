@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """
-Heimdallr Processing Daemon (run.py)
+Heimdallr Segmentation Daemon (run.py)
 
 Monitors the input/ directory for new NIfTI files and processes them through:
 1. TotalSegmentator organ and tissue segmentation (parallel)
@@ -22,7 +22,7 @@ Monitors the input/ directory for new NIfTI files and processes them through:
 3. Metrics calculation (volumes, densities, sarcopenia)
 4. Results archival
 
-Supports parallel processing of up to 3 cases simultaneously.
+Supports parallel segmentation of up to 3 cases simultaneously.
 """
 
 import os
@@ -32,7 +32,7 @@ import subprocess
 import threading
 import sys
 import time
-import concurrent.futures  # For parallel case processing
+import concurrent.futures  # For parallel case segmentation
 from pathlib import Path
 import datetime
 from zoneinfo import ZoneInfo
@@ -60,7 +60,7 @@ LOCAL_TZ = ZoneInfo(settings.TIMEZONE)
 # Use centralized configuration
 TOTALSEGMENTATOR_BIN = settings.TOTALSEGMENTATOR_BIN
 INPUT_DIR = settings.INPUT_DIR
-PROCESSING_DIR = settings.PROCESSING_DIR
+SEGMENTATION_DIR = settings.SEGMENTATION_DIR
 ERROR_DIR = settings.ERROR_DIR
 
 # Create directories if they don't exist
@@ -99,14 +99,14 @@ class PipelineLogger:
             self.log_file = None
 
 
-def ensure_processing_queue_table():
-    """Ensure processing queue table/index exist for immediate dispatch flow."""
+def ensure_segmentation_queue_table():
+    """Ensure segmentation queue table/index exist for immediate dispatch flow."""
     conn = db_connect()
     store.ensure_schema(conn)
     conn.close()
 
 
-def claim_next_pending_queue_item():
+def claim_next_pending_segmentation_queue_item():
     """
     Atomically claim a pending queue item.
 
@@ -115,7 +115,7 @@ def claim_next_pending_queue_item():
     """
     conn = db_connect()
     try:
-        return store.claim_next_pending_queue_item(conn)
+        return store.claim_next_pending_segmentation_queue_item(conn)
     finally:
         conn.close()
 
@@ -136,17 +136,17 @@ def format_elapsed_seconds(total_seconds):
     return str(datetime.timedelta(seconds=round(float(total_seconds), 6)))
 
 
-def mark_queue_item_done(queue_id):
+def mark_segmentation_queue_item_done(queue_id):
     """Mark queue item as done."""
     conn = db_connect()
-    store.mark_queue_item_done(conn, queue_id)
+    store.mark_segmentation_queue_item_done(conn, queue_id)
     conn.close()
 
 
-def mark_queue_item_error(queue_id, error_message):
+def mark_segmentation_queue_item_error(queue_id, error_message):
     """Mark queue item as error with a truncated message."""
     conn = db_connect()
-    store.mark_queue_item_error(conn, queue_id, error_message)
+    store.mark_segmentation_queue_item_error(conn, queue_id, error_message)
     conn.close()
 
 
@@ -540,7 +540,7 @@ def run_task(task_name, input_file, output_folder, extra_args=None, max_retries=
 def is_file_stable(file_path, min_age_seconds=None):
     """Return True when a new input file looks old enough to process."""
     if min_age_seconds is None:
-        min_age_seconds = max(5, settings.PROCESSING_SCAN_INTERVAL * 2)
+        min_age_seconds = max(5, settings.SEGMENTATION_SCAN_INTERVAL * 2)
     try:
         age_seconds = time.time() - file_path.stat().st_mtime
     except FileNotFoundError:
@@ -560,16 +560,16 @@ def move_case_file(source_path, destination_dir):
 
 def claim_input_file(input_path):
     """
-    Atomically move a case from input/ to processing/ so restarts do not resubmit it.
+    Atomically move a case from input/ to segmentation/ so restarts do not resubmit it.
     """
-    processing_path = PROCESSING_DIR / input_path.name
-    if processing_path.exists():
-        raise FileExistsError(f"Case already exists in processing/: {processing_path.name}")
-    shutil.move(str(input_path), str(processing_path))
-    return processing_path
+    segmentation_path = SEGMENTATION_DIR / input_path.name
+    if segmentation_path.exists():
+        raise FileExistsError(f"Case already exists in segmentation/: {segmentation_path.name}")
+    shutil.move(str(input_path), str(segmentation_path))
+    return segmentation_path
 
 
-def process_case(case_input):
+def segment_case(case_input):
     """
     Process a single patient case through the complete pipeline.
     
@@ -577,7 +577,7 @@ def process_case(case_input):
     1. Parallel segmentation (organs + tissues)
     2. Conditional specialized analysis (e.g., hemorrhage if brain found)
     3. Metrics calculation and JSON output
-    4. Update processing timestamps
+    4. Update segmentation timestamps
     5. Archive NIfTI file
     
     Args:
@@ -640,8 +640,8 @@ def process_case(case_input):
         except Exception:
             pass
 
-        processing_start_dt = datetime.datetime.now(LOCAL_TZ)
-        logger.print(f"\n=== Processing Case: {case_id} ===")
+        segmentation_start_dt = datetime.datetime.now(LOCAL_TZ)
+        logger.print(f"\n=== Segmentation Case: {case_id} ===")
 
         modality = "CT"
         selected_phase = "unknown"
@@ -655,8 +655,8 @@ def process_case(case_input):
                     selected_phase = selection_info.get("SelectedPhase", "unknown")
 
                 pipeline_data = meta.get("Pipeline", {})
-                pipeline_data["start_time"] = processing_start_dt.isoformat()
-                pipeline_data["processing_start_time"] = processing_start_dt.isoformat()
+                pipeline_data["start_time"] = segmentation_start_dt.isoformat()
+                pipeline_data["segmentation_start_time"] = segmentation_start_dt.isoformat()
                 if selection_info is not None:
                     pipeline_data["series_selection"] = selection_info
                 meta["Pipeline"] = pipeline_data
@@ -697,33 +697,33 @@ def process_case(case_input):
                 start_str = pipeline_data.get("start_time")
                 end_dt = datetime.datetime.now(LOCAL_TZ)
                 pipeline_data["end_time"] = end_dt.isoformat()
-                pipeline_data["processing_end_time"] = end_dt.isoformat()
+                pipeline_data["segmentation_end_time"] = end_dt.isoformat()
 
                 if start_str:
                     try:
                         start_dt = datetime.datetime.fromisoformat(start_str)
                         elapsed_str = str(end_dt - start_dt)
                         pipeline_data["elapsed_time"] = elapsed_str
-                        pipeline_data["processing_elapsed_time"] = elapsed_str
+                        pipeline_data["segmentation_elapsed_time"] = elapsed_str
                     except Exception:
                         pipeline_data["elapsed_time"] = "Error parsing start_time"
-                        pipeline_data["processing_elapsed_time"] = "Error parsing start_time"
+                        pipeline_data["segmentation_elapsed_time"] = "Error parsing start_time"
                 else:
                     pipeline_data["elapsed_time"] = "Unknown start_time"
-                    pipeline_data["processing_elapsed_time"] = "Unknown start_time"
+                    pipeline_data["segmentation_elapsed_time"] = "Unknown start_time"
 
                 prepare_elapsed_seconds = parse_elapsed_seconds(
                     pipeline_data.get("prepare_elapsed_time")
                 )
-                processing_elapsed_seconds = parse_elapsed_seconds(
-                    pipeline_data.get("processing_elapsed_time")
+                segmentation_elapsed_seconds = parse_elapsed_seconds(
+                    pipeline_data.get("segmentation_elapsed_time")
                 )
                 if (
                     prepare_elapsed_seconds is not None
-                    and processing_elapsed_seconds is not None
+                    and segmentation_elapsed_seconds is not None
                 ):
                     pipeline_data["pipeline_active_elapsed_time"] = format_elapsed_seconds(
-                        prepare_elapsed_seconds + processing_elapsed_seconds
+                        prepare_elapsed_seconds + segmentation_elapsed_seconds
                     )
 
                 prepare_start_str = pipeline_data.get("prepare_start_time")
@@ -811,7 +811,7 @@ def process_case(case_input):
         return True
 
     except Exception as e:
-        logger.print(f"Unhandled processing error for {case_id}: {e}")
+        logger.print(f"Unhandled segmentation error for {case_id}: {e}")
         try:
             with open(error_log_path, "w") as f:
                 f.write(str(e))
@@ -835,30 +835,30 @@ def main():
     Supports up to 3 simultaneous cases for optimal resource utilization.
     """
     print("Starting input/ directory monitoring...")
-    ensure_processing_queue_table()
+    ensure_segmentation_queue_table()
     
     max_cases = settings.MAX_PARALLEL_CASES  # Maximum concurrent cases from config
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_cases)
     
-    processing_files = set()  # Track files currently being processed
-    lock = threading.Lock()    # Thread-safe access to processing_files
+    segmentation_files = set()  # Track files currently being processed
+    lock = threading.Lock()    # Thread-safe access to segmentation_files
     
     def on_complete(fut, f_path, queue_id=None):
-        """Callback when a case finishes processing."""
+        """Callback when a case finishes segmentation."""
         with lock:
-            if f_path in processing_files:
-                processing_files.discard(f_path)
+            if f_path in segmentation_files:
+                segmentation_files.discard(f_path)
         try:
             ok = fut.result()  # Raise exception if case failed
             if queue_id is not None:
                 if ok:
-                    mark_queue_item_done(queue_id)
+                    mark_segmentation_queue_item_done(queue_id)
                 else:
-                    mark_queue_item_error(queue_id, "Case finished with failure return status")
+                    mark_segmentation_queue_item_error(queue_id, "Case finished with failure return status")
         except Exception as e:
             if queue_id is not None:
-                mark_queue_item_error(queue_id, e)
-            print(f"Error in case processing thread {f_path.name}: {e}")
+                mark_segmentation_queue_item_error(queue_id, e)
+            print(f"Error in case segmentation thread {f_path.name}: {e}")
 
     try:
         while True:
@@ -866,9 +866,9 @@ def main():
                 # Priority path: consume explicit queue signals first.
                 while True:
                     with lock:
-                        if len(processing_files) >= max_cases:
+                        if len(segmentation_files) >= max_cases:
                             break
-                    queue_item = claim_next_pending_queue_item()
+                    queue_item = claim_next_pending_segmentation_queue_item()
                     if not queue_item:
                         break
 
@@ -878,16 +878,16 @@ def main():
                         input_path = INPUT_DIR / input_path.name
 
                     if not input_path.exists():
-                        mark_queue_item_error(queue_id, f"Input file not found: {input_path}")
+                        mark_segmentation_queue_item_error(queue_id, f"Input file not found: {input_path}")
                         continue
 
                     with lock:
-                        if input_path in processing_files:
-                            mark_queue_item_error(queue_id, f"Input file already in processing set: {input_path.name}")
+                        if input_path in segmentation_files:
+                            mark_segmentation_queue_item_error(queue_id, f"Input file already in segmentation set: {input_path.name}")
                             continue
                         print(f"Submitting queued case: {input_path.name}")
-                        processing_files.add(input_path)
-                        future = executor.submit(process_case, input_path)
+                        segmentation_files.add(input_path)
+                        future = executor.submit(segment_case, input_path)
                         future.add_done_callback(lambda fut, p=input_path, qid=queue_id: on_complete(fut, p, qid))
 
                 # List all NIfTI files in input directory
@@ -896,32 +896,32 @@ def main():
                 for f in current_files:
                     with lock:
                         # If we're at max capacity, wait until next iteration
-                        if len(processing_files) >= max_cases:
+                        if len(segmentation_files) >= max_cases:
                             break
                         
                         # Skip if file is already being processed
-                        if f in processing_files:
+                        if f in segmentation_files:
                             continue
 
                         # Skip files that may still be mid-copy.
                         if not is_file_stable(f):
                             continue
 
-                        # Skip files that already have a claimed twin in processing/.
-                        if (PROCESSING_DIR / f.name).exists():
+                        # Skip files that already have a claimed twin in segmentation/.
+                        if (SEGMENTATION_DIR / f.name).exists():
                             continue
                             
-                        # Submit new case for processing
+                        # Submit new case for segmentation
                         print(f"Submitting new case: {f.name}")
-                        processing_files.add(f)
-                        future = executor.submit(process_case, f)
+                        segmentation_files.add(f)
+                        future = executor.submit(segment_case, f)
                         future.add_done_callback(lambda fut, p=f: on_complete(fut, p, None))
             
-                time.sleep(settings.PROCESSING_SCAN_INTERVAL)
+                time.sleep(settings.SEGMENTATION_SCAN_INTERVAL)
                 
             except Exception as e:
                 print(f"Error in main loop: {e}")
-                time.sleep(settings.PROCESSING_SCAN_INTERVAL)
+                time.sleep(settings.SEGMENTATION_SCAN_INTERVAL)
                 
     except KeyboardInterrupt:
         print("\nStopping monitoring...")
