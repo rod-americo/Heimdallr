@@ -19,11 +19,8 @@
           "sharp"
         ],
         "kernel_exact": [
-          "body_sharp",
-          "fc43",
           "fc51",
-          "fc52",
-          "tr20f"
+          "fc52"
         ]
       },
       "phase_priority": [
