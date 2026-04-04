@@ -21,6 +21,7 @@ from heimdallr.shared.sqlite import connect as db_connect
 LOCAL_TZ = ZoneInfo(settings.TIMEZONE)
 JOB_MODULES = {
     "l3_muscle_area": "heimdallr.metrics.jobs.l3_muscle_area",
+    "parenchymal_organ_volumetry": "heimdallr.metrics.jobs.parenchymal_organ_volumetry",
     "bone_health_l1_hu": "heimdallr.metrics.jobs.bone_health_l1_hu",
     "bone_health_l1_volumetric": "heimdallr.metrics.jobs.bone_health_l1_volumetric",
     "vertebral_fracture_screen": "heimdallr.metrics.jobs.vertebral_fracture_screen",
@@ -223,6 +224,7 @@ def _payload_summary(payload: dict) -> str:
     measurement = payload.get("measurement", {}) if isinstance(payload.get("measurement"), dict) else {}
     candidates = [
         measurement.get("skeletal_muscle_area_cm2"),
+        measurement.get("exported_slice_count"),
         measurement.get("l1_trabecular_hu_mean"),
         measurement.get("bone_health_l1_volumetric_trabecular_hu_mean"),
         measurement.get("aggregate", {}).get("visceral_proxy_volume_cm3")

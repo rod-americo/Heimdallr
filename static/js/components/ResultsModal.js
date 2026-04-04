@@ -63,6 +63,7 @@ function renderOverlayDetails(title, imageUrl, altText) {
 
 function renderResults(results, caseId, metadata = {}) {
     const sections = [];
+    const jobMetrics = results.metrics || {};
     const triageReport = results.kidney_stone_triage_report || null;
     const availableImages = new Set(results.images || []);
     const triageKidneys = triageReport?.kidneys || [];
@@ -191,6 +192,42 @@ function renderResults(results, caseId, metadata = {}) {
             </div>
             ${renderOverlayDetails('Ver overlay', l1OverlayUrl, 'L1 BMD overlay')}
         `);
+    }
+
+    const parenchymalMetric = jobMetrics.parenchymal_organ_volumetry || null;
+    const parenchymalMeasurement = parenchymalMetric?.measurement || null;
+    const parenchymalOrgans = parenchymalMeasurement?.organs || null;
+    if (parenchymalMetric?.status === 'done' && parenchymalOrgans) {
+        const organCards = [
+            ['liver', 'Figado'],
+            ['spleen', 'Baco'],
+            ['pancreas', 'Pancreas'],
+            ['kidney_right', 'Rim Direito'],
+            ['kidney_left', 'Rim Esquerdo']
+        ].map(([key, label]) => {
+            const organ = parenchymalOrgans[key];
+            if (!organ || organ.analysis_status === 'missing') return '';
+            const status = organ.complete ? 'Completo' : 'Parcial';
+            const volume = organ.observed_volume_cm3;
+            const huMean = organ.hu_mean;
+            return `
+                <div class="result-card">
+                    <div class="result-label">${label}</div>
+                    <div class="result-value">${formatFixed(volume, 0)} <span class="result-unit">cm³</span></div>
+                    <div class="organ-hu">${formatFixed(huMean, 0)} HU</div>
+                    <div class="organ-hu">${status}</div>
+                </div>
+            `;
+        }).filter(Boolean);
+
+        if (organCards.length > 0) {
+            sections.push(`
+                <h3 class="section-title">Orgaos Parenquimatosos (5 mm)</h3>
+                <div class="results-grid">
+                    ${organCards.join('')}
+                </div>
+            `);
+        }
     }
 
     if (results.lung_analysis_status === "Complete") {
