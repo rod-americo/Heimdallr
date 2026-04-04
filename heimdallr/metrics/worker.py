@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import concurrent.futures
 import datetime
+import importlib.util
 import json
+import re
 import subprocess
 import threading
 import time
@@ -19,16 +21,8 @@ from heimdallr.shared.sqlite import connect as db_connect
 
 
 LOCAL_TZ = ZoneInfo(settings.TIMEZONE)
-JOB_MODULES = {
-    "l3_muscle_area": "heimdallr.metrics.jobs.l3_muscle_area",
-    "parenchymal_organ_volumetry": "heimdallr.metrics.jobs.parenchymal_organ_volumetry",
-    "bone_health_l1_hu": "heimdallr.metrics.jobs.bone_health_l1_hu",
-    "bone_health_l1_volumetric": "heimdallr.metrics.jobs.bone_health_l1_volumetric",
-    "vertebral_fracture_screen": "heimdallr.metrics.jobs.vertebral_fracture_screen",
-    "opportunistic_osteoporosis_composite": "heimdallr.metrics.jobs.opportunistic_osteoporosis_composite",
-    "body_fat_abdominal_volumes": "heimdallr.metrics.jobs.body_fat_abdominal_volumes",
-    "body_fat_l3_slice": "heimdallr.metrics.jobs.body_fat_l3_slice",
-}
+JOB_NAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
+JOB_MODULE_PREFIX = "heimdallr.metrics.jobs."
 
 settings.ensure_directories()
 
@@ -169,9 +163,7 @@ def _validate_case_against_profile(case_id: str, metadata: dict, profile_name: s
 
 def _run_job(case_id: str, job: dict, log_dir: Path) -> dict:
     job_name = job["name"]
-    module_name = JOB_MODULES.get(job_name)
-    if module_name is None:
-        raise RuntimeError(f"Metrics job '{job_name}' is not registered")
+    module_name = _resolve_job_module_name(job)
 
     cmd = [
         settings.METRICS_PYTHON,
@@ -218,6 +210,22 @@ def _run_job(case_id: str, job: dict, log_dir: Path) -> dict:
         message = payload.get("error") or f"Metrics job '{job_name}' failed"
         raise RuntimeError(message)
     return payload
+
+
+def _resolve_job_module_name(job: dict) -> str:
+    job_name = str(job.get("name", "") or "").strip()
+    if not JOB_NAME_PATTERN.fullmatch(job_name):
+        raise RuntimeError(f"Metrics job name is invalid: {job_name or '<empty>'}")
+
+    configured_module = str(job.get("module", "") or "").strip()
+    module_name = configured_module or f"{JOB_MODULE_PREFIX}{job_name}"
+    if not module_name.startswith(JOB_MODULE_PREFIX):
+        raise RuntimeError(
+            f"Metrics job '{job_name}' must resolve inside {JOB_MODULE_PREFIX.rstrip('.')}"
+        )
+    if importlib.util.find_spec(module_name) is None:
+        raise RuntimeError(f"Metrics job '{job_name}' module not found: {module_name}")
+    return module_name
 
 
 def _payload_summary(payload: dict) -> str:
