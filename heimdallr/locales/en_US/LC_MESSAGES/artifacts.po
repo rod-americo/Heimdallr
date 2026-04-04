@@ -20,3 +20,24 @@ msgstr "Patient height: {value} m"
 
 msgid "l3.overlay.smi"
 msgstr "SMI (Skeletal Muscle Index): {value} cm²/m²"
+
+msgid "parenchymal.overlay.title"
+msgstr "Parenchymal organs:"
+
+msgid "parenchymal.overlay.attenuation_unit"
+msgstr "HU"
+
+msgid "parenchymal.overlay.organ.liver"
+msgstr "Liver: {volume} cm³ | {hu} {attenuation_unit}"
+
+msgid "parenchymal.overlay.organ.spleen"
+msgstr "Spleen: {volume} cm³ | {hu} {attenuation_unit}"
+
+msgid "parenchymal.overlay.organ.pancreas"
+msgstr "Pancreas: {volume} cm³ | {hu} {attenuation_unit}"
+
+msgid "parenchymal.overlay.organ.kidney_right"
+msgstr "Right kidney: {volume} cm³ | {hu} {attenuation_unit}"
+
+msgid "parenchymal.overlay.organ.kidney_left"
+msgstr "Left kidney: {volume} cm³ | {hu} {attenuation_unit}"
