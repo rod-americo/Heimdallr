@@ -1,4 +1,8 @@
 {
+  "_documentation": {
+    "job_resolution": "When jobs[].module is omitted, Heimdallr resolves jobs[].name to heimdallr.metrics.jobs.<name>.",
+    "job_addition": "To add a new job, create the module under heimdallr/metrics/jobs/ and declare it in jobs[]. Use jobs[].module only for non-conventional names inside heimdallr.metrics.jobs."
+  },
   "default_profile": "ct_native_basic_metrics",
   "profiles": {
     "ct_native_basic_metrics": {
