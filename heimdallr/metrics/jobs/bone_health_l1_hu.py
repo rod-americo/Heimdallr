@@ -53,9 +53,9 @@ def render_sagittal_overlay_rgb(
     summary_lines: list[str],
     plane_spacing_mm: tuple[float, float],
 ) -> np.ndarray:
-    rotated_ct = np.rot90(np.asarray(ct_plane, dtype=np.float32))
-    rotated_overlay = np.rot90(np.asarray(overlay_mask, dtype=bool))
-    rotated_outline = np.rot90(np.asarray(mask_outline, dtype=bool))
+    rotated_ct = np.fliplr(np.rot90(np.asarray(ct_plane, dtype=np.float32)))
+    rotated_overlay = np.fliplr(np.rot90(np.asarray(overlay_mask, dtype=bool)))
+    rotated_outline = np.fliplr(np.rot90(np.asarray(mask_outline, dtype=bool)))
     aspect = (
         float(plane_spacing_mm[1]) / float(plane_spacing_mm[0])
         if plane_spacing_mm[0] > 0 and plane_spacing_mm[1] > 0
@@ -204,9 +204,6 @@ def main() -> int:
             title, summary_lines = build_overlay_text(
                 hu_mean=slice_stats["mean_hu"],
                 hu_std=slice_stats["std_hu"],
-                roi_voxels=int(slice_stats["voxel_count"]),
-                roi_radius_mm=float(roi_info["roi_radius_mm"]),
-                classification=classification,
                 locale=artifact_locale,
             )
             overlay_rgb = render_sagittal_overlay_rgb(
@@ -227,7 +224,6 @@ def main() -> int:
                 derivation_description=derivation_description(
                     artifact_locale,
                     hu_mean=slice_stats["mean_hu"],
-                    classification=classification,
                 ),
             )
             artifacts["overlay_sc_dcm"] = str(overlay_sc_path.relative_to(case_dir))

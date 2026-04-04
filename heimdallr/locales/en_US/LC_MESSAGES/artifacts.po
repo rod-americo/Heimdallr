@@ -55,7 +55,7 @@ msgid "parenchymal.overlay.derivation_description"
 msgstr "5 mm axial reconstruction with parenchymal-organ overlays (liver, spleen, pancreas, right kidney, left kidney)"
 
 msgid "bone_health.overlay.title"
-msgstr "L1 Trabecular Attenuation ({classification})"
+msgstr "L1 Trabecular Attenuation"
 
 msgid "bone_health.overlay.hu_mean"
 msgstr "Mean: {value} HU"
@@ -63,26 +63,8 @@ msgstr "Mean: {value} HU"
 msgid "bone_health.overlay.hu_std"
 msgstr "SD: {value} HU"
 
-msgid "bone_health.overlay.roi_voxels"
-msgstr "ROI voxels: {value}"
-
-msgid "bone_health.overlay.roi_radius"
-msgstr "ROI radius: {value} mm"
-
-msgid "bone_health.overlay.classification.normal"
-msgstr "Normal"
-
-msgid "bone_health.overlay.classification.osteopenia"
-msgstr "Osteopenia"
-
-msgid "bone_health.overlay.classification.osteoporosis"
-msgstr "Osteoporosis"
-
-msgid "bone_health.overlay.classification.indeterminate"
-msgstr "Indeterminate"
-
 msgid "bone_health.overlay.series_description"
 msgstr "Heimdallr L1 Bone Health Sagittal Overlay"
 
 msgid "bone_health.overlay.derivation_description"
-msgstr "Burned-in sagittal L1 trabecular ROI generated from Heimdallr bone health metric (HU={hu_mean}, class={classification})"
+msgstr "Burned-in sagittal L1 trabecular ROI generated from Heimdallr bone health metric (HU={hu_mean})"
