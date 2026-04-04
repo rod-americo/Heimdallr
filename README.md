@@ -77,12 +77,12 @@ Heimdallr/
 │   │   └── worker.py             #   ZIP unpack, phase detect, NIfTI convert
 │   ├── segmentation/             # Segmentation pipeline worker
 │   │   ├── worker.py             #   TotalSegmentator orchestration
-│   │   ├── metrics.py            #   Legacy monolithic metrics (volumes, densities)
-│   │   ├── body_fat.py           #   Body composition analysis
-│   │   ├── bone_health.py        #   Bone mineral density routines
-│   │   ├── kidney_stone_triage.py#   Renal stone burden scoring
-│   │   └── vertebral_fracture.py #   Vertebral fracture morphometry
 │   ├── metrics/                  # Post-segmentation metrics engine
+│   │   ├── analysis/             #   Pure post-segmentation analysis helpers
+│   │   │   ├── body_fat.py       #     Body composition analysis
+│   │   │   ├── bone_health.py    #     Bone mineral density routines
+│   │   │   ├── kidney_stone_triage.py # Renal stone burden scoring
+│   │   │   └── vertebral_fracture.py  # Vertebral fracture morphometry
 │   │   ├── worker.py             #   Queue-driven job dispatcher
 │   │   └── jobs/                 #   Individual measurement modules
 │   ├── dicom_egress/             # Outbound DICOM artifact delivery worker
