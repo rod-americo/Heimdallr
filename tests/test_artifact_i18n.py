@@ -8,6 +8,10 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from heimdallr.metrics.jobs._l3_overlay_text import build_overlay_text, resolve_artifact_locale  # noqa: E402
+from heimdallr.metrics.jobs._parenchymal_overlay_text import (  # noqa: E402
+    build_overlay_text as build_parenchymal_overlay_text,
+    resolve_artifact_locale as resolve_parenchymal_locale,
+)
 
 
 class TestArtifactI18n(unittest.TestCase):
@@ -60,6 +64,54 @@ class TestArtifactI18n(unittest.TestCase):
                 "Probable viewer slice: 42",
                 "Patient height: 1.82 m",
                 "SMI (Skeletal Muscle Index): 11.5 cm²/m²",
+            ],
+        )
+
+    def test_parenchymal_overlay_text_in_pt_br_uses_dot_grouping_and_uh(self):
+        lines = build_parenchymal_overlay_text(
+            organ_measurements={
+                "liver": {"analysis_status": "complete", "observed_volume_cm3": 1355.0, "hu_mean": 56.0},
+                "spleen": {"analysis_status": "complete", "observed_volume_cm3": 384.0, "hu_mean": 48.0},
+                "pancreas": {"analysis_status": "complete", "observed_volume_cm3": 98.0, "hu_mean": 28.0},
+                "kidney_right": {"analysis_status": "complete", "observed_volume_cm3": 154.0, "hu_mean": 27.0},
+                "kidney_left": {"analysis_status": "complete", "observed_volume_cm3": 152.0, "hu_mean": 27.0},
+            },
+            locale="pt_BR",
+        )
+
+        self.assertEqual(
+            lines,
+            [
+                "Órgãos parenquimatosos:",
+                "Fígado: 1.355 cm³ | 56 UH",
+                "Baço: 384 cm³ | 48 UH",
+                "Pâncreas: 98 cm³ | 28 UH",
+                "Rim direito: 154 cm³ | 27 UH",
+                "Rim esquerdo: 152 cm³ | 27 UH",
+            ],
+        )
+
+    def test_parenchymal_overlay_text_in_en_us_uses_comma_grouping_and_hu(self):
+        lines = build_parenchymal_overlay_text(
+            organ_measurements={
+                "liver": {"analysis_status": "complete", "observed_volume_cm3": 1355.0, "hu_mean": 56.0},
+                "spleen": {"analysis_status": "complete", "observed_volume_cm3": 384.0, "hu_mean": 48.0},
+                "pancreas": {"analysis_status": "complete", "observed_volume_cm3": 98.0, "hu_mean": 28.0},
+                "kidney_right": {"analysis_status": "complete", "observed_volume_cm3": 154.0, "hu_mean": 27.0},
+                "kidney_left": {"analysis_status": "complete", "observed_volume_cm3": 152.0, "hu_mean": 27.0},
+            },
+            locale="en_US",
+        )
+
+        self.assertEqual(
+            lines,
+            [
+                "Parenchymal organs:",
+                "Liver: 1,355 cm³ | 56 HU",
+                "Spleen: 384 cm³ | 48 HU",
+                "Pancreas: 98 cm³ | 28 HU",
+                "Right kidney: 154 cm³ | 27 HU",
+                "Left kidney: 152 cm³ | 27 HU",
             ],
         )
 

@@ -113,3 +113,12 @@ def format_decimal(value: float, precision: int, locale: str | None = None) -> s
     if normalized == "pt_BR":
         return rendered.replace(".", ",")
     return rendered
+
+
+def format_integer(value: float | int, locale: str | None = None) -> str:
+    """Format integer values using locale-specific thousands separators."""
+    normalized = normalize_locale(locale)
+    rendered = f"{int(round(float(value))):,}"
+    if normalized == "pt_BR":
+        return rendered.replace(",", ".")
+    return rendered

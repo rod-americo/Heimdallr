@@ -24,6 +24,10 @@ from heimdallr.metrics.jobs._bone_job_common import (
     write_payload,
 )
 from heimdallr.metrics.jobs._dicom_secondary_capture import create_secondary_capture_from_rgb
+from heimdallr.metrics.jobs._parenchymal_overlay_text import (
+    build_overlay_text,
+    resolve_artifact_locale,
+)
 from heimdallr.shared.paths import study_metadata_json
 
 
@@ -136,27 +140,6 @@ def _blend_mask(rgb: np.ndarray, mask_2d: np.ndarray, color: tuple[int, int, int
     outline = _outline_mask(mask_bool)
     out[outline] = color_arr
     return np.clip(out, 0, 255).astype(np.uint8)
-
-
-def _summary_lines(
-    slice_number: int,
-    slice_count: int,
-    organ_measurements: dict[str, dict[str, Any]],
-) -> list[str]:
-    lines = [f"Parenchymal organs 5 mm | slice {slice_number}/{slice_count}"]
-    for organ_key, organ_label, _filename, _color in ORGAN_DEFINITIONS:
-        measurement = organ_measurements[organ_key]
-        if measurement["analysis_status"] == "missing":
-            continue
-        volume = measurement["observed_volume_cm3"]
-        hu_mean = measurement["hu_mean"]
-        status_suffix = "" if measurement["complete"] else " (partial)"
-        lines.append(
-            f"{organ_label}: {volume:.0f} cm3 | {hu_mean:.0f} HU{status_suffix}"
-            if volume is not None and hu_mean is not None
-            else f"{organ_label}: n/a{status_suffix}"
-        )
-    return lines
 
 
 def _legend_height(line_count: int) -> int:
@@ -295,6 +278,7 @@ def main() -> int:
 
         if job_config.get("generate_overlay", True):
             emit_dicom = bool(job_config.get("emit_secondary_capture_dicom", True))
+            artifact_locale = resolve_artifact_locale(job_config)
             series_instance_uid = generate_uid()
             for output_idx, slice_idx in enumerate(export_indices, start=1):
                 masks_for_slice = []
@@ -309,7 +293,10 @@ def main() -> int:
                 if not masks_for_slice:
                     continue
 
-                summary_lines = _summary_lines(output_idx, len(export_indices), organ_measurements)
+                summary_lines = build_overlay_text(
+                    organ_measurements=organ_measurements,
+                    locale=artifact_locale,
+                )
                 rgb = _render_slice_rgb(resampled_ct[:, :, slice_idx], masks_for_slice, summary_lines)
                 if emit_dicom:
                     dicom_path = dicom_dir / f"overlay_{output_idx:04d}.dcm"
