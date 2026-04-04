@@ -160,8 +160,10 @@ class TestTuiSnapshot(unittest.TestCase):
             self.assertGreaterEqual(snapshot.backlog_cases, 1)
             self.assertEqual(snapshot.stages[0].queued, 1)
             self.assertEqual(snapshot.stages[2].failed, 1)
-            self.assertTrue(any(case.case_id == "ProcessedCase_20260401_3" and case.stage_label == "Processed" for case in snapshot.cases))
-            self.assertTrue(any(case.case_id == "FailedCase_20260401_2" and case.stage_label == "Failed" for case in snapshot.cases))
+            self.assertTrue(any(case.case_id == "ProcessedCase_20260401_3" and case.stage_key == "processed" for case in snapshot.cases))
+            self.assertTrue(any(case.case_id == "FailedCase_20260401_2" and case.stage_key == "failed" for case in snapshot.cases))
+            self.assertTrue(any(case.case_id == "ProcessedCase_20260401_3" and case.stage_label == "Processado" for case in snapshot.cases))
+            self.assertTrue(any(alert.level == "warning" for alert in snapshot.alerts))
 
 
 if __name__ == "__main__":

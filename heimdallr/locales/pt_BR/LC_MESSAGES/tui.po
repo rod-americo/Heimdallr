@@ -1,0 +1,337 @@
+msgid ""
+msgstr ""
+"Language: pt_BR\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "shared.na"
+msgstr "n/d"
+
+msgid "binding.quit"
+msgstr "Sair"
+
+msgid "binding.refresh"
+msgstr "Atualizar"
+
+msgid "binding.pause"
+msgstr "Pausar"
+
+msgid "app.title"
+msgstr "Heimdallr TUI"
+
+msgid "app.subtitle"
+msgstr "Intake · Preparo · Processamento"
+
+msgid "app.table.patient"
+msgstr "Paciente"
+
+msgid "app.table.stage"
+msgstr "Etapa"
+
+msgid "app.table.queue"
+msgstr "Fila"
+
+msgid "app.table.prepare"
+msgstr "Preparo"
+
+msgid "app.table.process"
+msgstr "Processamento"
+
+msgid "app.table.updated"
+msgstr "Atualizado"
+
+msgid "app.table.signal"
+msgstr "Sinal"
+
+msgid "app.notify.paused"
+msgstr "Atualização automática pausada."
+
+msgid "app.notify.resumed"
+msgstr "Atualização automática retomada."
+
+msgid "app.radar.service"
+msgstr "Serviço"
+
+msgid "app.radar.state"
+msgstr "Estado"
+
+msgid "app.radar.workers"
+msgstr "Workers"
+
+msgid "app.radar.queue"
+msgstr "F"
+
+msgid "app.radar.active"
+msgstr "A"
+
+msgid "app.radar.signal"
+msgstr "Sinal"
+
+msgid "app.radar.title"
+msgstr "Workers"
+
+msgid "app.radar.subtitle"
+msgstr "estado + pressão de fila"
+
+msgid "app.service.live"
+msgstr "ATIVO"
+
+msgid "app.service.off"
+msgstr "OFF"
+
+msgid "app.metric.cases"
+msgstr "Casos"
+
+msgid "app.metric.backlog"
+msgstr "Backlog"
+
+msgid "app.metric.failures"
+msgstr "Falhas"
+
+msgid "app.metric.seen"
+msgstr "vistos"
+
+msgid "app.metric.queue"
+msgstr "fila"
+
+msgid "app.metric.attention"
+msgstr "atenção"
+
+msgid "app.refresh_seconds"
+msgstr "atualização {value}s"
+
+msgid "app.status.paused"
+msgstr "pausado"
+
+msgid "app.status.live"
+msgstr "ativo"
+
+msgid "app.avg_prepare"
+msgstr "média preparo {value}"
+
+msgid "app.avg_process"
+msgstr "média processamento {value}"
+
+msgid "app.pulse.title"
+msgstr "Pulso"
+
+msgid "app.alerts.empty"
+msgstr "Sem alertas."
+
+msgid "app.alerts.summary"
+msgstr "Bloqueios, backlog envelhecido e divergência de workers."
+
+msgid "app.alerts.title"
+msgstr "Alertas"
+
+msgid "app.flow.stage"
+msgstr "Etapa"
+
+msgid "app.flow.state"
+msgstr "Estado"
+
+msgid "app.flow.queue"
+msgstr "F"
+
+msgid "app.flow.active"
+msgstr "A"
+
+msgid "app.flow.done"
+msgstr "Feitos"
+
+msgid "app.flow.fail"
+msgstr "Falhas"
+
+msgid "app.flow.oldest"
+msgstr "Mais antigo"
+
+msgid "app.flow.notes"
+msgstr "Notas"
+
+msgid "app.flow.title"
+msgstr "Faixas do pipeline"
+
+msgid "app.flow.subtitle"
+msgstr "filesystem + sqlite + ps"
+
+msgid "app.spotlight.empty"
+msgstr "Nenhum caso encontrado ainda."
+
+msgid "app.spotlight.title"
+msgstr "Foco"
+
+msgid "app.case.stage"
+msgstr "Etapa"
+
+msgid "app.case.queue"
+msgstr "Fila"
+
+msgid "app.case.prepare"
+msgstr "Preparo"
+
+msgid "app.case.process"
+msgstr "Processamento"
+
+msgid "app.case.total"
+msgstr "Total"
+
+msgid "app.case.series"
+msgstr "Séries"
+
+msgid "app.case.signal"
+msgstr "Sinal"
+
+msgid "app.case.path"
+msgstr "Caminho"
+
+msgid "app.case.error"
+msgstr "Erro"
+
+msgid "app.case.series_summary"
+msgstr "{selected} selecionadas / {discarded} descartadas"
+
+msgid "service.intake"
+msgstr "Intake"
+
+msgid "service.prepare"
+msgstr "Preparo"
+
+msgid "service.processing"
+msgstr "Processamento"
+
+msgid "stage_state.flow"
+msgstr "FLUXO"
+
+msgid "stage_state.warning"
+msgstr "ALERTA"
+
+msgid "stage_state.blocked"
+msgstr "BLOQUEADO"
+
+msgid "queue_status.pending"
+msgstr "pendente"
+
+msgid "queue_status.claimed"
+msgstr "em execução"
+
+msgid "queue_status.done"
+msgstr "concluído"
+
+msgid "queue_status.error"
+msgstr "erro"
+
+msgid "case.stage.intake"
+msgstr "Intake"
+
+msgid "case.stage.prepared"
+msgstr "Preparado"
+
+msgid "case.stage.queued"
+msgstr "Na fila"
+
+msgid "case.stage.processing"
+msgstr "Processando"
+
+msgid "case.stage.failed"
+msgstr "Falha"
+
+msgid "case.stage.processed"
+msgstr "Processado"
+
+msgid "snapshot.service.detail"
+msgstr "PID {pid} • ativo há {etime} • {command}"
+
+msgid "snapshot.service.no_pressure"
+msgstr "Nenhuma pressão no pipeline detectada."
+
+msgid "snapshot.service.backlog_without_worker"
+msgstr "Há backlog, mas nenhum processo worker correspondente foi encontrado."
+
+msgid "snapshot.service.running"
+msgstr "ativo"
+
+msgid "snapshot.service.not_detected"
+msgstr "não detectado"
+
+msgid "snapshot.intake.note.zips_staged"
+msgstr "{count} ZIPs prontos para preparo"
+
+msgid "snapshot.intake.note.uploads_claimed"
+msgstr "{count} uploads atualmente capturados"
+
+msgid "snapshot.intake.note.active_dicom"
+msgstr "{count} itens ativos na aterrissagem DICOM"
+
+msgid "snapshot.intake.note.failures_retained"
+msgstr "{count} falhas de intake retidas"
+
+msgid "snapshot.intake.note.oldest_upload"
+msgstr "Upload mais antigo em espera: {age}"
+
+msgid "snapshot.prepare.note.studies_prepared"
+msgstr "{count} estudos já têm id.json e contexto de preparo"
+
+msgid "snapshot.prepare.note.studies_staged"
+msgstr "{count} estudos preparados estão prontos para processamento"
+
+msgid "snapshot.prepare.note.candidate_series"
+msgstr "{count} séries candidatas entre os casos preparados"
+
+msgid "snapshot.prepare.note.uploads_inside_prepare"
+msgstr "{count} uploads parecem estar dentro do preparo agora"
+
+msgid "snapshot.prepare.note.oldest_waiting"
+msgstr "Caso preparado mais antigo aguardando: {age}"
+
+msgid "snapshot.process.note.queued"
+msgstr "{count} na fila da tabela de processamento ou da pasta pending"
+
+msgid "snapshot.process.note.active"
+msgstr "{count} em execução na fila active"
+
+msgid "snapshot.process.note.completed"
+msgstr "{count} casos concluídos com resultados"
+
+msgid "snapshot.process.note.failed"
+msgstr "{count} casos marcados como falha"
+
+msgid "snapshot.process.note.queue_states"
+msgstr "Estados da fila: {value}"
+
+msgid "snapshot.process.note.oldest_pressure"
+msgstr "Pressão de processamento mais antiga: {age}"
+
+msgid "snapshot.alert.intake_failures"
+msgstr "O intake tem {count} falhas retidas."
+
+msgid "snapshot.alert.processing_backlog_no_worker"
+msgstr "Há backlog de processamento, mas o worker de processamento não foi detectado."
+
+msgid "snapshot.alert.queue_errors"
+msgstr "{count} item(ns) da fila de processamento estão em erro."
+
+msgid "snapshot.alert.intake_backlog_old"
+msgstr "O backlog de intake tem mais de 15 minutos."
+
+msgid "snapshot.alert.processing_old"
+msgstr "A pressão de processamento tem mais de 30 minutos."
+
+msgid "snapshot.alert.no_blocking"
+msgstr "Nenhuma condição de bloqueio detectada no snapshot atual."
+
+msgid "snapshot.case.signal.results_ready"
+msgstr "results.json pronto"
+
+msgid "snapshot.case.signal.segmentation_metrics"
+msgstr "segmentação + métricas"
+
+msgid "snapshot.case.signal.waiting_slot"
+msgstr "aguardando slot de processamento"
+
+msgid "snapshot.case.signal.series_ready"
+msgstr "{count} séries prontas"
+
+msgid "snapshot.case.signal.awaiting_metadata"
+msgstr "aguardando metadados de intake"
+
+msgid "snapshot.case.unknown"
+msgstr "Desconhecido"

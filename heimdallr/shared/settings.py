@@ -174,6 +174,18 @@ PRESENTATION_CONFIG = _load_json_config(PRESENTATION_CONFIG_PATH)
 PATIENT_NAME_PROFILE = (
     PRESENTATION_CONFIG.get("patient_name", {}).get("profile", "default")
 )
+ARTIFACTS_LOCALE = (
+    PRESENTATION_CONFIG.get("artifacts", {}).get("locale")
+    or os.getenv("HEIMDALLR_ARTIFACTS_LOCALE")
+    or os.getenv("HEIMDALLR_LOCALE")
+    or "en_US"
+)
+TUI_LOCALE = (
+    PRESENTATION_CONFIG.get("tui", {}).get("locale")
+    or ARTIFACTS_LOCALE
+    or os.getenv("HEIMDALLR_LOCALE")
+    or "en_US"
+)
 
 UPLOADER_DEFAULT_SERVER = os.getenv("HEIMDALLR_UPLOADER_SERVER", "http://thor:8001/upload")
 MEDGEMMA_SERVICE_URL = os.getenv("MEDGEMMA_SERVICE_URL", "http://localhost:8004/analyze")

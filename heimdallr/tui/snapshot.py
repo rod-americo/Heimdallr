@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 
 from heimdallr.shared import settings
 from heimdallr.shared.patient_names import normalize_patient_name_display
+from .i18n import no_data, queue_status_label, service_label, stage_label, tui
 
 
 LOCAL_TZ = ZoneInfo(settings.TIMEZONE)
@@ -85,7 +86,9 @@ class CaseOverview:
     modality: str
     accession_number: str
     study_date: str
+    stage_key: str
     stage_label: str
+    queue_status_key: str
     queue_status: str
     signal: str
     updated_at: datetime | None
@@ -100,12 +103,18 @@ class CaseOverview:
 
 
 @dataclass(slots=True)
+class AlertItem:
+    level: str
+    message: str
+
+
+@dataclass(slots=True)
 class DashboardSnapshot:
     generated_at: datetime
     services: list[ServiceStatus]
     stages: list[StageMetrics]
     cases: list[CaseOverview]
-    alerts: list[str]
+    alerts: list[AlertItem]
     total_cases: int
     processed_cases: int
     backlog_cases: int
@@ -257,9 +266,9 @@ def build_snapshot(
         queue_status_counts=queue_status_counts,
     )
 
-    processed_cases = sum(1 for case in cases if case.stage_label == "Processed")
-    failed_cases = sum(1 for case in cases if case.stage_label == "Failed")
-    backlog_cases = sum(1 for case in cases if case.stage_label in {"Queued", "Prepared", "Processing"})
+    processed_cases = sum(1 for case in cases if case.stage_key == "processed")
+    failed_cases = sum(1 for case in cases if case.stage_key == "failed")
+    backlog_cases = sum(1 for case in cases if case.stage_key in {"queued", "prepared", "processing"})
 
     return DashboardSnapshot(
         generated_at=generated_at,
@@ -289,9 +298,9 @@ def _build_services(
         "processing": process_stage,
     }
     labels = {
-        "intake": "Intake",
-        "prepare": "Prepare",
-        "processing": "Process",
+        "intake": service_label("intake"),
+        "prepare": service_label("prepare"),
+        "processing": service_label("processing"),
     }
     statuses: list[ServiceStatus] = []
     for slug, processes in process_scan.items():
@@ -299,12 +308,14 @@ def _build_services(
         running = bool(processes)
         details = []
         for item in processes[:3]:
-            details.append(f"PID {item['pid']} • up {item['etime']} • {item['command']}")
+            details.append(
+                tui("snapshot.service.detail", pid=item["pid"], etime=item["etime"], command=item["command"])
+            )
         if not details and stage.queued + stage.active == 0:
-            details.append("No pipeline pressure detected.")
+            details.append(tui("snapshot.service.no_pressure"))
         elif not details:
-            details.append("Backlog exists, but no matching worker process was found.")
-        summary = "running" if running else "not detected"
+            details.append(tui("snapshot.service.backlog_without_worker"))
+        summary = tui("snapshot.service.running") if running else tui("snapshot.service.not_detected")
         statuses.append(
             ServiceStatus(
                 slug=slug,
@@ -335,16 +346,16 @@ def _build_intake_stage(
     if (upload_files or incoming_items) and not services["intake"]:
         state = "blocked"
     notes = [
-        f"{len(upload_files)} ZIPs staged for prepare",
-        f"{len(claimed_uploads)} uploads currently claimed",
-        f"{len(incoming_items)} active DICOM landing items",
-        f"{len(failed_uploads) + len(failed_dicom_items)} intake failures retained",
+        tui("snapshot.intake.note.zips_staged", count=len(upload_files)),
+        tui("snapshot.intake.note.uploads_claimed", count=len(claimed_uploads)),
+        tui("snapshot.intake.note.active_dicom", count=len(incoming_items)),
+        tui("snapshot.intake.note.failures_retained", count=len(failed_uploads) + len(failed_dicom_items)),
     ]
     if upload_files:
-        notes.append(f"Oldest staged upload: {_friendly_age(oldest)}")
+        notes.append(tui("snapshot.intake.note.oldest_upload", age=_friendly_age(oldest)))
     return StageMetrics(
         slug="intake",
-        label="Intake",
+        label=service_label("intake"),
         state=state,
         queued=len(upload_files),
         active=len(claimed_uploads) + len(incoming_items),
@@ -363,8 +374,8 @@ def _build_prepare_stage(
     services: dict[str, list[dict[str, str]]],
     now: datetime,
 ) -> StageMetrics:
-    prepared = [case for case in cases if case.stage_label in {"Prepared", "Queued", "Processing", "Processed"}]
-    queued = [case for case in cases if case.stage_label == "Prepared"]
+    prepared = [case for case in cases if case.stage_key in {"prepared", "queued", "processing", "processed"}]
+    queued = [case for case in cases if case.stage_key == "prepared"]
     oldest = _oldest_case_age_seconds(queued, now)
     state = "flow"
     if failed_uploads:
@@ -372,16 +383,16 @@ def _build_prepare_stage(
     if claimed_uploads and not services["prepare"]:
         state = "blocked"
     notes = [
-        f"{len(prepared)} studies have id.json and prepare context",
-        f"{len(queued)} prepared studies are staged for processing",
-        f"{sum(case.selected_series for case in prepared)} candidate series across prepared cases",
-        f"{len(claimed_uploads)} uploads appear to be inside prepare right now",
+        tui("snapshot.prepare.note.studies_prepared", count=len(prepared)),
+        tui("snapshot.prepare.note.studies_staged", count=len(queued)),
+        tui("snapshot.prepare.note.candidate_series", count=sum(case.selected_series for case in prepared)),
+        tui("snapshot.prepare.note.uploads_inside_prepare", count=len(claimed_uploads)),
     ]
     if queued:
-        notes.append(f"Oldest prepared case waiting: {_friendly_age(oldest)}")
+        notes.append(tui("snapshot.prepare.note.oldest_waiting", age=_friendly_age(oldest)))
     return StageMetrics(
         slug="prepare",
-        label="Prepare",
+        label=service_label("prepare"),
         state=state,
         queued=len(queued),
         active=len(claimed_uploads),
@@ -404,10 +415,10 @@ def _build_process_stage(
     services: dict[str, list[dict[str, str]]],
     now: datetime,
 ) -> StageMetrics:
-    completed = [case for case in cases if case.stage_label == "Processed"]
-    queued_cases = [case for case in cases if case.stage_label == "Queued"]
-    active_cases = [case for case in cases if case.stage_label == "Processing"]
-    failed_cases = [case for case in cases if case.stage_label == "Failed"]
+    completed = [case for case in cases if case.stage_key == "processed"]
+    queued_cases = [case for case in cases if case.stage_key == "queued"]
+    active_cases = [case for case in cases if case.stage_key == "processing"]
+    failed_cases = [case for case in cases if case.stage_key == "failed"]
     queued_ids = {case.case_id for case in queued_cases}
     active_ids = {case.case_id for case in active_cases}
     failed_ids = {case.case_id for case in failed_cases}
@@ -418,21 +429,25 @@ def _build_process_stage(
     if (queued_cases or active_cases) and not services["processing"]:
         state = "blocked"
     notes = [
-        f"{len(queued_cases)} queued in processing table or pending folder",
-        f"{len(active_cases)} running in active queue",
-        f"{len(completed)} completed cases with results",
-        f"{len(failed_cases)} cases marked as failed",
+        tui("snapshot.process.note.queued", count=len(queued_cases)),
+        tui("snapshot.process.note.active", count=len(active_cases)),
+        tui("snapshot.process.note.completed", count=len(completed)),
+        tui("snapshot.process.note.failed", count=len(failed_cases)),
     ]
     if queue_status_counts:
         notes.append(
-            "Queue states: "
-            + ", ".join(f"{status}={count}" for status, count in sorted(queue_status_counts.items()))
+            tui(
+                "snapshot.process.note.queue_states",
+                value=", ".join(
+                    f"{queue_status_label(status)}={count}" for status, count in sorted(queue_status_counts.items())
+                ),
+            )
         )
     if oldest is not None:
-        notes.append(f"Oldest processing pressure: {_friendly_age(oldest)}")
+        notes.append(tui("snapshot.process.note.oldest_pressure", age=_friendly_age(oldest)))
     return StageMetrics(
         slug="processing",
-        label="Process",
+        label=service_label("processing"),
         state=state,
         queued=len(queued_ids | pending_case_ids),
         active=len(active_ids | active_case_ids),
@@ -450,38 +465,41 @@ def _build_alerts(
     prepare_stage: StageMetrics,
     process_stage: StageMetrics,
     queue_status_counts: dict[str, int],
-) -> list[str]:
-    alerts: list[str] = []
+) -> list[AlertItem]:
+    alerts: list[AlertItem] = []
     services_by_slug = {service.slug: service for service in services}
 
     if intake_stage.failed:
-        alerts.append(f"Intake has {intake_stage.failed} retained failures.")
+        alerts.append(AlertItem("warning", tui("snapshot.alert.intake_failures", count=intake_stage.failed)))
     if process_stage.queued and not services_by_slug["processing"].running:
-        alerts.append("Processing backlog exists, but the processing worker is not detected.")
+        alerts.append(AlertItem("warning", tui("snapshot.alert.processing_backlog_no_worker")))
     if queue_status_counts.get("error"):
-        alerts.append(f"{queue_status_counts['error']} processing queue item(s) are in error.")
+        alerts.append(AlertItem("warning", tui("snapshot.alert.queue_errors", count=queue_status_counts["error"])))
     if intake_stage.oldest_age_seconds and intake_stage.oldest_age_seconds > 900:
-        alerts.append("Intake backlog is older than 15 minutes.")
+        alerts.append(AlertItem("warning", tui("snapshot.alert.intake_backlog_old")))
     if process_stage.oldest_age_seconds and process_stage.oldest_age_seconds > 1800:
-        alerts.append("Processing pressure is older than 30 minutes.")
+        alerts.append(AlertItem("warning", tui("snapshot.alert.processing_old")))
     if not alerts:
-        alerts.append("No blocking condition detected in the current snapshot.")
+        alerts.append(AlertItem("ok", tui("snapshot.alert.no_blocking")))
     return alerts
 
 
 def _finalize_case(case: dict[str, Any]) -> CaseOverview:
-    stage_label = _derive_stage_label(case)
-    signal = _derive_case_signal(case, stage_label)
+    stage_key = _derive_stage_key(case)
+    signal = _derive_case_signal(case, stage_key)
+    queue_status_key = case["queue_status"] or ""
     updated_at = case["updated_at"]
     sort_timestamp = updated_at.timestamp() if updated_at is not None else 0.0
     return CaseOverview(
         case_id=case["case_id"],
-        patient_name=case["patient_name"] or "Unknown",
+        patient_name=case["patient_name"] or tui("snapshot.case.unknown"),
         modality=case["modality"] or "-",
         accession_number=case["accession_number"] or "-",
         study_date=case["study_date"] or "-",
-        stage_label=stage_label,
-        queue_status=case["queue_status"] or "-",
+        stage_key=stage_key,
+        stage_label=stage_label(stage_key),
+        queue_status_key=queue_status_key,
+        queue_status=queue_status_label(queue_status_key),
         signal=signal,
         updated_at=updated_at,
         prepare_elapsed=_display_duration(case["prepare_elapsed"]),
@@ -495,33 +513,33 @@ def _finalize_case(case: dict[str, Any]) -> CaseOverview:
     )
 
 
-def _derive_stage_label(case: dict[str, Any]) -> str:
+def _derive_stage_key(case: dict[str, Any]) -> str:
     queue_status = case["queue_status"]
     if case["has_results"] or queue_status == "done":
-        return "Processed"
+        return "processed"
     if queue_status == "error" or case["failed_file"] or case["has_error_log"]:
-        return "Failed"
+        return "failed"
     if queue_status == "claimed" or case["active_file"]:
-        return "Processing"
+        return "processing"
     if queue_status == "pending" or case["pending_file"]:
-        return "Queued"
+        return "queued"
     if case["path"] is not None:
-        return "Prepared"
-    return "Intake"
+        return "prepared"
+    return "intake"
 
 
-def _derive_case_signal(case: dict[str, Any], stage_label: str) -> str:
+def _derive_case_signal(case: dict[str, Any], stage_key: str) -> str:
     if case["error"]:
         return _truncate(case["error"], 52)
-    if stage_label == "Processed":
-        return "results.json ready"
-    if stage_label == "Processing":
-        return "segmentation + metrics"
-    if stage_label == "Queued":
-        return "waiting for processing slot"
-    if stage_label == "Prepared":
-        return f"{case['selected_series']} series ready"
-    return "awaiting intake metadata"
+    if stage_key == "processed":
+        return tui("snapshot.case.signal.results_ready")
+    if stage_key == "processing":
+        return tui("snapshot.case.signal.segmentation_metrics")
+    if stage_key == "queued":
+        return tui("snapshot.case.signal.waiting_slot")
+    if stage_key == "prepared":
+        return tui("snapshot.case.signal.series_ready", count=case["selected_series"])
+    return tui("snapshot.case.signal.awaiting_metadata")
 
 
 def _empty_case(case_id: str) -> dict[str, Any]:
@@ -816,7 +834,7 @@ def _oldest_pending_from_timestamps(timestamps: list[datetime], now: datetime) -
 
 def _friendly_age(seconds: float | None) -> str:
     if seconds is None:
-        return "n/a"
+        return no_data()
     minutes = int(seconds // 60)
     hours, minutes = divmod(minutes, 60)
     if hours:
