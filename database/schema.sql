@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS dicom_metadata (
     AccessionNumber TEXT,
     StudyDate TEXT,
     Modality TEXT,
+    CallingAET TEXT,
+    RemoteIP TEXT,
     
     -- Metadata Storage (JSON)
     IdJson TEXT,                -- Complete id.json from output directory
@@ -67,6 +69,32 @@ CREATE TABLE IF NOT EXISTS metrics_queue (
 );
 
 -- ============================================================
+-- DICOM Egress Queue: Outbound artifact delivery
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS dicom_egress_queue (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id TEXT NOT NULL,
+    study_uid TEXT,
+    artifact_path TEXT NOT NULL,
+    artifact_type TEXT NOT NULL,
+    destination_name TEXT NOT NULL,
+    destination_host TEXT NOT NULL,
+    destination_port INTEGER NOT NULL,
+    destination_called_aet TEXT NOT NULL,
+    source_calling_aet TEXT,
+    source_remote_ip TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    attempts INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP,
+    claimed_at TIMESTAMP,
+    finished_at TIMESTAMP,
+    next_attempt_at TIMESTAMP,
+    error TEXT,
+    UNIQUE(case_id, artifact_path, destination_name)
+);
+
+-- ============================================================
 -- Indexes for Performance
 -- ============================================================
 
@@ -77,6 +105,7 @@ CREATE INDEX IF NOT EXISTS idx_modality ON dicom_metadata(Modality);
 CREATE INDEX IF NOT EXISTS idx_processed_at ON dicom_metadata(ProcessedAt);
 CREATE INDEX IF NOT EXISTS idx_processing_queue_status_created ON processing_queue(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_metrics_queue_status_created ON metrics_queue(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_dicom_egress_queue_status_next_attempt ON dicom_egress_queue(status, next_attempt_at, created_at);
 
 -- ============================================================
 -- Schema Notes
@@ -88,6 +117,8 @@ CREATE INDEX IF NOT EXISTS idx_metrics_queue_status_created ON metrics_queue(sta
 -- AccessionNumber: Hospital/PACS accession number
 -- StudyDate: YYYYMMDD format
 -- Modality: CT, MR, etc.
+-- CallingAET: DICOM Calling AE Title of the upstream sender captured at intake
+-- RemoteIP: Source IP address observed on the DICOM association
 -- IdJson: Complete id.json from output directory (includes Pipeline info, SelectedSeries)
 -- JsonDump: Basic study metadata (PatientName, AccessionNumber, etc.) - legacy
 -- DicomMetadata: Complete DICOM tags from selected series (all standard tags)

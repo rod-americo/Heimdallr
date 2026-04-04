@@ -50,8 +50,9 @@ from pydicom.dataset import Dataset
 from pynetdicom import AE, ALL_TRANSFER_SYNTAXES, AllStoragePresentationContexts, _config, evt
 from pynetdicom.sop_class import Verification
 
-from heimdallr.shared import settings
+from heimdallr.shared import settings, store
 from heimdallr.shared.spool import atomic_write_bytes
+from heimdallr.shared.sqlite import connect as db_connect
 
 LOCAL_TZ = ZoneInfo(settings.TIMEZONE)
 INTAKE_MANIFEST_NAME = "_heimdallr_intake.json"
@@ -74,6 +75,8 @@ class StudyState:
     path: Path
     first_update_ts: float
     last_update_ts: float
+    calling_aet: str | None = None
+    remote_ip: str | None = None
     instance_count: int = 0
     locked: bool = False
 
@@ -100,6 +103,42 @@ def sanitize_filename(s: str) -> str:
     Removes special characters and limits length to prevent filesystem issues.
     """
     return "".join(c for c in s if c.isalnum() or c in ("-", "_", "."))[:200] or "unknown"
+
+
+def normalize_optional_text(value: object) -> str | None:
+    """Return a stripped string value or None."""
+    if value is None:
+        return None
+
+    text = str(value).strip()
+    return text or None
+
+
+def extract_requestor_identity(event) -> tuple[str | None, str | None]:
+    """Extract the upstream Calling AE Title and remote IP from a pynetdicom event."""
+    assoc = getattr(event, "assoc", None)
+    requestor = getattr(assoc, "requestor", None)
+    primitive = getattr(requestor, "primitive", None)
+
+    calling_aet = normalize_optional_text(getattr(requestor, "ae_title", None))
+    if not calling_aet:
+        calling_aet = normalize_optional_text(getattr(primitive, "calling_ae_title", None))
+
+    remote_ip = None
+    try:
+        remote_ip = normalize_optional_text(getattr(requestor, "address", None))
+    except Exception:
+        pass
+
+    if not remote_ip:
+        address_info = getattr(requestor, "address_info", None)
+        remote_ip = normalize_optional_text(getattr(address_info, "address", None))
+
+    if not remote_ip:
+        presentation_address = getattr(primitive, "calling_presentation_address", None)
+        remote_ip = normalize_optional_text(getattr(presentation_address, "address", None))
+
+    return calling_aet, remote_ip
 
 
 def write_instance(ds: Dataset, out_dir: Path) -> Path:
@@ -146,6 +185,8 @@ def build_intake_manifest(study: StudyState, *, handoff_ts: float) -> dict:
         "receive_elapsed_seconds": round(receive_elapsed_seconds, 3),
         "receive_elapsed_time": str(datetime.timedelta(seconds=round(receive_elapsed_seconds, 6))),
         "instance_count": study.instance_count,
+        "calling_aet": study.calling_aet,
+        "remote_ip": study.remote_ip,
         "handoff_time": isoformat_local(handoff_ts),
     }
 
@@ -290,6 +331,8 @@ class HeimdallrDicomListener:
                 # Fallback for malformed DICOM without StudyInstanceUID
                 study_uid = f"study_unknown_{int(now()*1000)}"
 
+            calling_aet, remote_ip = extract_requestor_identity(event)
+
             study_uid_s = sanitize_filename(study_uid)
             study_dir = self.incoming_dir / study_uid_s
             safe_mkdir(study_dir)
@@ -307,13 +350,39 @@ class HeimdallrDicomListener:
                     path=study_dir,
                     first_update_ts=ts,
                     last_update_ts=ts,
+                    calling_aet=calling_aet,
+                    remote_ip=remote_ip,
                     instance_count=1,
                 )
                 self.studies[study_uid_s] = st
+                persist_intake_metadata = True
             else:
                 # Existing study: update timestamp
                 st.last_update_ts = ts
                 st.instance_count += 1
+                persist_intake_metadata = False
+                if calling_aet and calling_aet != st.calling_aet:
+                    st.calling_aet = calling_aet
+                    persist_intake_metadata = True
+                if remote_ip and remote_ip != st.remote_ip:
+                    st.remote_ip = remote_ip
+                    persist_intake_metadata = True
+
+            if persist_intake_metadata and (st.calling_aet or st.remote_ip):
+                conn = None
+                try:
+                    conn = db_connect()
+                    store.upsert_intake_metadata(
+                        conn,
+                        study_uid,
+                        calling_aet=st.calling_aet,
+                        remote_ip=st.remote_ip,
+                    )
+                except Exception as db_exc:
+                    print(f"⚠ Failed to persist intake metadata for {study_uid}: {db_exc}")
+                finally:
+                    if conn is not None:
+                        conn.close()
 
             # Return success status
             return 0x0000

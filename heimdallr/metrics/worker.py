@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from heimdallr.dicom_egress.config import build_egress_queue_items
 from heimdallr.shared import settings, store
 from heimdallr.shared.paths import study_dir, study_id_json, study_logs_dir, study_results_json
 from heimdallr.shared.sqlite import connect as db_connect
@@ -238,6 +239,66 @@ def _payload_summary(payload: dict) -> str:
     return str(payload.get("status", "n/a"))
 
 
+def _normalize_dicom_exports(payload: dict) -> list[dict]:
+    exports: list[dict] = []
+    raw_exports = payload.get("dicom_exports")
+    if isinstance(raw_exports, list):
+        for item in raw_exports:
+            if not isinstance(item, dict):
+                continue
+            path = str(item.get("path", "") or "").strip()
+            kind = str(
+                item.get("kind") or item.get("artifact_type") or item.get("type") or ""
+            ).strip()
+            if not path or not kind:
+                continue
+            exports.append({"path": path, "kind": kind})
+
+    artifacts = payload.get("artifacts", {})
+    if isinstance(artifacts, dict):
+        legacy_overlay_path = str(artifacts.get("overlay_sc_dcm", "") or "").strip()
+        if legacy_overlay_path and not any(
+            export["path"] == legacy_overlay_path for export in exports
+        ):
+            exports.append(
+                {
+                    "path": legacy_overlay_path,
+                    "kind": "secondary_capture",
+                }
+            )
+    return exports
+
+
+def _enqueue_case_dicom_exports(
+    case_id: str,
+    metadata: dict,
+    dicom_exports: list[dict],
+    logger: MetricsLogger,
+) -> int:
+    if not dicom_exports:
+        return 0
+
+    queue_items = build_egress_queue_items(case_id, metadata, dicom_exports)
+    if not queue_items:
+        logger.log("[Metrics] No eligible DICOM egress destinations for generated artifacts")
+        return 0
+
+    enqueued = 0
+    conn = db_connect()
+    try:
+        for item in queue_items:
+            artifact_abspath = study_dir(case_id) / item["artifact_path"]
+            if not artifact_abspath.exists():
+                logger.log(f"[Metrics] Skipping missing DICOM artifact: {artifact_abspath}")
+                continue
+            store.enqueue_dicom_export(conn, **item)
+            enqueued += 1
+    finally:
+        conn.close()
+
+    return enqueued
+
+
 def process_case_metrics(case_input: Path) -> bool:
     case_id = case_input.name
     log_dir = study_logs_dir(case_id)
@@ -267,20 +328,35 @@ def process_case_metrics(case_input: Path) -> bool:
         _write_case_metadata(case_id, metadata)
 
         completed_jobs = []
+        dicom_exports = []
         for job in jobs:
             job_name = job["name"]
             logger.log(f"[Metrics] Running {job_name}")
             payload = _run_job(case_id, job, log_dir)
             _upsert_results(case_id, job_name, payload, metadata)
+            job_dicom_exports = _normalize_dicom_exports(payload)
+            dicom_exports.extend(job_dicom_exports)
             completed_jobs.append(
                 {
                     "name": job_name,
                     "status": payload.get("status"),
                     "result_json": payload.get("artifacts", {}).get("result_json"),
                     "overlay_png": payload.get("artifacts", {}).get("overlay_png"),
+                    "dicom_exports": job_dicom_exports,
                 }
             )
             logger.log(f"[Metrics] ✓ {job_name} ({_payload_summary(payload)})")
+
+        try:
+            enqueued_dicom_exports = _enqueue_case_dicom_exports(
+                case_id,
+                metadata,
+                dicom_exports,
+                logger,
+            )
+        except Exception as exc:
+            enqueued_dicom_exports = 0
+            logger.log(f"[Metrics] Warning: failed to enqueue DICOM egress items: {exc}")
 
         end_dt = datetime.datetime.now(LOCAL_TZ)
         pipeline = metadata.get("Pipeline", {})
@@ -289,6 +365,7 @@ def process_case_metrics(case_input: Path) -> bool:
         pipeline["metrics_pipeline"] = {
             "profile": profile_name,
             "jobs": completed_jobs,
+            "dicom_egress_items_enqueued": enqueued_dicom_exports,
         }
         metadata["Pipeline"] = pipeline
         _write_case_metadata(case_id, metadata)

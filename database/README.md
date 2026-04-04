@@ -18,11 +18,23 @@ Stores DICOM metadata and calculation results for all processed studies.
 | `AccessionNumber` | TEXT | Hospital/PACS accession number |
 | `StudyDate` | TEXT | Study date in YYYYMMDD format |  
 | `Modality` | TEXT | Imaging modality (CT, MR, etc.) |
+| `CallingAET` | TEXT | DICOM Calling AE Title captured by intake |
+| `RemoteIP` | TEXT | Sender IP captured by intake |
 | `IdJson` | TEXT | Complete id.json from output directory (includes Pipeline info, SelectedSeries) |
 | `JsonDump` | TEXT | Basic metadata JSON from prepare.py |
 | `DicomMetadata` | TEXT | Complete DICOM tags JSON from selected series |
 | `CalculationResults` | TEXT | Computed metrics JSON (volumes, densities, etc.) |
 | `ProcessedAt` | TIMESTAMP | When study was first processed (America/Sao_Paulo) |
+
+### Queue Tables
+
+Operational dispatch is tracked in three queue tables:
+
+| Table | Purpose |
+|-------|---------|
+| `processing_queue` | Prepared studies waiting for segmentation/processing |
+| `metrics_queue` | Processed studies waiting for post-segmentation metrics |
+| `dicom_egress_queue` | Generated DICOM artifacts waiting for outbound C-STORE delivery |
 
 ### Indexes
 
@@ -51,9 +63,19 @@ prepare.py
   ↓
   Updates: DicomMetadata (full DICOM tags from selected series)
 
-run.py
+heimdallr.intake
   ↓
-  Updates: CalculationResults (after metrics.py completes)
+  Upserts: StudyInstanceUID, CallingAET, RemoteIP
+
+heimdallr.metrics
+  ↓
+  Updates: CalculationResults (after metrics worker completes)
+  ↓
+  Enqueues: dicom_egress_queue entries for generated DICOM artifacts
+
+heimdallr.dicom_egress
+  ↓
+  Claims: pending outbound artifacts and performs DICOM C-STORE delivery
 ```
 
 ## Querying Examples

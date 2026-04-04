@@ -349,7 +349,15 @@ def main() -> int:
                 },
             },
             "artifacts": artifacts,
+            "dicom_exports": [],
         }
+        if "overlay_sc_dcm" in artifacts:
+            payload["dicom_exports"].append(
+                {
+                    "path": artifacts["overlay_sc_dcm"],
+                    "kind": "secondary_capture",
+                }
+            )
 
         result_path.write_text(
             json.dumps(payload, indent=2, ensure_ascii=False),
