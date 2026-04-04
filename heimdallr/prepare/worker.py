@@ -774,6 +774,8 @@ def process_zip(zip_path):
                 pipeline_data["intake_receive_elapsed_time"] = intake_manifest.get("receive_elapsed_time")
                 pipeline_data["intake_receive_elapsed_seconds"] = intake_manifest.get("receive_elapsed_seconds")
                 pipeline_data["intake_instance_count"] = intake_manifest.get("instance_count")
+                pipeline_data["intake_calling_aet"] = intake_manifest.get("calling_aet")
+                pipeline_data["intake_remote_ip"] = intake_manifest.get("remote_ip")
                 pipeline_data["intake_handoff_time"] = intake_manifest.get("handoff_time")
                 handoff_time = intake_manifest.get("handoff_time")
                 if handoff_time:

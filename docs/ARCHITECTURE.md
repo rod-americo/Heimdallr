@@ -33,6 +33,10 @@ The repository is currently transitioning from script-oriented entrypoints to a 
 - Consumes `metrics_queue` for post-segmentation derived jobs
 - Runs modular jobs such as bone-health screening and vertebral fracture heuristics
 
+7. `heimdallr/dicom_egress/`
+- Consumes `dicom_egress_queue` for outbound artifact delivery
+- Acts as DICOM SCU and performs C-STORE to configured remote SCP destinations
+
 ## Data and Storage
 
 - Intake staging: `runtime/intake/uploads/`, `runtime/intake/uploads_failed/`
@@ -65,6 +69,13 @@ PACS/Modality (DICOM) --> heimdallr/intake --> /upload (heimdallr/control_plane)
                                          (derived jobs + job artifacts)
                                                          |
                                                          v
+                                               dicom_egress_queue
+                                                         |
+                                                         v
+                                           heimdallr/dicom_egress
+                                            (C-STORE outbound SCU)
+                                                         |
+                                                         v
                                             runtime/studies/<case_id>/
                                                          |
                                                          v
@@ -81,7 +92,7 @@ PACS/Modality (DICOM) --> heimdallr/intake --> /upload (heimdallr/control_plane)
 ## Operational Boundaries
 
 - Assistive outputs are operational results and require clinical validation before use.
-- Production operation expects independent process supervision for the control plane, processing worker, and intake gateway runtimes.
+- Production operation expects independent process supervision for the control plane, prepare worker, processing worker, metrics worker, intake gateway, and DICOM egress runtimes.
 
 ## Cross-References
 

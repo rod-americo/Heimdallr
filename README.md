@@ -1,8 +1,8 @@
 # Heimdallr
 
-**Open-source radiological image MLOps infrastructure — intake, segmentation, and quantitative analysis**
+**Open-source radiological image MLOps infrastructure — intake, segmentation, quantitative analysis, and DICOM artifact delivery**
 
-Heimdallr is a production-oriented radiology pipeline that connects DICOM intake, study preparation, TotalSegmentator-backed segmentation, and deterministic quantitative analysis into a single modular Python package. The architecture is cloud-native (12-Factor), with zero `.env` files and configuration driven entirely by `HEIMDALLR_*` environment variables and JSON profiles.
+Heimdallr is a production-oriented radiology pipeline that connects DICOM intake, study preparation, TotalSegmentator-backed segmentation, deterministic quantitative analysis, and outbound DICOM artifact delivery into a single modular Python package. The architecture is cloud-native (12-Factor), with zero `.env` files and configuration driven entirely by `HEIMDALLR_*` environment variables and JSON profiles.
 
 > **Scope boundary** — Heimdallr handles the open-source imaging infrastructure only. Proprietary clinical support, LLM-assisted reporting, and intelligence layers belong to the companion **Asha** repository.
 
@@ -28,7 +28,10 @@ heimdallr.processing      ← TotalSegmentator segmentation (parallel tasks)
       │ masks
       ▼
 heimdallr.metrics         ← deterministic derived measurements (job-based)
-      │ results
+      │ results + DICOM artifacts
+      ▼
+heimdallr.dicom_egress   ← outbound C-STORE delivery worker
+      │ queued deliveries
       ▼
 runtime/studies/<case_id>/ + database/dicom.db
 ```
@@ -50,11 +53,13 @@ runtime/studies/<case_id>/ + database/dicom.db
    - `body_fat_abdominal_volumes` — Abdominal visceral / subcutaneous fat volumes
    - `body_fat_l3_slice` — L3-level body composition analysis
 
-5. **Control Plane** — FastAPI application serving the web dashboard, upload endpoint, patient/results API, and PDF case report generation.
+5. **DICOM Egress** — Queue-driven outbound C-STORE worker that delivers generated DICOM artifacts such as Secondary Capture overlays to fixed remote SCP destinations.
 
-6. **Operations TUI** — Textual-based terminal dashboard with live process monitoring, queue inspection, and study browsing.
+6. **Control Plane** — FastAPI application serving the web dashboard, upload endpoint, patient/results API, and PDF case report generation.
 
-7. **De-identification Gateway** — OCR-based burned-in text detection and metadata scrubbing for outbound payloads (`services/deid_gateway.py`).
+7. **Operations TUI** — Textual-based terminal dashboard with live process monitoring, queue inspection, and study browsing.
+
+8. **De-identification Gateway** — OCR-based burned-in text detection and metadata scrubbing for outbound payloads (`services/deid_gateway.py`).
 
 ## Repository Layout
 
@@ -80,6 +85,9 @@ Heimdallr/
 │   ├── metrics/                  # Post-segmentation metrics engine
 │   │   ├── worker.py             #   Queue-driven job dispatcher
 │   │   └── jobs/                 #   Individual measurement modules
+│   ├── dicom_egress/             # Outbound DICOM artifact delivery worker
+│   │   ├── worker.py             #   Queue-driven C-STORE SCU dispatcher
+│   │   └── config.py             #   Destination config loader + routing helper
 │   ├── shared/                   # Cross-cutting concerns
 │   │   ├── settings.py           #   Centralized runtime settings
 │   │   ├── store.py              #   SQLite data access layer
@@ -99,9 +107,10 @@ Heimdallr/
 │   ├── series_selection.json     #   Series selection strategy
 │   ├── segmentation_pipeline.json#   TotalSegmentator task list
 │   ├── metrics_pipeline.json     #   Post-segmentation job list
-│   └── presentation.json        #   Patient name display profiles
+│   ├── dicom_egress.json         #   Outbound DICOM destinations
+│   └── presentation.json         #   Patient name display profiles
 ├── database/                     # Persistent storage
-│   ├── schema.sql                #   SQLite schema (dicom_metadata, queues)
+│   ├── schema.sql                #   SQLite schema (dicom_metadata, processing/metrics/egress queues)
 │   └── README.md                 #   Schema documentation
 ├── bin/                          # Bundled platform binaries
 │   ├── darwin-arm64/dcm2niix     #   macOS ARM
@@ -184,7 +193,10 @@ Start the baseline services in separate terminals:
 # 4) DICOM Listener — C-STORE intake (default :11114)
 .venv/bin/python -m heimdallr.intake
 
-# 5) Operations TUI — terminal dashboard
+# 5) DICOM Egress Worker — outbound C-STORE delivery
+.venv/bin/python -m heimdallr.dicom_egress
+
+# 6) Operations TUI — terminal dashboard
 .venv/bin/python -m heimdallr.tui
 ```
 
@@ -232,6 +244,7 @@ Key environment variables:
 |---|---|---|
 | `HEIMDALLR_SERVER_PORT` | `8001` | Control plane HTTP port |
 | `HEIMDALLR_DICOM_PORT` | `11114` | DICOM listener port |
+| `HEIMDALLR_DICOM_EGRESS_CONFIG` | `config/dicom_egress.json` | Outbound DICOM destination config |
 | `HEIMDALLR_AE_TITLE` | `HEIMDALLR` | DICOM Application Entity title |
 | `HEIMDALLR_TIMEZONE` | `America/Sao_Paulo` | Operational timezone |
 | `HEIMDALLR_MAX_PARALLEL_CASES` | `3` | Concurrent processing slots |

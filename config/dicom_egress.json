@@ -1,0 +1,19 @@
+{
+  "local_ae_title": "HEIMDALLR",
+  "retry_attempts": 3,
+  "retry_backoff_seconds": 10,
+  "connect_timeout_seconds": 15,
+  "dimse_timeout_seconds": 30,
+  "destinations": [
+    {
+      "name": "return_to_sender",
+      "enabled": false,
+      "host": "10.242.2.22",
+      "port": 1044,
+      "called_aet": "OSIRIX_MEZO",
+      "artifact_types": [
+        "secondary_capture"
+      ]
+    }
+  ]
+}
