@@ -10,7 +10,7 @@ from typing import Any
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from pydicom.uid import generate_uid
-from scipy.ndimage import binary_erosion, zoom
+from scipy.ndimage import binary_erosion
 
 from heimdallr.metrics.jobs._bone_job_common import (
     load_ct_volume,
@@ -73,14 +73,6 @@ def _load_case_metadata(case_id: str, case_dir: Path) -> dict[str, Any]:
     merged.update(id_json)
     merged.update(metadata_json)
     return merged
-
-
-def _resample_along_z(volume: np.ndarray, z_scale: float, *, order: int) -> np.ndarray:
-    if volume.ndim != 3:
-        raise ValueError(f"Expected 3D volume. Got {volume.shape}")
-    if z_scale <= 0:
-        raise ValueError(f"z_scale must be positive. Got {z_scale}")
-    return zoom(volume, zoom=(1.0, 1.0, z_scale), order=order)
 
 
 def _compute_mask_measurement(
@@ -163,8 +155,69 @@ def _blend_mask(rgb: np.ndarray, mask_2d: np.ndarray, color: tuple[int, int, int
     return np.clip(out, 0, 255).astype(np.uint8)
 
 
-def _legend_height(line_count: int) -> int:
-    return 44 + (line_count * 20)
+def _source_slice_positions_mm(z_size: int, spacing_z: float) -> np.ndarray:
+    return np.arange(int(z_size), dtype=np.float32) * float(spacing_z)
+
+
+def _select_slab_source_indices(
+    source_positions_mm: np.ndarray,
+    *,
+    center_mm: float,
+    slab_thickness_mm: float,
+) -> np.ndarray:
+    half_thickness = float(slab_thickness_mm) / 2.0
+    selected = np.where(
+        (source_positions_mm >= (center_mm - half_thickness))
+        & (source_positions_mm <= (center_mm + half_thickness))
+    )[0]
+    if selected.size > 0:
+        return selected
+    nearest = int(np.argmin(np.abs(source_positions_mm - center_mm)))
+    return np.asarray([nearest], dtype=np.int32)
+
+
+def _build_export_slabs(
+    union_mask: np.ndarray,
+    *,
+    spacing_z: float,
+    slab_thickness_mm: float,
+) -> list[dict[str, Any]]:
+    occupied_indices = np.where(np.asarray(union_mask, dtype=bool).sum(axis=(0, 1)) > 0)[0]
+    if occupied_indices.size == 0:
+        return []
+
+    source_positions_mm = _source_slice_positions_mm(union_mask.shape[2], spacing_z)
+    step_mm = float(slab_thickness_mm)
+    max_center_index = int(np.ceil(float(source_positions_mm[-1]) / step_mm))
+    occupied_start_mm = float(source_positions_mm[int(occupied_indices[0])])
+    occupied_end_mm = float(source_positions_mm[int(occupied_indices[-1])])
+
+    center_index_start = max(0, int(np.floor(occupied_start_mm / step_mm)) - 1)
+    center_index_end = min(max_center_index, int(np.ceil(occupied_end_mm / step_mm)) + 1)
+
+    slabs: list[dict[str, Any]] = []
+    for center_index in range(center_index_start, center_index_end + 1):
+        center_mm = float(center_index * step_mm)
+        source_indices = _select_slab_source_indices(
+            source_positions_mm,
+            center_mm=center_mm,
+            slab_thickness_mm=slab_thickness_mm,
+        )
+        slabs.append(
+            {
+                "center_mm": center_mm,
+                "source_indices": [int(idx) for idx in source_indices.tolist()],
+            }
+        )
+    return slabs
+
+
+def _average_ct_slab(ct_data: np.ndarray, source_indices: list[int]) -> np.ndarray:
+    return np.mean(np.asarray(ct_data[:, :, source_indices], dtype=np.float32), axis=2)
+
+
+def _mask_slab(mask_data: np.ndarray, source_indices: list[int]) -> np.ndarray:
+    return np.any(np.asarray(mask_data[:, :, source_indices], dtype=bool), axis=2)
 
 
 def _render_slice_rgb(
@@ -180,8 +233,8 @@ def _render_slice_rgb(
 
     image = Image.fromarray(rgb, mode="RGB")
     draw = ImageDraw.Draw(image, mode="RGBA")
-    title_font = _load_overlay_font(size=20)
-    body_font = _load_overlay_font(size=18)
+    title_font = _load_overlay_font(size=18)
+    body_font = _load_overlay_font(size=16)
 
     line_heights: list[int] = []
     max_width = 0
@@ -270,35 +323,26 @@ def main() -> int:
             print(json.dumps(payload, indent=2))
             return 0
 
-        z_scale = float(spacing_xyz[2]) / TARGET_SLICE_THICKNESS_MM
-        resampled_ct = _resample_along_z(ct_data, z_scale, order=1)
-        resampled_masks = {
-            organ_key: (
-                _resample_along_z(mask.astype(np.float32), z_scale, order=0) > 0.5
-                if mask is not None
-                else None
-            )
-            for organ_key, mask in organ_masks.items()
-        }
-        union_mask = np.zeros(resampled_ct.shape, dtype=bool)
-        for mask in resampled_masks.values():
+        union_mask = np.zeros(ct_data.shape, dtype=bool)
+        for mask in organ_masks.values():
             if mask is not None:
                 union_mask |= np.asarray(mask, dtype=bool)
 
-        occupied_indices = np.where(union_mask.sum(axis=(0, 1)) > 0)[0].tolist()
-        if not occupied_indices:
+        export_slabs = _build_export_slabs(
+            union_mask,
+            spacing_z=float(spacing_xyz[2]),
+            slab_thickness_mm=TARGET_SLICE_THICKNESS_MM,
+        )
+        if not export_slabs:
             payload["status"] = "skipped"
             payload["measurement"] = {
-                "job_status": "empty_resampled_overlay",
+                "job_status": "empty_overlay",
                 "organs": organ_measurements,
             }
             payload["artifacts"] = {"result_json": str(result_path.relative_to(case_dir))}
             write_payload(result_path, payload)
             print(json.dumps(payload, indent=2))
             return 0
-        export_start = max(0, int(occupied_indices[0]) - 1)
-        export_end = min(int(resampled_ct.shape[2]) - 1, int(occupied_indices[-1]) + 1)
-        export_indices = list(range(export_start, export_end + 1))
 
         artifacts = {
             "result_json": str(result_path.relative_to(case_dir)),
@@ -309,13 +353,14 @@ def main() -> int:
             emit_dicom = bool(job_config.get("emit_secondary_capture_dicom", True))
             artifact_locale = resolve_artifact_locale(job_config)
             series_instance_uid = generate_uid()
-            for output_idx, slice_idx in enumerate(export_indices, start=1):
+            for output_idx, slab in enumerate(export_slabs, start=1):
+                source_indices = slab["source_indices"]
                 masks_for_slice = []
                 for organ_key, _organ_label, _filename, color in ORGAN_DEFINITIONS:
-                    mask = resampled_masks[organ_key]
+                    mask = organ_masks[organ_key]
                     if mask is None:
                         continue
-                    slice_mask = np.asarray(mask[:, :, slice_idx], dtype=bool)
+                    slice_mask = _mask_slab(mask, source_indices)
                     if slice_mask.any():
                         masks_for_slice.append((slice_mask, color))
 
@@ -323,7 +368,11 @@ def main() -> int:
                     organ_measurements=organ_measurements,
                     locale=artifact_locale,
                 )
-                rgb = _render_slice_rgb(resampled_ct[:, :, slice_idx], masks_for_slice, summary_lines)
+                rgb = _render_slice_rgb(
+                    _average_ct_slab(ct_data, source_indices),
+                    masks_for_slice,
+                    summary_lines,
+                )
                 if emit_dicom:
                     dicom_path = dicom_dir / f"overlay_{output_idx:04d}.dcm"
                     create_secondary_capture_from_rgb(
@@ -358,9 +407,10 @@ def main() -> int:
                     "y": spacing_xyz[1],
                     "z": spacing_xyz[2],
                 },
-                "resampled_slice_count": int(resampled_ct.shape[2]),
+                "reconstruction_mode": "slab_average",
+                "source_slice_count": int(ct_data.shape[2]),
                 "exported_slice_count": len(dicom_exports),
-                "exported_slice_indices": [int(idx) for idx in export_indices],
+                "exported_slabs": export_slabs,
                 "organs": organ_measurements,
             },
             "artifacts": artifacts,
