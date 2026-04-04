@@ -77,6 +77,62 @@ def sagittal_plane_from_mask(mask: np.ndarray) -> tuple[np.ndarray, int, str]:
     return np.asarray(mask_bool[:, center_index, :], dtype=bool), center_index, "y"
 
 
+def centered_slab_bounds(center_index: int, axis_len: int, spacing_mm: float, slab_thickness_mm: float) -> tuple[int, int]:
+    if axis_len <= 0:
+        raise RuntimeError("Invalid slab axis length")
+
+    slice_count = max(1, int(round(float(slab_thickness_mm) / max(float(spacing_mm), 1e-6))))
+    if slice_count % 2 == 0:
+        slice_count += 1
+
+    radius = slice_count // 2
+    start = max(0, center_index - radius)
+    end = min(axis_len, center_index + radius + 1)
+
+    missing = slice_count - (end - start)
+    if missing > 0:
+        extend_left = min(start, missing)
+        start -= extend_left
+        missing -= extend_left
+        end = min(axis_len, end + missing)
+
+    return int(start), int(end)
+
+
+def sagittal_slab_from_mask(
+    image_data: np.ndarray,
+    mask: np.ndarray,
+    plane_index: int,
+    axis: str,
+    spacing_mm: tuple[float, float, float],
+    slab_thickness_mm: float,
+) -> tuple[np.ndarray, np.ndarray, tuple[int, int], float]:
+    if axis == "x":
+        lateral_spacing = float(spacing_mm[1])
+        slab_start, slab_end = centered_slab_bounds(
+            plane_index,
+            image_data.shape[0],
+            spacing_mm=float(spacing_mm[0]),
+            slab_thickness_mm=slab_thickness_mm,
+        )
+        ct_slab = np.asarray(image_data[slab_start:slab_end, :, :], dtype=np.float32)
+        mask_slab = np.asarray(mask[slab_start:slab_end, :, :], dtype=bool)
+    else:
+        lateral_spacing = float(spacing_mm[0])
+        slab_start, slab_end = centered_slab_bounds(
+            plane_index,
+            image_data.shape[1],
+            spacing_mm=float(spacing_mm[1]),
+            slab_thickness_mm=slab_thickness_mm,
+        )
+        ct_slab = np.asarray(image_data[:, slab_start:slab_end, :], dtype=np.float32)
+        mask_slab = np.asarray(mask[:, slab_start:slab_end, :], dtype=bool)
+
+    sagittal_ct = np.mean(ct_slab, axis=0, dtype=np.float32)
+    sagittal_mask = np.any(mask_slab, axis=0)
+    return sagittal_ct, sagittal_mask, (slab_start, slab_end), lateral_spacing
+
+
 def render_overlay_rgb(
     image_data: np.ndarray,
     l3_mask: np.ndarray,
@@ -85,26 +141,28 @@ def render_overlay_rgb(
     title: str,
     summary_lines: list[str],
     spacing_mm: tuple[float, float, float],
+    sagittal_slab_thickness_mm: float = 3.0,
 ) -> np.ndarray:
     ct_slice = np.asarray(image_data[:, :, slice_idx], dtype=np.float32)
     muscle_slice = np.asarray(muscle_mask[:, :, slice_idx], dtype=bool)
     l3_slice = np.asarray(l3_mask[:, :, slice_idx], dtype=bool)
-    sagittal_l3, sagittal_index, sagittal_axis = sagittal_plane_from_mask(l3_mask)
-
-    if sagittal_axis == "x":
-        sagittal_ct = np.asarray(image_data[sagittal_index, :, :], dtype=np.float32)
-        lateral_spacing = float(spacing_mm[1])
-    else:
-        sagittal_ct = np.asarray(image_data[:, sagittal_index, :], dtype=np.float32)
-        lateral_spacing = float(spacing_mm[0])
+    _, sagittal_index, sagittal_axis = sagittal_plane_from_mask(l3_mask)
+    sagittal_ct, sagittal_l3, _, lateral_spacing = sagittal_slab_from_mask(
+        image_data=image_data,
+        mask=l3_mask,
+        plane_index=sagittal_index,
+        axis=sagittal_axis,
+        spacing_mm=spacing_mm,
+        slab_thickness_mm=sagittal_slab_thickness_mm,
+    )
 
     ct_slice = np.clip(ct_slice, -160.0, 240.0)
     sagittal_ct = np.clip(sagittal_ct, -160.0, 240.0)
     rotated_ct = np.rot90(ct_slice)
     rotated_muscle = np.rot90(muscle_slice.astype(np.uint8))
     rotated_l3 = np.rot90(l3_slice.astype(np.uint8))
-    rotated_sagittal_ct = np.rot90(sagittal_ct)
-    rotated_sagittal_l3 = np.rot90(sagittal_l3.astype(np.uint8))
+    rotated_sagittal_ct = np.fliplr(np.rot90(sagittal_ct))
+    rotated_sagittal_l3 = np.fliplr(np.rot90(sagittal_l3.astype(np.uint8)))
 
     spacing_x, spacing_y, spacing_z = (float(value) for value in spacing_mm)
     axial_aspect = (spacing_y / spacing_x) if spacing_x > 0 and spacing_y > 0 else 1.0
@@ -162,7 +220,7 @@ def render_overlay_rgb(
     ax_sagittal.text(
         0.03,
         0.03,
-        f"Axial level z={slice_idx}",
+        f"Axial level z={slice_idx} | slab {sagittal_slab_thickness_mm:.0f} mm",
         transform=ax_sagittal.transAxes,
         ha="left",
         va="bottom",
