@@ -64,17 +64,10 @@ def sagittal_plane_from_mask(mask: np.ndarray) -> tuple[np.ndarray, int, str]:
     if coords.size == 0:
         raise RuntimeError("L3 mask is empty")
 
-    x_min, y_min, _ = coords.min(axis=0)
-    x_max, y_max, _ = coords.max(axis=0)
-    x_span = int(x_max - x_min + 1)
-    y_span = int(y_max - y_min + 1)
-
-    if x_span <= y_span:
-        center_index = int(round((x_min + x_max) / 2.0))
-        return np.asarray(mask_bool[center_index, :, :], dtype=bool), center_index, "x"
-
-    center_index = int(round((y_min + y_max) / 2.0))
-    return np.asarray(mask_bool[:, center_index, :], dtype=bool), center_index, "y"
+    x_min = int(coords[:, 0].min())
+    x_max = int(coords[:, 0].max())
+    center_index = int(round((x_min + x_max) / 2.0))
+    return np.asarray(mask_bool[center_index, :, :], dtype=bool), center_index, "x"
 
 
 def centered_slab_bounds(center_index: int, axis_len: int, spacing_mm: float, slab_thickness_mm: float) -> tuple[int, int]:

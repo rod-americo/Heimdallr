@@ -16,7 +16,7 @@ class TestL3MuscleAreaJob(unittest.TestCase):
 
         self.assertEqual((start, end), (9, 12))
 
-    def test_sagittal_plane_from_mask_prefers_narrower_lateral_span(self):
+    def test_sagittal_plane_from_mask_uses_left_right_axis(self):
         mask = np.zeros((12, 18, 10), dtype=bool)
         mask[4:7, 3:13, 2:8] = True
 
@@ -25,6 +25,17 @@ class TestL3MuscleAreaJob(unittest.TestCase):
         self.assertEqual(axis, "x")
         self.assertEqual(index, 5)
         self.assertEqual(plane.shape, (18, 10))
+        self.assertTrue(plane.any())
+
+    def test_sagittal_plane_from_mask_still_uses_x_for_wide_vertebra(self):
+        mask = np.zeros((20, 12, 14), dtype=bool)
+        mask[4:16, 5:8, 3:11] = True
+
+        plane, index, axis = sagittal_plane_from_mask(mask)
+
+        self.assertEqual(axis, "x")
+        self.assertEqual(index, 10)
+        self.assertEqual(plane.shape, (12, 14))
         self.assertTrue(plane.any())
 
     def test_sagittal_slab_from_mask_projects_three_millimeter_slab(self):
@@ -53,14 +64,11 @@ class TestL3MuscleAreaJob(unittest.TestCase):
         mask = np.zeros_like(image, dtype=bool)
         mask[4:16, 5:8, 3:11] = True
 
-        _, plane_index, axis = sagittal_plane_from_mask(mask)
-        self.assertEqual(axis, "y")
-
         sagittal_ct, sagittal_mask, slab_bounds, lateral_spacing = sagittal_slab_from_mask(
             image_data=image,
             mask=mask,
-            plane_index=plane_index,
-            axis=axis,
+            plane_index=6,
+            axis="y",
             spacing_mm=(1.0, 1.0, 2.5),
             slab_thickness_mm=3.0,
         )
