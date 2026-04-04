@@ -27,7 +27,7 @@
         },
         {
           "name": "bone_health_l1_hu",
-          "enabled": false,
+          "enabled": true,
           "generate_overlay": true,
           "strict_qc": false
         },
