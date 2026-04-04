@@ -14,7 +14,9 @@
           "enabled": true,
           "output_dir": "artifacts/total",
           "extra_args": [
-            "--fast"
+            "--fast",
+            "--device",
+            "gpu"
           ],
           "license_required": false
         },
@@ -22,7 +24,10 @@
           "name": "tissue_types",
           "enabled": true,
           "output_dir": "artifacts/tissue_types",
-          "extra_args": [],
+          "extra_args": [
+            "--device",
+            "gpu"
+          ],
           "license_required": true
         }
       ]
