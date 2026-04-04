@@ -39,3 +39,13 @@ def build_overlay_text(
             )
         )
     return summary_lines
+
+
+def series_description(locale: str) -> str:
+    """Return the localized DICOM SeriesDescription."""
+    return translate("parenchymal.overlay.series_description", locale=locale)
+
+
+def derivation_description(locale: str) -> str:
+    """Return the localized DICOM DerivationDescription."""
+    return translate("parenchymal.overlay.derivation_description", locale=locale)

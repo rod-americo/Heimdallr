@@ -41,3 +41,9 @@ msgstr "Right kidney: {volume} cm³ | {hu} {attenuation_unit}"
 
 msgid "parenchymal.overlay.organ.kidney_left"
 msgstr "Left kidney: {volume} cm³ | {hu} {attenuation_unit}"
+
+msgid "parenchymal.overlay.series_description"
+msgstr "Heimdallr Parenchymal Organ Overlay 5 mm"
+
+msgid "parenchymal.overlay.derivation_description"
+msgstr "5 mm axial reconstruction with parenchymal-organ overlays (liver, spleen, pancreas, right kidney, left kidney)"
