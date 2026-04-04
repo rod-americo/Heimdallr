@@ -139,7 +139,7 @@ def build_snapshot(
     metrics_queue_rows = _load_metrics_queue(db_path)
     metadata_rows = _load_metadata_rows(db_path)
     process_scan = _scan_system_processes()
-    study_entries = _load_studies(layout.studies_dir)
+    study_entries = _load_studies(layout.studies_dir, generated_at)
     pending_files = _collect_files(layout.pending_dir, suffix=".nii.gz")
     active_files = _collect_files(layout.active_dir, suffix=".nii.gz")
     failed_files = _collect_files(layout.failed_dir, suffix=".nii.gz")
@@ -736,7 +736,7 @@ def _load_metadata_rows(db_path: Path) -> list[dict[str, Any]]:
         return []
 
 
-def _load_studies(studies_dir: Path) -> dict[str, dict[str, Any]]:
+def _load_studies(studies_dir: Path, now: datetime) -> dict[str, dict[str, Any]]:
     if not studies_dir.exists():
         return {}
     studies: dict[str, dict[str, Any]] = {}
@@ -757,12 +757,34 @@ def _load_studies(studies_dir: Path) -> dict[str, dict[str, Any]]:
             "modality": payload.get("Modality", ""),
             "accession_number": payload.get("AccessionNumber", ""),
             "study_date": payload.get("StudyDate", ""),
-            "prepare_elapsed": pipeline.get("prepare_elapsed_time", ""),
-            "segmentation_elapsed": pipeline.get("segmentation_elapsed_time")
-            or pipeline.get("processing_elapsed_time")
-            or "",
-            "metrics_elapsed": pipeline.get("metrics_elapsed_time", ""),
-            "total_elapsed": pipeline.get("elapsed_time", ""),
+            "prepare_elapsed": _resolve_elapsed_time(
+                pipeline,
+                now=now,
+                elapsed_keys=("prepare_elapsed_time",),
+                start_keys=("prepare_start_time",),
+                end_keys=("prepare_end_time",),
+            ),
+            "segmentation_elapsed": _resolve_elapsed_time(
+                pipeline,
+                now=now,
+                elapsed_keys=("segmentation_elapsed_time", "processing_elapsed_time", "elapsed_time"),
+                start_keys=("segmentation_start_time", "start_time"),
+                end_keys=("segmentation_end_time", "end_time"),
+            ),
+            "metrics_elapsed": _resolve_elapsed_time(
+                pipeline,
+                now=now,
+                elapsed_keys=("metrics_elapsed_time",),
+                start_keys=("metrics_start_time",),
+                end_keys=("metrics_end_time",),
+            ),
+            "total_elapsed": _resolve_elapsed_time(
+                pipeline,
+                now=now,
+                elapsed_keys=("pipeline_end_to_end_elapsed_time", "pipeline_active_elapsed_time"),
+                start_keys=("prepare_start_time",),
+                end_keys=("metrics_end_time", "segmentation_end_time", "end_time", "prepare_end_time"),
+            ),
             "metrics_started": bool(pipeline.get("metrics_start_time")),
             "metrics_finished": bool(pipeline.get("metrics_end_time")),
             "selected_series": len(payload.get("AvailableSeries", [])),
@@ -783,6 +805,37 @@ def _read_json(path: Path) -> dict[str, Any]:
         return data if isinstance(data, dict) else {}
     except (OSError, json.JSONDecodeError):
         return {}
+
+
+def _resolve_elapsed_time(
+    pipeline: dict[str, Any],
+    *,
+    now: datetime,
+    elapsed_keys: tuple[str, ...],
+    start_keys: tuple[str, ...],
+    end_keys: tuple[str, ...],
+) -> str:
+    for key in elapsed_keys:
+        value = str(pipeline.get(key, "") or "").strip()
+        if value:
+            return value
+
+    start_dt = _first_pipeline_datetime(pipeline, start_keys)
+    if start_dt is None:
+        return ""
+
+    end_dt = _first_pipeline_datetime(pipeline, end_keys) or now
+    if end_dt < start_dt:
+        return ""
+    return str(end_dt - start_dt)
+
+
+def _first_pipeline_datetime(pipeline: dict[str, Any], keys: tuple[str, ...]) -> datetime | None:
+    for key in keys:
+        parsed = _parse_datetime(pipeline.get(key))
+        if parsed is not None:
+            return parsed
+    return None
 
 
 def _tail_text(path: Path, limit: int) -> str:
