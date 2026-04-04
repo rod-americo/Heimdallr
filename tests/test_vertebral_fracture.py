@@ -97,6 +97,19 @@ class TestVertebralFractureHelpers(unittest.TestCase):
         self.assertEqual(result["screen_label"], "indeterminate")
         self.assertIn("empty_mask", result["qc_flags"])
 
+    def test_screen_vertebral_fracture_returns_no_suspicion_for_clean_mask(self):
+        ap_len = 16
+        heights = np.full(ap_len, 18)
+        widths = np.full(ap_len, 18)
+        mask = make_profiled_vertebra(heights=heights, widths=widths, lateral_size=28, si_size=28)
+
+        result = screen_vertebral_fracture(mask, spacing_mm=(1.0, 1.0, 1.0))
+
+        self.assertEqual(result["status"], "no_suspicion")
+        self.assertEqual(result["screen_label"], "no_suspicion")
+        self.assertIsNone(result["suspected_pattern"])
+        self.assertIn("no_qualifying_fracture_pattern", result["qc_flags"])
+
     def test_screen_vertebral_fracture_full_pipeline(self):
         ap_len = 16
         heights = np.linspace(11, 21, ap_len)

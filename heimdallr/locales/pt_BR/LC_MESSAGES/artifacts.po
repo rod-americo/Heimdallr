@@ -68,3 +68,78 @@ msgstr "Heimdallr Overlay Sagital de Saúde Óssea em L1"
 
 msgid "bone_health.overlay.derivation_description"
 msgstr "ROI trabecular sagital em L1 com burned-in gerada a partir da métrica de saúde óssea do Heimdallr (HU={hu_mean})"
+
+msgid "vertebral_fracture.overlay.title"
+msgstr "Rastreamento de fratura vertebral"
+
+msgid "vertebral_fracture.overlay.panel.title"
+msgstr "{vertebra}"
+
+msgid "vertebral_fracture.overlay.panel.status"
+msgstr "Status: {value}"
+
+msgid "vertebral_fracture.overlay.panel.label"
+msgstr "Rótulo: {value}"
+
+msgid "vertebral_fracture.overlay.panel.pattern"
+msgstr "Padrão: {value}"
+
+msgid "vertebral_fracture.overlay.panel.severity"
+msgstr "Severidade: {value}"
+
+msgid "vertebral_fracture.overlay.status_value.suspected"
+msgstr "Suspeita"
+
+msgid "vertebral_fracture.overlay.status_value.no_suspicion"
+msgstr "Sem suspeita"
+
+msgid "vertebral_fracture.overlay.status_value.indeterminate"
+msgstr "Indeterminado"
+
+msgid "vertebral_fracture.overlay.label_value.suspected_wedge"
+msgstr "Suspeita de cunha"
+
+msgid "vertebral_fracture.overlay.label_value.suspected_biconcave"
+msgstr "Suspeita de biconcavidade"
+
+msgid "vertebral_fracture.overlay.label_value.suspected_crush"
+msgstr "Suspeita de colapso"
+
+msgid "vertebral_fracture.overlay.label_value.no_suspicion"
+msgstr "Sem suspeita"
+
+msgid "vertebral_fracture.overlay.label_value.indeterminate"
+msgstr "Indeterminado"
+
+msgid "vertebral_fracture.overlay.pattern_value.wedge"
+msgstr "Cunha"
+
+msgid "vertebral_fracture.overlay.pattern_value.biconcave"
+msgstr "Biconcavo"
+
+msgid "vertebral_fracture.overlay.pattern_value.crush"
+msgstr "Colapso"
+
+msgid "vertebral_fracture.overlay.pattern_value.none"
+msgstr "Nenhum"
+
+msgid "vertebral_fracture.overlay.severity_value.severe"
+msgstr "Grave"
+
+msgid "vertebral_fracture.overlay.severity_value.moderate"
+msgstr "Moderada"
+
+msgid "vertebral_fracture.overlay.severity_value.mild"
+msgstr "Leve"
+
+msgid "vertebral_fracture.overlay.severity_value.none"
+msgstr "Nenhuma"
+
+msgid "vertebral_fracture.overlay.severity_value.indeterminate"
+msgstr "Indeterminada"
+
+msgid "vertebral_fracture.overlay.series_description"
+msgstr "Heimdallr Rastreamento de Fratura Vertebral"
+
+msgid "vertebral_fracture.overlay.derivation_description"
+msgstr "Rastreamento sagital toracolombar de fratura vertebral com painéis burned-in ({vertebrae})"

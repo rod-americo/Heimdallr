@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import matplotlib
 
@@ -14,6 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from heimdallr.metrics.jobs._bone_job_common import (
+    extract_plane,
     load_case_json_bundle,
     load_ct_volume,
     load_job_config,
@@ -22,10 +22,21 @@ from heimdallr.metrics.jobs._bone_job_common import (
     metric_output_dir,
     parse_args,
     resolve_canonical_nifti,
+    sagittal_plane_from_mask,
+    sagittal_plane_spacing_mm,
     write_payload,
 )
 from heimdallr.metrics.analysis.bone_health import extract_study_technique_context
 from heimdallr.metrics.analysis.vertebral_fracture import screen_vertebral_fracture
+from heimdallr.metrics.jobs._vertebral_fracture_overlay_text import (
+    build_overlay_title,
+    build_panel_lines,
+    build_panel_title,
+    derivation_description,
+    resolve_artifact_locale,
+    series_description,
+)
+from heimdallr.metrics.jobs._dicom_secondary_capture import create_secondary_capture_from_rgb
 from heimdallr.shared.paths import study_artifacts_dir
 
 
@@ -42,32 +53,30 @@ def severity_from_label(screen_label: str | None) -> str:
     return "none"
 
 
-def sagittal_slice_from_mask(mask: np.ndarray) -> tuple[np.ndarray, int]:
-    mask_bool = np.asarray(mask, dtype=bool)
-    coords = np.argwhere(mask_bool)
-    x_min, y_min, z_min = coords.min(axis=0)
-    x_max, y_max, z_max = coords.max(axis=0)
-    x_span = int(x_max - x_min + 1)
-    y_span = int(y_max - y_min + 1)
-    if x_span <= y_span:
-        center_index = int(round((x_min + x_max) / 2.0))
-        return np.asarray(mask_bool[center_index, :, :], dtype=bool), center_index
-    center_index = int(round((y_min + y_max) / 2.0))
-    return np.asarray(mask_bool[:, center_index, :], dtype=bool), center_index
+SERIES_NUMBER = 9107
 
 
-def save_fracture_panel(ct_data: np.ndarray, vertebra_panels: list[dict], output_path: Path) -> None:
-    fig, axes = plt.subplots(1, len(vertebra_panels), figsize=(5 * len(vertebra_panels), 6))
+def render_fracture_panel_rgb(vertebra_panels: list[dict], title: str) -> np.ndarray:
+    fig, axes = plt.subplots(1, len(vertebra_panels), figsize=(5 * len(vertebra_panels), 6), facecolor="black")
     if len(vertebra_panels) == 1:
         axes = [axes]
 
+    fig.patch.set_facecolor("black")
     for ax, panel in zip(axes, vertebra_panels):
         plane = np.rot90(np.asarray(panel["ct_plane"], dtype=np.float32))
         mask_plane = np.rot90(np.asarray(panel["mask_plane"], dtype=bool))
-        ax.imshow(plane, cmap="gray", vmin=-250, vmax=1250, interpolation="nearest")
+        ax.set_facecolor("black")
+        ax.imshow(
+            plane,
+            cmap="gray",
+            vmin=-250,
+            vmax=1250,
+            interpolation="nearest",
+            aspect=float(panel.get("aspect", 1.0)),
+        )
         if mask_plane.any():
             ax.contour(mask_plane, levels=[0.5], colors=["#ff7b7b"], linewidths=1.2)
-        ax.set_title(panel["title"], fontsize=12)
+        ax.set_title(panel["title"], fontsize=12, color="white")
         ax.text(
             0.03,
             0.97,
@@ -86,9 +95,13 @@ def save_fracture_panel(ct_data: np.ndarray, vertebra_panels: list[dict], output
         )
         ax.axis("off")
 
-    fig.tight_layout()
-    fig.savefig(output_path, dpi=180, bbox_inches="tight", pad_inches=0.05)
+    fig.suptitle(title, fontsize=15, color="white")
+    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.95))
+    fig.canvas.draw()
+    rgba = np.asarray(fig.canvas.buffer_rgba(), dtype=np.uint8)
+    rgb = np.ascontiguousarray(rgba[:, :, :3])
     plt.close(fig)
+    return rgb
 
 
 def main() -> int:
@@ -96,13 +109,15 @@ def main() -> int:
     job_config = load_job_config(args.job_config_json)
     metric_key = "vertebral_fracture_screen"
     payload = {"metric_key": metric_key, "status": "error", "case_id": args.case_id}
+    case_dir = None
+    result_path = None
 
     try:
         case_dir, metric_dir, result_path = metric_output_dir(args.case_id, metric_key)
         artifacts_dir = study_artifacts_dir(args.case_id)
         ct_path = resolve_canonical_nifti(args.case_id)
         vertebrae = list(job_config.get("vertebrae", ["T12", "L1", "L2"]))
-        overlay_path = metric_dir / "overlay.png"
+        overlay_sc_path = metric_dir / "overlay_sc.dcm"
 
         if ct_path is None or not ct_path.exists():
             payload["status"] = "skipped"
@@ -114,6 +129,9 @@ def main() -> int:
 
         ct_img, ct_data = load_ct_volume(ct_path)
         bundle = load_case_json_bundle(args.case_id)
+        case_metadata = {}
+        case_metadata.update(bundle["id_json"])
+        case_metadata.update(bundle["metadata_json"])
         spacing = tuple(float(value) for value in ct_img.header.get_zooms()[:3])
         technique_context = extract_study_technique_context(
             id_data=bundle["id_json"],
@@ -127,6 +145,7 @@ def main() -> int:
                 ),
             },
         )
+        artifact_locale = resolve_artifact_locale(job_config)
 
         per_vertebra: dict[str, dict] = {}
         panels: list[dict] = []
@@ -181,30 +200,51 @@ def main() -> int:
             if severity_order.get(summarized["severity"], -1) > severity_order.get(highest_severity, -1):
                 highest_severity = summarized["severity"]
 
-            mask_plane, plane_index = sagittal_slice_from_mask(mask)
-            if mask_plane.shape[0] == ct_data.shape[1]:
-                ct_plane = ct_data[plane_index, :, :]
-            else:
-                ct_plane = ct_data[:, plane_index, :]
+            mask_plane, plane_index, plane_axis = sagittal_plane_from_mask(mask)
+            if mask_plane is None or plane_index is None or plane_axis is None:
+                continue
+            ct_plane = np.asarray(extract_plane(ct_data, plane_axis, plane_index), dtype=np.float32)
+            plane_spacing = sagittal_plane_spacing_mm(spacing, plane_axis)
+            aspect = (
+                float(plane_spacing[1]) / float(plane_spacing[0])
+                if plane_spacing[0] > 0 and plane_spacing[1] > 0
+                else 1.0
+            )
 
             panels.append(
                 {
                     "ct_plane": ct_plane,
                     "mask_plane": mask_plane,
-                    "title": vertebra,
-                    "summary_lines": [
-                        f"Status: {summarized['status']}",
-                        f"Label: {summarized['screen_label']}",
-                        f"Pattern: {summarized['suspected_pattern']}",
-                        f"Severity: {summarized['severity']}",
-                    ],
+                    "title": build_panel_title(vertebra, locale=artifact_locale),
+                    "summary_lines": build_panel_lines(summarized, locale=artifact_locale),
+                    "aspect": aspect,
                 }
             )
 
         artifacts = {"result_json": str(result_path.relative_to(case_dir))}
-        if panels and job_config.get("generate_overlay", True):
-            save_fracture_panel(ct_data, panels, overlay_path)
-            artifacts["overlay_png"] = str(overlay_path.relative_to(case_dir))
+        dicom_exports: list[dict[str, str]] = []
+        emit_dicom = bool(job_config.get("emit_secondary_capture_dicom", job_config.get("generate_overlay", True)))
+        if panels and emit_dicom:
+            overlay_rgb = render_fracture_panel_rgb(
+                panels,
+                title=build_overlay_title(locale=artifact_locale),
+            )
+            create_secondary_capture_from_rgb(
+                overlay_rgb,
+                overlay_sc_path,
+                case_metadata,
+                series_description=series_description(artifact_locale),
+                series_number=SERIES_NUMBER,
+                instance_number=1,
+                derivation_description=derivation_description(artifact_locale, vertebrae=vertebrae),
+            )
+            artifacts["overlay_sc_dcm"] = str(overlay_sc_path.relative_to(case_dir))
+            dicom_exports.append(
+                {
+                    "path": artifacts["overlay_sc_dcm"],
+                    "kind": "secondary_capture",
+                }
+            )
 
         payload = {
             "metric_key": metric_key,
@@ -225,10 +265,17 @@ def main() -> int:
                 "per_vertebra": per_vertebra,
             },
             "artifacts": artifacts,
+            "dicom_exports": dicom_exports,
         }
         write_payload(result_path, payload)
     except Exception as exc:
+        payload["status"] = "error"
+        payload.setdefault("measurement", {"job_status": "error"})
+        if case_dir is not None and result_path is not None:
+            payload["artifacts"] = {"result_json": str(result_path.relative_to(case_dir))}
         payload["error"] = str(exc)
+        if result_path is not None:
+            write_payload(result_path, payload)
         print(json.dumps(payload, indent=2))
         return 1
 
