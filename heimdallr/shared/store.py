@@ -56,7 +56,11 @@ def ensure_schema(conn: sqlite3.Connection | None = None) -> None:
         for row in cursor.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()
     }
     if "processing_queue" in existing_tables and "segmentation_queue" not in existing_tables:
-        cursor.execute("ALTER TABLE processing_queue RENAME TO segmentation_queue")
+        try:
+            cursor.execute("ALTER TABLE processing_queue RENAME TO segmentation_queue")
+        except sqlite3.OperationalError as exc:
+            if "no such table: processing_queue" not in str(exc).lower():
+                raise
         existing_tables.discard("processing_queue")
         existing_tables.add("segmentation_queue")
     cursor.execute("DROP INDEX IF EXISTS idx_processing_queue_status_created")
