@@ -104,6 +104,45 @@ def center_slice_index(mask: np.ndarray) -> int | None:
     return int(z_indices[len(z_indices) // 2])
 
 
+def sagittal_plane_from_mask(mask: np.ndarray) -> tuple[np.ndarray | None, int | None, str | None]:
+    mask_bool = np.asarray(mask, dtype=bool)
+    coords = np.argwhere(mask_bool)
+    if coords.size == 0:
+        return None, None, None
+
+    x_min, y_min, _ = coords.min(axis=0)
+    x_max, y_max, _ = coords.max(axis=0)
+    x_span = int(x_max - x_min + 1)
+    y_span = int(y_max - y_min + 1)
+
+    if x_span <= y_span:
+        plane_index = int(round((x_min + x_max) / 2.0))
+        return np.asarray(mask_bool[plane_index, :, :], dtype=bool), plane_index, "x"
+
+    plane_index = int(round((y_min + y_max) / 2.0))
+    return np.asarray(mask_bool[:, plane_index, :], dtype=bool), plane_index, "y"
+
+
+def extract_plane(data: np.ndarray, plane_axis: str, plane_index: int) -> np.ndarray:
+    array = np.asarray(data)
+    if plane_axis == "x":
+        return np.asarray(array[plane_index, :, :])
+    if plane_axis == "y":
+        return np.asarray(array[:, plane_index, :])
+    raise ValueError(f"Unsupported plane axis: {plane_axis}")
+
+
+def sagittal_plane_spacing_mm(
+    spacing_mm: tuple[float, float, float],
+    plane_axis: str,
+) -> tuple[float, float]:
+    if plane_axis == "x":
+        return float(spacing_mm[1]), float(spacing_mm[2])
+    if plane_axis == "y":
+        return float(spacing_mm[0]), float(spacing_mm[2])
+    raise ValueError(f"Unsupported plane axis: {plane_axis}")
+
+
 def build_l1_axial_roi(mask_l1: np.ndarray, spacing_mm: tuple[float, float, float]) -> tuple[np.ndarray | None, dict[str, Any]]:
     from scipy.ndimage import binary_erosion, center_of_mass, label as ndlabel
 
@@ -158,6 +197,80 @@ def build_l1_axial_roi(mask_l1: np.ndarray, spacing_mm: tuple[float, float, floa
         "slice_index": center_z,
         "roi_center_xy": {"x": round(float(center_x), 2), "y": round(float(center_y), 2)},
         "roi_radius_xy": {"x": round(float(rx), 2), "y": round(float(ry), 2)},
+    }
+
+
+def build_l1_sagittal_roi(
+    mask_l1: np.ndarray,
+    spacing_mm: tuple[float, float, float],
+    erosion_mm: float = 5.0,
+    roi_radius_mm: float = 6.0,
+) -> tuple[np.ndarray | None, dict[str, Any]]:
+    from scipy.ndimage import binary_erosion, distance_transform_edt, label as ndlabel
+
+    plane_mask, plane_index, plane_axis = sagittal_plane_from_mask(mask_l1)
+    if plane_mask is None or plane_index is None or plane_axis is None:
+        return None, {"status": "empty_mask"}
+
+    plane_spacing = sagittal_plane_spacing_mm(spacing_mm, plane_axis)
+    min_spacing = max(min(plane_spacing), 1e-6)
+    erosion_iters = max(1, int(round(float(erosion_mm) / min_spacing)))
+    eroded_2d = binary_erosion(plane_mask, iterations=erosion_iters)
+
+    labeled, num_features = ndlabel(eroded_2d)
+    if num_features > 1:
+        component_sizes = [np.sum(labeled == i) for i in range(1, num_features + 1)]
+        largest = int(np.argmax(component_sizes)) + 1
+        eroded_2d = labeled == largest
+
+    if not np.any(eroded_2d):
+        return None, {
+            "status": "empty_eroded_mask",
+            "plane": "sagittal",
+            "plane_axis": plane_axis,
+            "plane_index": plane_index,
+        }
+
+    distance_mm = distance_transform_edt(eroded_2d, sampling=plane_spacing)
+    max_inscribed_radius_mm = float(np.max(distance_mm))
+    if max_inscribed_radius_mm <= 0.0:
+        return None, {
+            "status": "empty_distance_core",
+            "plane": "sagittal",
+            "plane_axis": plane_axis,
+            "plane_index": plane_index,
+        }
+
+    center_row, center_col = np.unravel_index(int(np.argmax(distance_mm)), distance_mm.shape)
+    effective_radius_mm = min(float(roi_radius_mm), max_inscribed_radius_mm * 0.85)
+    effective_radius_mm = max(effective_radius_mm, min_spacing * 0.5)
+
+    row_grid, col_grid = np.ogrid[:eroded_2d.shape[0], :eroded_2d.shape[1]]
+    circle = (
+        ((row_grid - center_row) * plane_spacing[0]) ** 2
+        + ((col_grid - center_col) * plane_spacing[1]) ** 2
+    ) <= effective_radius_mm**2
+    roi_mask = np.asarray(circle & eroded_2d, dtype=bool)
+    if not np.any(roi_mask):
+        return None, {
+            "status": "empty_roi_mask",
+            "plane": "sagittal",
+            "plane_axis": plane_axis,
+            "plane_index": plane_index,
+        }
+
+    return roi_mask, {
+        "status": "ok",
+        "plane": "sagittal",
+        "plane_axis": plane_axis,
+        "plane_index": plane_index,
+        "roi_center_2d": {"row": int(center_row), "col": int(center_col)},
+        "roi_radius_mm": round(float(effective_radius_mm), 2),
+        "max_inscribed_radius_mm": round(float(max_inscribed_radius_mm), 2),
+        "plane_spacing_mm": {
+            "row": round(float(plane_spacing[0]), 4),
+            "col": round(float(plane_spacing[1]), 4),
+        },
     }
 
 
@@ -219,4 +332,3 @@ def metric_output_dir(case_id: str, metric_key: str) -> tuple[Path, Path, Path]:
 
 def write_payload(result_path: Path, payload: dict[str, Any]) -> None:
     result_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-
