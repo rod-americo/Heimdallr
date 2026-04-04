@@ -53,3 +53,36 @@ msgstr "Heimdallr Overlay de Órgãos Parenquimatosos 5 mm"
 
 msgid "parenchymal.overlay.derivation_description"
 msgstr "Reconstrução axial de 5 mm com overlays de órgãos parenquimatosos (fígado, baço, pâncreas, rim direito, rim esquerdo)"
+
+msgid "bone_health.overlay.title"
+msgstr "Atenuação trabecular em L1 ({classification})"
+
+msgid "bone_health.overlay.hu_mean"
+msgstr "Média: {value} UH"
+
+msgid "bone_health.overlay.hu_std"
+msgstr "DP: {value} UH"
+
+msgid "bone_health.overlay.roi_voxels"
+msgstr "Voxels da ROI: {value}"
+
+msgid "bone_health.overlay.roi_radius"
+msgstr "Raio da ROI: {value} mm"
+
+msgid "bone_health.overlay.classification.normal"
+msgstr "Normal"
+
+msgid "bone_health.overlay.classification.osteopenia"
+msgstr "Osteopenia"
+
+msgid "bone_health.overlay.classification.osteoporosis"
+msgstr "Osteoporose"
+
+msgid "bone_health.overlay.classification.indeterminate"
+msgstr "Indeterminado"
+
+msgid "bone_health.overlay.series_description"
+msgstr "Heimdallr Overlay Sagital de Saúde Óssea em L1"
+
+msgid "bone_health.overlay.derivation_description"
+msgstr "ROI trabecular sagital em L1 com burned-in gerada a partir da métrica de saúde óssea do Heimdallr (HU={hu_mean}, classe={classification})"
