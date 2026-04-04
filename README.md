@@ -107,8 +107,8 @@ Heimdallr/
 │   ├── series_selection.json     #   Series selection strategy
 │   ├── segmentation_pipeline.json#   TotalSegmentator task list
 │   ├── metrics_pipeline.json     #   Post-segmentation job list
-│   ├── dicom_egress.json         #   Outbound DICOM destinations
-│   └── presentation.json         #   Patient name display profiles
+│   ├── dicom_egress.example.json #   Example outbound DICOM destinations
+│   └── presentation.example.json #   Example patient/presentation profiles
 ├── database/                     # Persistent storage
 │   ├── schema.sql                #   SQLite schema (dicom_metadata, segmentation/metrics/egress queues)
 │   └── README.md                 #   Schema documentation
@@ -245,12 +245,20 @@ Key environment variables:
 | `HEIMDALLR_SERVER_PORT` | `8001` | Control plane HTTP port |
 | `HEIMDALLR_DICOM_PORT` | `11114` | DICOM listener port |
 | `HEIMDALLR_DICOM_EGRESS_CONFIG` | `config/dicom_egress.json` | Outbound DICOM destination config |
+| `HEIMDALLR_PRESENTATION_CONFIG` | `config/presentation.json` | Patient name and locale presentation config |
 | `HEIMDALLR_AE_TITLE` | `HEIMDALLR` | DICOM Application Entity title |
 | `HEIMDALLR_TIMEZONE` | `America/Sao_Paulo` | Operational timezone |
 | `HEIMDALLR_MAX_PARALLEL_CASES` | `3` | Concurrent segmentation slots |
 | `HEIMDALLR_DICOM_HANDOFF_MODE` | `local_prepare` | `local_prepare` or `http_upload` |
 | `HEIMDALLR_METRICS_MODULES` | *(see settings.py)* | Comma-separated enabled metrics |
 | `TOTALSEGMENTATOR_LICENSE` | — | TotalSegmentator license key |
+
+Before enabling outbound delivery or customizing display/locale on a host, create the local config files from the versioned examples:
+
+```bash
+cp config/dicom_egress.example.json config/dicom_egress.json
+cp config/presentation.example.json config/presentation.json
+```
 
 See [`heimdallr/shared/settings.py`](heimdallr/shared/settings.py) for the complete reference.
 
