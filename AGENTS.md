@@ -41,3 +41,11 @@ Format: `type(scope): summary`
 ## 4. Directory Handling
 *   **Root Cleanliness**: The ecosystem is polished with community standards residing in `.github` (CODEOWNERS, CONTRIBUTING, SECURITY).
 *   Do not recreate transient traces like `.tmp`, `.pycache_local` or loose queue folders in the root (e.g., `/output/`, `/data/`). Auto-generated folders must be properly silenced in `.gitignore`.
+
+## 5. Temporary Git Workflow
+
+> [!NOTE]
+> For now, Heimdallr is being maintained by a single developer. Until this changes, agents should work directly on `main`.
+
+*   Do not create feature branches, integration branches, or PR-only branches unless explicitly requested.
+*   Default workflow for agentic changes is: modify on `main`, commit on `main`, and push to `origin/main`.
