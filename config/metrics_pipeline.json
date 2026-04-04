@@ -16,6 +16,12 @@
           "emit_secondary_capture_dicom": true
         },
         {
+          "name": "parenchymal_organ_volumetry",
+          "enabled": true,
+          "generate_overlay": true,
+          "emit_secondary_capture_dicom": true
+        },
+        {
           "name": "bone_health_l1_hu",
           "enabled": false,
           "generate_overlay": true,
