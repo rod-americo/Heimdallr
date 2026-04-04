@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from heimdallr.segmentation.vertebral_fracture import (
+from heimdallr.metrics.analysis.vertebral_fracture import (
     classify_fracture_pattern,
     isolate_vertebral_body,
     screen_vertebral_fracture,
