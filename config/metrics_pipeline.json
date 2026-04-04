@@ -17,20 +17,20 @@
         },
         {
           "name": "bone_health_l1_hu",
-          "enabled": true,
+          "enabled": false,
           "generate_overlay": true,
           "strict_qc": false
         },
         {
           "name": "bone_health_l1_volumetric",
-          "enabled": true,
+          "enabled": false,
           "generate_overlay": true,
           "strict_qc": false,
           "erosion_mm": 5.0
         },
         {
           "name": "vertebral_fracture_screen",
-          "enabled": true,
+          "enabled": false,
           "generate_overlay": true,
           "vertebrae": [
             "T12",
@@ -41,17 +41,17 @@
         },
         {
           "name": "opportunistic_osteoporosis_composite",
-          "enabled": true
+          "enabled": false
         },
         {
           "name": "body_fat_abdominal_volumes",
-          "enabled": true,
+          "enabled": false,
           "generate_overlay": true,
           "emit_secondary_capture_dicom": false
         },
         {
           "name": "body_fat_l3_slice",
-          "enabled": true,
+          "enabled": false,
           "generate_overlay": true,
           "emit_secondary_capture_dicom": false
         }
