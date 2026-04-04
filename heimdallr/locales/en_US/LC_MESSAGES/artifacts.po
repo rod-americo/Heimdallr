@@ -21,6 +21,12 @@ msgstr "Patient height: {value} m"
 msgid "l3.overlay.smi"
 msgstr "SMI (Skeletal Muscle Index): {value} cm²/m²"
 
+msgid "l3.overlay.axial_title"
+msgstr "Axial"
+
+msgid "l3.overlay.sagittal_title"
+msgstr "Sagittal Reference"
+
 msgid "parenchymal.overlay.title"
 msgstr "Parenchymal organs:"
 

@@ -48,3 +48,11 @@ def build_overlay_text(
             )
         )
     return title, summary_lines
+
+
+def build_overlay_panel_titles(*, locale: str) -> tuple[str, str]:
+    """Build localized panel titles for the L3 overlay."""
+    return (
+        translate("l3.overlay.axial_title", locale=locale),
+        translate("l3.overlay.sagittal_title", locale=locale),
+    )
