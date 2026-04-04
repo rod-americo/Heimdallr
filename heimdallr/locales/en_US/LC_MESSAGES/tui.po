@@ -1,0 +1,337 @@
+msgid ""
+msgstr ""
+"Language: en_US\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "shared.na"
+msgstr "n/a"
+
+msgid "binding.quit"
+msgstr "Quit"
+
+msgid "binding.refresh"
+msgstr "Refresh"
+
+msgid "binding.pause"
+msgstr "Pause"
+
+msgid "app.title"
+msgstr "Heimdallr TUI"
+
+msgid "app.subtitle"
+msgstr "Intake · Prepare · Process"
+
+msgid "app.table.patient"
+msgstr "Patient"
+
+msgid "app.table.stage"
+msgstr "Stage"
+
+msgid "app.table.queue"
+msgstr "Queue"
+
+msgid "app.table.prepare"
+msgstr "Prepare"
+
+msgid "app.table.process"
+msgstr "Process"
+
+msgid "app.table.updated"
+msgstr "Updated"
+
+msgid "app.table.signal"
+msgstr "Signal"
+
+msgid "app.notify.paused"
+msgstr "Auto-refresh paused."
+
+msgid "app.notify.resumed"
+msgstr "Auto-refresh resumed."
+
+msgid "app.radar.service"
+msgstr "Service"
+
+msgid "app.radar.state"
+msgstr "State"
+
+msgid "app.radar.workers"
+msgstr "Workers"
+
+msgid "app.radar.queue"
+msgstr "Q"
+
+msgid "app.radar.active"
+msgstr "A"
+
+msgid "app.radar.signal"
+msgstr "Signal"
+
+msgid "app.radar.title"
+msgstr "Workers"
+
+msgid "app.radar.subtitle"
+msgstr "state + queue pressure"
+
+msgid "app.service.live"
+msgstr "LIVE"
+
+msgid "app.service.off"
+msgstr "OFF"
+
+msgid "app.metric.cases"
+msgstr "Cases"
+
+msgid "app.metric.backlog"
+msgstr "Backlog"
+
+msgid "app.metric.failures"
+msgstr "Failures"
+
+msgid "app.metric.seen"
+msgstr "seen"
+
+msgid "app.metric.queue"
+msgstr "queue"
+
+msgid "app.metric.attention"
+msgstr "attention"
+
+msgid "app.refresh_seconds"
+msgstr "refresh {value}s"
+
+msgid "app.status.paused"
+msgstr "paused"
+
+msgid "app.status.live"
+msgstr "live"
+
+msgid "app.avg_prepare"
+msgstr "avg prepare {value}"
+
+msgid "app.avg_process"
+msgstr "avg process {value}"
+
+msgid "app.pulse.title"
+msgstr "Pulse"
+
+msgid "app.alerts.empty"
+msgstr "No alerts."
+
+msgid "app.alerts.summary"
+msgstr "Blocking, stale backlog, worker mismatch."
+
+msgid "app.alerts.title"
+msgstr "Alerts"
+
+msgid "app.flow.stage"
+msgstr "Stage"
+
+msgid "app.flow.state"
+msgstr "State"
+
+msgid "app.flow.queue"
+msgstr "Q"
+
+msgid "app.flow.active"
+msgstr "A"
+
+msgid "app.flow.done"
+msgstr "Done"
+
+msgid "app.flow.fail"
+msgstr "Fail"
+
+msgid "app.flow.oldest"
+msgstr "Oldest"
+
+msgid "app.flow.notes"
+msgstr "Notes"
+
+msgid "app.flow.title"
+msgstr "Pipeline Lanes"
+
+msgid "app.flow.subtitle"
+msgstr "filesystem + sqlite + ps"
+
+msgid "app.spotlight.empty"
+msgstr "No cases discovered yet."
+
+msgid "app.spotlight.title"
+msgstr "Spotlight"
+
+msgid "app.case.stage"
+msgstr "Stage"
+
+msgid "app.case.queue"
+msgstr "Queue"
+
+msgid "app.case.prepare"
+msgstr "Prepare"
+
+msgid "app.case.process"
+msgstr "Process"
+
+msgid "app.case.total"
+msgstr "Total"
+
+msgid "app.case.series"
+msgstr "Series"
+
+msgid "app.case.signal"
+msgstr "Signal"
+
+msgid "app.case.path"
+msgstr "Path"
+
+msgid "app.case.error"
+msgstr "Error"
+
+msgid "app.case.series_summary"
+msgstr "{selected} selected / {discarded} discarded"
+
+msgid "service.intake"
+msgstr "Intake"
+
+msgid "service.prepare"
+msgstr "Prepare"
+
+msgid "service.processing"
+msgstr "Process"
+
+msgid "stage_state.flow"
+msgstr "FLOW"
+
+msgid "stage_state.warning"
+msgstr "WARNING"
+
+msgid "stage_state.blocked"
+msgstr "BLOCKED"
+
+msgid "queue_status.pending"
+msgstr "pending"
+
+msgid "queue_status.claimed"
+msgstr "claimed"
+
+msgid "queue_status.done"
+msgstr "done"
+
+msgid "queue_status.error"
+msgstr "error"
+
+msgid "case.stage.intake"
+msgstr "Intake"
+
+msgid "case.stage.prepared"
+msgstr "Prepared"
+
+msgid "case.stage.queued"
+msgstr "Queued"
+
+msgid "case.stage.processing"
+msgstr "Processing"
+
+msgid "case.stage.failed"
+msgstr "Failed"
+
+msgid "case.stage.processed"
+msgstr "Processed"
+
+msgid "snapshot.service.detail"
+msgstr "PID {pid} • up {etime} • {command}"
+
+msgid "snapshot.service.no_pressure"
+msgstr "No pipeline pressure detected."
+
+msgid "snapshot.service.backlog_without_worker"
+msgstr "Backlog exists, but no matching worker process was found."
+
+msgid "snapshot.service.running"
+msgstr "running"
+
+msgid "snapshot.service.not_detected"
+msgstr "not detected"
+
+msgid "snapshot.intake.note.zips_staged"
+msgstr "{count} ZIPs staged for prepare"
+
+msgid "snapshot.intake.note.uploads_claimed"
+msgstr "{count} uploads currently claimed"
+
+msgid "snapshot.intake.note.active_dicom"
+msgstr "{count} active DICOM landing items"
+
+msgid "snapshot.intake.note.failures_retained"
+msgstr "{count} intake failures retained"
+
+msgid "snapshot.intake.note.oldest_upload"
+msgstr "Oldest staged upload: {age}"
+
+msgid "snapshot.prepare.note.studies_prepared"
+msgstr "{count} studies have id.json and prepare context"
+
+msgid "snapshot.prepare.note.studies_staged"
+msgstr "{count} prepared studies are staged for processing"
+
+msgid "snapshot.prepare.note.candidate_series"
+msgstr "{count} candidate series across prepared cases"
+
+msgid "snapshot.prepare.note.uploads_inside_prepare"
+msgstr "{count} uploads appear to be inside prepare right now"
+
+msgid "snapshot.prepare.note.oldest_waiting"
+msgstr "Oldest prepared case waiting: {age}"
+
+msgid "snapshot.process.note.queued"
+msgstr "{count} queued in processing table or pending folder"
+
+msgid "snapshot.process.note.active"
+msgstr "{count} running in active queue"
+
+msgid "snapshot.process.note.completed"
+msgstr "{count} completed cases with results"
+
+msgid "snapshot.process.note.failed"
+msgstr "{count} cases marked as failed"
+
+msgid "snapshot.process.note.queue_states"
+msgstr "Queue states: {value}"
+
+msgid "snapshot.process.note.oldest_pressure"
+msgstr "Oldest processing pressure: {age}"
+
+msgid "snapshot.alert.intake_failures"
+msgstr "Intake has {count} retained failures."
+
+msgid "snapshot.alert.processing_backlog_no_worker"
+msgstr "Processing backlog exists, but the processing worker is not detected."
+
+msgid "snapshot.alert.queue_errors"
+msgstr "{count} processing queue item(s) are in error."
+
+msgid "snapshot.alert.intake_backlog_old"
+msgstr "Intake backlog is older than 15 minutes."
+
+msgid "snapshot.alert.processing_old"
+msgstr "Processing pressure is older than 30 minutes."
+
+msgid "snapshot.alert.no_blocking"
+msgstr "No blocking condition detected in the current snapshot."
+
+msgid "snapshot.case.signal.results_ready"
+msgstr "results.json ready"
+
+msgid "snapshot.case.signal.segmentation_metrics"
+msgstr "segmentation + metrics"
+
+msgid "snapshot.case.signal.waiting_slot"
+msgstr "waiting for processing slot"
+
+msgid "snapshot.case.signal.series_ready"
+msgstr "{count} series ready"
+
+msgid "snapshot.case.signal.awaiting_metadata"
+msgstr "awaiting intake metadata"
+
+msgid "snapshot.case.unknown"
+msgstr "Unknown"

@@ -1,0 +1,22 @@
+msgid ""
+msgstr ""
+"Language: en_US\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "l3.overlay.title"
+msgstr "L3 Center Slice"
+
+msgid "l3.overlay.sma"
+msgstr "SMA (Skeletal muscle area): {value} cm²"
+
+msgid "l3.overlay.nifti_slice"
+msgstr "NIfTI slice: {value}"
+
+msgid "l3.overlay.viewer_slice"
+msgstr "Probable viewer slice: {value}"
+
+msgid "l3.overlay.height"
+msgstr "Patient height: {value} m"
+
+msgid "l3.overlay.smi"
+msgstr "SMI (Skeletal Muscle Index): {value} cm²/m²"

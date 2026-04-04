@@ -1,0 +1,22 @@
+msgid ""
+msgstr ""
+"Language: pt_BR\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "l3.overlay.title"
+msgstr "Corte no centro L3"
+
+msgid "l3.overlay.sma"
+msgstr "SMA (Área músculo-esquelética): {value} cm²"
+
+msgid "l3.overlay.nifti_slice"
+msgstr "Corte NIfTI: {value}"
+
+msgid "l3.overlay.viewer_slice"
+msgstr "Provável corte no visualizador: {value}"
+
+msgid "l3.overlay.height"
+msgstr "Altura do paciente: {value} m"
+
+msgid "l3.overlay.smi"
+msgstr "SMI (Índice de Massa Muscular Esquelética): {value} cm²/m²"
