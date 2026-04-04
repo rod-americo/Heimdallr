@@ -8,9 +8,9 @@
     {
       "name": "return_to_sender",
       "enabled": false,
-      "host": "10.242.2.22",
-      "port": 1044,
-      "called_aet": "OSIRIX_MEZO",
+      "host": "pacs.example.internal",
+      "port": 104,
+      "called_aet": "REMOTE_AET",
       "artifact_types": [
         "secondary_capture"
       ]

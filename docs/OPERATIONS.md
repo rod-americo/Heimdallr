@@ -70,6 +70,14 @@ export HEIMDALLR_AE_TITLE="HEIMDALLR"
 export HEIMDALLR_DICOM_PORT="11114"
 export HEIMDALLR_IDLE_SECONDS="30"
 export HEIMDALLR_DICOM_EGRESS_CONFIG="config/dicom_egress.json"
+export HEIMDALLR_PRESENTATION_CONFIG="config/presentation.json"
+```
+
+Before enabling outbound DICOM delivery or customizing presentation defaults on a host, create the local config files from the repository examples:
+
+```bash
+cp config/dicom_egress.example.json config/dicom_egress.json
+cp config/presentation.example.json config/presentation.json
 ```
 
 ## End-to-End Pipeline Flow
@@ -189,7 +197,8 @@ venv/bin/python scripts/retroactive_emphysema.py
 - **Changing series selection**: Update `config/series_selection.json`.
 - **Adding a clinical metric**: Add a job under `heimdallr/metrics/jobs/` and register it in the pipeline config.
 - **Improving intake logic**: Edit `heimdallr/intake/gateway.py`.
-- **Changing outbound DICOM destinations**: Update `config/dicom_egress.json`.
+- **Changing outbound DICOM destinations**: Update the host-local `config/dicom_egress.json` created from `config/dicom_egress.example.json`.
+- **Changing locale or patient-name presentation defaults**: Update the host-local `config/presentation.json` created from `config/presentation.example.json`.
 
 ## Checklist Before Changes
 - Confirm impact on `id.json` and `resultados.json` consistency.
