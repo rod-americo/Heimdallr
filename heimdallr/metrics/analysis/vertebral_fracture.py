@@ -439,6 +439,7 @@ def classify_fracture_pattern(
     - suspected_wedge
     - suspected_biconcave
     - suspected_crush
+    - no_suspicion
     - indeterminate
     """
 
@@ -504,8 +505,26 @@ def classify_fracture_pattern(
         qc_flags.append("orientation_ambiguous")
         confidence = min(confidence, 0.65)
 
-    if label == "indeterminate" and not qc_flags:
+    if label == "indeterminate":
+        if qc_flags:
+            qc_flags.append("no_qualifying_fracture_pattern")
+            return {
+                "screen_status": "indeterminate",
+                "screen_label": "indeterminate",
+                "screen_confidence": 0.0,
+                "suspected_pattern": None,
+                "ratios": ratios,
+                "qc_flags": qc_flags,
+            }
         qc_flags.append("no_qualifying_fracture_pattern")
+        return {
+            "screen_status": "no_suspicion",
+            "screen_label": "no_suspicion",
+            "screen_confidence": 0.0,
+            "suspected_pattern": None,
+            "ratios": ratios,
+            "qc_flags": qc_flags,
+        }
 
     return {
         "screen_status": "suspected" if suspected_pattern else "indeterminate",

@@ -68,3 +68,78 @@ msgstr "Heimdallr L1 Bone Health Sagittal Overlay"
 
 msgid "bone_health.overlay.derivation_description"
 msgstr "Burned-in sagittal L1 trabecular ROI generated from Heimdallr bone health metric (HU={hu_mean})"
+
+msgid "vertebral_fracture.overlay.title"
+msgstr "Vertebral fracture screen"
+
+msgid "vertebral_fracture.overlay.panel.title"
+msgstr "{vertebra}"
+
+msgid "vertebral_fracture.overlay.panel.status"
+msgstr "Status: {value}"
+
+msgid "vertebral_fracture.overlay.panel.label"
+msgstr "Label: {value}"
+
+msgid "vertebral_fracture.overlay.panel.pattern"
+msgstr "Pattern: {value}"
+
+msgid "vertebral_fracture.overlay.panel.severity"
+msgstr "Severity: {value}"
+
+msgid "vertebral_fracture.overlay.status_value.suspected"
+msgstr "Suspected"
+
+msgid "vertebral_fracture.overlay.status_value.no_suspicion"
+msgstr "No suspicion"
+
+msgid "vertebral_fracture.overlay.status_value.indeterminate"
+msgstr "Indeterminate"
+
+msgid "vertebral_fracture.overlay.label_value.suspected_wedge"
+msgstr "Suspected wedge"
+
+msgid "vertebral_fracture.overlay.label_value.suspected_biconcave"
+msgstr "Suspected biconcave"
+
+msgid "vertebral_fracture.overlay.label_value.suspected_crush"
+msgstr "Suspected crush"
+
+msgid "vertebral_fracture.overlay.label_value.no_suspicion"
+msgstr "No suspicion"
+
+msgid "vertebral_fracture.overlay.label_value.indeterminate"
+msgstr "Indeterminate"
+
+msgid "vertebral_fracture.overlay.pattern_value.wedge"
+msgstr "Wedge"
+
+msgid "vertebral_fracture.overlay.pattern_value.biconcave"
+msgstr "Biconcave"
+
+msgid "vertebral_fracture.overlay.pattern_value.crush"
+msgstr "Crush"
+
+msgid "vertebral_fracture.overlay.pattern_value.none"
+msgstr "None"
+
+msgid "vertebral_fracture.overlay.severity_value.severe"
+msgstr "Severe"
+
+msgid "vertebral_fracture.overlay.severity_value.moderate"
+msgstr "Moderate"
+
+msgid "vertebral_fracture.overlay.severity_value.mild"
+msgstr "Mild"
+
+msgid "vertebral_fracture.overlay.severity_value.none"
+msgstr "None"
+
+msgid "vertebral_fracture.overlay.severity_value.indeterminate"
+msgstr "Indeterminate"
+
+msgid "vertebral_fracture.overlay.series_description"
+msgstr "Heimdallr Vertebral Fracture Screen"
+
+msgid "vertebral_fracture.overlay.derivation_description"
+msgstr "Sagittal thoracolumbar vertebral fracture screen with burned-in panels ({vertebrae})"
