@@ -74,7 +74,11 @@ class PatientService:
                 
                 # Elapsed time
                 pipeline = metadata.get("Pipeline", {})
-                elapsed_seconds = parse_elapsed_seconds(pipeline.get("segmentation_elapsed_time") or pipeline.get("elapsed_time", ""))
+                elapsed_seconds = parse_elapsed_seconds(
+                    pipeline.get("segmentation_elapsed_time")
+                    or pipeline.get("processing_elapsed_time")
+                    or pipeline.get("elapsed_time", "")
+                )
                 prepare_elapsed_seconds = parse_elapsed_seconds(pipeline.get("prepare_elapsed_time", ""))
 
                 hemorrhage_vol = results.get("hemorrhage_vol_cm3")

@@ -8,7 +8,7 @@ Run as independent services:
 
 1. `python -m heimdallr.control_plane` (API, dashboard, upload endpoints)
 2. `python -m heimdallr.prepare` (study preparation watchdog)
-3. `python -m heimdallr.segmentation` (segmentation/segmentation worker)
+3. `python -m heimdallr.segmentation` (segmentation worker)
 4. `python -m heimdallr.metrics` (post-segmentation derived metrics worker)
 5. `python -m heimdallr.intake` (DICOM C-STORE intake)
 6. `python -m heimdallr.dicom_egress` (outbound DICOM artifact delivery)
