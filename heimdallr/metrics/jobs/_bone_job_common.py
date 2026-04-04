@@ -231,6 +231,26 @@ def build_l1_sagittal_roi(
             "plane_index": plane_index,
         }
 
+    ap_profile = plane_mask.sum(axis=1).astype(np.float64)
+    edge_width = max(1, int(round(ap_profile.size * 0.18)))
+    low_edge = float(np.median(ap_profile[:edge_width]))
+    high_edge = float(np.median(ap_profile[-edge_width:]))
+    anterior_is_low_index = high_edge > low_edge
+
+    row_indices, col_indices = np.where(eroded_2d)
+    row_min, row_max = int(row_indices.min()), int(row_indices.max())
+    col_min, col_max = int(col_indices.min()), int(col_indices.max())
+    ap_span = max(1, row_max - row_min + 1)
+    si_span = max(1, col_max - col_min + 1)
+
+    # Place the ROI slightly anterior, centered around segments 2-3 out of 7.
+    ap_center_fraction = 2.5 / 7.0
+    if anterior_is_low_index:
+        center_row = row_min + (ap_span - 1) * ap_center_fraction
+    else:
+        center_row = row_max - (ap_span - 1) * ap_center_fraction
+    center_col = (col_min + col_max) / 2.0
+
     distance_mm = distance_transform_edt(eroded_2d, sampling=plane_spacing)
     max_inscribed_radius_mm = float(np.max(distance_mm))
     if max_inscribed_radius_mm <= 0.0:
@@ -241,16 +261,26 @@ def build_l1_sagittal_roi(
             "plane_index": plane_index,
         }
 
-    center_row, center_col = np.unravel_index(int(np.argmax(distance_mm)), distance_mm.shape)
-    effective_radius_mm = min(float(roi_radius_mm), max_inscribed_radius_mm * 0.85)
-    effective_radius_mm = max(effective_radius_mm, min_spacing * 0.5)
-
     row_grid, col_grid = np.ogrid[:eroded_2d.shape[0], :eroded_2d.shape[1]]
-    circle = (
+    target_distance_mm = np.sqrt(
         ((row_grid - center_row) * plane_spacing[0]) ** 2
         + ((col_grid - center_col) * plane_spacing[1]) ** 2
-    ) <= effective_radius_mm**2
-    roi_mask = np.asarray(circle & eroded_2d, dtype=bool)
+    )
+    center_score = np.where(eroded_2d, distance_mm - (0.12 * target_distance_mm), -np.inf)
+    center_row, center_col = np.unravel_index(int(np.argmax(center_score)), center_score.shape)
+
+    requested_ap_radius_mm = max(float(roi_radius_mm) * 0.85, min_spacing)
+    requested_si_radius_mm = max(float(roi_radius_mm) * 1.15, min_spacing)
+    effective_ap_radius_mm = min(requested_ap_radius_mm, max_inscribed_radius_mm * 0.95)
+    effective_si_radius_mm = min(requested_si_radius_mm, max_inscribed_radius_mm * 1.20)
+    effective_ap_radius_mm = max(effective_ap_radius_mm, min_spacing * 0.5)
+    effective_si_radius_mm = max(effective_si_radius_mm, min_spacing * 0.5)
+
+    ellipse = (
+        ((row_grid - center_row) * plane_spacing[0]) ** 2 / max(effective_ap_radius_mm**2, 1e-6)
+        + ((col_grid - center_col) * plane_spacing[1]) ** 2 / max(effective_si_radius_mm**2, 1e-6)
+    ) <= 1.0
+    roi_mask = np.asarray(ellipse & eroded_2d, dtype=bool)
     if not np.any(roi_mask):
         return None, {
             "status": "empty_roi_mask",
@@ -264,9 +294,14 @@ def build_l1_sagittal_roi(
         "plane": "sagittal",
         "plane_axis": plane_axis,
         "plane_index": plane_index,
-        "roi_center_2d": {"row": int(center_row), "col": int(center_col)},
-        "roi_radius_mm": round(float(effective_radius_mm), 2),
+        "roi_center_2d": {"row": round(float(center_row), 2), "col": round(float(center_col), 2)},
+        "roi_radius_mm": {
+            "ap": round(float(effective_ap_radius_mm), 2),
+            "si": round(float(effective_si_radius_mm), 2),
+        },
         "max_inscribed_radius_mm": round(float(max_inscribed_radius_mm), 2),
+        "roi_ap_center_fraction": round(float(ap_center_fraction), 4),
+        "anterior_is_low_index": bool(anterior_is_low_index),
         "plane_spacing_mm": {
             "row": round(float(plane_spacing[0]), 4),
             "col": round(float(plane_spacing[1]), 4),
