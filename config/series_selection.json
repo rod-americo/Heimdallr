@@ -6,21 +6,36 @@
         "modality": "CT",
         "min_slices": 120
       },
+      "hard_reject": {
+        "description_contains": [
+          "mip",
+          "lung",
+          "scout",
+          "topogram"
+        ],
+        "kernel_contains": [
+          "bone",
+          "lung",
+          "sharp"
+        ],
+        "kernel_exact": [
+          "body_sharp",
+          "fc43",
+          "fc51",
+          "fc52",
+          "tr20f"
+        ]
+      },
       "phase_priority": [
         "native"
       ],
       "text_hints": {
         "description_avoid": [
           "mip",
-          "bone",
-          "lung",
-          "scout",
-          "topogram"
+          "bone"
         ],
         "kernel_avoid": [
-          "bone",
-          "lung",
-          "sharp"
+          "bone"
         ]
       }
     }
