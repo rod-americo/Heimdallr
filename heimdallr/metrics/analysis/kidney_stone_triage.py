@@ -17,7 +17,8 @@
 Kidney stone candidate triage for Heimdallr.
 
 Adapted from TotalSegmentator/heimdallr/kidney_stone_triage.py and integrated
-as a pipeline-side helper. This module does not modify the source script.
+as a post-segmentation analysis helper. This module does not modify the source
+script.
 """
 
 from __future__ import annotations

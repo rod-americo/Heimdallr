@@ -20,7 +20,7 @@ from heimdallr.metrics.jobs._bone_job_common import (
     save_png_overlay,
     write_payload,
 )
-from heimdallr.segmentation.bone_health import (
+from heimdallr.metrics.analysis.bone_health import (
     build_bone_health_qc_flags,
     build_l1_trabecular_roi_mask,
     classify_l1_hu,

@@ -14,15 +14,11 @@
 # limitations under the License.
 
 """
-Heimdallr Segmentation Daemon (run.py)
+Heimdallr segmentation daemon.
 
-Monitors the input/ directory for new NIfTI files and processes them through:
-1. TotalSegmentator organ and tissue segmentation (parallel)
-2. Conditional specialized analysis (e.g., cerebral hemorrhage if brain detected)
-3. Metrics calculation (volumes, densities, sarcopenia)
-4. Results archival
-
-Supports parallel segmentation of up to 3 cases simultaneously.
+Consumes prepared studies from the segmentation queue, selects the configured
+pipeline profile, runs the enabled segmentation tasks, and forwards completed
+cases to the metrics stage.
 """
 
 import os
