@@ -82,7 +82,6 @@ class HeimdallrDashboardApp(App[None]):
             tui("app.table.segment"),
             tui("app.table.metrics"),
             tui("app.table.updated"),
-            tui("app.table.signal"),
         )
         self._refresh_timer = self.set_interval(self.refresh_seconds, self._tick_refresh)
         self.refresh_snapshot()
@@ -268,7 +267,6 @@ class HeimdallrDashboardApp(App[None]):
                 case.segmentation_elapsed,
                 case.metrics_elapsed,
                 updated,
-                case.signal,
                 key=case.case_id,
             )
 
