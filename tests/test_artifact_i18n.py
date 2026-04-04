@@ -10,7 +10,9 @@ if str(ROOT) not in sys.path:
 from heimdallr.metrics.jobs._l3_overlay_text import build_overlay_text, resolve_artifact_locale  # noqa: E402
 from heimdallr.metrics.jobs._parenchymal_overlay_text import (  # noqa: E402
     build_overlay_text as build_parenchymal_overlay_text,
+    derivation_description as parenchymal_derivation_description,
     resolve_artifact_locale as resolve_parenchymal_locale,
+    series_description as parenchymal_series_description,
 )
 
 
@@ -68,6 +70,9 @@ class TestArtifactI18n(unittest.TestCase):
         )
 
     def test_parenchymal_overlay_text_in_pt_br_uses_dot_grouping_and_uh(self):
+        with patch("heimdallr.metrics.jobs._parenchymal_overlay_text.settings.ARTIFACTS_LOCALE", "pt_BR"):
+            self.assertEqual(resolve_parenchymal_locale({}), "pt_BR")
+
         lines = build_parenchymal_overlay_text(
             organ_measurements={
                 "liver": {"analysis_status": "complete", "observed_volume_cm3": 1355.0, "hu_mean": 56.0},
@@ -90,8 +95,19 @@ class TestArtifactI18n(unittest.TestCase):
                 "Rim esquerdo: 152 cm³ | 27 UH",
             ],
         )
+        self.assertEqual(
+            parenchymal_series_description("pt_BR"),
+            "Heimdallr Overlay de Órgãos Parenquimatosos 5 mm",
+        )
+        self.assertIn(
+            "Reconstrução axial de 5 mm",
+            parenchymal_derivation_description("pt_BR"),
+        )
 
     def test_parenchymal_overlay_text_in_en_us_uses_comma_grouping_and_hu(self):
+        with patch("heimdallr.metrics.jobs._parenchymal_overlay_text.settings.ARTIFACTS_LOCALE", "pt_BR"):
+            self.assertEqual(resolve_parenchymal_locale({"locale": "en_US"}), "en_US")
+
         lines = build_parenchymal_overlay_text(
             organ_measurements={
                 "liver": {"analysis_status": "complete", "observed_volume_cm3": 1355.0, "hu_mean": 56.0},
@@ -113,6 +129,10 @@ class TestArtifactI18n(unittest.TestCase):
                 "Right kidney: 154 cm³ | 27 HU",
                 "Left kidney: 152 cm³ | 27 HU",
             ],
+        )
+        self.assertEqual(
+            parenchymal_series_description("en_US"),
+            "Heimdallr Parenchymal Organ Overlay 5 mm",
         )
 
 
