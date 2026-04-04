@@ -19,7 +19,7 @@ msgid "app.title"
 msgstr "Heimdallr TUI"
 
 msgid "app.subtitle"
-msgstr "Intake · Prepare · Segmentation"
+msgstr "Intake · Prepare · Segmentation · Metrics"
 
 msgid "app.table.patient"
 msgstr "Patient"
@@ -35,6 +35,9 @@ msgstr "Prepare"
 
 msgid "app.table.segment"
 msgstr "Segment"
+
+msgid "app.table.metrics"
+msgstr "Metrics"
 
 msgid "app.table.updated"
 msgstr "Updated"
@@ -111,6 +114,9 @@ msgstr "avg prepare {value}"
 msgid "app.avg_segment"
 msgstr "avg segmentation {value}"
 
+msgid "app.avg_metrics"
+msgstr "avg metrics {value}"
+
 msgid "app.pulse.title"
 msgstr "Pulse"
 
@@ -171,6 +177,9 @@ msgstr "Prepare"
 msgid "app.case.segment"
 msgstr "Segmentation"
 
+msgid "app.case.metrics"
+msgstr "Metrics"
+
 msgid "app.case.total"
 msgstr "Total"
 
@@ -197,6 +206,9 @@ msgstr "Prepare"
 
 msgid "service.segmentation"
 msgstr "Segmentation"
+
+msgid "service.metrics"
+msgstr "Metrics"
 
 msgid "stage_state.flow"
 msgstr "FLOW"
@@ -230,6 +242,9 @@ msgstr "Queued"
 
 msgid "case.stage.segmentation"
 msgstr "Segmentation"
+
+msgid "case.stage.metrics"
+msgstr "Metrics"
 
 msgid "case.stage.failed"
 msgstr "Failed"
@@ -300,20 +315,47 @@ msgstr "Queue states: {value}"
 msgid "snapshot.segmentation.note.oldest_pressure"
 msgstr "Oldest segmentation pressure: {age}"
 
+msgid "snapshot.metrics.note.queued"
+msgstr "{count} queued in metrics queue"
+
+msgid "snapshot.metrics.note.active"
+msgstr "{count} running in metrics queue"
+
+msgid "snapshot.metrics.note.completed"
+msgstr "{count} cases with completed metrics"
+
+msgid "snapshot.metrics.note.failed"
+msgstr "{count} cases with metrics failures"
+
+msgid "snapshot.metrics.note.queue_states"
+msgstr "Metrics queue states: {value}"
+
+msgid "snapshot.metrics.note.oldest_pressure"
+msgstr "Oldest metrics pressure: {age}"
+
 msgid "snapshot.alert.intake_failures"
 msgstr "Intake has {count} retained failures."
 
 msgid "snapshot.alert.segmentation_backlog_no_worker"
 msgstr "Segmentation backlog exists, but the segmentation worker is not detected."
 
-msgid "snapshot.alert.queue_errors"
+msgid "snapshot.alert.metrics_backlog_no_worker"
+msgstr "Metrics backlog exists, but the metrics worker is not detected."
+
+msgid "snapshot.alert.segmentation_queue_errors"
 msgstr "{count} segmentation queue item(s) are in error."
+
+msgid "snapshot.alert.metrics_queue_errors"
+msgstr "{count} metrics queue item(s) are in error."
 
 msgid "snapshot.alert.intake_backlog_old"
 msgstr "Intake backlog is older than 15 minutes."
 
 msgid "snapshot.alert.segmentation_old"
 msgstr "Segmentation pressure is older than 30 minutes."
+
+msgid "snapshot.alert.metrics_old"
+msgstr "Metrics pressure is older than 30 minutes."
 
 msgid "snapshot.alert.no_blocking"
 msgstr "No blocking condition detected in the current snapshot."
@@ -323,6 +365,9 @@ msgstr "results.json ready"
 
 msgid "snapshot.case.signal.segmentation_metrics"
 msgstr "segmentation + metrics"
+
+msgid "snapshot.case.signal.metrics_running"
+msgstr "metrics running"
 
 msgid "snapshot.case.signal.waiting_slot"
 msgstr "waiting for segmentation slot"

@@ -80,6 +80,7 @@ class HeimdallrDashboardApp(App[None]):
             tui("app.table.queue"),
             tui("app.table.prepare"),
             tui("app.table.segment"),
+            tui("app.table.metrics"),
             tui("app.table.updated"),
             tui("app.table.signal"),
         )
@@ -167,6 +168,7 @@ class HeimdallrDashboardApp(App[None]):
         )
         avg_prepare = _seconds_to_clock(self.snapshot.avg_prepare_seconds)
         avg_segmentation = _seconds_to_clock(self.snapshot.avg_segmentation_seconds)
+        avg_metrics = _seconds_to_clock(self.snapshot.avg_metrics_seconds)
         meta = Table.grid(expand=True)
         meta.add_column()
         meta.add_column()
@@ -181,6 +183,10 @@ class HeimdallrDashboardApp(App[None]):
         meta.add_row(
             Text(tui("app.avg_prepare", value=avg_prepare), style="#94a3b8"),
             Text(tui("app.avg_segment", value=avg_segmentation), style="#94a3b8", justify="right"),
+        )
+        meta.add_row(
+            Text(tui("app.avg_metrics", value=avg_metrics), style="#94a3b8"),
+            Text("", style="#94a3b8"),
         )
         self.query_one("#pulse", RichPanel).set_renderable(
             Panel(
@@ -260,6 +266,7 @@ class HeimdallrDashboardApp(App[None]):
                 case.queue_status,
                 case.prepare_elapsed,
                 case.segmentation_elapsed,
+                case.metrics_elapsed,
                 updated,
                 case.signal,
                 key=case.case_id,
@@ -278,6 +285,7 @@ class HeimdallrDashboardApp(App[None]):
         timeline.add_row(Text(tui("app.case.queue"), style="#94a3b8"), Text(case.queue_status, style="#e2e8f0"))
         timeline.add_row(Text(tui("app.case.prepare"), style="#94a3b8"), Text(case.prepare_elapsed, style="#e2e8f0"))
         timeline.add_row(Text(tui("app.case.segment"), style="#94a3b8"), Text(case.segmentation_elapsed, style="#e2e8f0"))
+        timeline.add_row(Text(tui("app.case.metrics"), style="#94a3b8"), Text(case.metrics_elapsed, style="#e2e8f0"))
         timeline.add_row(Text(tui("app.case.total"), style="#94a3b8"), Text(case.total_elapsed, style="#e2e8f0"))
         timeline.add_row(
             Text(tui("app.case.series"), style="#94a3b8"),
