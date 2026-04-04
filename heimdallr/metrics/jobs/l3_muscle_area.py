@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 from pathlib import Path
 
 import matplotlib
@@ -15,16 +14,12 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import nibabel as nib
 import numpy as np
-from PIL import Image
-from pydicom.dataset import FileDataset, FileMetaDataset
-from pydicom.uid import (
-    ExplicitVRLittleEndian,
-    PYDICOM_IMPLEMENTATION_UID,
-    SecondaryCaptureImageStorage,
-    generate_uid,
-)
 
-from heimdallr.shared import settings
+from heimdallr.metrics.jobs._dicom_secondary_capture import (
+    create_secondary_capture_from_rgb,
+    parse_optional_float,
+)
+from heimdallr.metrics.jobs._l3_overlay_text import build_overlay_text, resolve_artifact_locale
 from heimdallr.shared.paths import study_artifacts_dir, study_dir, study_metadata_json, study_nifti
 
 
@@ -49,29 +44,6 @@ def load_job_config(raw_json: str) -> dict:
     return parsed
 
 
-def parse_optional_float(value):
-    if value in (None, "", "Unknown"):
-        return None
-    try:
-        return float(str(value).strip().replace(",", "."))
-    except (TypeError, ValueError):
-        return None
-
-
-def resolve_study_uid(value) -> str:
-    raw = str(value or "").strip()
-    if raw and len(raw) <= 64 and re.fullmatch(r"[0-9]+(?:\.[0-9]+)*", raw):
-        return raw
-    return generate_uid()
-
-
-def metadata_value(case_metadata: dict, key: str, default=None):
-    if key in case_metadata and case_metadata.get(key) not in (None, ""):
-        return case_metadata.get(key)
-    reference = case_metadata.get("ReferenceDicom") or {}
-    return reference.get(key, default)
-
-
 def load_mask(mask_path: Path) -> tuple[nib.Nifti1Image, np.ndarray]:
     image = nib.load(str(mask_path))
     data = np.asarray(image.get_fdata())
@@ -86,47 +58,85 @@ def compute_center_slice(mask_l3: np.ndarray) -> tuple[np.ndarray, int]:
     return slice_indices, center_idx
 
 
-def build_overlay(
+def sagittal_plane_from_mask(mask: np.ndarray) -> tuple[np.ndarray, int, str]:
+    mask_bool = np.asarray(mask, dtype=bool)
+    coords = np.argwhere(mask_bool)
+    if coords.size == 0:
+        raise RuntimeError("L3 mask is empty")
+
+    x_min, y_min, _ = coords.min(axis=0)
+    x_max, y_max, _ = coords.max(axis=0)
+    x_span = int(x_max - x_min + 1)
+    y_span = int(y_max - y_min + 1)
+
+    if x_span <= y_span:
+        center_index = int(round((x_min + x_max) / 2.0))
+        return np.asarray(mask_bool[center_index, :, :], dtype=bool), center_index, "x"
+
+    center_index = int(round((y_min + y_max) / 2.0))
+    return np.asarray(mask_bool[:, center_index, :], dtype=bool), center_index, "y"
+
+
+def render_overlay_rgb(
     image_data: np.ndarray,
     l3_mask: np.ndarray,
     muscle_mask: np.ndarray,
     slice_idx: int,
-    output_path: Path,
+    title: str,
     summary_lines: list[str],
-) -> None:
+    spacing_mm: tuple[float, float, float],
+) -> np.ndarray:
     ct_slice = np.asarray(image_data[:, :, slice_idx], dtype=np.float32)
     muscle_slice = np.asarray(muscle_mask[:, :, slice_idx], dtype=bool)
     l3_slice = np.asarray(l3_mask[:, :, slice_idx], dtype=bool)
+    sagittal_l3, sagittal_index, sagittal_axis = sagittal_plane_from_mask(l3_mask)
+
+    if sagittal_axis == "x":
+        sagittal_ct = np.asarray(image_data[sagittal_index, :, :], dtype=np.float32)
+        lateral_spacing = float(spacing_mm[1])
+    else:
+        sagittal_ct = np.asarray(image_data[:, sagittal_index, :], dtype=np.float32)
+        lateral_spacing = float(spacing_mm[0])
 
     ct_slice = np.clip(ct_slice, -160.0, 240.0)
+    sagittal_ct = np.clip(sagittal_ct, -160.0, 240.0)
     rotated_ct = np.rot90(ct_slice)
     rotated_muscle = np.rot90(muscle_slice.astype(np.uint8))
     rotated_l3 = np.rot90(l3_slice.astype(np.uint8))
+    rotated_sagittal_ct = np.rot90(sagittal_ct)
+    rotated_sagittal_l3 = np.rot90(sagittal_l3.astype(np.uint8))
 
-    fig, ax = plt.subplots(figsize=(8, 8))
-    ax.imshow(rotated_ct, cmap="gray", interpolation="nearest")
+    spacing_x, spacing_y, spacing_z = (float(value) for value in spacing_mm)
+    axial_aspect = (spacing_y / spacing_x) if spacing_x > 0 and spacing_y > 0 else 1.0
+    sagittal_aspect = (spacing_z / lateral_spacing) if spacing_z > 0 and lateral_spacing > 0 else 1.0
+    slice_row = int(np.clip(sagittal_ct.shape[1] - 1 - slice_idx, 0, rotated_sagittal_ct.shape[0] - 1))
+
+    fig, (ax_axial, ax_sagittal) = plt.subplots(1, 2, figsize=(13, 8))
+    fig.suptitle(title, fontsize=15)
+    ax_axial.imshow(rotated_ct, cmap="gray", interpolation="nearest", aspect=axial_aspect)
 
     if rotated_muscle.any():
         muscle_overlay = np.ma.masked_where(rotated_muscle == 0, rotated_muscle)
-        ax.imshow(
+        ax_axial.imshow(
             muscle_overlay,
             cmap="autumn",
             interpolation="nearest",
             alpha=0.45,
             vmin=0,
             vmax=1,
+            aspect=axial_aspect,
         )
-        ax.contour(rotated_muscle, levels=[0.5], colors=["#ffb000"], linewidths=1.2)
+        ax_axial.contour(rotated_muscle, levels=[0.5], colors=["#ffb000"], linewidths=1.2)
 
     if rotated_l3.any():
-        ax.contour(rotated_l3, levels=[0.5], colors=["#00d5ff"], linewidths=1.0)
+        ax_axial.contour(rotated_l3, levels=[0.5], colors=["#00d5ff"], linewidths=1.0)
 
-    ax.set_title(f"L3 Center Slice {slice_idx}", fontsize=14)
-    ax.text(
+    ax_axial.set_title("Axial", fontsize=12)
+    ax_axial.text(
         0.03,
         0.97,
         "\n".join(summary_lines),
-        transform=ax.transAxes,
+        transform=ax_axial.transAxes,
         ha="left",
         va="top",
         fontsize=10,
@@ -138,97 +148,68 @@ def build_overlay(
             "edgecolor": "none",
         },
     )
-    ax.axis("off")
-    fig.tight_layout()
-    fig.savefig(output_path, dpi=180, bbox_inches="tight", pad_inches=0.05)
+    ax_axial.axis("off")
+
+    ax_sagittal.imshow(
+        rotated_sagittal_ct,
+        cmap="gray",
+        interpolation="nearest",
+        aspect=sagittal_aspect,
+    )
+    if rotated_sagittal_l3.any():
+        ax_sagittal.contour(rotated_sagittal_l3, levels=[0.5], colors=["#ffb000"], linewidths=1.1)
+    ax_sagittal.axhline(slice_row, color="#00d5ff", linewidth=1.3, linestyle="--")
+    ax_sagittal.text(
+        0.03,
+        0.03,
+        f"Axial level z={slice_idx}",
+        transform=ax_sagittal.transAxes,
+        ha="left",
+        va="bottom",
+        fontsize=9,
+        color="white",
+        bbox={
+            "boxstyle": "round,pad=0.3",
+            "facecolor": "black",
+            "alpha": 0.45,
+            "edgecolor": "none",
+        },
+    )
+    ax_sagittal.set_title("Sagittal Reference", fontsize=12)
+    ax_sagittal.axis("off")
+
+    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.96))
+    fig.canvas.draw()
+    rgba = np.asarray(fig.canvas.buffer_rgba(), dtype=np.uint8)
+    rgb = np.ascontiguousarray(rgba[:, :, :3])
     plt.close(fig)
+    return rgb
 
 
 def create_secondary_capture(
-    png_path: Path,
+    rgb: np.ndarray,
     output_path: Path,
     case_metadata: dict,
     measurement: dict,
 ) -> None:
-    image = Image.open(png_path).convert("RGB")
-    rgb = np.asarray(image, dtype=np.uint8)
-
-    file_meta = FileMetaDataset()
-    file_meta.FileMetaInformationVersion = b"\x00\x01"
-    file_meta.MediaStorageSOPClassUID = SecondaryCaptureImageStorage
-    file_meta.MediaStorageSOPInstanceUID = generate_uid()
-    file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
-    file_meta.ImplementationClassUID = PYDICOM_IMPLEMENTATION_UID
-
-    now = settings.local_now()
-    ds = FileDataset(str(output_path), {}, file_meta=file_meta, preamble=b"\0" * 128)
-    ds.is_little_endian = True
-    ds.is_implicit_VR = False
-
-    ds.SOPClassUID = SecondaryCaptureImageStorage
-    ds.SOPInstanceUID = file_meta.MediaStorageSOPInstanceUID
-    ds.StudyInstanceUID = resolve_study_uid(metadata_value(case_metadata, "StudyInstanceUID"))
-    ds.SeriesInstanceUID = generate_uid()
-    ds.Modality = "OT"
-    ds.SeriesDescription = "Heimdallr L3 Muscle Area Overlay"
-    ds.ImageType = ["DERIVED", "SECONDARY"]
-    ds.ConversionType = "WSD"
-    ds.DerivationDescription = (
-        "PNG overlay burned in from Heimdallr L3 muscle area metric "
-        f"(SMA={measurement['skeletal_muscle_area_cm2']:.2f} cm2"
-        + (
-            f", SMI={measurement['smi_cm2_m2']:.2f} cm2/m2"
-            if measurement.get("smi_cm2_m2") is not None
-            else ""
-        )
-        + ")"
+    create_secondary_capture_from_rgb(
+        rgb,
+        output_path,
+        case_metadata,
+        series_description="Heimdallr L3 Muscle Area Overlay",
+        series_number=9101,
+        instance_number=1,
+        derivation_description=(
+            "Burned-in overlay generated from Heimdallr L3 muscle area metric "
+            f"(SMA={measurement['skeletal_muscle_area_cm2']:.2f} cm2"
+            + (
+                f", SMI={measurement['smi_cm2_m2']:.2f} cm2/m2"
+                if measurement.get("smi_cm2_m2") is not None
+                else ""
+            )
+            + ")"
+        ),
     )
-    ds.BurnedInAnnotation = "YES"
-    ds.Manufacturer = "Heimdallr"
-    ds.SoftwareVersions = "Heimdallr"
-    ds.PatientName = str(metadata_value(case_metadata, "PatientName", "Unknown") or "Unknown")
-    patient_id = str(metadata_value(case_metadata, "PatientID", "") or "").strip()
-    if patient_id:
-        ds.PatientID = patient_id
-    patient_sex = str(metadata_value(case_metadata, "PatientSex", "") or "").strip()
-    if patient_sex:
-        ds.PatientSex = patient_sex
-    patient_size = parse_optional_float(case_metadata.get("Height"))
-    if patient_size is None:
-        patient_size = parse_optional_float(metadata_value(case_metadata, "PatientSize"))
-    if patient_size is not None:
-        ds.PatientSize = f"{patient_size:.3f}"
-    patient_weight = parse_optional_float(case_metadata.get("Weight"))
-    if patient_weight is None:
-        patient_weight = parse_optional_float(metadata_value(case_metadata, "PatientWeight"))
-    if patient_weight is not None:
-        ds.PatientWeight = f"{patient_weight:.1f}"
-    accession_number = str(metadata_value(case_metadata, "AccessionNumber", "") or "").strip()
-    if accession_number:
-        ds.AccessionNumber = accession_number
-    study_date = str(metadata_value(case_metadata, "StudyDate", "") or "").strip()
-    if study_date:
-        ds.StudyDate = study_date
-    ds.ContentDate = now.strftime("%Y%m%d")
-    ds.ContentTime = now.strftime("%H%M%S.%f")
-    ds.SeriesDate = ds.ContentDate
-    ds.SeriesTime = ds.ContentTime
-    ds.InstanceCreationDate = ds.ContentDate
-    ds.InstanceCreationTime = ds.ContentTime
-    ds.SeriesNumber = "9101"
-    ds.InstanceNumber = 1
-
-    ds.Rows = int(rgb.shape[0])
-    ds.Columns = int(rgb.shape[1])
-    ds.SamplesPerPixel = 3
-    ds.PhotometricInterpretation = "RGB"
-    ds.PlanarConfiguration = 0
-    ds.BitsAllocated = 8
-    ds.BitsStored = 8
-    ds.HighBit = 7
-    ds.PixelRepresentation = 0
-    ds.PixelData = rgb.tobytes()
-    ds.save_as(str(output_path), write_like_original=False)
 
 
 def main() -> int:
@@ -255,7 +236,6 @@ def main() -> int:
         l3_path = artifacts_dir / "total" / "vertebrae_L3.nii.gz"
         muscle_path = artifacts_dir / "tissue_types" / "skeletal_muscle.nii.gz"
         result_path = metric_dir / "result.json"
-        overlay_path = metric_dir / "overlay.png"
         overlay_sc_path = metric_dir / "overlay_sc.dcm"
 
         missing = [str(path) for path in (ct_path, metadata_path, l3_path, muscle_path) if not path.exists()]
@@ -278,7 +258,7 @@ def main() -> int:
         total_slices = int(ct_data.shape[2])
         probable_viewer_slice_index_one_based = total_slices - slice_idx
 
-        spacing_x, spacing_y = (float(value) for value in muscle_img.header.get_zooms()[:2])
+        spacing_x, spacing_y, spacing_z = (float(value) for value in muscle_img.header.get_zooms()[:3])
         pixel_area_mm2 = spacing_x * spacing_y
         muscle_pixels = int(np.count_nonzero(muscle_slice))
         muscle_area_cm2 = (muscle_pixels * pixel_area_mm2) / 100.0
@@ -297,25 +277,31 @@ def main() -> int:
         artifacts = {
             "result_json": str(result_path.relative_to(case_dir)),
         }
-        if job_config.get("generate_overlay", True):
-            summary_lines = [
-                f"SMA: {muscle_area_cm2:.1f} cm²",
-                f"NIfTI slice: {slice_idx}",
-                f"Probable viewer slice: {probable_viewer_slice_index_one_based}",
-            ]
-            if height_m is not None:
-                summary_lines.append(f"Height: {height_m:.2f} m")
-            if smi_cm2_m2 is not None:
-                summary_lines.append(f"SMI: {smi_cm2_m2:.1f} cm²/m²")
-            build_overlay(ct_data, l3_mask, muscle_mask, slice_idx, overlay_path, summary_lines)
-            artifacts["overlay_png"] = str(overlay_path.relative_to(case_dir))
-            if job_config.get("emit_secondary_capture_dicom", True):
-                measurement_stub = {
-                    "skeletal_muscle_area_cm2": float(muscle_area_cm2),
-                    "smi_cm2_m2": float(smi_cm2_m2) if smi_cm2_m2 is not None else None,
-                }
-                create_secondary_capture(overlay_path, overlay_sc_path, case_metadata, measurement_stub)
-                artifacts["overlay_sc_dcm"] = str(overlay_sc_path.relative_to(case_dir))
+        if job_config.get("emit_secondary_capture_dicom", True):
+            artifact_locale = resolve_artifact_locale(job_config)
+            title, summary_lines = build_overlay_text(
+                slice_idx=slice_idx,
+                probable_viewer_slice_index_one_based=probable_viewer_slice_index_one_based,
+                muscle_area_cm2=muscle_area_cm2,
+                height_m=height_m,
+                smi_cm2_m2=smi_cm2_m2,
+                locale=artifact_locale,
+            )
+            overlay_rgb = render_overlay_rgb(
+                ct_data,
+                l3_mask,
+                muscle_mask,
+                slice_idx,
+                title,
+                summary_lines,
+                spacing_mm=(spacing_x, spacing_y, spacing_z),
+            )
+            measurement_stub = {
+                "skeletal_muscle_area_cm2": float(muscle_area_cm2),
+                "smi_cm2_m2": float(smi_cm2_m2) if smi_cm2_m2 is not None else None,
+            }
+            create_secondary_capture(overlay_rgb, overlay_sc_path, case_metadata, measurement_stub)
+            artifacts["overlay_sc_dcm"] = str(overlay_sc_path.relative_to(case_dir))
 
         payload = {
             "metric_key": "l3_muscle_area",
