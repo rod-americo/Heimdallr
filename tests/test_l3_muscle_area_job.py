@@ -93,6 +93,7 @@ class TestL3MuscleAreaJob(unittest.TestCase):
             slice_idx=8,
             title="L3 Center Slice",
             summary_lines=["SMA: 42.0 cm2", "Slice: 8"],
+            panel_titles=("Axial", "Sagittal Reference"),
             spacing_mm=(1.0, 1.0, 2.5),
         )
 

@@ -19,7 +19,11 @@ from heimdallr.metrics.jobs._dicom_secondary_capture import (
     create_secondary_capture_from_rgb,
     parse_optional_float,
 )
-from heimdallr.metrics.jobs._l3_overlay_text import build_overlay_text, resolve_artifact_locale
+from heimdallr.metrics.jobs._l3_overlay_text import (
+    build_overlay_panel_titles,
+    build_overlay_text,
+    resolve_artifact_locale,
+)
 from heimdallr.shared.paths import study_artifacts_dir, study_dir, study_metadata_json, study_nifti
 
 
@@ -135,6 +139,7 @@ def render_overlay_rgb(
     slice_idx: int,
     title: str,
     summary_lines: list[str],
+    panel_titles: tuple[str, str],
     spacing_mm: tuple[float, float, float],
     sagittal_slab_thickness_mm: float = 3.0,
 ) -> np.ndarray:
@@ -164,8 +169,17 @@ def render_overlay_rgb(
     sagittal_aspect = (spacing_z / lateral_spacing) if spacing_z > 0 and lateral_spacing > 0 else 1.0
     slice_row = int(np.clip(sagittal_ct.shape[1] - 1 - slice_idx, 0, rotated_sagittal_ct.shape[0] - 1))
 
-    fig, (ax_axial, ax_sagittal) = plt.subplots(1, 2, figsize=(13, 8))
-    fig.suptitle(title, fontsize=15)
+    fig, (ax_axial, ax_sagittal) = plt.subplots(
+        1,
+        2,
+        figsize=(12.6, 8),
+        facecolor="black",
+        gridspec_kw={"wspace": 0.02},
+    )
+    fig.patch.set_facecolor("black")
+    ax_axial.set_facecolor("black")
+    ax_sagittal.set_facecolor("black")
+    fig.suptitle(title, fontsize=15, color="white")
     ax_axial.imshow(rotated_ct, cmap="gray", interpolation="nearest", aspect=axial_aspect)
 
     if rotated_muscle.any():
@@ -184,7 +198,7 @@ def render_overlay_rgb(
     if rotated_l3.any():
         ax_axial.contour(rotated_l3, levels=[0.5], colors=["#00d5ff"], linewidths=1.0)
 
-    ax_axial.set_title("Axial", fontsize=12)
+    ax_axial.set_title(panel_titles[0], fontsize=12, color="white")
     ax_axial.text(
         0.03,
         0.97,
@@ -228,10 +242,10 @@ def render_overlay_rgb(
             "edgecolor": "none",
         },
     )
-    ax_sagittal.set_title("Sagittal Reference", fontsize=12)
+    ax_sagittal.set_title(panel_titles[1], fontsize=12, color="white")
     ax_sagittal.axis("off")
 
-    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.96))
+    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.965), w_pad=0.15)
     fig.canvas.draw()
     rgba = np.asarray(fig.canvas.buffer_rgba(), dtype=np.uint8)
     rgb = np.ascontiguousarray(rgba[:, :, :3])
@@ -340,6 +354,7 @@ def main() -> int:
                 smi_cm2_m2=smi_cm2_m2,
                 locale=artifact_locale,
             )
+            panel_titles = build_overlay_panel_titles(locale=artifact_locale)
             overlay_rgb = render_overlay_rgb(
                 ct_data,
                 l3_mask,
@@ -347,6 +362,7 @@ def main() -> int:
                 slice_idx,
                 title,
                 summary_lines,
+                panel_titles,
                 spacing_mm=(spacing_x, spacing_y, spacing_z),
             )
             measurement_stub = {
