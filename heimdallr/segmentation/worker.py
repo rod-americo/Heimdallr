@@ -224,6 +224,28 @@ def _series_text_penalty(series, text_hints):
     return penalty
 
 
+def _series_hard_reject_reason(series, rules):
+    description, kernel = _text_tokens(series)
+    kernel_compact = kernel.strip()
+
+    for token in rules.get("description_contains", []):
+        normalized = str(token or "").strip().lower()
+        if normalized and normalized in description:
+            return f"description_rejected:{normalized}"
+
+    for token in rules.get("kernel_contains", []):
+        normalized = str(token or "").strip().lower()
+        if normalized and normalized in kernel:
+            return f"kernel_rejected_contains:{normalized}"
+
+    for token in rules.get("kernel_exact", []):
+        normalized = str(token or "").strip().lower()
+        if normalized and kernel_compact == normalized:
+            return f"kernel_rejected_exact:{normalized}"
+
+    return None
+
+
 def select_prepared_series(case_id, id_data):
     """
     Select the NIfTI series to process from a prepared study.
@@ -236,6 +258,7 @@ def select_prepared_series(case_id, id_data):
 
     profile_name, profile = load_series_selection_profile()
     required = profile.get("required", {})
+    hard_reject = profile.get("hard_reject", {})
     text_hints = profile.get("text_hints", {})
     phase_priority = [_normalize_phase(p) for p in profile.get("phase_priority", ["unknown"])]
     phase_rank = {phase: idx for idx, phase in enumerate(phase_priority)}
@@ -276,6 +299,17 @@ def select_prepared_series(case_id, id_data):
                     "SeriesInstanceUID": series.get("SeriesInstanceUID"),
                     "SeriesNumber": series.get("SeriesNumber"),
                     "reason": f"below_min_slices:{slice_count}",
+                }
+            )
+            continue
+
+        hard_reject_reason = _series_hard_reject_reason(series, hard_reject)
+        if hard_reject_reason:
+            rejected.append(
+                {
+                    "SeriesInstanceUID": series.get("SeriesInstanceUID"),
+                    "SeriesNumber": series.get("SeriesNumber"),
+                    "reason": hard_reject_reason,
                 }
             )
             continue
