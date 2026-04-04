@@ -48,6 +48,29 @@ class TestL3MuscleAreaJob(unittest.TestCase):
         self.assertEqual(sagittal_mask.shape, (18, 10))
         self.assertTrue(sagittal_mask.any())
 
+    def test_sagittal_slab_from_mask_keeps_full_width_for_y_axis(self):
+        image = np.zeros((20, 12, 14), dtype=np.float32)
+        mask = np.zeros_like(image, dtype=bool)
+        mask[4:16, 5:8, 3:11] = True
+
+        _, plane_index, axis = sagittal_plane_from_mask(mask)
+        self.assertEqual(axis, "y")
+
+        sagittal_ct, sagittal_mask, slab_bounds, lateral_spacing = sagittal_slab_from_mask(
+            image_data=image,
+            mask=mask,
+            plane_index=plane_index,
+            axis=axis,
+            spacing_mm=(1.0, 1.0, 2.5),
+            slab_thickness_mm=3.0,
+        )
+
+        self.assertEqual(slab_bounds, (5, 8))
+        self.assertEqual(lateral_spacing, 1.0)
+        self.assertEqual(sagittal_ct.shape, (20, 14))
+        self.assertEqual(sagittal_mask.shape, (20, 14))
+        self.assertTrue(sagittal_mask.any())
+
     def test_render_overlay_rgb_returns_combined_axial_and_sagittal_image(self):
         image = np.linspace(-200.0, 250.0, num=24 * 20 * 16, dtype=np.float32).reshape((24, 20, 16))
         l3_mask = np.zeros_like(image, dtype=bool)

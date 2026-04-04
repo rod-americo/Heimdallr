@@ -108,6 +108,7 @@ def sagittal_slab_from_mask(
     slab_thickness_mm: float,
 ) -> tuple[np.ndarray, np.ndarray, tuple[int, int], float]:
     if axis == "x":
+        projection_axis = 0
         lateral_spacing = float(spacing_mm[1])
         slab_start, slab_end = centered_slab_bounds(
             plane_index,
@@ -118,6 +119,7 @@ def sagittal_slab_from_mask(
         ct_slab = np.asarray(image_data[slab_start:slab_end, :, :], dtype=np.float32)
         mask_slab = np.asarray(mask[slab_start:slab_end, :, :], dtype=bool)
     else:
+        projection_axis = 1
         lateral_spacing = float(spacing_mm[0])
         slab_start, slab_end = centered_slab_bounds(
             plane_index,
@@ -128,8 +130,8 @@ def sagittal_slab_from_mask(
         ct_slab = np.asarray(image_data[:, slab_start:slab_end, :], dtype=np.float32)
         mask_slab = np.asarray(mask[:, slab_start:slab_end, :], dtype=bool)
 
-    sagittal_ct = np.mean(ct_slab, axis=0, dtype=np.float32)
-    sagittal_mask = np.any(mask_slab, axis=0)
+    sagittal_ct = np.mean(ct_slab, axis=projection_axis, dtype=np.float32)
+    sagittal_mask = np.any(mask_slab, axis=projection_axis)
     return sagittal_ct, sagittal_mask, (slab_start, slab_end), lateral_spacing
 
 
