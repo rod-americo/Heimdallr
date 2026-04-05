@@ -8,7 +8,7 @@
     "locale": "pt_BR"
   },
   "patient_name": {
-    "_comment": "Display-only normalization profile. Use 'medsenior' when the PACS sends the family name first and the UI should rotate it for human reading.",
-    "profile": "medsenior"
+    "_comment": "Display-only normalization profile. Use 'dicom_caret' when PatientName arrives as 'SURNAME^GIVEN NAMES' and the UI should render it as 'GIVEN NAMES SURNAME'.",
+    "profile": "dicom_caret"
   }
 }
