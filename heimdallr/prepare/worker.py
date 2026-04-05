@@ -92,16 +92,16 @@ def parse_optional_float(value):
     """Parse a DICOM numeric scalar into float or None."""
     if value in (None, "", "Unknown"):
         return None
+    try:
+        return float(str(value).strip().replace(",", "."))
+    except (TypeError, ValueError):
+        return None
 
 
 def normalize_patient_name_for_prepare(name):
     """Normalize DICOM PatientName for stored metadata and case naming."""
     normalized = normalize_patient_name_display(str(name or ""), settings.PATIENT_NAME_PROFILE)
     return normalized or "Unknown"
-    try:
-        return float(str(value).strip().replace(",", "."))
-    except (TypeError, ValueError):
-        return None
 
 
 def build_reference_dicom_context(ds):
@@ -140,7 +140,7 @@ def build_reference_dicom_context(ds):
             context[field_name] = [str(item) for item in value]
         else:
             if field_name == "PatientName":
-                context[field_name] = normalize_patient_name_for_prepare(value)
+                context[field_name] = str(value).strip()
             else:
                 context[field_name] = str(value).replace("^", " ").strip()
     return context
