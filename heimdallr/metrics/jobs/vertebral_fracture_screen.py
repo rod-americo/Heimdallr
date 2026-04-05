@@ -21,6 +21,7 @@ from heimdallr.metrics.jobs._bone_job_common import (
     load_job_config,
     load_nifti_mask,
     mask_complete,
+    mask_complete_along_axis,
     metric_output_dir,
     parse_args,
     resolve_canonical_nifti,
@@ -28,6 +29,7 @@ from heimdallr.metrics.jobs._bone_job_common import (
 )
 from heimdallr.metrics.analysis.bone_health import extract_study_technique_context
 from heimdallr.metrics.analysis.vertebral_fracture import (
+    isolate_vertebral_body,
     refine_classification_with_adjacent_reference,
     screen_vertebral_fracture,
     vertebra_level_index,
@@ -111,6 +113,34 @@ def screen_single_vertebra(
             "summary": {"job_status": "shape_mismatch"},
         }
 
+    complete_mask = (
+        mask_complete_along_axis(mask, si_axis)
+        if si_axis is not None
+        else mask_complete(mask)
+    )
+    if not complete_mask:
+        return {
+            "vertebra": vertebra,
+            "available": True,
+            "mask_path": str(mask_path),
+            "analysis_eligible": False,
+            "summary": {
+                "job_name": "vertebral_fracture_screen",
+                "status": "indeterminate",
+                "screen_label": "indeterminate",
+                "screen_confidence": 0.0,
+                "genant_grade": None,
+                "genant_label": "indeterminate",
+                "severity": "indeterminate",
+                "suspected_pattern": None,
+                "body_isolation": {},
+                "morphometry": {},
+                "ratios": {},
+                "qc_flags": ["mask_incomplete"],
+                "mask_complete": False,
+            },
+        }
+
     screen = screen_vertebral_fracture(
         mask,
         spacing_mm=spacing_mm,
@@ -150,6 +180,7 @@ def screen_single_vertebra(
         "vertebra": vertebra,
         "available": True,
         "mask_path": str(mask_path),
+        "analysis_eligible": True,
         "summary": summarized,
     }
 
@@ -257,7 +288,8 @@ def vertebral_centerline_points(
 
 def build_centerline_sagittal_slab(
     ct_data: np.ndarray,
-    masks_by_vertebra: dict[str, np.ndarray],
+    geometry_masks_by_vertebra: dict[str, np.ndarray],
+    overlay_masks_by_vertebra: dict[str, np.ndarray],
     *,
     spacing_mm: tuple[float, float, float],
     ap_axis: int,
@@ -265,20 +297,20 @@ def build_centerline_sagittal_slab(
     slab_thickness_mm: float = 5.0,
     crop_padding_voxels: int = 6,
 ) -> tuple[np.ndarray | None, dict[str, np.ndarray], float]:
-    if not masks_by_vertebra:
+    if not geometry_masks_by_vertebra or not overlay_masks_by_vertebra:
         return None, {}, 1.0
 
     lateral_axis = remaining_axis(ap_axis, si_axis)
     centerline_points = vertebral_centerline_points(
-        masks_by_vertebra,
+        geometry_masks_by_vertebra,
         si_axis=si_axis,
         lateral_axis=lateral_axis,
     )
     if not centerline_points:
         return None, {}, 1.0
 
-    combined_mask = np.zeros_like(next(iter(masks_by_vertebra.values())), dtype=bool)
-    for mask in masks_by_vertebra.values():
+    combined_mask = np.zeros_like(next(iter(geometry_masks_by_vertebra.values())), dtype=bool)
+    for mask in geometry_masks_by_vertebra.values():
         combined_mask |= np.asarray(mask, dtype=bool)
 
     combined_reoriented = reorient_volume(combined_mask, ap_axis, si_axis)
@@ -298,7 +330,7 @@ def build_centerline_sagittal_slab(
     ct_crop = np.asarray(ct_reoriented[ap_start:ap_stop, si_start:si_stop, :], dtype=np.float32)
     mask_crops = {
         vertebra: reorient_volume(mask, ap_axis, si_axis)[ap_start:ap_stop, si_start:si_stop, :]
-        for vertebra, mask in masks_by_vertebra.items()
+        for vertebra, mask in overlay_masks_by_vertebra.items()
     }
 
     centerline_si = np.asarray([point[0] for point in centerline_points], dtype=np.float64)
@@ -391,7 +423,9 @@ def main() -> int:
         per_vertebra: dict[str, dict] = {}
         mask_overlays: list[dict] = []
         overlay_mask_paths_by_vertebra: dict[str, str] = {}
-        available_count = 0
+        available_count = len(vertebrae)
+        analyzed_vertebrae: list[str] = []
+        incomplete_vertebrae: list[str] = []
         max_workers = max(1, len(vertebrae))
         if vertebrae:
             with ProcessPoolExecutor(max_workers=max_workers) as executor:
@@ -412,16 +446,23 @@ def main() -> int:
                     vertebra = str(result["vertebra"])
                     per_vertebra[vertebra] = dict(result["summary"])
                     if bool(result.get("available")):
-                        available_count += 1
                         overlay_mask_paths_by_vertebra[vertebra] = str(result["mask_path"])
+                    if bool(result.get("analysis_eligible")):
+                        analyzed_vertebrae.append(vertebra)
+                    elif bool(result.get("available")):
+                        incomplete_vertebrae.append(vertebra)
 
-        per_vertebra = refine_classification_with_adjacent_reference(per_vertebra)
+        refined_vertebrae = refine_classification_with_adjacent_reference(
+            {vertebra: per_vertebra[vertebra] for vertebra in analyzed_vertebrae if vertebra in per_vertebra}
+        )
+        for vertebra, summary in refined_vertebrae.items():
+            per_vertebra[vertebra] = summary
         overall_suspicion = False
         highest_severity = "indeterminate"
         highest_genant_grade: int | None = None
         suspicious_levels: list[str] = []
         severity_order = {"indeterminate": -1, "none": 0, "mild": 1, "moderate": 2, "severe": 3}
-        for vertebra in vertebrae:
+        for vertebra in analyzed_vertebrae:
             summarized = per_vertebra.get(vertebra, {})
             if not isinstance(summarized, dict):
                 continue
@@ -438,21 +479,36 @@ def main() -> int:
         dicom_exports: list[dict[str, str]] = []
         emit_dicom = bool(job_config.get("emit_secondary_capture_dicom", job_config.get("generate_overlay", True)))
         if overlay_mask_paths_by_vertebra and emit_dicom and ap_axis is not None and si_axis is not None:
-            overlay_masks_by_vertebra = {
+            geometry_masks_by_vertebra = {
                 vertebra: load_nifti_mask(Path(mask_path_str))[1]
                 for vertebra, mask_path_str in overlay_mask_paths_by_vertebra.items()
             }
+            overlay_body_masks_by_vertebra = {}
+            for vertebra in analyzed_vertebrae:
+                mask = geometry_masks_by_vertebra.get(vertebra)
+                if mask is None:
+                    continue
+                body_result = isolate_vertebral_body(
+                    mask,
+                    spacing_mm=spacing,
+                    ap_axis=ap_axis,
+                    si_axis=si_axis,
+                )
+                body_mask = np.asarray(body_result.get("body_mask"), dtype=bool)
+                if np.any(body_mask):
+                    overlay_body_masks_by_vertebra[vertebra] = body_mask
             slab_thickness_mm = float(job_config.get("overlay_sagittal_slab_thickness_mm", 5.0))
             ct_plane, overlay_planes, aspect = build_centerline_sagittal_slab(
                 ct_data,
-                overlay_masks_by_vertebra,
+                geometry_masks_by_vertebra,
+                overlay_body_masks_by_vertebra,
                 spacing_mm=spacing,
                 ap_axis=ap_axis,
                 si_axis=si_axis,
                 slab_thickness_mm=slab_thickness_mm,
             )
             if ct_plane is not None:
-                for vertebra in vertebrae:
+                for vertebra in analyzed_vertebrae:
                     mask_plane = overlay_planes.get(vertebra)
                     summary = per_vertebra.get(vertebra, {})
                     if mask_plane is None or not np.any(mask_plane):
@@ -499,13 +555,16 @@ def main() -> int:
                 "vertebrae": {v: f"artifacts/total/vertebrae_{v}.nii.gz" for v in vertebrae},
             },
             "measurement": {
-                "job_status": "complete" if available_count > 0 else "missing_masks",
+                "job_status": "complete" if analyzed_vertebrae else "missing_masks",
                 "technique_context": technique_context,
                 "vertebrae_requested": vertebrae,
                 "vertebrae_available_count": available_count,
-                "overall_suspicion": overall_suspicion if available_count > 0 else None,
-                "highest_genant_grade": highest_genant_grade if available_count > 0 else None,
-                "highest_severity": highest_severity if available_count > 0 else "indeterminate",
+                "vertebrae_analyzed": analyzed_vertebrae,
+                "vertebrae_analyzed_count": len(analyzed_vertebrae),
+                "vertebrae_incomplete": sorted(incomplete_vertebrae, key=_vertebra_sort_key),
+                "overall_suspicion": overall_suspicion if analyzed_vertebrae else None,
+                "highest_genant_grade": highest_genant_grade if analyzed_vertebrae else None,
+                "highest_severity": highest_severity if analyzed_vertebrae else "indeterminate",
                 "suspicious_levels": suspicious_levels,
                 "per_vertebra": per_vertebra,
             },

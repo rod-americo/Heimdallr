@@ -117,6 +117,47 @@ def _restore_from_crop(cropped_mask: np.ndarray, full_shape: tuple[int, int, int
     return restored
 
 
+def _crop_reoriented_to_dominant_ap_span(
+    reoriented_mask: np.ndarray,
+    *,
+    min_area_fraction: float = 0.35,
+    padding_slices: int = 1,
+) -> np.ndarray:
+    mask = np.asarray(reoriented_mask, dtype=bool)
+    if mask.ndim != 3 or not np.any(mask):
+        return mask
+
+    area_profile = mask.sum(axis=(1, 2)).astype(np.float64)
+    if area_profile.size == 0:
+        return mask
+
+    max_area = float(np.max(area_profile))
+    if max_area <= 0.0:
+        return mask
+
+    threshold = max(1.0, float(min_area_fraction) * max_area)
+    support = area_profile >= threshold
+    if not np.any(support):
+        return mask
+
+    peak_index = int(np.argmax(area_profile))
+    left = peak_index
+    right = peak_index
+    while left > 0 and support[left - 1]:
+        left -= 1
+    while right < (support.size - 1) and support[right + 1]:
+        right += 1
+
+    left = max(0, left - int(padding_slices))
+    right = min(mask.shape[0] - 1, right + int(padding_slices))
+    if right <= left:
+        return mask
+
+    cropped = np.zeros_like(mask, dtype=bool)
+    cropped[left : right + 1] = mask[left : right + 1]
+    return cropped
+
+
 def _moving_average(values: np.ndarray, window: int) -> np.ndarray:
     if window <= 1 or values.size == 0:
         return values.astype(np.float64, copy=False)
@@ -304,6 +345,13 @@ def isolate_vertebral_body(
         body_mask = interior.copy()
 
     full_body_mask = _restore_from_crop(body_mask, mask.shape, crop_slices)
+    reoriented_body_mask = _reorient(full_body_mask, axis_info["ap_axis"], axis_info["si_axis"])
+    cropped_reoriented_body_mask = _crop_reoriented_to_dominant_ap_span(reoriented_body_mask)
+    full_body_mask = np.moveaxis(
+        cropped_reoriented_body_mask,
+        (0, 1, 2),
+        (axis_info["ap_axis"], axis_info["si_axis"], axis_info["lateral_axis"]),
+    )
 
     body_voxels = _component_voxel_count(full_body_mask)
     body_fraction = 0.0 if original_voxels == 0 else float(body_voxels / original_voxels)

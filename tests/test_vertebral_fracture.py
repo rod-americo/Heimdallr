@@ -12,6 +12,7 @@ from heimdallr.metrics.analysis.vertebral_fracture import (
     estimate_vertebral_heights,
     vertebra_level_index,
 )
+from heimdallr.metrics.jobs._bone_job_common import mask_complete_along_axis
 from heimdallr.metrics.jobs.vertebral_fracture_screen import discover_available_vertebrae
 
 
@@ -63,6 +64,13 @@ class TestVertebralFractureHelpers(unittest.TestCase):
         self.assertLess(vertebra_level_index("T12"), vertebra_level_index("L1"))
         self.assertLess(vertebra_level_index("L5"), vertebra_level_index("S1"))
         self.assertLess(vertebra_level_index("S3"), vertebra_level_index("S4"))
+
+    def test_mask_complete_along_axis_uses_requested_dimension(self):
+        mask = np.zeros((12, 12, 12), dtype=bool)
+        mask[3:9, 2:10, 0:8] = True
+
+        self.assertFalse(mask_complete_along_axis(mask, axis=2))
+        self.assertTrue(mask_complete_along_axis(mask, axis=1))
 
     def test_refine_classification_uses_adjacent_normal_vertebrae(self):
         refined = refine_classification_with_adjacent_reference(
@@ -133,6 +141,17 @@ class TestVertebralFractureHelpers(unittest.TestCase):
         self.assertGreater(result["original_voxels"], result["body_voxels"])
         self.assertLess(result["body_fraction"], 1.0)
         self.assertTrue(np.any(result["body_mask"]))
+
+    def test_isolate_vertebral_body_trims_dominant_ap_span(self):
+        mask = np.zeros((24, 18, 28), dtype=bool)
+        mask[6:18, 3:11, 5:23] = True
+        mask[10:14, 11:17, 12:18] = True
+
+        result = isolate_vertebral_body(mask, spacing_mm=(1.0, 1.0, 1.0), ap_axis=1, si_axis=2)
+        body_mask = np.asarray(result["body_mask"], dtype=bool)
+        occupied_ap = np.where(body_mask.any(axis=(0, 2)))[0]
+
+        self.assertLessEqual(int(occupied_ap[-1]), 11)
 
     def test_estimate_heights_detects_wedge_with_explicit_axes(self):
         ap_len = 14
