@@ -14,7 +14,7 @@
         ]
       },
       "execution": {
-        "max_parallel_jobs": 3
+        "max_parallel_jobs": 4
       },
       "jobs": [
         {
