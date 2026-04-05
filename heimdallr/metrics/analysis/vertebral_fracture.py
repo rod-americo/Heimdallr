@@ -44,6 +44,14 @@ DEFAULT_CORE_RADIUS_MM = 2.5
 DEFAULT_RESTORE_RADIUS_MM = 1.5
 DEFAULT_EDGE_FRACTION = 0.18
 DEFAULT_SMOOTHING_WINDOW = 3
+VERTEBRA_LEVELS = tuple(
+    [
+        *(f"C{i}" for i in range(1, 8)),
+        *(f"T{i}" for i in range(1, 13)),
+        *(f"L{i}" for i in range(1, 6)),
+        *(f"S{i}" for i in range(1, 5)),
+    ]
+)
 
 
 def _normalize_spacing(spacing_mm: Any) -> tuple[float, float, float]:
@@ -104,6 +112,16 @@ def _moving_average(values: np.ndarray, window: int) -> np.ndarray:
 
 def _clamp01(value: float) -> float:
     return float(min(1.0, max(0.0, value)))
+
+
+def vertebra_level_index(level: str | None) -> int | None:
+    normalized = str(level or "").strip().upper()
+    if not normalized:
+        return None
+    try:
+        return VERTEBRA_LEVELS.index(normalized)
+    except ValueError:
+        return None
 
 
 def _infer_axes(mask: np.ndarray, ap_axis: int | None = None, si_axis: int | None = None) -> dict[str, Any]:
@@ -323,6 +341,9 @@ def estimate_vertebral_heights(
             "anterior_height_mm": None,
             "middle_height_mm": None,
             "posterior_height_mm": None,
+            "anterior_area_voxels": None,
+            "middle_area_voxels": None,
+            "posterior_area_voxels": None,
             "anterior_posterior_ratio": None,
             "middle_posterior_ratio": None,
             "anterior_middle_ratio": None,
@@ -377,6 +398,9 @@ def estimate_vertebral_heights(
     anterior_height = _window_median(height_profile_mm, int(np.median(anterior_indices)) if anterior_indices.size else 0, edge_width)
     middle_height = _window_median(height_profile_mm, int(np.median(middle_indices)) if middle_indices.size else ap_len // 2, edge_width)
     posterior_height = _window_median(height_profile_mm, int(np.median(posterior_indices)) if posterior_indices.size else ap_len - 1, edge_width)
+    anterior_area = _window_median(area_profile_vox, int(np.median(anterior_indices)) if anterior_indices.size else 0, edge_width)
+    middle_area = _window_median(area_profile_vox, int(np.median(middle_indices)) if middle_indices.size else ap_len // 2, edge_width)
+    posterior_area = _window_median(area_profile_vox, int(np.median(posterior_indices)) if posterior_indices.size else ap_len - 1, edge_width)
 
     ap_indices = np.where(reoriented.any(axis=(1, 2)))[0]
     if ap_indices.size > 0:
@@ -418,6 +442,9 @@ def estimate_vertebral_heights(
         "anterior_height_mm": float(anterior_height) if np.isfinite(anterior_height) else None,
         "middle_height_mm": float(middle_height) if np.isfinite(middle_height) else None,
         "posterior_height_mm": float(posterior_height) if np.isfinite(posterior_height) else None,
+        "anterior_area_voxels": float(anterior_area) if np.isfinite(anterior_area) else None,
+        "middle_area_voxels": float(middle_area) if np.isfinite(middle_area) else None,
+        "posterior_area_voxels": float(posterior_area) if np.isfinite(posterior_area) else None,
         "anterior_posterior_ratio": anterior_posterior_ratio,
         "middle_posterior_ratio": middle_posterior_ratio,
         "anterior_middle_ratio": anterior_middle_ratio,
@@ -433,22 +460,19 @@ def classify_fracture_pattern(
     crush_depth_ratio_threshold: float = 0.55,
 ) -> dict[str, Any]:
     """
-    Convert vertebral morphometry into a conservative triage label.
-
-    The output uses neutral language:
-    - suspected_wedge
-    - suspected_biconcave
-    - suspected_crush
-    - no_suspicion
-    - indeterminate
+    Convert vertebral morphometry into a Genant semi-quantitative grade.
     """
 
     qc_flags = list(height_result.get("qc_flags", []))
     anterior = height_result.get("anterior_height_mm")
     middle = height_result.get("middle_height_mm")
     posterior = height_result.get("posterior_height_mm")
+    anterior_area = height_result.get("anterior_area_voxels")
+    middle_area = height_result.get("middle_area_voxels")
+    posterior_area = height_result.get("posterior_area_voxels")
     ap_depth_mm = height_result.get("ap_depth_mm")
     orientation_confidence = float(height_result.get("orientation_confidence") or 0.0)
+    severity_by_grade = {0: "none", 1: "mild", 2: "moderate", 3: "severe"}
 
     if any(value is None for value in (anterior, middle, posterior)):
         qc_flags.append("missing_height_measurement")
@@ -456,12 +480,18 @@ def classify_fracture_pattern(
             "screen_status": "indeterminate",
             "screen_label": "indeterminate",
             "screen_confidence": 0.0,
+            "genant_grade": None,
+            "genant_label": "indeterminate",
+            "severity": "indeterminate",
             "suspected_pattern": None,
             "ratios": {
                 "anterior_posterior_ratio": height_result.get("anterior_posterior_ratio"),
                 "middle_posterior_ratio": height_result.get("middle_posterior_ratio"),
                 "anterior_middle_ratio": height_result.get("anterior_middle_ratio"),
                 "height_uniformity_ratio": height_result.get("height_uniformity_ratio"),
+                "height_loss_ratio_percent": None,
+                "posterior_height_loss_ratio_percent": None,
+                "area_loss_ratio_percent": None,
             },
             "qc_flags": qc_flags,
         }
@@ -470,70 +500,346 @@ def classify_fracture_pattern(
     middle = float(middle)
     posterior = float(posterior)
     ap_depth_mm = float(ap_depth_mm or 0.0)
+    area_values = [
+        float(value)
+        for value in (anterior_area, middle_area, posterior_area)
+        if value is not None
+    ]
+    height_values = [anterior, middle, posterior]
+    lowest_height = float(min(height_values))
+    highest_height = float(max(height_values))
+    reference_height = float(max(highest_height, posterior))
+    posterior_height_loss = float((1.0 - (lowest_height / posterior)) * 100.0) if posterior > 0 else None
+    height_loss_percent = float((1.0 - (lowest_height / reference_height)) * 100.0) if reference_height > 0 else None
+    height_depth_ratio = float(highest_height / ap_depth_mm) if ap_depth_mm > 0 else None
+
+    lowest_area = float(min(area_values)) if area_values else None
+    reference_area = float(max(area_values)) if area_values else None
+    area_loss_percent = (
+        float((1.0 - (lowest_area / reference_area)) * 100.0)
+        if lowest_area is not None and reference_area is not None and reference_area > 0
+        else None
+    )
 
     ratios = {
         "anterior_posterior_ratio": float(anterior / posterior) if posterior > 0 else None,
         "middle_posterior_ratio": float(middle / posterior) if posterior > 0 else None,
         "anterior_middle_ratio": float(anterior / middle) if middle > 0 else None,
         "height_uniformity_ratio": float(min(anterior, middle, posterior) / max(anterior, middle, posterior)) if max(anterior, middle, posterior) > 0 else None,
+        "lowest_height_mm": lowest_height,
+        "reference_height_mm": reference_height,
+        "posterior_height_reference_mm": posterior,
+        "height_loss_ratio_percent": height_loss_percent,
+        "posterior_height_loss_ratio_percent": posterior_height_loss,
+        "height_depth_ratio": height_depth_ratio,
+        "lowest_area_voxels": lowest_area,
+        "reference_area_voxels": reference_area,
+        "area_loss_ratio_percent": area_loss_percent,
     }
 
     label = "indeterminate"
+    genant_grade = None
+    severity = "indeterminate"
     suspected_pattern = None
     confidence = 0.0
 
-    if ratios["anterior_posterior_ratio"] is not None and ratios["middle_posterior_ratio"] is not None:
-        if ratios["anterior_posterior_ratio"] <= wedge_threshold and ratios["middle_posterior_ratio"] >= wedge_threshold:
-            label = "suspected_wedge"
-            suspected_pattern = "wedge"
-            confidence = _clamp01((wedge_threshold - ratios["anterior_posterior_ratio"]) / max(wedge_threshold, 1e-6))
-            confidence = max(confidence, _clamp01((ratios["middle_posterior_ratio"] - wedge_threshold) / max(1.0 - wedge_threshold, 1e-6)))
-        elif (
-            min(anterior, posterior) > 0
-            and middle <= biconcave_threshold * min(anterior, posterior)
-            and abs(anterior - posterior) / max(anterior, posterior) <= 0.15
-        ):
-            label = "suspected_biconcave"
-            suspected_pattern = "biconcave"
-            confidence = _clamp01((biconcave_threshold * min(anterior, posterior) - middle) / max(max(anterior, posterior), 1.0))
-        elif ap_depth_mm > 0 and (max(anterior, middle, posterior) / ap_depth_mm) <= crush_depth_ratio_threshold:
-            label = "suspected_crush"
-            suspected_pattern = "crush"
-            confidence = _clamp01((crush_depth_ratio_threshold - (max(anterior, middle, posterior) / ap_depth_mm)) / crush_depth_ratio_threshold)
+    if height_loss_percent is not None:
+        if height_loss_percent > 40.0:
+            genant_grade = 3
+        elif height_loss_percent >= 25.0:
+            genant_grade = 2
+        elif height_loss_percent >= 20.0:
+            genant_grade = 1
+        else:
+            genant_grade = 0
+
+        label = f"grade_{genant_grade}"
+        severity = severity_by_grade[genant_grade]
+        if genant_grade >= 1:
+            confidence = _clamp01(height_loss_percent / 100.0)
+
+        if genant_grade >= 1:
+            if (
+                ratios["anterior_posterior_ratio"] is not None
+                and ratios["middle_posterior_ratio"] is not None
+                and ratios["anterior_posterior_ratio"] <= wedge_threshold
+                and ratios["middle_posterior_ratio"] >= min(0.98, wedge_threshold + 0.05)
+            ):
+                suspected_pattern = "wedge"
+            elif (
+                min(anterior, posterior) > 0
+                and middle <= biconcave_threshold * min(anterior, posterior)
+                and abs(anterior - posterior) / max(anterior, posterior) <= 0.15
+            ):
+                suspected_pattern = "biconcave"
+            elif height_depth_ratio is not None and height_depth_ratio <= crush_depth_ratio_threshold:
+                suspected_pattern = "crush"
+            else:
+                lowest_height_name = min(
+                    (
+                        ("anterior", anterior),
+                        ("middle", middle),
+                        ("posterior", posterior),
+                    ),
+                    key=lambda item: item[1],
+                )[0]
+                if lowest_height_name == "anterior":
+                    suspected_pattern = "wedge"
+                elif lowest_height_name == "middle":
+                    suspected_pattern = "biconcave"
+                elif height_depth_ratio is not None and height_depth_ratio <= (crush_depth_ratio_threshold + 0.10):
+                    suspected_pattern = "crush"
 
     if orientation_confidence < 0.2:
         qc_flags.append("orientation_ambiguous")
         confidence = min(confidence, 0.65)
 
-    if label == "indeterminate":
+    if genant_grade is None:
         if qc_flags:
-            qc_flags.append("no_qualifying_fracture_pattern")
+            qc_flags.append("genant_grade_unavailable")
             return {
                 "screen_status": "indeterminate",
                 "screen_label": "indeterminate",
                 "screen_confidence": 0.0,
+                "genant_grade": None,
+                "genant_label": "indeterminate",
+                "severity": "indeterminate",
                 "suspected_pattern": None,
                 "ratios": ratios,
                 "qc_flags": qc_flags,
             }
-        qc_flags.append("no_qualifying_fracture_pattern")
+        qc_flags.append("genant_grade_unavailable")
         return {
-            "screen_status": "no_suspicion",
-            "screen_label": "no_suspicion",
+            "screen_status": "indeterminate",
+            "screen_label": "indeterminate",
             "screen_confidence": 0.0,
+            "genant_grade": None,
+            "genant_label": "indeterminate",
+            "severity": "indeterminate",
             "suspected_pattern": None,
             "ratios": ratios,
             "qc_flags": qc_flags,
         }
 
+    if genant_grade == 0:
+        qc_flags.append("no_qualifying_genant_deformity")
+
     return {
-        "screen_status": "suspected" if suspected_pattern else "indeterminate",
+        "screen_status": "suspected" if genant_grade >= 1 else "no_suspicion",
         "screen_label": label,
         "screen_confidence": float(confidence),
+        "genant_grade": genant_grade,
+        "genant_label": label,
+        "severity": severity,
         "suspected_pattern": suspected_pattern,
         "ratios": ratios,
         "qc_flags": qc_flags,
     }
+
+
+def _severity_from_genant_grade(genant_grade: int | None) -> str:
+    if genant_grade is None:
+        return "indeterminate"
+    if genant_grade <= 0:
+        return "none"
+    if genant_grade == 1:
+        return "mild"
+    if genant_grade == 2:
+        return "moderate"
+    return "severe"
+
+
+def _select_height_key_from_summary(summary: dict[str, Any]) -> str | None:
+    morphometry = summary.get("morphometry", {}) if isinstance(summary.get("morphometry"), dict) else {}
+    components = {
+        "anterior_height_mm": morphometry.get("anterior_height_mm"),
+        "middle_height_mm": morphometry.get("middle_height_mm"),
+        "posterior_height_mm": morphometry.get("posterior_height_mm"),
+    }
+    pattern = str(summary.get("suspected_pattern") or "").strip().lower()
+    if pattern == "wedge" and components["anterior_height_mm"] is not None:
+        return "anterior_height_mm"
+    if pattern == "biconcave" and components["middle_height_mm"] is not None:
+        return "middle_height_mm"
+
+    finite_components = [(key, float(value)) for key, value in components.items() if value is not None]
+    if not finite_components:
+        return None
+    return min(finite_components, key=lambda item: item[1])[0]
+
+
+def _nearest_adjacent_levels(level: str, available_levels: list[str]) -> list[str]:
+    target_index = vertebra_level_index(level)
+    if target_index is None:
+        return []
+
+    indexed_levels = sorted(
+        ((candidate, vertebra_level_index(candidate)) for candidate in available_levels),
+        key=lambda item: (-1 if item[1] is None else item[1]),
+    )
+    lower: str | None = None
+    upper: str | None = None
+    for candidate, candidate_index in indexed_levels:
+        if candidate_index is None or candidate == level:
+            continue
+        if candidate_index < target_index:
+            lower = candidate
+        elif candidate_index > target_index and upper is None:
+            upper = candidate
+            break
+    adjacent = []
+    if lower is not None:
+        adjacent.append(lower)
+    if upper is not None:
+        adjacent.append(upper)
+    return adjacent
+
+
+def refine_classification_with_adjacent_reference(
+    per_vertebra: dict[str, dict[str, Any]],
+    *,
+    pathologic_threshold_percent: float = 20.0,
+) -> dict[str, dict[str, Any]]:
+    """
+    Reclassify vertebrae using adjacent vertebral heights as the primary reference.
+
+    The per-vertebra summaries are expected to contain:
+    - `morphometry.anterior_height_mm`, `middle_height_mm`, `posterior_height_mm`
+    - provisional `screen_label` / `genant_grade`
+    - optional `suspected_pattern`
+    """
+
+    available_levels = [
+        level
+        for level, summary in per_vertebra.items()
+        if isinstance(summary, dict) and isinstance(summary.get("morphometry"), dict)
+    ]
+    refined: dict[str, dict[str, Any]] = {}
+
+    for level, summary in per_vertebra.items():
+        if not isinstance(summary, dict):
+            refined[level] = summary
+            continue
+
+        morphometry = summary.get("morphometry", {}) if isinstance(summary.get("morphometry"), dict) else {}
+        qc_flags = list(summary.get("qc_flags", []))
+        ratios = dict(summary.get("ratios", {})) if isinstance(summary.get("ratios"), dict) else {}
+        height_key = _select_height_key_from_summary(summary)
+        if height_key is None:
+            qc_flags.append("adjacent_reference_target_height_unavailable")
+            updated = dict(summary)
+            updated["qc_flags"] = sorted(set(qc_flags))
+            refined[level] = updated
+            continue
+
+        target_height = morphometry.get(height_key)
+        if target_height is None:
+            qc_flags.append("adjacent_reference_target_height_unavailable")
+            updated = dict(summary)
+            updated["qc_flags"] = sorted(set(qc_flags))
+            refined[level] = updated
+            continue
+
+        adjacent_levels = _nearest_adjacent_levels(level, available_levels)
+        normal_reference_levels = []
+        fallback_reference_levels = []
+        for candidate in adjacent_levels:
+            candidate_summary = per_vertebra.get(candidate, {})
+            candidate_morphometry = (
+                candidate_summary.get("morphometry", {})
+                if isinstance(candidate_summary.get("morphometry"), dict)
+                else {}
+            )
+            candidate_height = candidate_morphometry.get(height_key)
+            if candidate_height is None:
+                continue
+            if candidate_summary.get("genant_grade") == 0:
+                normal_reference_levels.append(candidate)
+            else:
+                fallback_reference_levels.append(candidate)
+
+        reference_levels = normal_reference_levels or fallback_reference_levels
+        reference_heights = []
+        for candidate in reference_levels:
+            candidate_summary = per_vertebra.get(candidate, {})
+            candidate_morphometry = (
+                candidate_summary.get("morphometry", {})
+                if isinstance(candidate_summary.get("morphometry"), dict)
+                else {}
+            )
+            candidate_height = candidate_morphometry.get(height_key)
+            if candidate_height is not None:
+                reference_heights.append(float(candidate_height))
+
+        updated = dict(summary)
+        if "height_loss_ratio_percent" in ratios:
+            ratios["intra_vertebral_height_loss_ratio_percent"] = ratios.get("height_loss_ratio_percent")
+
+        ratios["reference_height_key"] = height_key
+        ratios["adjacent_reference_levels"] = reference_levels
+
+        if not reference_heights:
+            qc_flags.append("adjacent_reference_unavailable")
+            updated["status"] = "indeterminate"
+            updated["screen_label"] = "indeterminate"
+            updated["genant_label"] = "indeterminate"
+            updated["genant_grade"] = None
+            updated["severity"] = "indeterminate"
+            updated["screen_confidence"] = 0.0
+            ratios["adjacent_reference_height_mm"] = None
+            ratios["adjacent_target_height_mm"] = float(target_height)
+            ratios["height_loss_ratio_percent"] = None
+            updated["ratios"] = ratios
+            updated["qc_flags"] = sorted(set(qc_flags))
+            refined[level] = updated
+            continue
+
+        if not normal_reference_levels:
+            qc_flags.append("adjacent_reference_not_normal")
+
+        reference_height = float(np.median(np.asarray(reference_heights, dtype=np.float64)))
+        height_loss_percent = (
+            float((1.0 - (float(target_height) / reference_height)) * 100.0)
+            if reference_height > 0
+            else None
+        )
+        ratios["adjacent_reference_height_mm"] = reference_height
+        ratios["adjacent_target_height_mm"] = float(target_height)
+        ratios["height_loss_ratio_percent"] = height_loss_percent
+
+        if height_loss_percent is None:
+            qc_flags.append("adjacent_reference_invalid")
+            updated["status"] = "indeterminate"
+            updated["screen_label"] = "indeterminate"
+            updated["genant_label"] = "indeterminate"
+            updated["genant_grade"] = None
+            updated["severity"] = "indeterminate"
+            updated["screen_confidence"] = 0.0
+            updated["ratios"] = ratios
+            updated["qc_flags"] = sorted(set(qc_flags))
+            refined[level] = updated
+            continue
+
+        if height_loss_percent > 40.0:
+            genant_grade = 3
+        elif height_loss_percent >= 25.0:
+            genant_grade = 2
+        elif height_loss_percent >= pathologic_threshold_percent:
+            genant_grade = 1
+        else:
+            genant_grade = 0
+
+        updated["status"] = "suspected" if genant_grade >= 1 else "no_suspicion"
+        updated["screen_label"] = f"grade_{genant_grade}"
+        updated["genant_label"] = f"grade_{genant_grade}"
+        updated["genant_grade"] = genant_grade
+        updated["severity"] = _severity_from_genant_grade(genant_grade)
+        updated["screen_confidence"] = _clamp01((height_loss_percent / 100.0) + (0.1 * max(0, len(normal_reference_levels) - 1)))
+        updated["ratios"] = ratios
+        updated["qc_flags"] = sorted(set(qc_flags))
+        refined[level] = updated
+
+    return refined
 
 
 def screen_vertebral_fracture(
@@ -579,6 +885,9 @@ def screen_vertebral_fracture(
         "status": classification["screen_status"],
         "screen_label": classification["screen_label"],
         "screen_confidence": classification["screen_confidence"],
+        "genant_grade": classification["genant_grade"],
+        "genant_label": classification["genant_label"],
+        "severity": classification["severity"],
         "suspected_pattern": classification["suspected_pattern"],
         "body_isolation": {
             "original_voxels": body_result["original_voxels"],
@@ -596,6 +905,9 @@ def screen_vertebral_fracture(
             "anterior_height_mm": height_result["anterior_height_mm"],
             "middle_height_mm": height_result["middle_height_mm"],
             "posterior_height_mm": height_result["posterior_height_mm"],
+            "anterior_area_voxels": height_result["anterior_area_voxels"],
+            "middle_area_voxels": height_result["middle_area_voxels"],
+            "posterior_area_voxels": height_result["posterior_area_voxels"],
             "height_profile_mm": height_result["height_profile_mm"],
             "area_profile_voxels": height_result["area_profile_voxels"],
         },

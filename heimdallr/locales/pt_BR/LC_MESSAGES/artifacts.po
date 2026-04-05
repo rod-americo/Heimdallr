@@ -81,11 +81,20 @@ msgstr "Status: {value}"
 msgid "vertebral_fracture.overlay.panel.label"
 msgstr "Rótulo: {value}"
 
+msgid "vertebral_fracture.overlay.panel.height_loss"
+msgstr "Perda de altura: {value}%"
+
 msgid "vertebral_fracture.overlay.panel.pattern"
 msgstr "Padrão: {value}"
 
 msgid "vertebral_fracture.overlay.panel.severity"
 msgstr "Severidade: {value}"
+
+msgid "vertebral_fracture.overlay.annotation"
+msgstr "{vertebra}: {grade} ({value}%)"
+
+msgid "vertebral_fracture.overlay.annotation_no_loss"
+msgstr "{vertebra}: {grade}"
 
 msgid "vertebral_fracture.overlay.status_value.suspected"
 msgstr "Suspeita"
@@ -96,14 +105,17 @@ msgstr "Sem suspeita"
 msgid "vertebral_fracture.overlay.status_value.indeterminate"
 msgstr "Indeterminado"
 
-msgid "vertebral_fracture.overlay.label_value.suspected_wedge"
-msgstr "Suspeita de cunha"
+msgid "vertebral_fracture.overlay.label_value.grade_0"
+msgstr "Grau 0"
 
-msgid "vertebral_fracture.overlay.label_value.suspected_biconcave"
-msgstr "Suspeita de biconcavidade"
+msgid "vertebral_fracture.overlay.label_value.grade_1"
+msgstr "Grau 1"
 
-msgid "vertebral_fracture.overlay.label_value.suspected_crush"
-msgstr "Suspeita de colapso"
+msgid "vertebral_fracture.overlay.label_value.grade_2"
+msgstr "Grau 2"
+
+msgid "vertebral_fracture.overlay.label_value.grade_3"
+msgstr "Grau 3"
 
 msgid "vertebral_fracture.overlay.label_value.no_suspicion"
 msgstr "Sem suspeita"

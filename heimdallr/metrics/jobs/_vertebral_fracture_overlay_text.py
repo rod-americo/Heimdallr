@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from heimdallr.shared import settings
-from heimdallr.shared.i18n import normalize_locale, translate
+from heimdallr.shared.i18n import format_decimal, normalize_locale, translate
 
 
 def resolve_artifact_locale(job_config: dict) -> str:
@@ -36,7 +36,7 @@ def translate_severity(value: str | None, *, locale: str) -> str:
 
 def build_panel_lines(summary: dict, *, locale: str) -> list[str]:
     """Build localized summary lines for a vertebra panel."""
-    return [
+    lines = [
         translate(
             "vertebral_fracture.overlay.panel.status",
             locale=locale,
@@ -59,10 +59,45 @@ def build_panel_lines(summary: dict, *, locale: str) -> list[str]:
         ),
     ]
 
+    ratios = summary.get("ratios", {}) if isinstance(summary.get("ratios"), dict) else {}
+    height_loss_percent = ratios.get("height_loss_ratio_percent")
+    if height_loss_percent is not None:
+        lines.insert(
+            2,
+            translate(
+                "vertebral_fracture.overlay.panel.height_loss",
+                locale=locale,
+                value=format_decimal(float(height_loss_percent), 1, locale=locale),
+            ),
+        )
+
+    return lines
+
 
 def build_panel_title(vertebra: str, *, locale: str) -> str:
     """Build a localized panel title."""
     return translate("vertebral_fracture.overlay.panel.title", locale=locale, vertebra=vertebra)
+
+
+def build_pathology_label(vertebra: str, summary: dict, *, locale: str) -> str:
+    """Build a concise per-vertebra annotation label for the sagittal overlay."""
+    ratios = summary.get("ratios", {}) if isinstance(summary.get("ratios"), dict) else {}
+    height_loss_percent = ratios.get("height_loss_ratio_percent")
+    if height_loss_percent is not None:
+        height_loss_text = format_decimal(float(height_loss_percent), 1, locale=locale)
+        return translate(
+            "vertebral_fracture.overlay.annotation",
+            locale=locale,
+            vertebra=vertebra,
+            grade=translate_label(summary.get("screen_label"), locale=locale),
+            value=height_loss_text,
+        )
+    return translate(
+        "vertebral_fracture.overlay.annotation_no_loss",
+        locale=locale,
+        vertebra=vertebra,
+        grade=translate_label(summary.get("screen_label"), locale=locale),
+    )
 
 
 def build_overlay_title(*, locale: str) -> str:

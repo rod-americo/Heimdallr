@@ -5,8 +5,10 @@ import numpy as np
 from heimdallr.metrics.analysis.vertebral_fracture import (
     classify_fracture_pattern,
     isolate_vertebral_body,
+    refine_classification_with_adjacent_reference,
     screen_vertebral_fracture,
     estimate_vertebral_heights,
+    vertebra_level_index,
 )
 
 
@@ -35,6 +37,70 @@ def make_profiled_vertebra(
 
 
 class TestVertebralFractureHelpers(unittest.TestCase):
+    def test_vertebra_level_index_supports_cervical_to_sacral_levels(self):
+        self.assertLess(vertebra_level_index("C7"), vertebra_level_index("T1"))
+        self.assertLess(vertebra_level_index("T12"), vertebra_level_index("L1"))
+        self.assertLess(vertebra_level_index("L5"), vertebra_level_index("S1"))
+        self.assertLess(vertebra_level_index("S3"), vertebra_level_index("S4"))
+
+    def test_refine_classification_uses_adjacent_normal_vertebrae(self):
+        refined = refine_classification_with_adjacent_reference(
+            {
+                "T12": {
+                    "status": "no_suspicion",
+                    "screen_label": "grade_0",
+                    "genant_label": "grade_0",
+                    "genant_grade": 0,
+                    "severity": "none",
+                    "suspected_pattern": None,
+                    "morphometry": {
+                        "anterior_height_mm": 20.0,
+                        "middle_height_mm": 20.0,
+                        "posterior_height_mm": 20.0,
+                    },
+                    "ratios": {},
+                    "qc_flags": [],
+                },
+                "L1": {
+                    "status": "no_suspicion",
+                    "screen_label": "grade_0",
+                    "genant_label": "grade_0",
+                    "genant_grade": 0,
+                    "severity": "none",
+                    "suspected_pattern": "wedge",
+                    "morphometry": {
+                        "anterior_height_mm": 15.0,
+                        "middle_height_mm": 18.0,
+                        "posterior_height_mm": 20.0,
+                    },
+                    "ratios": {"height_loss_ratio_percent": 25.0},
+                    "qc_flags": [],
+                },
+                "L2": {
+                    "status": "no_suspicion",
+                    "screen_label": "grade_0",
+                    "genant_label": "grade_0",
+                    "genant_grade": 0,
+                    "severity": "none",
+                    "suspected_pattern": None,
+                    "morphometry": {
+                        "anterior_height_mm": 20.0,
+                        "middle_height_mm": 20.0,
+                        "posterior_height_mm": 20.0,
+                    },
+                    "ratios": {},
+                    "qc_flags": [],
+                },
+            }
+        )
+
+        self.assertEqual(refined["L1"]["status"], "suspected")
+        self.assertEqual(refined["L1"]["genant_grade"], 2)
+        self.assertEqual(refined["L1"]["screen_label"], "grade_2")
+        self.assertAlmostEqual(refined["L1"]["ratios"]["adjacent_reference_height_mm"], 20.0)
+        self.assertAlmostEqual(refined["L1"]["ratios"]["height_loss_ratio_percent"], 25.0)
+        self.assertEqual(refined["L1"]["ratios"]["adjacent_reference_levels"], ["T12", "L2"])
+
     def test_isolate_vertebral_body_removes_thin_appendage(self):
         mask = np.zeros((20, 16, 24), dtype=bool)
         mask[4:14, 3:13, 5:19] = True
@@ -60,7 +126,9 @@ class TestVertebralFractureHelpers(unittest.TestCase):
         self.assertGreater(result["posterior_height_mm"], 0)
 
         classification = classify_fracture_pattern(result)
-        self.assertEqual(classification["screen_label"], "suspected_wedge")
+        self.assertEqual(classification["screen_label"], "grade_3")
+        self.assertEqual(classification["genant_grade"], 3)
+        self.assertEqual(classification["severity"], "severe")
         self.assertEqual(classification["suspected_pattern"], "wedge")
 
     def test_classify_fracture_pattern_covers_biconcave_and_crush(self):
@@ -74,20 +142,24 @@ class TestVertebralFractureHelpers(unittest.TestCase):
                 "qc_flags": [],
             }
         )
-        self.assertEqual(biconcave["screen_label"], "suspected_biconcave")
+        self.assertEqual(biconcave["screen_label"], "grade_2")
+        self.assertEqual(biconcave["genant_grade"], 2)
+        self.assertEqual(biconcave["severity"], "moderate")
         self.assertEqual(biconcave["suspected_pattern"], "biconcave")
 
         crush = classify_fracture_pattern(
             {
                 "anterior_height_mm": 8.0,
-                "middle_height_mm": 7.0,
-                "posterior_height_mm": 8.5,
+                "middle_height_mm": 8.5,
+                "posterior_height_mm": 10.5,
                 "ap_depth_mm": 20.0,
                 "orientation_confidence": 0.9,
                 "qc_flags": [],
             }
         )
-        self.assertEqual(crush["screen_label"], "suspected_crush")
+        self.assertEqual(crush["screen_label"], "grade_1")
+        self.assertEqual(crush["genant_grade"], 1)
+        self.assertEqual(crush["severity"], "mild")
         self.assertEqual(crush["suspected_pattern"], "crush")
 
     def test_screen_vertebral_fracture_returns_indeterminate_for_empty_mask(self):
@@ -106,9 +178,11 @@ class TestVertebralFractureHelpers(unittest.TestCase):
         result = screen_vertebral_fracture(mask, spacing_mm=(1.0, 1.0, 1.0))
 
         self.assertEqual(result["status"], "no_suspicion")
-        self.assertEqual(result["screen_label"], "no_suspicion")
+        self.assertEqual(result["screen_label"], "grade_0")
+        self.assertEqual(result["genant_grade"], 0)
+        self.assertEqual(result["severity"], "none")
         self.assertIsNone(result["suspected_pattern"])
-        self.assertIn("no_qualifying_fracture_pattern", result["qc_flags"])
+        self.assertIn("no_qualifying_genant_deformity", result["qc_flags"])
 
     def test_screen_vertebral_fracture_full_pipeline(self):
         ap_len = 16
@@ -119,7 +193,9 @@ class TestVertebralFractureHelpers(unittest.TestCase):
         result = screen_vertebral_fracture(mask, spacing_mm=(1.0, 1.0, 1.0))
 
         self.assertEqual(result["job_name"], "vertebral_fracture_screen")
-        self.assertEqual(result["screen_label"], "suspected_wedge")
+        self.assertEqual(result["screen_label"], "grade_3")
+        self.assertEqual(result["genant_grade"], 3)
+        self.assertEqual(result["severity"], "severe")
         self.assertEqual(result["suspected_pattern"], "wedge")
         self.assertGreater(result["screen_confidence"], 0.0)
         self.assertGreater(result["morphometry"]["posterior_height_mm"], result["morphometry"]["anterior_height_mm"])
