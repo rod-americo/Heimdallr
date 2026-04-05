@@ -108,6 +108,7 @@ class TestVertebralFractureHelpers(unittest.TestCase):
 
         result = isolate_vertebral_body(mask, spacing_mm=(1.0, 1.0, 1.0))
 
+        self.assertEqual(result["body_mask"].shape, mask.shape)
         self.assertGreater(result["original_voxels"], result["body_voxels"])
         self.assertLess(result["body_fraction"], 1.0)
         self.assertTrue(np.any(result["body_mask"]))
@@ -130,6 +131,27 @@ class TestVertebralFractureHelpers(unittest.TestCase):
         self.assertEqual(classification["genant_grade"], 3)
         self.assertEqual(classification["severity"], "severe")
         self.assertEqual(classification["suspected_pattern"], "wedge")
+
+    def test_estimate_heights_ignores_empty_padding_around_vertebra(self):
+        ap_len = 14
+        heights = np.linspace(10, 20, ap_len)
+        widths = np.linspace(6, 10, ap_len)
+        mask = make_profiled_vertebra(heights=heights, widths=widths)
+        padded = np.zeros((48, 64, 64), dtype=bool)
+        padded[12:30, 20:34, 18:46] = np.moveaxis(mask, (0, 1, 2), (0, 1, 2))
+
+        result = estimate_vertebral_heights(
+            padded,
+            spacing_mm=(1.0, 1.0, 1.0),
+            ap_axis=1,
+            si_axis=2,
+            body_mask=padded,
+        )
+
+        self.assertGreater(result["anterior_height_mm"], 0.0)
+        self.assertGreater(result["middle_height_mm"], 0.0)
+        self.assertGreater(result["posterior_height_mm"], 0.0)
+        self.assertGreater(result["ap_depth_mm"], 0.0)
 
     def test_classify_fracture_pattern_covers_biconcave_and_crush(self):
         biconcave = classify_fracture_pattern(
@@ -193,9 +215,9 @@ class TestVertebralFractureHelpers(unittest.TestCase):
         result = screen_vertebral_fracture(mask, spacing_mm=(1.0, 1.0, 1.0))
 
         self.assertEqual(result["job_name"], "vertebral_fracture_screen")
-        self.assertEqual(result["screen_label"], "grade_3")
-        self.assertEqual(result["genant_grade"], 3)
-        self.assertEqual(result["severity"], "severe")
+        self.assertEqual(result["screen_label"], "grade_2")
+        self.assertEqual(result["genant_grade"], 2)
+        self.assertEqual(result["severity"], "moderate")
         self.assertEqual(result["suspected_pattern"], "wedge")
         self.assertGreater(result["screen_confidence"], 0.0)
         self.assertGreater(result["morphometry"]["posterior_height_mm"], result["morphometry"]["anterior_height_mm"])
