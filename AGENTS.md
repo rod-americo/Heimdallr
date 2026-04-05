@@ -41,6 +41,7 @@ Format: `type(scope): summary`
 ## 4. Directory Handling
 *   **Root Cleanliness**: The ecosystem is polished with community standards residing in `.github` (CODEOWNERS, CONTRIBUTING, SECURITY).
 *   Do not recreate transient traces like `.tmp`, `.pycache_local` or loose queue folders in the root (e.g., `/output/`, `/data/`). Auto-generated folders must be properly silenced in `.gitignore`.
+*   **Metrics Pipeline Contract**: `config/metrics_pipeline.json` is a host-local operational file and must stay ignored. The repository-tracked template is `config/metrics_pipeline.example.json`, and every new metrics module added to the pipeline must update this example in the same change.
 
 ## 5. Temporary Git Workflow
 

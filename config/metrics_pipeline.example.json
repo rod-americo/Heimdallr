@@ -1,0 +1,80 @@
+{
+  "_documentation": {
+    "job_resolution": "When jobs[].module is omitted, Heimdallr resolves jobs[].name to heimdallr.metrics.jobs.<name>.",
+    "job_addition": "To add a new job, create the module under heimdallr/metrics/jobs/ and declare it in jobs[]. Use jobs[].module only for non-conventional names inside heimdallr.metrics.jobs.",
+    "parallel_execution": "Profiles may set execution.max_parallel_jobs. Jobs may declare needs to wait for prerequisite job names while still allowing independent jobs to run in parallel."
+  },
+  "default_profile": "ct_native_basic_metrics",
+  "profiles": {
+    "ct_native_basic_metrics": {
+      "required": {
+        "modality": "CT",
+        "selected_phase": [
+          "native"
+        ]
+      },
+      "execution": {
+        "max_parallel_jobs": 4
+      },
+      "jobs": [
+        {
+          "name": "l3_muscle_area",
+          "enabled": true,
+          "generate_overlay": true,
+          "emit_secondary_capture_dicom": true
+        },
+        {
+          "name": "parenchymal_organ_volumetry",
+          "enabled": true,
+          "generate_overlay": true,
+          "emit_secondary_capture_dicom": true
+        },
+        {
+          "name": "bone_health_l1_hu",
+          "enabled": true,
+          "generate_overlay": true,
+          "strict_qc": false
+        },
+        {
+          "name": "bone_health_l1_volumetric",
+          "enabled": false,
+          "generate_overlay": true,
+          "strict_qc": false,
+          "erosion_mm": 5.0
+        },
+        {
+          "name": "vertebral_fracture_screen",
+          "enabled": false,
+          "generate_overlay": true,
+          "vertebrae": [
+            "T12",
+            "L1",
+            "L2"
+          ],
+          "asymmetry_threshold": 0.8
+        },
+        {
+          "name": "opportunistic_osteoporosis_composite",
+          "enabled": false,
+          "needs": [
+            "bone_health_l1_hu",
+            "bone_health_l1_volumetric",
+            "vertebral_fracture_screen"
+          ]
+        },
+        {
+          "name": "body_fat_abdominal_volumes",
+          "enabled": false,
+          "generate_overlay": true,
+          "emit_secondary_capture_dicom": false
+        },
+        {
+          "name": "body_fat_l3_slice",
+          "enabled": false,
+          "generate_overlay": true,
+          "emit_secondary_capture_dicom": false
+        }
+      ]
+    }
+  }
+}
