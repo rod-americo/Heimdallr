@@ -1,7 +1,8 @@
 {
   "_documentation": {
     "job_resolution": "When jobs[].module is omitted, Heimdallr resolves jobs[].name to heimdallr.metrics.jobs.<name>.",
-    "job_addition": "To add a new job, create the module under heimdallr/metrics/jobs/ and declare it in jobs[]. Use jobs[].module only for non-conventional names inside heimdallr.metrics.jobs."
+    "job_addition": "To add a new job, create the module under heimdallr/metrics/jobs/ and declare it in jobs[]. Use jobs[].module only for non-conventional names inside heimdallr.metrics.jobs.",
+    "parallel_execution": "Profiles may set execution.max_parallel_jobs. Jobs may declare needs to wait for prerequisite job names while still allowing independent jobs to run in parallel."
   },
   "default_profile": "ct_native_basic_metrics",
   "profiles": {
@@ -11,6 +12,9 @@
         "selected_phase": [
           "native"
         ]
+      },
+      "execution": {
+        "max_parallel_jobs": 3
       },
       "jobs": [
         {
@@ -51,7 +55,12 @@
         },
         {
           "name": "opportunistic_osteoporosis_composite",
-          "enabled": false
+          "enabled": false,
+          "needs": [
+            "bone_health_l1_hu",
+            "bone_health_l1_volumetric",
+            "vertebral_fracture_screen"
+          ]
         },
         {
           "name": "body_fat_abdominal_volumes",
