@@ -36,9 +36,11 @@ def resolve_study_uid(value: Any) -> str:
 
 
 def metadata_value(case_metadata: dict[str, Any], key: str, default: Any = None) -> Any:
+    reference = case_metadata.get("ReferenceDicom") or {}
+    if key == "PatientName" and isinstance(reference, dict) and reference.get(key) not in (None, ""):
+        return reference.get(key)
     if key in case_metadata and case_metadata.get(key) not in (None, ""):
         return case_metadata.get(key)
-    reference = case_metadata.get("ReferenceDicom") or {}
     if isinstance(reference, dict):
         return reference.get(key, default)
     return default
