@@ -44,7 +44,7 @@
         },
         {
           "name": "vertebral_fracture_screen",
-          "enabled": true,
+          "enabled": false,
           "generate_overlay": true,
           "vertebrae": [
             "T12",
