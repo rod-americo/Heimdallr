@@ -300,6 +300,162 @@ def _normalize_dicom_exports(payload: dict) -> list[dict]:
     return exports
 
 
+def _normalize_job_needs(job: dict) -> list[str]:
+    raw_needs = job.get("needs", [])
+    if raw_needs in (None, ""):
+        return []
+    if not isinstance(raw_needs, list):
+        raise RuntimeError(f"Metrics job '{job.get('name', '<unknown>')}' needs must be a list")
+
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for item in raw_needs:
+        need = str(item or "").strip()
+        if not need:
+            continue
+        if need in seen:
+            continue
+        normalized.append(need)
+        seen.add(need)
+    return normalized
+
+
+def _resolve_enabled_jobs(profile: dict) -> list[dict]:
+    jobs = [dict(job) for job in profile.get("jobs", []) if job.get("enabled", True)]
+    seen_names: set[str] = set()
+    for job in jobs:
+        name = str(job.get("name", "") or "").strip()
+        if not name:
+            raise RuntimeError("Metrics job is missing a name")
+        if name in seen_names:
+            raise RuntimeError(f"Metrics profile contains duplicate job '{name}'")
+        seen_names.add(name)
+        job["name"] = name
+        job["needs"] = _normalize_job_needs(job)
+    return jobs
+
+
+def _validate_job_dependency_graph(jobs: list[dict]) -> None:
+    jobs_by_name = {job["name"]: job for job in jobs}
+    for job in jobs:
+        name = job["name"]
+        for need in job["needs"]:
+            if need not in jobs_by_name:
+                raise RuntimeError(f"Metrics job '{name}' depends on missing job '{need}'")
+            if need == name:
+                raise RuntimeError(f"Metrics job '{name}' cannot depend on itself")
+
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(name: str) -> None:
+        if name in visited:
+            return
+        if name in visiting:
+            raise RuntimeError(f"Metrics job dependency cycle detected at '{name}'")
+        visiting.add(name)
+        for need in jobs_by_name[name]["needs"]:
+            visit(need)
+        visiting.remove(name)
+        visited.add(name)
+
+    for job in jobs:
+        visit(job["name"])
+
+
+def _resolve_max_parallel_jobs(profile: dict) -> int:
+    execution = profile.get("execution", {})
+    if not isinstance(execution, dict):
+        execution = {}
+    value = execution.get("max_parallel_jobs", 1)
+    try:
+        return max(1, int(value))
+    except (TypeError, ValueError):
+        raise RuntimeError(f"Invalid max_parallel_jobs value: {value!r}")
+
+
+def _execute_jobs(
+    case_id: str,
+    jobs: list[dict],
+    *,
+    max_parallel_jobs: int,
+    log_dir: Path,
+    logger: MetricsLogger,
+    metadata: dict,
+) -> tuple[list[dict], list[dict]]:
+    completed_jobs_by_name: dict[str, dict] = {}
+    dicom_exports_by_name: dict[str, list[dict]] = {}
+    job_payloads: dict[str, dict] = {}
+    remaining_needs = {job["name"]: set(job["needs"]) for job in jobs}
+    submitted: dict[str, concurrent.futures.Future] = {}
+    future_to_name: dict[concurrent.futures.Future, str] = {}
+    failed_job: tuple[str, Exception] | None = None
+    job_names_in_order = [job["name"] for job in jobs]
+    jobs_by_name = {job["name"]: job for job in jobs}
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_parallel_jobs) as executor:
+        while len(job_payloads) < len(jobs):
+            if failed_job is None:
+                for job_name in job_names_in_order:
+                    if job_name in submitted or job_name in job_payloads:
+                        continue
+                    if remaining_needs[job_name]:
+                        continue
+                    logger.log(f"[Metrics] Running {job_name}")
+                    future = executor.submit(_run_job, case_id, jobs_by_name[job_name], log_dir)
+                    submitted[job_name] = future
+                    future_to_name[future] = job_name
+                    if len(submitted) >= max_parallel_jobs:
+                        break
+
+            if not future_to_name:
+                if failed_job is not None:
+                    break
+                unresolved = {name: sorted(needs) for name, needs in remaining_needs.items() if name not in job_payloads}
+                raise RuntimeError(f"Metrics job scheduling deadlock: {json.dumps(unresolved, ensure_ascii=False)}")
+
+            done, _ = concurrent.futures.wait(
+                list(future_to_name.keys()),
+                return_when=concurrent.futures.FIRST_COMPLETED,
+            )
+
+            for future in done:
+                job_name = future_to_name.pop(future)
+                submitted.pop(job_name, None)
+                try:
+                    payload = future.result()
+                except Exception as exc:
+                    if failed_job is None:
+                        failed_job = (job_name, exc)
+                    continue
+
+                job_payloads[job_name] = payload
+                _upsert_results(case_id, job_name, payload, metadata)
+                job_dicom_exports = _normalize_dicom_exports(payload)
+                dicom_exports_by_name[job_name] = job_dicom_exports
+                completed_jobs_by_name[job_name] = {
+                    "name": job_name,
+                    "status": payload.get("status"),
+                    "result_json": payload.get("artifacts", {}).get("result_json"),
+                    "overlay_png": payload.get("artifacts", {}).get("overlay_png"),
+                    "dicom_exports": job_dicom_exports,
+                }
+                logger.log(f"[Metrics] ✓ {job_name} ({_payload_summary(payload)})")
+
+                for dependent_name, needs in remaining_needs.items():
+                    needs.discard(job_name)
+
+        if failed_job is not None:
+            failed_name, failed_exc = failed_job
+            raise RuntimeError(f"Metrics job '{failed_name}' failed: {failed_exc}") from failed_exc
+
+    completed_jobs = [completed_jobs_by_name[name] for name in job_names_in_order if name in completed_jobs_by_name]
+    dicom_exports: list[dict] = []
+    for name in job_names_in_order:
+        dicom_exports.extend(dicom_exports_by_name.get(name, []))
+    return completed_jobs, dicom_exports
+
+
 def _enqueue_case_dicom_exports(
     case_id: str,
     metadata: dict,
@@ -341,16 +497,19 @@ def segment_case_metrics(case_input: Path) -> bool:
         metadata = _load_case_metadata(case_id)
         profile_name, profile = load_metrics_pipeline_profile()
         _validate_case_against_profile(case_id, metadata, profile_name, profile)
-        jobs = [job for job in profile.get("jobs", []) if job.get("enabled", True)]
+        jobs = _resolve_enabled_jobs(profile)
         if not jobs:
             logger.log(f"[Metrics] No enabled jobs for profile {profile_name}")
             logger.close()
             return True
+        _validate_job_dependency_graph(jobs)
+        max_parallel_jobs = _resolve_max_parallel_jobs(profile)
 
         start_dt = datetime.datetime.now(LOCAL_TZ)
         logger.log(f"=== Metrics Case: {case_id} ===")
         logger.log(f"[Metrics] Profile: {profile_name}")
         logger.log(f"[Metrics] Jobs: {', '.join(job['name'] for job in jobs)}")
+        logger.log(f"[Metrics] Max parallel jobs: {max_parallel_jobs}")
 
         pipeline = metadata.get("Pipeline", {})
         pipeline["metrics_start_time"] = start_dt.isoformat()
@@ -358,25 +517,14 @@ def segment_case_metrics(case_input: Path) -> bool:
         metadata["Pipeline"] = pipeline
         _write_case_metadata(case_id, metadata)
 
-        completed_jobs = []
-        dicom_exports = []
-        for job in jobs:
-            job_name = job["name"]
-            logger.log(f"[Metrics] Running {job_name}")
-            payload = _run_job(case_id, job, log_dir)
-            _upsert_results(case_id, job_name, payload, metadata)
-            job_dicom_exports = _normalize_dicom_exports(payload)
-            dicom_exports.extend(job_dicom_exports)
-            completed_jobs.append(
-                {
-                    "name": job_name,
-                    "status": payload.get("status"),
-                    "result_json": payload.get("artifacts", {}).get("result_json"),
-                    "overlay_png": payload.get("artifacts", {}).get("overlay_png"),
-                    "dicom_exports": job_dicom_exports,
-                }
-            )
-            logger.log(f"[Metrics] ✓ {job_name} ({_payload_summary(payload)})")
+        completed_jobs, dicom_exports = _execute_jobs(
+            case_id,
+            jobs,
+            max_parallel_jobs=max_parallel_jobs,
+            log_dir=log_dir,
+            logger=logger,
+            metadata=metadata,
+        )
 
         try:
             enqueued_dicom_exports = _enqueue_case_dicom_exports(
@@ -395,6 +543,7 @@ def segment_case_metrics(case_input: Path) -> bool:
         pipeline["metrics_elapsed_time"] = str(end_dt - start_dt)
         pipeline["metrics_pipeline"] = {
             "profile": profile_name,
+            "max_parallel_jobs": max_parallel_jobs,
             "jobs": completed_jobs,
             "dicom_egress_items_enqueued": enqueued_dicom_exports,
         }
