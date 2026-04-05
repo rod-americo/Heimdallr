@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ProcessPoolExecutor, as_completed
 import json
+from pathlib import Path
 
 import matplotlib
 
@@ -11,9 +13,9 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 import numpy as np
+from nibabel.orientations import aff2axcodes
 
 from heimdallr.metrics.jobs._bone_job_common import (
-    extract_plane,
     load_case_json_bundle,
     load_ct_volume,
     load_job_config,
@@ -22,8 +24,6 @@ from heimdallr.metrics.jobs._bone_job_common import (
     metric_output_dir,
     parse_args,
     resolve_canonical_nifti,
-    sagittal_plane_from_mask,
-    sagittal_plane_spacing_mm,
     write_payload,
 )
 from heimdallr.metrics.analysis.bone_health import extract_study_technique_context
@@ -45,13 +45,99 @@ from heimdallr.shared.paths import study_artifacts_dir
 SERIES_NUMBER = 9107
 
 
+def infer_patient_axes_from_affine(affine: np.ndarray) -> tuple[int | None, int | None]:
+    """Resolve AP and SI array axes from the image affine when available."""
+    try:
+        axis_codes = aff2axcodes(affine)
+    except Exception:
+        return None, None
+
+    ap_axis = None
+    si_axis = None
+    for axis_index, axis_code in enumerate(axis_codes):
+        code = str(axis_code or "").upper()
+        if code in {"A", "P"}:
+            ap_axis = axis_index
+        elif code in {"S", "I"}:
+            si_axis = axis_index
+    return ap_axis, si_axis
+
+
+def screen_single_vertebra(
+    vertebra: str,
+    mask_path_str: str,
+    ct_shape: tuple[int, ...],
+    spacing_mm: tuple[float, float, float],
+    ap_axis: int | None,
+    si_axis: int | None,
+) -> dict:
+    """Load one vertebral mask and run the screen in an isolated worker."""
+    mask_path = Path(mask_path_str)
+    if not mask_path.exists():
+        return {
+            "vertebra": vertebra,
+            "available": False,
+            "summary": {"job_status": "missing_mask"},
+        }
+
+    _, mask = load_nifti_mask(mask_path)
+    if tuple(mask.shape) != tuple(ct_shape):
+        return {
+            "vertebra": vertebra,
+            "available": False,
+            "summary": {"job_status": "shape_mismatch"},
+        }
+
+    screen = screen_vertebral_fracture(
+        mask,
+        spacing_mm=spacing_mm,
+        ap_axis=ap_axis,
+        si_axis=si_axis,
+    )
+    summarized = {
+        "job_name": screen.get("job_name"),
+        "status": screen.get("status"),
+        "screen_label": screen.get("screen_label"),
+        "screen_confidence": screen.get("screen_confidence"),
+        "genant_grade": screen.get("genant_grade"),
+        "genant_label": screen.get("genant_label"),
+        "severity": screen.get("severity"),
+        "suspected_pattern": screen.get("suspected_pattern"),
+        "body_isolation": {
+            "original_voxels": screen.get("body_isolation", {}).get("original_voxels"),
+            "body_voxels": screen.get("body_isolation", {}).get("body_voxels"),
+            "body_fraction": screen.get("body_isolation", {}).get("body_fraction"),
+            "orientation_confidence": screen.get("body_isolation", {}).get("axis_info", {}).get("orientation_confidence"),
+        },
+        "morphometry": {
+            "ap_depth_mm": screen.get("morphometry", {}).get("ap_depth_mm"),
+            "anterior_height_mm": screen.get("morphometry", {}).get("anterior_height_mm"),
+            "middle_height_mm": screen.get("morphometry", {}).get("middle_height_mm"),
+            "posterior_height_mm": screen.get("morphometry", {}).get("posterior_height_mm"),
+            "anterior_area_voxels": screen.get("morphometry", {}).get("anterior_area_voxels"),
+            "middle_area_voxels": screen.get("morphometry", {}).get("middle_area_voxels"),
+            "posterior_area_voxels": screen.get("morphometry", {}).get("posterior_area_voxels"),
+            "orientation_confidence": screen.get("morphometry", {}).get("orientation_confidence"),
+        },
+        "ratios": screen.get("ratios"),
+        "qc_flags": screen.get("qc_flags"),
+        "mask_complete": mask_complete(mask),
+    }
+    return {
+        "vertebra": vertebra,
+        "available": True,
+        "mask_path": str(mask_path),
+        "summary": summarized,
+    }
+
+
 def render_fracture_overlay_rgb(
     ct_plane: np.ndarray,
     vertebra_overlays: list[dict],
     title: str,
     aspect: float,
 ) -> np.ndarray:
-    rotated_ct = np.rot90(np.asarray(ct_plane, dtype=np.float32))
+    rotated_ct = np.fliplr(np.rot90(np.asarray(ct_plane, dtype=np.float32)))
     fig, ax = plt.subplots(figsize=(7, 9), facecolor="black")
     fig.patch.set_facecolor("black")
     ax.set_facecolor("black")
@@ -65,7 +151,7 @@ def render_fracture_overlay_rgb(
     )
 
     for overlay in vertebra_overlays:
-        rotated_mask = np.rot90(np.asarray(overlay["mask_plane"], dtype=bool))
+        rotated_mask = np.fliplr(np.rot90(np.asarray(overlay["mask_plane"], dtype=bool)))
         if not rotated_mask.any():
             continue
         color = "#ff7b7b" if overlay.get("is_pathologic") else "#9aa0a6"
@@ -121,6 +207,120 @@ def render_fracture_overlay_rgb(
     return rgb
 
 
+def remaining_axis(ap_axis: int, si_axis: int) -> int:
+    return next(axis for axis in range(3) if axis not in (ap_axis, si_axis))
+
+
+def reorient_volume(data: np.ndarray, ap_axis: int, si_axis: int) -> np.ndarray:
+    lateral_axis = remaining_axis(ap_axis, si_axis)
+    return np.moveaxis(np.asarray(data), (ap_axis, si_axis, lateral_axis), (0, 1, 2))
+
+
+def vertebral_centerline_points(
+    masks_by_vertebra: dict[str, np.ndarray],
+    *,
+    si_axis: int,
+    lateral_axis: int,
+) -> list[tuple[float, float, str]]:
+    points: list[tuple[float, float, str]] = []
+    for vertebra, mask in masks_by_vertebra.items():
+        coords = np.argwhere(np.asarray(mask, dtype=bool))
+        if coords.size == 0:
+            continue
+        center = coords.mean(axis=0)
+        points.append((float(center[si_axis]), float(center[lateral_axis]), vertebra))
+    return sorted(points, key=lambda item: item[0])
+
+
+def build_centerline_sagittal_slab(
+    ct_data: np.ndarray,
+    masks_by_vertebra: dict[str, np.ndarray],
+    *,
+    spacing_mm: tuple[float, float, float],
+    ap_axis: int,
+    si_axis: int,
+    slab_thickness_mm: float = 5.0,
+    crop_padding_voxels: int = 6,
+) -> tuple[np.ndarray | None, dict[str, np.ndarray], float]:
+    if not masks_by_vertebra:
+        return None, {}, 1.0
+
+    lateral_axis = remaining_axis(ap_axis, si_axis)
+    centerline_points = vertebral_centerline_points(
+        masks_by_vertebra,
+        si_axis=si_axis,
+        lateral_axis=lateral_axis,
+    )
+    if not centerline_points:
+        return None, {}, 1.0
+
+    combined_mask = np.zeros_like(next(iter(masks_by_vertebra.values())), dtype=bool)
+    for mask in masks_by_vertebra.values():
+        combined_mask |= np.asarray(mask, dtype=bool)
+
+    combined_reoriented = reorient_volume(combined_mask, ap_axis, si_axis)
+    ap_positions = np.where(combined_reoriented.any(axis=(1, 2)))[0]
+    si_positions = np.where(combined_reoriented.any(axis=(0, 2)))[0]
+    if ap_positions.size == 0 or si_positions.size == 0:
+        return None, {}, 1.0
+
+    ap_start = max(0, int(ap_positions[0]) - int(crop_padding_voxels))
+    ap_stop = min(int(combined_reoriented.shape[0]), int(ap_positions[-1]) + int(crop_padding_voxels) + 1)
+    si_start = max(0, int(si_positions[0]) - int(crop_padding_voxels))
+    si_stop = min(int(combined_reoriented.shape[1]), int(si_positions[-1]) + int(crop_padding_voxels) + 1)
+    if ap_stop <= ap_start or si_stop <= si_start:
+        return None, {}, 1.0
+
+    ct_reoriented = reorient_volume(ct_data, ap_axis, si_axis)
+    ct_crop = np.asarray(ct_reoriented[ap_start:ap_stop, si_start:si_stop, :], dtype=np.float32)
+    mask_crops = {
+        vertebra: reorient_volume(mask, ap_axis, si_axis)[ap_start:ap_stop, si_start:si_stop, :]
+        for vertebra, mask in masks_by_vertebra.items()
+    }
+
+    centerline_si = np.asarray([point[0] for point in centerline_points], dtype=np.float64)
+    centerline_lateral = np.asarray([point[1] for point in centerline_points], dtype=np.float64)
+    si_global = np.arange(si_start, si_stop, dtype=np.float64)
+    if centerline_si.size == 1:
+        slab_centers = np.full(si_global.shape, centerline_lateral[0], dtype=np.float64)
+    else:
+        slab_centers = np.interp(
+            si_global,
+            centerline_si,
+            centerline_lateral,
+            left=float(centerline_lateral[0]),
+            right=float(centerline_lateral[-1]),
+        )
+
+    lateral_spacing_mm = float(spacing_mm[lateral_axis]) if spacing_mm[lateral_axis] > 0 else 1.0
+    slab_width_vox = max(1, int(round(float(slab_thickness_mm) / lateral_spacing_mm)))
+
+    slab_plane = np.zeros((ct_crop.shape[0], ct_crop.shape[1]), dtype=np.float32)
+    overlay_planes = {
+        vertebra: np.zeros((ct_crop.shape[0], ct_crop.shape[1]), dtype=bool)
+        for vertebra in mask_crops
+    }
+    for si_local, center_lateral in enumerate(slab_centers):
+        left = int(np.floor(center_lateral - (slab_width_vox / 2.0)))
+        right = left + slab_width_vox
+        left = max(0, left)
+        right = min(int(ct_crop.shape[2]), right)
+        left = max(0, right - slab_width_vox)
+        if right <= left:
+            right = min(int(ct_crop.shape[2]), left + 1)
+
+        slab_plane[:, si_local] = np.mean(ct_crop[:, si_local, left:right], axis=1)
+        for vertebra, mask_crop in mask_crops.items():
+            overlay_planes[vertebra][:, si_local] = np.any(mask_crop[:, si_local, left:right], axis=1)
+
+    aspect = (
+        float(spacing_mm[si_axis]) / float(spacing_mm[ap_axis])
+        if spacing_mm[ap_axis] > 0 and spacing_mm[si_axis] > 0
+        else 1.0
+    )
+    return slab_plane, overlay_planes, aspect
+
+
 def main() -> int:
     args = parse_args(__doc__ or "Fracture screen job")
     job_config = load_job_config(args.job_config_json)
@@ -150,6 +350,7 @@ def main() -> int:
         case_metadata.update(bundle["id_json"])
         case_metadata.update(bundle["metadata_json"])
         spacing = tuple(float(value) for value in ct_img.header.get_zooms()[:3])
+        ap_axis, si_axis = infer_patient_axes_from_affine(ct_img.affine)
         technique_context = extract_study_technique_context(
             id_data=bundle["id_json"],
             results={
@@ -166,53 +367,29 @@ def main() -> int:
 
         per_vertebra: dict[str, dict] = {}
         mask_overlays: list[dict] = []
-        overlay_masks_by_vertebra: dict[str, np.ndarray] = {}
+        overlay_mask_paths_by_vertebra: dict[str, str] = {}
         available_count = 0
-
-        for vertebra in vertebrae:
-            mask_path = artifacts_dir / "total" / f"vertebrae_{vertebra}.nii.gz"
-            if not mask_path.exists():
-                per_vertebra[vertebra] = {"job_status": "missing_mask"}
-                continue
-
-            _, mask = load_nifti_mask(mask_path)
-            if ct_data.shape != mask.shape:
-                per_vertebra[vertebra] = {"job_status": "shape_mismatch"}
-                continue
-
-            available_count += 1
-            screen = screen_vertebral_fracture(mask, spacing_mm=spacing)
-            summarized = {
-                "job_name": screen.get("job_name"),
-                "status": screen.get("status"),
-                "screen_label": screen.get("screen_label"),
-                "screen_confidence": screen.get("screen_confidence"),
-                "genant_grade": screen.get("genant_grade"),
-                "genant_label": screen.get("genant_label"),
-                "severity": screen.get("severity"),
-                "suspected_pattern": screen.get("suspected_pattern"),
-                "body_isolation": {
-                    "original_voxels": screen.get("body_isolation", {}).get("original_voxels"),
-                    "body_voxels": screen.get("body_isolation", {}).get("body_voxels"),
-                    "body_fraction": screen.get("body_isolation", {}).get("body_fraction"),
-                    "orientation_confidence": screen.get("body_isolation", {}).get("axis_info", {}).get("orientation_confidence"),
-                },
-                "morphometry": {
-                    "ap_depth_mm": screen.get("morphometry", {}).get("ap_depth_mm"),
-                    "anterior_height_mm": screen.get("morphometry", {}).get("anterior_height_mm"),
-                    "middle_height_mm": screen.get("morphometry", {}).get("middle_height_mm"),
-                    "posterior_height_mm": screen.get("morphometry", {}).get("posterior_height_mm"),
-                    "anterior_area_voxels": screen.get("morphometry", {}).get("anterior_area_voxels"),
-                    "middle_area_voxels": screen.get("morphometry", {}).get("middle_area_voxels"),
-                    "posterior_area_voxels": screen.get("morphometry", {}).get("posterior_area_voxels"),
-                    "orientation_confidence": screen.get("morphometry", {}).get("orientation_confidence"),
-                },
-                "ratios": screen.get("ratios"),
-                "qc_flags": screen.get("qc_flags"),
-                "mask_complete": mask_complete(mask),
+        max_workers = max(1, len(vertebrae))
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            future_map = {
+                executor.submit(
+                    screen_single_vertebra,
+                    vertebra,
+                    str(artifacts_dir / "total" / f"vertebrae_{vertebra}.nii.gz"),
+                    tuple(int(value) for value in ct_data.shape),
+                    spacing,
+                    ap_axis,
+                    si_axis,
+                ): vertebra
+                for vertebra in vertebrae
             }
-            per_vertebra[vertebra] = summarized
-            overlay_masks_by_vertebra[vertebra] = np.asarray(mask, dtype=bool)
+            for future in as_completed(future_map):
+                result = future.result()
+                vertebra = str(result["vertebra"])
+                per_vertebra[vertebra] = dict(result["summary"])
+                if bool(result.get("available")):
+                    available_count += 1
+                    overlay_mask_paths_by_vertebra[vertebra] = str(result["mask_path"])
 
         per_vertebra = refine_classification_with_adjacent_reference(per_vertebra)
         overall_suspicion = False
@@ -236,30 +413,25 @@ def main() -> int:
         artifacts = {"result_json": str(result_path.relative_to(case_dir))}
         dicom_exports: list[dict[str, str]] = []
         emit_dicom = bool(job_config.get("emit_secondary_capture_dicom", job_config.get("generate_overlay", True)))
-        combined_mask = None
-        if overlay_masks_by_vertebra:
-            combined_mask = np.zeros_like(next(iter(overlay_masks_by_vertebra.values())), dtype=bool)
-            for mask in overlay_masks_by_vertebra.values():
-                combined_mask |= np.asarray(mask, dtype=bool)
-
-        if combined_mask is not None and emit_dicom:
-            plane_union, plane_index, plane_axis = sagittal_plane_from_mask(combined_mask)
-            if plane_union is not None and plane_index is not None and plane_axis is not None:
-                ct_plane = np.asarray(extract_plane(ct_data, plane_axis, plane_index), dtype=np.float32)
-                plane_spacing = sagittal_plane_spacing_mm(spacing, plane_axis)
-                aspect = (
-                    float(plane_spacing[1]) / float(plane_spacing[0])
-                    if plane_spacing[0] > 0 and plane_spacing[1] > 0
-                    else 1.0
-                )
-
+        if overlay_mask_paths_by_vertebra and emit_dicom and ap_axis is not None and si_axis is not None:
+            overlay_masks_by_vertebra = {
+                vertebra: load_nifti_mask(Path(mask_path_str))[1]
+                for vertebra, mask_path_str in overlay_mask_paths_by_vertebra.items()
+            }
+            slab_thickness_mm = float(job_config.get("overlay_sagittal_slab_thickness_mm", 5.0))
+            ct_plane, overlay_planes, aspect = build_centerline_sagittal_slab(
+                ct_data,
+                overlay_masks_by_vertebra,
+                spacing_mm=spacing,
+                ap_axis=ap_axis,
+                si_axis=si_axis,
+                slab_thickness_mm=slab_thickness_mm,
+            )
+            if ct_plane is not None:
                 for vertebra in vertebrae:
-                    full_mask = overlay_masks_by_vertebra.get(vertebra)
+                    mask_plane = overlay_planes.get(vertebra)
                     summary = per_vertebra.get(vertebra, {})
-                    if full_mask is None:
-                        continue
-                    mask_plane = np.asarray(extract_plane(full_mask, plane_axis, plane_index), dtype=bool)
-                    if not mask_plane.any():
+                    if mask_plane is None or not np.any(mask_plane):
                         continue
                     is_pathologic = bool((summary.get("genant_grade") or 0) >= 1)
                     mask_overlays.append(
