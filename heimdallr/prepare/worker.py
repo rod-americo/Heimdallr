@@ -38,6 +38,7 @@ from zoneinfo import ZoneInfo
 
 from heimdallr.shared import settings
 from heimdallr.shared import store
+from heimdallr.shared.patient_names import normalize_patient_name_display
 from heimdallr.shared.paths import (
     study_artifacts_dir,
     study_derived_dir,
@@ -91,6 +92,12 @@ def parse_optional_float(value):
     """Parse a DICOM numeric scalar into float or None."""
     if value in (None, "", "Unknown"):
         return None
+
+
+def normalize_patient_name_for_prepare(name):
+    """Normalize DICOM PatientName for stored metadata and case naming."""
+    normalized = normalize_patient_name_display(str(name or ""), settings.PATIENT_NAME_PROFILE)
+    return normalized or "Unknown"
     try:
         return float(str(value).strip().replace(",", "."))
     except (TypeError, ValueError):
@@ -132,7 +139,10 @@ def build_reference_dicom_context(ds):
         if isinstance(value, (pydicom.multival.MultiValue, list, tuple)):
             context[field_name] = [str(item) for item in value]
         else:
-            context[field_name] = str(value).replace("^", " ").strip()
+            if field_name == "PatientName":
+                context[field_name] = normalize_patient_name_for_prepare(value)
+            else:
+                context[field_name] = str(value).replace("^", " ").strip()
     return context
 
 def generate_clinical_name(patient_name, study_date_str, accession_number):
@@ -492,7 +502,7 @@ def process_zip(zip_path):
                             if global_meta["PatientName"] == "Unknown":
                                 name_val = get_tag_value(ds, "PatientName", "")
                                 if name_val:
-                                    global_meta["PatientName"] = str(name_val).replace('^', ' ').strip()
+                                    global_meta["PatientName"] = normalize_patient_name_for_prepare(name_val)
                                 global_meta["PatientID"] = str(get_tag_value(ds, "PatientID", "") or "")
                                 global_meta["PatientSex"] = str(get_tag_value(ds, "PatientSex", "Unknown"))
                                 global_meta["AccessionNumber"] = str(get_tag_value(ds, "AccessionNumber", "000000"))
