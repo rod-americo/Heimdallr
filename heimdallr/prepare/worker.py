@@ -680,10 +680,10 @@ def process_zip(zip_path):
         else:
             # --- CT LOGIC: CONVERT, PRESERVE AND CHARACTERIZE ALL SERIES ---
             select_started = time.perf_counter()
-            print("  [CT Mode] Converting, preserving and characterizing all CT series (Parallel - 3 Threads)...")
+            print("  [CT Mode] Converting, preserving and characterizing all CT series (Parallel - 5 Threads)...")
             candidates = []
             
-            with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
                 futures = []
                 for uid, s_data in series_map.items():
                     futures.append(
