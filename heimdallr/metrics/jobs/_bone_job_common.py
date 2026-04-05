@@ -87,14 +87,22 @@ def load_ct_volume(ct_path: Path) -> tuple[nib.Nifti1Image, np.ndarray]:
     return image, np.asarray(image.get_fdata(), dtype=np.float32)
 
 
-def mask_complete(mask: np.ndarray) -> bool:
+def mask_complete_along_axis(mask: np.ndarray, axis: int) -> bool:
     mask_bool = np.asarray(mask, dtype=bool)
     if mask_bool.ndim != 3 or not np.any(mask_bool):
         return False
-    z_indices = np.where(mask_bool.sum(axis=(0, 1)) > 0)[0]
-    if len(z_indices) == 0:
+    axis = int(axis)
+    if axis < 0 or axis >= mask_bool.ndim:
         return False
-    return int(z_indices[0]) > 0 and int(z_indices[-1]) < (mask_bool.shape[2] - 1)
+    reduce_axes = tuple(idx for idx in range(mask_bool.ndim) if idx != axis)
+    occupied_indices = np.where(mask_bool.sum(axis=reduce_axes) > 0)[0]
+    if len(occupied_indices) == 0:
+        return False
+    return int(occupied_indices[0]) > 0 and int(occupied_indices[-1]) < (mask_bool.shape[axis] - 1)
+
+
+def mask_complete(mask: np.ndarray) -> bool:
+    return mask_complete_along_axis(mask, axis=2)
 
 
 def center_slice_index(mask: np.ndarray) -> int | None:
