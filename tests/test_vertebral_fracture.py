@@ -1,4 +1,6 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import numpy as np
 
@@ -10,6 +12,7 @@ from heimdallr.metrics.analysis.vertebral_fracture import (
     estimate_vertebral_heights,
     vertebra_level_index,
 )
+from heimdallr.metrics.jobs.vertebral_fracture_screen import discover_available_vertebrae
 
 
 def make_profiled_vertebra(
@@ -37,6 +40,24 @@ def make_profiled_vertebra(
 
 
 class TestVertebralFractureHelpers(unittest.TestCase):
+    def test_discover_available_vertebrae_sorts_all_segmented_levels(self):
+        with TemporaryDirectory() as tmp_dir:
+            total_dir = Path(tmp_dir) / "total"
+            total_dir.mkdir(parents=True, exist_ok=True)
+            for filename in (
+                "vertebrae_L1.nii.gz",
+                "vertebrae_T12.nii.gz",
+                "vertebrae_C7.nii.gz",
+                "vertebrae_S1.nii.gz",
+                "vertebrae_T1.nii.gz",
+                "vertebrae_X1.nii.gz",
+            ):
+                (total_dir / filename).touch()
+
+            discovered = discover_available_vertebrae(Path(tmp_dir))
+
+        self.assertEqual(discovered, ["C7", "T1", "T12", "L1", "S1", "X1"])
+
     def test_vertebra_level_index_supports_cervical_to_sacral_levels(self):
         self.assertLess(vertebra_level_index("C7"), vertebra_level_index("T1"))
         self.assertLess(vertebra_level_index("T12"), vertebra_level_index("L1"))

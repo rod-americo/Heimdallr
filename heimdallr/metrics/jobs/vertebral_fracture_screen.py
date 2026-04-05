@@ -30,6 +30,7 @@ from heimdallr.metrics.analysis.bone_health import extract_study_technique_conte
 from heimdallr.metrics.analysis.vertebral_fracture import (
     refine_classification_with_adjacent_reference,
     screen_vertebral_fracture,
+    vertebra_level_index,
 )
 from heimdallr.metrics.jobs._vertebral_fracture_overlay_text import (
     build_pathology_label,
@@ -43,6 +44,28 @@ from heimdallr.shared.paths import study_artifacts_dir
 
 
 SERIES_NUMBER = 9107
+
+
+def _vertebra_sort_key(level: str) -> tuple[int, int, str]:
+    index = vertebra_level_index(level)
+    if index is None:
+        return (1, 10_000, str(level))
+    return (0, int(index), str(level))
+
+
+def discover_available_vertebrae(artifacts_dir: Path) -> list[str]:
+    total_dir = artifacts_dir / "total"
+    discovered: list[str] = []
+    for mask_path in total_dir.glob("vertebrae_*.nii.gz"):
+        prefix = "vertebrae_"
+        suffix = ".nii.gz"
+        name = mask_path.name
+        if not name.startswith(prefix) or not name.endswith(suffix):
+            continue
+        vertebra = name[len(prefix):-len(suffix)].strip().upper()
+        if vertebra:
+            discovered.append(vertebra)
+    return sorted(set(discovered), key=_vertebra_sort_key)
 
 
 def infer_patient_axes_from_affine(affine: np.ndarray) -> tuple[int | None, int | None]:
@@ -333,7 +356,7 @@ def main() -> int:
         case_dir, metric_dir, result_path = metric_output_dir(args.case_id, metric_key)
         artifacts_dir = study_artifacts_dir(args.case_id)
         ct_path = resolve_canonical_nifti(args.case_id)
-        vertebrae = list(job_config.get("vertebrae", ["T12", "L1", "L2"]))
+        vertebrae = discover_available_vertebrae(artifacts_dir)
         overlay_sc_path = metric_dir / "overlay_sc.dcm"
 
         if ct_path is None or not ct_path.exists():
@@ -370,26 +393,27 @@ def main() -> int:
         overlay_mask_paths_by_vertebra: dict[str, str] = {}
         available_count = 0
         max_workers = max(1, len(vertebrae))
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            future_map = {
-                executor.submit(
-                    screen_single_vertebra,
-                    vertebra,
-                    str(artifacts_dir / "total" / f"vertebrae_{vertebra}.nii.gz"),
-                    tuple(int(value) for value in ct_data.shape),
-                    spacing,
-                    ap_axis,
-                    si_axis,
-                ): vertebra
-                for vertebra in vertebrae
-            }
-            for future in as_completed(future_map):
-                result = future.result()
-                vertebra = str(result["vertebra"])
-                per_vertebra[vertebra] = dict(result["summary"])
-                if bool(result.get("available")):
-                    available_count += 1
-                    overlay_mask_paths_by_vertebra[vertebra] = str(result["mask_path"])
+        if vertebrae:
+            with ProcessPoolExecutor(max_workers=max_workers) as executor:
+                future_map = {
+                    executor.submit(
+                        screen_single_vertebra,
+                        vertebra,
+                        str(artifacts_dir / "total" / f"vertebrae_{vertebra}.nii.gz"),
+                        tuple(int(value) for value in ct_data.shape),
+                        spacing,
+                        ap_axis,
+                        si_axis,
+                    ): vertebra
+                    for vertebra in vertebrae
+                }
+                for future in as_completed(future_map):
+                    result = future.result()
+                    vertebra = str(result["vertebra"])
+                    per_vertebra[vertebra] = dict(result["summary"])
+                    if bool(result.get("available")):
+                        available_count += 1
+                        overlay_mask_paths_by_vertebra[vertebra] = str(result["mask_path"])
 
         per_vertebra = refine_classification_with_adjacent_reference(per_vertebra)
         overall_suspicion = False
