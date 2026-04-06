@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 
 import numpy as np
 
-from heimdallr.metrics.analysis.vertebral_fracture import (
+from heimdallr.metrics.jobs.tests.vertebral_fracture import (
     classify_fracture_pattern,
     isolate_vertebral_body,
     refine_classification_with_adjacent_reference,
@@ -13,7 +13,7 @@ from heimdallr.metrics.analysis.vertebral_fracture import (
     vertebra_level_index,
 )
 from heimdallr.metrics.jobs._bone_job_common import mask_complete_along_axis
-from heimdallr.metrics.jobs.vertebral_fracture_screen import discover_available_vertebrae
+from heimdallr.metrics.jobs.tests.vertebral_fracture_screen import discover_available_vertebrae
 
 
 def make_profiled_vertebra(
@@ -152,6 +152,7 @@ class TestVertebralFractureHelpers(unittest.TestCase):
         occupied_ap = np.where(body_mask.any(axis=(0, 2)))[0]
 
         self.assertLessEqual(int(occupied_ap[-1]), 11)
+
 
     def test_estimate_heights_detects_wedge_with_explicit_axes(self):
         ap_len = 14

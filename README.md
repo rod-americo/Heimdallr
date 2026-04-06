@@ -46,12 +46,8 @@ runtime/studies/<case_id>/ + database/dicom.db
 
 4. **Quantitative Metrics** — Job-based post-segmentation engine with the following modules:
    - `l3_muscle_area` — L3-level skeletal muscle area and sarcopenia metrics
+   - `parenchymal_organ_volumetry` — Organ volumetry and derived overlays
    - `bone_health_l1_hu` — L1 trabecular HU-based BMD estimation
-   - `bone_health_l1_volumetric` — L1 volumetric BMD with cortical erosion
-   - `vertebral_fracture_screen` — Morphometric vertebral fracture screening
-   - `opportunistic_osteoporosis_composite` — Composite osteoporosis risk score
-   - `body_fat_abdominal_volumes` — Abdominal visceral / subcutaneous fat volumes
-   - `body_fat_l3_slice` — L3-level body composition analysis
 
 5. **DICOM Egress** — Queue-driven outbound C-STORE worker that delivers generated DICOM artifacts such as Secondary Capture overlays to fixed remote SCP destinations.
 
@@ -82,9 +78,10 @@ Heimdallr/
 │   │   │   ├── body_fat.py       #     Body composition analysis
 │   │   │   ├── bone_health.py    #     Bone mineral density routines
 │   │   │   ├── kidney_stone_triage.py # Renal stone burden scoring
-│   │   │   └── vertebral_fracture.py  # Vertebral fracture morphometry
+│   │   │   └── opportunistic_osteoporosis_composite.py # Experimental composite entrypoint
 │   │   ├── worker.py             #   Queue-driven job dispatcher
-│   │   └── jobs/                 #   Individual measurement modules
+│   │   └── jobs/                 #   Individual production measurement modules
+│   │       └── tests/            #   Experimental jobs and validation helpers
 │   ├── deid_gateway.py           # OCR-based pixel/text de-identification helpers
 │   ├── dicom_egress/             # Outbound DICOM artifact delivery worker
 │   │   ├── worker.py             #   Queue-driven C-STORE SCU dispatcher
@@ -289,6 +286,10 @@ See [`heimdallr/shared/settings.py`](heimdallr/shared/settings.py) for the compl
 | `scripts/update_kvp_retroactive.py` | Backfill kVp values from DICOM metadata |
 | `scripts/bmd_roi_comparison_preview.py` | Visual preview of BMD ROI placement |
 | `scripts/watch_heimdallr.py` | Filesystem watcher for auto-upload from drop folder |
+
+Experimental metrics jobs are not part of the default profile. Keep them under
+`heimdallr/metrics/jobs/tests/` and enable them only through explicit
+`jobs[].module` overrides in a host-local metrics pipeline config.
 
 ## Documentation
 

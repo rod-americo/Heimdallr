@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 
-from heimdallr.metrics.jobs._body_fat_job_common import (
+from heimdallr.metrics.jobs.tests._body_fat_job_common import (
     TARGET_LEVELS,
     build_abdominal_aggregate,
     compute_level_measurements,

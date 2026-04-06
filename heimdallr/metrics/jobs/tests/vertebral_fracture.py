@@ -44,6 +44,8 @@ DEFAULT_CORE_RADIUS_MM = 2.5
 DEFAULT_RESTORE_RADIUS_MM = 1.5
 DEFAULT_EDGE_FRACTION = 0.18
 DEFAULT_SMOOTHING_WINDOW = 3
+DEFAULT_SAGITTAL_SLAB_THICKNESS_MM = 5.0
+DEFAULT_PARASAGITTAL_OFFSETS_MM = (-15.0, -10.0, -5.0, 0.0, 5.0, 10.0, 15.0)
 VERTEBRA_LEVELS = tuple(
     [
         *(f"C{i}" for i in range(1, 8)),
@@ -272,6 +274,175 @@ def _window_median(values: np.ndarray, center_index: int, width: int) -> float:
     return float(np.median(window))
 
 
+def _slab_bounds(center_index: int, slab_width_vox: int, max_size: int) -> tuple[int, int]:
+    width = max(1, int(slab_width_vox))
+    left = int(center_index) - (width // 2)
+    right = left + width
+    left = max(0, left)
+    right = min(int(max_size), right)
+    left = max(0, right - width)
+    if right <= left:
+        right = min(int(max_size), left + 1)
+    return left, right
+
+
+def _reoriented_centerline_lateral_positions(reoriented_mask: np.ndarray) -> tuple[np.ndarray, np.ndarray] | None:
+    mask = np.asarray(reoriented_mask, dtype=bool)
+    if mask.ndim != 3 or not np.any(mask):
+        return None
+
+    si_positions = np.where(mask.any(axis=(0, 2)))[0]
+    if si_positions.size == 0:
+        return None
+
+    si_start = int(si_positions[0])
+    si_stop = int(si_positions[-1] + 1)
+    si_range = np.arange(si_start, si_stop, dtype=np.int32)
+    centers = np.full(si_range.shape, np.nan, dtype=np.float64)
+    for idx, si_global in enumerate(si_range):
+        lateral_coords = np.where(mask[:, si_global, :].any(axis=0))[0]
+        if lateral_coords.size == 0:
+            continue
+        centers[idx] = float(np.median(lateral_coords))
+
+    finite = np.isfinite(centers)
+    if not np.any(finite):
+        return None
+    if np.count_nonzero(finite) == 1:
+        centers[:] = float(centers[finite][0])
+    else:
+        centers = np.interp(
+            si_range.astype(np.float64),
+            si_range[finite].astype(np.float64),
+            centers[finite],
+        )
+    return si_range, centers
+
+
+def _measure_parasagittal_slab(
+    reoriented_mask: np.ndarray,
+    *,
+    centerline_si_range: np.ndarray,
+    centerline_lateral_positions: np.ndarray,
+    spacing: tuple[float, float, float],
+    axis_info: dict[str, Any],
+    center_offset_mm: float,
+    slab_thickness_mm: float,
+    edge_fraction: float,
+    smoothing_window: int,
+) -> dict[str, Any] | None:
+    lateral_spacing_mm = float(spacing[axis_info["lateral_axis"]]) if spacing[axis_info["lateral_axis"]] > 0 else 1.0
+    slab_width_vox = max(1, int(round(float(slab_thickness_mm) / lateral_spacing_mm)))
+    offset_vox = int(round(float(center_offset_mm) / lateral_spacing_mm))
+    plane_mask = np.zeros((int(reoriented_mask.shape[0]), int(centerline_si_range.size)), dtype=bool)
+    for si_local, si_global in enumerate(centerline_si_range):
+        slab_center_index = int(round(float(centerline_lateral_positions[si_local]) + float(offset_vox)))
+        slab_left, slab_right = _slab_bounds(slab_center_index, slab_width_vox, int(reoriented_mask.shape[2]))
+        plane_mask[:, si_local] = np.any(reoriented_mask[:, int(si_global), slab_left:slab_right], axis=1)
+
+    if not np.any(plane_mask):
+        return None
+
+    ap_positions = np.where(plane_mask.any(axis=1))[0]
+    if ap_positions.size < 3:
+        return None
+
+    ap_start = int(ap_positions[0])
+    ap_stop = int(ap_positions[-1] + 1)
+    occupied = plane_mask[ap_start:ap_stop]
+    if occupied.shape[0] < 3:
+        return None
+
+    height_profile_vox = np.zeros(int(occupied.shape[0]), dtype=np.float64)
+    area_profile_vox = occupied.sum(axis=1).astype(np.float64)
+    for ap_idx in range(int(occupied.shape[0])):
+        occupied_si = np.where(occupied[ap_idx])[0]
+        if occupied_si.size == 0:
+            continue
+        height_profile_vox[ap_idx] = float(occupied_si[-1] - occupied_si[0] + 1)
+
+    if not np.any(height_profile_vox > 0):
+        return None
+
+    height_profile_mm = _moving_average(
+        height_profile_vox * float(spacing[axis_info["si_axis"]]),
+        smoothing_window,
+    )
+    area_profile_vox = _moving_average(area_profile_vox, smoothing_window)
+
+    anterior_is_low_index, orientation_confidence, orientation_note = _infer_anterior_is_low_index(
+        occupied[:, :, np.newaxis],
+        edge_fraction,
+    )
+    ap_len_occupied = int(occupied.shape[0])
+    edge_width = max(1, int(round(ap_len_occupied * edge_fraction)))
+    left_indices = np.arange(0, edge_width)
+    right_indices = np.arange(max(0, ap_len_occupied - edge_width), ap_len_occupied)
+    mid_start = max(0, ap_len_occupied // 2 - edge_width // 2)
+    mid_end = min(ap_len_occupied, mid_start + edge_width)
+    middle_indices = np.arange(mid_start, mid_end)
+
+    if not anterior_is_low_index:
+        anterior_indices = right_indices
+        posterior_indices = left_indices
+    else:
+        anterior_indices = left_indices
+        posterior_indices = right_indices
+
+    if anterior_indices.size == 0 or posterior_indices.size == 0 or middle_indices.size == 0:
+        return None
+
+    anterior_height = _window_median(
+        height_profile_mm,
+        int(np.median(anterior_indices)),
+        edge_width,
+    )
+    middle_height = _window_median(
+        height_profile_mm,
+        int(np.median(middle_indices)),
+        edge_width,
+    )
+    posterior_height = _window_median(
+        height_profile_mm,
+        int(np.median(posterior_indices)),
+        edge_width,
+    )
+    anterior_area = _window_median(
+        area_profile_vox,
+        int(np.median(anterior_indices)),
+        edge_width,
+    )
+    middle_area = _window_median(
+        area_profile_vox,
+        int(np.median(middle_indices)),
+        edge_width,
+    )
+    posterior_area = _window_median(
+        area_profile_vox,
+        int(np.median(posterior_indices)),
+        edge_width,
+    )
+    if any(not np.isfinite(value) for value in (anterior_height, middle_height, posterior_height)):
+        return None
+
+    return {
+        "offset_mm": float(center_offset_mm),
+        "ap_depth_mm": float(ap_len_occupied * spacing[axis_info["ap_axis"]]),
+        "ap_positions": ap_positions.tolist(),
+        "height_profile_mm": height_profile_mm.tolist(),
+        "area_profile_voxels": area_profile_vox.tolist(),
+        "anterior_height_mm": float(anterior_height),
+        "middle_height_mm": float(middle_height),
+        "posterior_height_mm": float(posterior_height),
+        "anterior_area_voxels": float(anterior_area),
+        "middle_area_voxels": float(middle_area),
+        "posterior_area_voxels": float(posterior_area),
+        "anterior_is_low_index": bool(anterior_is_low_index),
+        "orientation_confidence": float(orientation_confidence),
+        "orientation_note": str(orientation_note),
+    }
+
+
 @dataclass(frozen=True)
 class VertebralAxisInfo:
     ap_axis: int
@@ -380,6 +551,8 @@ def estimate_vertebral_heights(
     si_axis: int | None = None,
     edge_fraction: float = DEFAULT_EDGE_FRACTION,
     smoothing_window: int = DEFAULT_SMOOTHING_WINDOW,
+    sagittal_slab_thickness_mm: float = DEFAULT_SAGITTAL_SLAB_THICKNESS_MM,
+    parasagittal_offsets_mm: tuple[float, ...] = DEFAULT_PARASAGITTAL_OFFSETS_MM,
 ) -> dict[str, Any]:
     """
     Estimate anterior, middle, and posterior heights from a vertebral body.
@@ -425,18 +598,15 @@ def estimate_vertebral_heights(
         }
 
     reoriented = _reorient(body_mask, axis_info["ap_axis"], axis_info["si_axis"])
-    ap_len = int(reoriented.shape[0])
-    ap_positions = np.where(reoriented.any(axis=(1, 2)))[0]
-    if ap_positions.size < 3:
-        qc_flags.append("insufficient_ap_samples")
-    if ap_positions.size == 0:
-        qc_flags.append("empty_ap_profile")
+    centerline = _reoriented_centerline_lateral_positions(reoriented)
+    if centerline is None:
+        qc_flags.append("empty_centerline_profile")
         return {
             "ap_axis": axis_info["ap_axis"],
             "si_axis": axis_info["si_axis"],
             "lateral_axis": axis_info["lateral_axis"],
             "orientation_confidence": 0.0,
-            "orientation_note": "empty_ap_profile",
+            "orientation_note": "empty_centerline_profile",
             "anterior_is_low_index": True,
             "orientation_status": "indeterminate",
             "ap_depth_mm": 0.0,
@@ -456,57 +626,83 @@ def estimate_vertebral_heights(
             "qc_flags": qc_flags,
         }
 
-    ap_start = int(ap_positions[0])
-    ap_stop = int(ap_positions[-1] + 1)
-    reoriented_occupied = reoriented[ap_start:ap_stop]
-    ap_len_occupied = int(reoriented_occupied.shape[0])
+    centerline_si_range, centerline_lateral_positions = centerline
+    slab_measurements = []
+    for offset_mm in parasagittal_offsets_mm:
+        slab_result = _measure_parasagittal_slab(
+            reoriented,
+            centerline_si_range=centerline_si_range,
+            centerline_lateral_positions=centerline_lateral_positions,
+            spacing=spacing,
+            axis_info=axis_info,
+            center_offset_mm=float(offset_mm),
+            slab_thickness_mm=sagittal_slab_thickness_mm,
+            edge_fraction=edge_fraction,
+            smoothing_window=smoothing_window,
+        )
+        if slab_result is not None:
+            slab_measurements.append(slab_result)
 
-    height_profile_vox = np.zeros(ap_len_occupied, dtype=np.float64)
-    area_profile_vox = reoriented_occupied.sum(axis=(1, 2)).astype(np.float64)
-    for ap_idx in range(ap_len_occupied):
-        slab = reoriented_occupied[ap_idx]
-        occupied_si = np.where(slab.any(axis=1))[0]
-        if occupied_si.size == 0:
-            continue
-        height_profile_vox[ap_idx] = float(occupied_si[-1] - occupied_si[0] + 1)
+    if not slab_measurements:
+        qc_flags.append("no_valid_parasagittal_slabs")
+        return {
+            "ap_axis": axis_info["ap_axis"],
+            "si_axis": axis_info["si_axis"],
+            "lateral_axis": axis_info["lateral_axis"],
+            "orientation_confidence": 0.0,
+            "orientation_note": "no_valid_parasagittal_slabs",
+            "anterior_is_low_index": True,
+            "orientation_status": "indeterminate",
+            "ap_depth_mm": 0.0,
+            "ap_positions": [],
+            "height_profile_mm": [],
+            "area_profile_voxels": [],
+            "anterior_height_mm": None,
+            "middle_height_mm": None,
+            "posterior_height_mm": None,
+            "anterior_area_voxels": None,
+            "middle_area_voxels": None,
+            "posterior_area_voxels": None,
+            "anterior_posterior_ratio": None,
+            "middle_posterior_ratio": None,
+            "anterior_middle_ratio": None,
+            "height_uniformity_ratio": None,
+            "qc_flags": qc_flags,
+        }
 
-    height_profile_mm = height_profile_vox * float(spacing[axis_info["si_axis"]])
-    height_profile_mm = _moving_average(height_profile_mm, smoothing_window)
-    area_profile_vox = _moving_average(area_profile_vox, smoothing_window)
+    if len(slab_measurements) < max(3, len(parasagittal_offsets_mm) // 2):
+        qc_flags.append("limited_parasagittal_slabs")
 
-    anterior_is_low_index, orientation_confidence, orientation_note = _infer_anterior_is_low_index(
-        reoriented_occupied,
-        edge_fraction,
+    representative = min(
+        slab_measurements,
+        key=lambda item: (abs(float(item["offset_mm"])), -float(item["orientation_confidence"])),
     )
+    anterior_height = float(np.median([float(item["anterior_height_mm"]) for item in slab_measurements]))
+    middle_height = float(np.median([float(item["middle_height_mm"]) for item in slab_measurements]))
+    posterior_height = float(np.median([float(item["posterior_height_mm"]) for item in slab_measurements]))
+    anterior_area = float(np.median([float(item["anterior_area_voxels"]) for item in slab_measurements]))
+    middle_area = float(np.median([float(item["middle_area_voxels"]) for item in slab_measurements]))
+    posterior_area = float(np.median([float(item["posterior_area_voxels"]) for item in slab_measurements]))
+    ap_depth_mm = float(np.median([float(item["ap_depth_mm"]) for item in slab_measurements]))
+
+    orientation_confidences = np.asarray(
+        [float(item["orientation_confidence"]) for item in slab_measurements],
+        dtype=np.float64,
+    )
+    orientation_confidence = float(np.median(orientation_confidences)) if orientation_confidences.size else 0.0
+    anterior_votes = np.asarray(
+        [1.0 if bool(item["anterior_is_low_index"]) else -1.0 for item in slab_measurements],
+        dtype=np.float64,
+    )
+    weighted_vote = float(np.sum(anterior_votes * np.maximum(orientation_confidences, 0.05)))
+    anterior_is_low_index = bool(weighted_vote >= 0.0)
+    orientation_note = str(representative["orientation_note"])
+    ap_positions = representative["ap_positions"]
+    height_profile_mm = representative["height_profile_mm"]
+    area_profile_vox = representative["area_profile_voxels"]
+
     if orientation_confidence < 0.2:
         qc_flags.append("orientation_ambiguous")
-
-    edge_width = max(1, int(round(ap_len_occupied * edge_fraction)))
-    left_indices = np.arange(0, edge_width)
-    right_indices = np.arange(max(0, ap_len_occupied - edge_width), ap_len_occupied)
-    mid_start = max(0, ap_len_occupied // 2 - edge_width // 2)
-    mid_end = min(ap_len_occupied, mid_start + edge_width)
-    middle_indices = np.arange(mid_start, mid_end)
-
-    if not anterior_is_low_index:
-        anterior_indices = right_indices
-        posterior_indices = left_indices
-    else:
-        anterior_indices = left_indices
-        posterior_indices = right_indices
-
-    if anterior_indices.size == 0 or posterior_indices.size == 0 or middle_indices.size == 0:
-        qc_flags.append("insufficient_sampling_windows")
-
-    anterior_height = _window_median(height_profile_mm, int(np.median(anterior_indices)) if anterior_indices.size else 0, edge_width)
-    middle_height = _window_median(height_profile_mm, int(np.median(middle_indices)) if middle_indices.size else ap_len_occupied // 2, edge_width)
-    posterior_height = _window_median(height_profile_mm, int(np.median(posterior_indices)) if posterior_indices.size else ap_len_occupied - 1, edge_width)
-    anterior_area = _window_median(area_profile_vox, int(np.median(anterior_indices)) if anterior_indices.size else 0, edge_width)
-    middle_area = _window_median(area_profile_vox, int(np.median(middle_indices)) if middle_indices.size else ap_len_occupied // 2, edge_width)
-    posterior_area = _window_median(area_profile_vox, int(np.median(posterior_indices)) if posterior_indices.size else ap_len_occupied - 1, edge_width)
-
-    ap_span_vox = ap_len_occupied
-    ap_depth_mm = float(ap_span_vox * spacing[axis_info["ap_axis"]])
 
     heights = np.array([anterior_height, middle_height, posterior_height], dtype=np.float64)
     max_height = float(np.nanmax(heights)) if np.any(np.isfinite(heights)) else float("nan")
@@ -535,9 +731,9 @@ def estimate_vertebral_heights(
         "anterior_is_low_index": bool(anterior_is_low_index),
         "orientation_status": "known" if orientation_confidence >= 0.2 else "indeterminate",
         "ap_depth_mm": ap_depth_mm,
-        "ap_positions": ap_positions.tolist(),
-        "height_profile_mm": height_profile_mm.tolist(),
-        "area_profile_voxels": area_profile_vox.tolist(),
+        "ap_positions": list(ap_positions),
+        "height_profile_mm": list(height_profile_mm),
+        "area_profile_voxels": list(area_profile_vox),
         "anterior_height_mm": float(anterior_height) if np.isfinite(anterior_height) else None,
         "middle_height_mm": float(middle_height) if np.isfinite(middle_height) else None,
         "posterior_height_mm": float(posterior_height) if np.isfinite(posterior_height) else None,
@@ -767,6 +963,27 @@ def _select_height_key_from_summary(summary: dict[str, Any]) -> str | None:
     return min(finite_components, key=lambda item: item[1])[0]
 
 
+def _summary_is_valid_adjacent_reference(summary: dict[str, Any]) -> bool:
+    if not isinstance(summary, dict):
+        return False
+    if summary.get("genant_grade") != 0:
+        return False
+    if summary.get("mask_complete") is False:
+        return False
+
+    qc_flags = {str(flag) for flag in summary.get("qc_flags", [])}
+    blocking_qc_flags = {
+        "mask_incomplete",
+        "orientation_ambiguous",
+        "body_fraction_low",
+        "adjacent_reference_unavailable",
+        "adjacent_reference_invalid",
+    }
+    if qc_flags & blocking_qc_flags:
+        return False
+    return True
+
+
 def _nearest_adjacent_levels(level: str, available_levels: list[str]) -> list[str]:
     target_index = vertebra_level_index(level)
     if target_index is None:
@@ -841,7 +1058,6 @@ def refine_classification_with_adjacent_reference(
 
         adjacent_levels = _nearest_adjacent_levels(level, available_levels)
         normal_reference_levels = []
-        fallback_reference_levels = []
         for candidate in adjacent_levels:
             candidate_summary = per_vertebra.get(candidate, {})
             candidate_morphometry = (
@@ -852,12 +1068,10 @@ def refine_classification_with_adjacent_reference(
             candidate_height = candidate_morphometry.get(height_key)
             if candidate_height is None:
                 continue
-            if candidate_summary.get("genant_grade") == 0:
+            if _summary_is_valid_adjacent_reference(candidate_summary):
                 normal_reference_levels.append(candidate)
-            else:
-                fallback_reference_levels.append(candidate)
 
-        reference_levels = normal_reference_levels or fallback_reference_levels
+        reference_levels = normal_reference_levels
         reference_heights = []
         for candidate in reference_levels:
             candidate_summary = per_vertebra.get(candidate, {})
@@ -892,9 +1106,6 @@ def refine_classification_with_adjacent_reference(
             updated["qc_flags"] = sorted(set(qc_flags))
             refined[level] = updated
             continue
-
-        if not normal_reference_levels:
-            qc_flags.append("adjacent_reference_not_normal")
 
         reference_height = float(np.median(np.asarray(reference_heights, dtype=np.float64)))
         height_loss_percent = (

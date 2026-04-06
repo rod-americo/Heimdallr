@@ -103,8 +103,8 @@ These five JSON files are host-local operational config and are ignored by Git:
 
 1. **Intake**: Study arrives via DICOM C-STORE (`intake`) or manual `POST /upload`.
 2. **Spooling**: Files are stored in `runtime/intake/uploads/`.
-3. **Preparation**: `prepare` worker extracts ZIP, selects the best series using `config/series_selection.json`, converts to NIfTI via `dcm2niix`, and creates `metadata/id.json`.
-4. **Segmentation**: `segmentation` worker claims the case, runs segmentation (e.g., TotalSegmentator), and archives results in `runtime/studies/<CaseID>/derived/`.
+3. **Preparation**: `prepare` worker extracts ZIP, enumerates candidate series, converts them to NIfTI via `dcm2niix`, records phase metadata, and creates `metadata/id.json`.
+4. **Segmentation**: `segmentation` worker claims the case, selects the series using `config/series_selection.json`, runs segmentation (e.g., TotalSegmentator), and archives results in `runtime/studies/<CaseID>/derived/`.
 5. **Metrics**: `metrics` worker executes derived calculations (volumetry, density) and updates `metadata/resultados.json`.
 6. **DICOM Egress**: `metrics` enqueues generated DICOM artifacts into `dicom_egress_queue`, and `dicom_egress` delivers them to configured remote SCP destinations.
 7. **Storage Reclamation**: `space_manager` periodically checks filesystem usage and, above threshold, deletes the oldest non-active case directories under `runtime/studies/` while marking them as purged in SQLite.
@@ -215,7 +215,8 @@ Legacy compatibility wrapper:
 
 - **Adjusting endpoints**: Edit the relevant router under `heimdallr/control_plane/routers/`.
 - **Changing series selection**: Update `config/series_selection.json`.
-- **Adding a clinical metric**: Add a job under `heimdallr/metrics/jobs/` and enable it in the host-local `config/metrics_pipeline.json`.
+- **Adding a clinical metric**: Add a production job under `heimdallr/metrics/jobs/` and enable it in the host-local `config/metrics_pipeline.json`.
+- **Keeping an experimental metric out of the default profile**: Place it under `heimdallr/metrics/jobs/tests/` or `heimdallr/metrics/analysis/` and use an explicit `jobs[].module` override only in host-local config.
 - **Changing segmentation tasks or CPU/GPU/threading policy**: Update the host-local `config/segmentation_pipeline.json` created from `config/segmentation_pipeline.example.json`.
 - **Changing enabled metrics or job parallelism**: Update the host-local `config/metrics_pipeline.json` created from `config/metrics_pipeline.example.json`.
 - **Changing storage reclamation policy**: Update the host-local `config/space_manager.json` created from `config/space_manager.example.json`.

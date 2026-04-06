@@ -12,8 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from heimdallr.metrics.jobs import body_fat_abdominal_volumes, body_fat_l3_slice  # noqa: E402
-from heimdallr.metrics.jobs._body_fat_job_common import (  # noqa: E402
+from heimdallr.metrics.jobs.tests import body_fat_abdominal_volumes, body_fat_l3_slice  # noqa: E402
+from heimdallr.metrics.jobs.tests._body_fat_job_common import (  # noqa: E402
     build_abdominal_aggregate,
     compute_level_measurements,
 )
