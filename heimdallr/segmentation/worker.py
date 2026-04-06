@@ -45,6 +45,8 @@ from heimdallr.shared.paths import (
 )
 from heimdallr.shared.sqlite import connect as db_connect
 
+settings.configure_service_stdio()
+
 path_entries = [str(settings.TOTALSEG_BIN_DIR), str(Path(sys.executable).parent)]
 os.environ["PATH"] = os.pathsep.join(path_entries + [os.environ["PATH"]])
 LOCAL_TZ = ZoneInfo(settings.TIMEZONE)

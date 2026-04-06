@@ -205,6 +205,21 @@ def local_timestamp(fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
     return local_now().strftime(fmt)
 
 
+def configure_service_stdio() -> None:
+    """Force line-buffered stdout/stderr for long-running service processes.
+
+    Resident workers mainly use ``print()`` for operational progress. Under
+    systemd these streams can stay block-buffered and only flush on restart,
+    which makes `journalctl`/`skuld logs` misleading during live monitoring.
+    Jobs that emit structured JSON should not call this helper.
+    """
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            reconfigure(line_buffering=True)
+
+
 def _resolve_binary(env_name: str, bundled_name: str, fallback_name: str) -> str:
     explicit = os.getenv(env_name)
     if explicit:

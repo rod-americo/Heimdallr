@@ -50,6 +50,8 @@ from heimdallr.shared.paths import (
 from heimdallr.shared.spool import CLAIM_SUFFIX, claim_path, unclaim_path
 from heimdallr.shared.sqlite import connect as db_connect
 
+settings.configure_service_stdio()
+
 OUTPUT_BASE_DIR = settings.OUTPUT_DIR
 TOTALSEG_GET_PHASE_BIN = settings.TOTALSEG_GET_PHASE_BIN
 INTAKE_MANIFEST_NAME = "_heimdallr_intake.json"
