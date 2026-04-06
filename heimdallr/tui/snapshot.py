@@ -894,9 +894,9 @@ def _scan_system_processes() -> dict[str, list[dict[str, str]]]:
 
 def _service_patterns() -> dict[str, tuple[str, ...]]:
     return {
-        "intake": ("-m heimdallr.intake", "heimdallr/intake", "services/dicom_listener.py"),
+        "intake": ("-m heimdallr.intake", "heimdallr/intake", "intake/gateway.py"),
         "prepare": ("-m heimdallr.prepare", "heimdallr/prepare", "prepare/worker.py"),
-        "segmentation": ("-m heimdallr.segmentation", "heimdallr/segmentation", "/run.py", " run.py"),
+        "segmentation": ("-m heimdallr.segmentation", "heimdallr/segmentation"),
         "metrics": ("-m heimdallr.metrics", "heimdallr/metrics", "metrics/worker.py"),
     }
 

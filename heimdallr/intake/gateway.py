@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """
-Heimdallr DICOM Listener (dicom_listener.py)
+Heimdallr DICOM Intake Gateway
 
 DICOM C-STORE SCP (Service Class Provider) that:
 1. Receives DICOM images from modalities/PACS via DICOM protocol

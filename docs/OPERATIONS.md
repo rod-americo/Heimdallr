@@ -36,31 +36,31 @@ Run as independent services:
 
 ```bash
 # API + Dashboard
-source venv/bin/activate
+source .venv/bin/activate
 python -m heimdallr.control_plane
 
 # Prepare worker
-source venv/bin/activate
+source .venv/bin/activate
 python -m heimdallr.prepare
 
 # Segmentation worker
-source venv/bin/activate
+source .venv/bin/activate
 python -m heimdallr.segmentation
 
 # Metrics worker
-source venv/bin/activate
+source .venv/bin/activate
 python -m heimdallr.metrics
 
 # DICOM listener
-source venv/bin/activate
+source .venv/bin/activate
 python -m heimdallr.intake
 
 # DICOM egress worker
-source venv/bin/activate
+source .venv/bin/activate
 python -m heimdallr.dicom_egress
 
 # Space manager
-source venv/bin/activate
+source .venv/bin/activate
 python -m heimdallr.space_manager
 ```
 
@@ -188,20 +188,20 @@ sqlite3 database/dicom.db "PRAGMA integrity_check;"
 Use the batch recalculation script when derived metrics need to be regenerated from existing case outputs:
 
 ```bash
-source venv/bin/activate
-venv/bin/python scripts/retroactive_recalculate_metrics.py --limit 10
+source .venv/bin/activate
+.venv/bin/python scripts/retroactive_recalculate_metrics.py --limit 10
 ```
 
 Common variants:
 
-- Skip PNG regeneration: `venv/bin/python scripts/retroactive_recalculate_metrics.py --skip-overlays`
-- Process a specific case: `venv/bin/python scripts/retroactive_recalculate_metrics.py --case <case_id>`
-- Parallelize cautiously: `venv/bin/python scripts/retroactive_recalculate_metrics.py --workers 2`
+- Skip PNG regeneration: `.venv/bin/python scripts/retroactive_recalculate_metrics.py --skip-overlays`
+- Process a specific case: `.venv/bin/python scripts/retroactive_recalculate_metrics.py --case <case_id>`
+- Parallelize cautiously: `.venv/bin/python scripts/retroactive_recalculate_metrics.py --workers 2`
 
 Legacy compatibility wrapper:
 
 ```bash
-venv/bin/python scripts/retroactive_emphysema.py
+.venv/bin/python scripts/retroactive_emphysema.py
 ```
 
 ## Incident Triage Shortlist
@@ -215,7 +215,7 @@ venv/bin/python scripts/retroactive_emphysema.py
 
 - **Adjusting endpoints**: Edit the relevant router under `heimdallr/control_plane/routers/`.
 - **Changing series selection**: Update `config/series_selection.json`.
-- **Adding a clinical metric**: Add a job under `heimdallr/metrics/jobs/` and register it in the pipeline config.
+- **Adding a clinical metric**: Add a job under `heimdallr/metrics/jobs/` and enable it in the host-local `config/metrics_pipeline.json`.
 - **Changing segmentation tasks or CPU/GPU/threading policy**: Update the host-local `config/segmentation_pipeline.json` created from `config/segmentation_pipeline.example.json`.
 - **Changing enabled metrics or job parallelism**: Update the host-local `config/metrics_pipeline.json` created from `config/metrics_pipeline.example.json`.
 - **Changing storage reclamation policy**: Update the host-local `config/space_manager.json` created from `config/space_manager.example.json`.

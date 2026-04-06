@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from PIL import Image
 
-from deid_gateway import (
+from heimdallr.deid_gateway import (
     DeidReviewRequiredError,
     coarsen_age,
     deidentify_image_payload,
@@ -34,7 +34,7 @@ class TestDeidGateway(unittest.TestCase):
         img.save(raw, format="PNG")
 
         with patch(
-            "deid_gateway._detect_text_boxes_ocr",
+            "heimdallr.deid_gateway._detect_text_boxes_ocr",
             return_value=([], {"ocr_available": True, "ocr_engine": "mock"}),
         ):
             result = deidentify_image_payload(raw.getvalue())
@@ -52,7 +52,7 @@ class TestDeidGateway(unittest.TestCase):
 
         with patch.dict("os.environ", {"DEID_OCR_ACTION": "block"}):
             with patch(
-                "deid_gateway._detect_text_boxes_ocr",
+                "heimdallr.deid_gateway._detect_text_boxes_ocr",
                 return_value=(boxes, {"ocr_available": True, "ocr_engine": "mock"}),
             ):
                 with self.assertRaises(DeidReviewRequiredError):

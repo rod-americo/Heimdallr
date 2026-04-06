@@ -6,8 +6,6 @@ Heimdallr is an imaging operations pipeline designed to convert incoming radiolo
 
 ## Runtime Components
 
-The repository is currently transitioning from script-oriented entrypoints to a modular package layout under `heimdallr/`.
-
 1. `heimdallr/intake/`
 - DICOM C-STORE intake service (`AE=HEIMDALLR`, default port `11114`)
 - Owns the DICOM ingress gateway runtime
@@ -18,12 +16,12 @@ The repository is currently transitioning from script-oriented entrypoints to a 
 
 3. `heimdallr/prepare/`
 - Validates uploaded study package
-- Selects target series and converts DICOM to NIfTI (`dcm2niix`)
+- Enumerates candidate series, converts DICOM to NIfTI (`dcm2niix`), and detects contrast phase
 - Owns the study preparation worker runtime
 
 4. `heimdallr/segmentation/`
 - Claims prepared studies from `segmentation_queue`
-- Executes segmentation pipeline and baseline segmentation metrics
+- Selects the target series and executes the segmentation pipeline
 - Writes outputs to `runtime/studies/<case_id>/` and updates database fields
 
 5. `heimdallr/shared/`
@@ -99,4 +97,3 @@ PACS/Modality (DICOM) --> heimdallr/intake --> /upload (heimdallr/control_plane)
 - Operations runbook: `docs/OPERATIONS.md`
 - API contracts: `docs/API.md`
 - Validation stages: `docs/validation-stage-manual.md`
-- Strategic roadmap: `docs/UPCOMING.md`
