@@ -882,6 +882,7 @@ def main():
                 segmentation_files.discard(f_path)
         try:
             ok = fut.result()  # Raise exception if case failed
+            print(f"[Segmentation] {'Done' if ok else 'Failed'}: {f_path.name}")
             if queue_id is not None:
                 if ok:
                     mark_segmentation_queue_item_done(queue_id)
@@ -917,7 +918,7 @@ def main():
                         if input_path in segmentation_files:
                             mark_segmentation_queue_item_error(queue_id, f"Input file already in segmentation set: {input_path.name}")
                             continue
-                        print(f"Submitting queued case: {input_path.name}")
+                        print(f"[Segmentation] Claimed queue item: {input_path.name}")
                         segmentation_files.add(input_path)
                         future = executor.submit(segment_case, input_path)
                         future.add_done_callback(lambda fut, p=input_path, qid=queue_id: on_complete(fut, p, qid))
@@ -944,7 +945,7 @@ def main():
                             continue
                             
                         # Submit new case for segmentation
-                        print(f"Submitting new case: {f.name}")
+                        print(f"[Segmentation] Claimed input file: {f.name}")
                         segmentation_files.add(f)
                         future = executor.submit(segment_case, f)
                         future.add_done_callback(lambda fut, p=f: on_complete(fut, p, None))

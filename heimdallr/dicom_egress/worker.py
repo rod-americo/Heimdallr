@@ -153,6 +153,10 @@ def main() -> int:
                     attempts_before_claim,
                 ) = queue_item
 
+                print(
+                    f"[DICOM Egress] Claimed {case_id}: {artifact_path} -> "
+                    f"{destination_name} ({destination_called_aet}@{destination_host}:{destination_port})"
+                )
                 try:
                     send_dicom_export(
                         case_id=case_id,

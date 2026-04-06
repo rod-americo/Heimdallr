@@ -485,6 +485,7 @@ def _enqueue_case_dicom_exports(
     finally:
         conn.close()
 
+    logger.log(f"[Metrics] Enqueued {enqueued} DICOM exports")
     return enqueued
 
 
@@ -572,6 +573,7 @@ def main() -> int:
             segmentation_cases.discard(case_path)
         try:
             ok = fut.result()
+            print(f"[Metrics] {'Done' if ok else 'Failed'}: {case_path.name}")
             if queue_id is not None:
                 if ok:
                     mark_metrics_queue_item_done(queue_id)
@@ -595,6 +597,7 @@ def main() -> int:
                         if not case_path.exists():
                             mark_metrics_queue_item_error(queue_id, f"Input path not found: {case_path}")
                         else:
+                            print(f"[Metrics] Claimed queue item: {case_path.name}")
                             with lock:
                                 segmentation_cases.add(case_path)
                             future = executor.submit(segment_case_metrics, case_path)

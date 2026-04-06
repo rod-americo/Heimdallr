@@ -433,7 +433,7 @@ def process_zip(zip_path):
     if not zip_path.exists():
         raise FileNotFoundError(f"File {zip_path} not found.")
 
-    print(f"Segmentation {zip_path.name}...")
+    print(f"=== Prepare Upload: {unclaim_path(zip_path).name} ===")
 
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_dir = Path(temp_dir)
@@ -556,6 +556,10 @@ def process_zip(zip_path):
         
         clinical_name = generate_clinical_name(global_meta["PatientName"], str(study_date), str(acc_num))
         print(f"  Clinical Name (CaseID): {clinical_name}")
+        print(
+            f"[Prepare] Case {clinical_name}: modality={exam_modality}, "
+            f"series={prepare_stats['series_kept_for_conversion']}"
+        )
         
         # Override CaseID with ClinicalName
         case_id = clinical_name
@@ -760,6 +764,7 @@ def process_zip(zip_path):
         # 5. Final Handover & Metadata Enrichment
         if available_series:
             enqueue_case_for_segmentation(case_id)
+            print(f"[Prepare] Enqueued for segmentation: {case_id}")
             print(f"\n  Ready: {study_dir(case_id)}")
             print(str(study_dir(case_id)))
 
@@ -825,6 +830,8 @@ def process_zip(zip_path):
             except Exception as e:
                 print(f"  [Warning] Failed to update prepare timing in DB: {e}")
 
+            print(f"[Prepare] ✓ Complete {case_id} ({prepare_elapsed_str})")
+
         else:
              raise PrepareError("No series were successfully converted.")
 
@@ -840,6 +847,7 @@ def process_zip(zip_path):
 def process_spooled_zip(zip_path: Path) -> bool:
     """Process a claimed spool ZIP and keep the watchdog alive on failures."""
     try:
+        print(f"[Prepare] Claimed upload: {unclaim_path(zip_path).name}")
         process_zip(zip_path)
         return True
     except Exception as exc:
