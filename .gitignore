@@ -55,3 +55,4 @@ upcoming_features.md
 config/dicom_egress.json
 config/metrics_pipeline.json
 config/presentation.json
+config/segmentation_pipeline.json

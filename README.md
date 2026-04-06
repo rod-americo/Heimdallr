@@ -105,10 +105,10 @@ Heimdallr/
 ├── config/                       # JSON pipeline profiles
 │   ├── intake_pipeline.json      #   Listener and prepare watchdog tuning
 │   ├── series_selection.json     #   Series selection strategy
-│   ├── segmentation_pipeline.json#   TotalSegmentator task list
-│   ├── metrics_pipeline.json     #   Post-segmentation job list
-│   ├── dicom_egress.example.json #   Example outbound DICOM destinations
-│   └── presentation.example.json #   Example patient/presentation profiles
+│   ├── segmentation_pipeline.example.json # Example TotalSegmentator task list
+│   ├── metrics_pipeline.example.json      # Example post-segmentation job list
+│   ├── dicom_egress.example.json          # Example outbound DICOM destinations
+│   └── presentation.example.json          # Example patient/presentation profiles
 ├── database/                     # Persistent storage
 │   ├── schema.sql                #   SQLite schema (dicom_metadata, segmentation/metrics/egress queues)
 │   └── README.md                 #   Schema documentation
@@ -253,12 +253,21 @@ Key environment variables:
 | `HEIMDALLR_METRICS_MODULES` | *(see settings.py)* | Comma-separated enabled metrics |
 | `TOTALSEGMENTATOR_LICENSE` | — | TotalSegmentator license key |
 
-Before enabling outbound delivery or customizing display/locale on a host, create the local config files from the versioned examples:
+Before enabling segmentation, metrics, outbound delivery, or customized display/locale on a host, create the local config files from the versioned examples:
 
 ```bash
+cp config/segmentation_pipeline.example.json config/segmentation_pipeline.json
+cp config/metrics_pipeline.example.json config/metrics_pipeline.json
 cp config/dicom_egress.example.json config/dicom_egress.json
 cp config/presentation.example.json config/presentation.json
 ```
+
+These four JSON files are treated as host-local operational config and are ignored by Git:
+
+- `config/segmentation_pipeline.json`
+- `config/metrics_pipeline.json`
+- `config/dicom_egress.json`
+- `config/presentation.json`
 
 See [`heimdallr/shared/settings.py`](heimdallr/shared/settings.py) for the complete reference.
 
