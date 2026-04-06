@@ -11,7 +11,7 @@ This document summarizes high-value API contracts used in Heimdallr workflows.
 
 - Current contract line: `v1` (path is unversioned today).
 - Backward-compatible changes may be shipped in-place.
-- Breaking changes should be documented in `CHANGELOG.md` before release.
+- Breaking changes should be documented in the affected API and operations docs before release.
 
 ## Authentication and Access Model
 
@@ -26,7 +26,7 @@ This document summarizes high-value API contracts used in Heimdallr workflows.
 - `POST /upload`
 - `GET /api/tools/uploader`
 
-`POST /upload` accepts a `.zip` payload and launches the `heimdallr.prepare` worker flow asynchronously using the repository virtual environment Python binary.
+`POST /upload` accepts a `.zip` payload and hands it off asynchronously to the `heimdallr.prepare` flow.
 
 ### Patients and Results
 

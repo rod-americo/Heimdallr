@@ -4,11 +4,8 @@
 # Documentation owners
 /docs/ @rod-americo
 /README.md @rod-americo
-/UPCOMING.md @rod-americo
 
 # Core pipeline owners
-/server.py @rod-americo
-/prepare.py @rod-americo
-/run.py @rod-americo
-/dicom_listener.py @rod-americo
-/metrics.py @rod-americo
+/heimdallr/ @rod-americo
+/config/ @rod-americo
+/database/ @rod-americo

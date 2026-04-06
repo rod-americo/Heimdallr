@@ -176,7 +176,6 @@ def deidentify_image_payload(file_bytes: bytes) -> DeidImageResult:
     }
 
     image: Image.Image
-    # Try DICOM first.
     try:
         dicom_ds = pydicom.dcmread(io.BytesIO(file_bytes), force=True)
         if hasattr(dicom_ds, "PixelData"):
@@ -185,7 +184,6 @@ def deidentify_image_payload(file_bytes: bytes) -> DeidImageResult:
         else:
             raise ValueError("DICOM without PixelData.")
     except Exception:
-        # Fallback to regular image formats.
         try:
             image = Image.open(io.BytesIO(file_bytes)).convert("RGB")
             details["input_format"] = "image"
@@ -218,9 +216,7 @@ def deidentify_image_payload(file_bytes: bytes) -> DeidImageResult:
 
 
 def sanitize_free_text(value: str | None) -> str:
-    """
-    Remove common direct identifier patterns from free text metadata.
-    """
+    """Remove common direct identifier patterns from free text metadata."""
     if not value:
         return ""
     text = value.strip()
@@ -232,9 +228,7 @@ def sanitize_free_text(value: str | None) -> str:
 
 
 def coarsen_age(value: str | None) -> str:
-    """
-    Coarsen age into bands to reduce re-identification risk.
-    """
+    """Coarsen age into bands to reduce re-identification risk."""
     if not value:
         return "unknown age"
 
@@ -270,9 +264,7 @@ def coarsen_age(value: str | None) -> str:
 
 
 def sanitize_outbound_metadata(payload: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-    """
-    Apply metadata sanitization to known outbound fields.
-    """
+    """Apply metadata sanitization to known outbound fields."""
     clean = dict(payload)
     details: Dict[str, Any] = {"metadata_redaction": True}
 

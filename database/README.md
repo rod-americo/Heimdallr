@@ -21,9 +21,11 @@ Stores DICOM metadata and calculation results for all processed studies.
 | `CallingAET` | TEXT | DICOM Calling AE Title captured by intake |
 | `RemoteIP` | TEXT | Sender IP captured by intake |
 | `IdJson` | TEXT | Complete id.json from output directory (includes Pipeline info, SelectedSeries) |
-| `JsonDump` | TEXT | Basic metadata JSON from prepare.py |
+| `JsonDump` | TEXT | Basic metadata JSON from `heimdallr.prepare` |
 | `DicomMetadata` | TEXT | Complete DICOM tags JSON from selected series |
 | `CalculationResults` | TEXT | Computed metrics JSON (volumes, densities, etc.) |
+| `ArtifactsPurged` | INTEGER | Whether runtime artifacts were reclaimed from disk |
+| `ArtifactsPurgedAt` | TIMESTAMP | When runtime artifacts were purged |
 | `ProcessedAt` | TIMESTAMP | When study was first processed (America/Sao_Paulo) |
 
 ### Queue Tables
@@ -47,7 +49,7 @@ Performance indexes on commonly queried fields:
 
 ## Initialization
 
-The database is automatically created by `prepare.py` on first run. The schema includes:
+The database is automatically created by the Heimdallr workers on first run. The schema includes:
 
 1. Table creation with `CREATE TABLE IF NOT EXISTS`
 2. Automatic migration for new columns using `ALTER TABLE` (if table exists)
@@ -56,7 +58,7 @@ The database is automatically created by `prepare.py` on first run. The schema i
 ## Data Flow
 
 ```
-prepare.py
+heimdallr.prepare
   ↓
   Inserts: StudyInstanceUID, PatientName, ClinicalName, 
            AccessionNumber, StudyDate, Modality, JsonDump
@@ -148,4 +150,4 @@ sqlite3 database/dicom.db "PRAGMA integrity_check;"
 - Added `DicomMetadata` column for full DICOM tags
 - Added `CalculationResults` column for computed metrics
 - Created performance indexes
-- Implemented automatic migration in `prepare.py`
+- Implemented automatic migration in the SQLite access layer

@@ -18,7 +18,7 @@ Thank you for your interest in contributing to Heimdallr! We welcome contributio
 
 - Use the PR template and include reproducible test steps.
 - Document operational or API contract changes in `README.md`, `docs/API.md`, or `docs/OPERATIONS.md` when applicable.
-- Record user-visible or contract-relevant updates in `CHANGELOG.md` (`[Unreleased]` section).
+- Record user-visible or contract-relevant updates in `README.md`, `docs/API.md`, or `docs/OPERATIONS.md`.
 - Do not include PHI/PII, credentials, or sensitive clinical data in code, fixtures, screenshots, or logs.
 
 ## Licensing

@@ -57,11 +57,9 @@ runtime/studies/<case_id>/ + database/dicom.db
 
 6. **Space Manager** — Resident storage guard that monitors the filesystem hosting `runtime/studies/` and purges the oldest completed case directories when disk usage reaches a configurable host-local threshold.
 
-7. **Control Plane** — FastAPI application serving the web dashboard, upload endpoint, patient/results API, and PDF case report generation.
+7. **Control Plane** — FastAPI application serving the web dashboard, upload endpoint, patient/results API, and deterministic PDF export of case outputs.
 
 8. **Operations TUI** — Textual-based terminal dashboard with live process monitoring, queue inspection, and study browsing.
-
-9. **De-identification Gateway** — OCR-based burned-in text detection and metadata scrubbing for outbound payloads (`services/deid_gateway.py`).
 
 ## Repository Layout
 
@@ -87,6 +85,7 @@ Heimdallr/
 │   │   │   └── vertebral_fracture.py  # Vertebral fracture morphometry
 │   │   ├── worker.py             #   Queue-driven job dispatcher
 │   │   └── jobs/                 #   Individual measurement modules
+│   ├── deid_gateway.py           # OCR-based pixel/text de-identification helpers
 │   ├── dicom_egress/             # Outbound DICOM artifact delivery worker
 │   │   ├── worker.py             #   Queue-driven C-STORE SCU dispatcher
 │   │   └── config.py             #   Destination config loader + routing helper
@@ -101,9 +100,6 @@ Heimdallr/
 │       ├── app.py                #   TUI application
 │       ├── snapshot.py           #   Runtime state snapshot collector
 │       └── dashboard.tcss        #   Textual CSS stylesheet
-├── services/                     # Standalone operational services
-│   ├── dicom_listener.py         #   Legacy DICOM listener (see heimdallr.intake)
-│   └── deid_gateway.py           #   De-identification gateway
 ├── config/                       # JSON pipeline profiles
 │   ├── intake_pipeline.json      #   Listener and prepare watchdog tuning
 │   ├── series_selection.json     #   Series selection strategy
@@ -236,7 +232,7 @@ Start the baseline services in separate terminals:
 | `GET` | `/api/patients/{case_id}/results` | Case calculation results |
 | `GET` | `/api/patients/{case_id}/metadata` | DICOM and pipeline metadata |
 | `GET` | `/api/patients/{case_id}/nifti` | Download canonical NIfTI |
-| `GET` | `/api/patients/{case_id}/report.pdf` | Generated PDF case report |
+| `GET` | `/api/patients/{case_id}/report.pdf` | Deterministic PDF export of case outputs |
 | `GET` | `/api/patients/{case_id}/download/{folder}` | Download artifact folder as ZIP |
 | `GET` | `/api/patients/{case_id}/images/{filename}` | Serve overlay or artifact image |
 | `GET` | `/api/patients/{case_id}/artifacts/{path}` | Serve arbitrary case artifact |
@@ -301,9 +297,7 @@ See [`heimdallr/shared/settings.py`](heimdallr/shared/settings.py) for the compl
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System architecture overview |
 | [`docs/API.md`](docs/API.md) | API contracts and examples |
 | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) | Operations runbook |
-| [`docs/UPCOMING.md`](docs/UPCOMING.md) | Roadmap and future modules |
 | [`docs/validation-stage-manual.md`](docs/validation-stage-manual.md) | Validation stage manual |
-| [`docs/pipeline-implementation-guidelines.md`](docs/pipeline-implementation-guidelines.md) | Pipeline implementation guidelines |
 | [`database/README.md`](database/README.md) | Database schema documentation |
 
 ## Governance

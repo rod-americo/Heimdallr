@@ -26,9 +26,9 @@ CREATE TABLE IF NOT EXISTS dicom_metadata (
     
     -- Metadata Storage (JSON)
     IdJson TEXT,                -- Complete id.json from output directory
-    JsonDump TEXT,              -- Basic metadata from prepare.py (legacy)
+    JsonDump TEXT,              -- Basic metadata from heimdallr.prepare (legacy)
     DicomMetadata TEXT,         -- Full DICOM tags from selected series
-    CalculationResults TEXT,    -- Computed metrics from run.py/metrics.py
+    CalculationResults TEXT,    -- Computed metrics from heimdallr.metrics
     PatientSex TEXT,
     Weight REAL,
     Height REAL,
