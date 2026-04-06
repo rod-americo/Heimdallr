@@ -19,6 +19,8 @@ from heimdallr.shared import settings, store
 from heimdallr.shared.paths import study_dir, study_id_json, study_logs_dir, study_results_json
 from heimdallr.shared.sqlite import connect as db_connect
 
+settings.configure_service_stdio()
+
 
 LOCAL_TZ = ZoneInfo(settings.TIMEZONE)
 JOB_NAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")

@@ -54,6 +54,8 @@ from heimdallr.shared import settings, store
 from heimdallr.shared.spool import atomic_write_bytes
 from heimdallr.shared.sqlite import connect as db_connect
 
+settings.configure_service_stdio()
+
 LOCAL_TZ = ZoneInfo(settings.TIMEZONE)
 INTAKE_MANIFEST_NAME = "_heimdallr_intake.json"
 

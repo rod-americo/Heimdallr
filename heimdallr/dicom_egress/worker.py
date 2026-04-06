@@ -21,6 +21,8 @@ from heimdallr.shared import settings, store
 from heimdallr.shared.paths import study_dir
 from heimdallr.shared.sqlite import connect as db_connect
 
+settings.configure_service_stdio()
+
 
 def ensure_dicom_egress_queue_table() -> None:
     conn = db_connect()
