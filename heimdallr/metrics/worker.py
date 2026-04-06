@@ -25,12 +25,16 @@ settings.configure_service_stdio()
 LOCAL_TZ = ZoneInfo(settings.TIMEZONE)
 JOB_NAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 JOB_MODULE_PREFIX = "heimdallr.metrics.jobs."
+JOB_ALLOWED_MODULE_PREFIXES = (
+    "heimdallr.metrics.jobs.",
+    "heimdallr.metrics.analysis.",
+)
 
 # Metrics job resolution is intentionally convention-based so operational
 # changes live in config/metrics_pipeline.json instead of this worker:
 # - jobs[].name="l3_muscle_area" -> heimdallr.metrics.jobs.l3_muscle_area
-# - jobs[].module may override the module path, but only inside the
-#   heimdallr.metrics.jobs namespace.
+# - jobs[].module may override the module path inside
+#   heimdallr.metrics.jobs or heimdallr.metrics.analysis.
 # This means toggling or parameterizing jobs in the JSON does not require a
 # worker restart; only changes to this worker module itself do.
 
@@ -233,8 +237,9 @@ def _resolve_job_module_name(job: dict) -> str:
     3. The worker will resolve it automatically without further code changes
 
     `jobs[].module` remains available for rare cases where the JSON name should
-    not match the module filename, but the override is restricted to the same
-    namespace to keep execution deterministic.
+    not match the module filename, including experimental jobs under
+    `heimdallr.metrics.jobs.tests` or analysis entrypoints under
+    `heimdallr.metrics.analysis`.
     """
     job_name = str(job.get("name", "") or "").strip()
     if not JOB_NAME_PATTERN.fullmatch(job_name):
@@ -242,9 +247,11 @@ def _resolve_job_module_name(job: dict) -> str:
 
     configured_module = str(job.get("module", "") or "").strip()
     module_name = configured_module or f"{JOB_MODULE_PREFIX}{job_name}"
-    if not module_name.startswith(JOB_MODULE_PREFIX):
+    if not any(module_name.startswith(prefix) for prefix in JOB_ALLOWED_MODULE_PREFIXES):
         raise RuntimeError(
-            f"Metrics job '{job_name}' must resolve inside {JOB_MODULE_PREFIX.rstrip('.')}"
+            "Metrics job "
+            f"'{job_name}' must resolve inside one of "
+            f"{', '.join(prefix.rstrip('.') for prefix in JOB_ALLOWED_MODULE_PREFIXES)}"
         )
     if importlib.util.find_spec(module_name) is None:
         raise RuntimeError(f"Metrics job '{job_name}' module not found: {module_name}")

@@ -24,11 +24,11 @@ class TestMetricsWorker(unittest.TestCase):
         module_name = _resolve_job_module_name(
             {
                 "name": "custom_alias",
-                "module": "heimdallr.metrics.jobs.l3_muscle_area",
+                "module": "heimdallr.metrics.analysis.opportunistic_osteoporosis_composite",
             }
         )
 
-        self.assertEqual(module_name, "heimdallr.metrics.jobs.l3_muscle_area")
+        self.assertEqual(module_name, "heimdallr.metrics.analysis.opportunistic_osteoporosis_composite")
 
     def test_resolve_job_module_name_rejects_invalid_names(self):
         with self.assertRaisesRegex(RuntimeError, "invalid"):
@@ -39,7 +39,7 @@ class TestMetricsWorker(unittest.TestCase):
             _resolve_job_module_name(
                 {
                     "name": "l3_muscle_area",
-                    "module": "heimdallr.metrics.analysis.body_fat",
+                    "module": "heimdallr.shared.settings",
                 }
             )
 

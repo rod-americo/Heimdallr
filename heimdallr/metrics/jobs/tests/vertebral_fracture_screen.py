@@ -28,13 +28,13 @@ from heimdallr.metrics.jobs._bone_job_common import (
     write_payload,
 )
 from heimdallr.metrics.analysis.bone_health import extract_study_technique_context
-from heimdallr.metrics.analysis.vertebral_fracture import (
+from heimdallr.metrics.jobs.tests.vertebral_fracture import (
     isolate_vertebral_body,
     refine_classification_with_adjacent_reference,
     screen_vertebral_fracture,
     vertebra_level_index,
 )
-from heimdallr.metrics.jobs._vertebral_fracture_overlay_text import (
+from heimdallr.metrics.jobs.tests._vertebral_fracture_overlay_text import (
     build_pathology_label,
     build_overlay_title,
     derivation_description,
