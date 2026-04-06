@@ -71,14 +71,25 @@ export HEIMDALLR_DICOM_PORT="11114"
 export HEIMDALLR_IDLE_SECONDS="30"
 export HEIMDALLR_DICOM_EGRESS_CONFIG="config/dicom_egress.json"
 export HEIMDALLR_PRESENTATION_CONFIG="config/presentation.json"
+export HEIMDALLR_SEGMENTATION_PIPELINE_CONFIG="config/segmentation_pipeline.json"
+export HEIMDALLR_METRICS_PIPELINE_CONFIG="config/metrics_pipeline.json"
 ```
 
-Before enabling outbound DICOM delivery or customizing presentation defaults on a host, create the local config files from the repository examples:
+Before enabling segmentation, metrics, outbound DICOM delivery, or customizing presentation defaults on a host, create the local config files from the repository examples:
 
 ```bash
+cp config/segmentation_pipeline.example.json config/segmentation_pipeline.json
+cp config/metrics_pipeline.example.json config/metrics_pipeline.json
 cp config/dicom_egress.example.json config/dicom_egress.json
 cp config/presentation.example.json config/presentation.json
 ```
+
+These four JSON files are host-local operational config and are ignored by Git:
+
+- `config/segmentation_pipeline.json`
+- `config/metrics_pipeline.json`
+- `config/dicom_egress.json`
+- `config/presentation.json`
 
 ## End-to-End Pipeline Flow
 
@@ -196,6 +207,8 @@ venv/bin/python scripts/retroactive_emphysema.py
 - **Adjusting endpoints**: Edit the relevant router under `heimdallr/control_plane/routers/`.
 - **Changing series selection**: Update `config/series_selection.json`.
 - **Adding a clinical metric**: Add a job under `heimdallr/metrics/jobs/` and register it in the pipeline config.
+- **Changing segmentation tasks or CPU/GPU/threading policy**: Update the host-local `config/segmentation_pipeline.json` created from `config/segmentation_pipeline.example.json`.
+- **Changing enabled metrics or job parallelism**: Update the host-local `config/metrics_pipeline.json` created from `config/metrics_pipeline.example.json`.
 - **Improving intake logic**: Edit `heimdallr/intake/gateway.py`.
 - **Changing outbound DICOM destinations**: Update the host-local `config/dicom_egress.json` created from `config/dicom_egress.example.json`.
 - **Changing locale or patient-name presentation defaults**: Update the host-local `config/presentation.json` created from `config/presentation.example.json`.
