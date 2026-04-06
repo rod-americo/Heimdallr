@@ -10,6 +10,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse, Response
 
+from ...shared import store
 from ...shared.dependencies import get_db
 from ...shared.paths import study_artifacts_dir, study_derived_dir, study_dir, study_id_json, study_results_json
 from ...shared.schemas import BiometricData, PatientListResponse, SMIData
@@ -80,29 +81,27 @@ async def download_folder(case_id: str, folder_name: str):
 
 @router.get("/{case_id}/results")
 async def get_results(case_id: str, db=Depends(get_db)):
-    cursor = db.cursor()
-    cursor.execute("SELECT CalculationResults FROM dicom_metadata")
-    for row in cursor.fetchall():
-        try:
-            _ = json.loads(row["CalculationResults"]) if row["CalculationResults"] else {}
-        except Exception:
-            continue
-
+    case_row = store.find_case_row_by_case_id(db, case_id)
     case_folder = study_dir(case_id)
     results_path = study_results_json(case_id)
 
-    if not results_path.exists():
-        raise HTTPException(status_code=404, detail="Results not found")
-
     try:
-        with open(results_path, "r") as f:
-            results = json.load(f)
+        if results_path.exists():
+            with open(results_path, "r") as f:
+                results = json.load(f)
+        elif case_row and case_row["CalculationResults"]:
+            results = json.loads(case_row["CalculationResults"])
+        else:
+            raise HTTPException(status_code=404, detail="Results not found")
 
         images = []
         if case_folder.exists():
             for img in case_folder.rglob("*.png"):
                 images.append(str(img.relative_to(case_folder)))
         results["images"] = sorted(images)
+        if case_row:
+            results["artifacts_purged"] = bool(case_row["ArtifactsPurged"])
+            results["artifacts_purged_at"] = case_row["ArtifactsPurgedAt"]
 
         triage_report_path = study_artifacts_dir(case_id) / "urology" / "kidney_stone_triage.json"
         if triage_report_path.exists():

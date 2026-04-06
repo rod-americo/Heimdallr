@@ -1,0 +1,5 @@
+{
+  "_comment": "Host-local storage reclamation policy for runtime/studies. The daemon polls the filesystem and deletes the oldest case directories when usage reaches the configured threshold.",
+  "scan_interval_seconds": 60,
+  "usage_threshold_percent": 80
+}

@@ -44,6 +44,16 @@ def _config_int(env_name: str, config: dict, keys: tuple[str, ...], default: int
     return int(configured)
 
 
+def _config_float(env_name: str, config: dict, keys: tuple[str, ...], default: float) -> float:
+    explicit = os.getenv(env_name)
+    if explicit is not None:
+        return float(explicit)
+    configured = _get_nested_config(config, *keys)
+    if configured is None:
+        return default
+    return float(configured)
+
+
 BASE_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_RUNTIME_PYTHON = str(Path(sys.executable))
 DEFAULT_BIN_DIR = BASE_DIR / "bin"
@@ -150,6 +160,25 @@ DICOM_EGRESS_CONFIG_PATH = Path(
     )
 )
 DICOM_EGRESS_SCAN_INTERVAL = int(os.getenv("HEIMDALLR_DICOM_EGRESS_SCAN_INTERVAL", "2"))
+SPACE_MANAGER_CONFIG_PATH = Path(
+    os.getenv(
+        "HEIMDALLR_SPACE_MANAGER_CONFIG",
+        str(CONFIG_DIR / "space_manager.json"),
+    )
+)
+SPACE_MANAGER_CONFIG = _load_json_config(SPACE_MANAGER_CONFIG_PATH)
+SPACE_MANAGER_SCAN_INTERVAL = _config_int(
+    "HEIMDALLR_SPACE_MANAGER_SCAN_INTERVAL",
+    SPACE_MANAGER_CONFIG,
+    ("scan_interval_seconds",),
+    60,
+)
+SPACE_MANAGER_USAGE_THRESHOLD_PERCENT = _config_float(
+    "HEIMDALLR_SPACE_MANAGER_USAGE_THRESHOLD_PERCENT",
+    SPACE_MANAGER_CONFIG,
+    ("usage_threshold_percent",),
+    80.0,
+)
 SERIES_SELECTION_CONFIG_PATH = Path(
     os.getenv(
         "HEIMDALLR_SERIES_SELECTION_CONFIG",
