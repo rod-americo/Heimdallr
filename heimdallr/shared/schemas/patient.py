@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import List
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -21,6 +22,8 @@ class PatientResponse(BaseModel):
     has_results: bool
     body_regions: List[str]
     has_hemorrhage: bool
+    artifacts_purged: bool = False
+    artifacts_purged_at: Optional[str] = None
 
 
 class PatientListResponse(BaseModel):

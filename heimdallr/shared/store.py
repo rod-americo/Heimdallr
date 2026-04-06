@@ -29,6 +29,8 @@ _DICOM_METADATA_COLUMNS = {
     "Weight": "REAL",
     "Height": "REAL",
     "SMI": "REAL",
+    "ArtifactsPurged": "INTEGER DEFAULT 0",
+    "ArtifactsPurgedAt": "TIMESTAMP",
     "ProcessedAt": "TIMESTAMP",
 }
 
@@ -83,6 +85,8 @@ def ensure_schema(conn: sqlite3.Connection | None = None) -> None:
             Weight REAL,
             Height REAL,
             SMI REAL,
+            ArtifactsPurged INTEGER DEFAULT 0,
+            ArtifactsPurgedAt TIMESTAMP,
             ProcessedAt TIMESTAMP
         )
         """
@@ -205,6 +209,8 @@ def upsert_study_metadata(conn: sqlite3.Connection, metadata: dict[str, Any]) ->
             CallingAET = COALESCE(NULLIF(excluded.CallingAET, ''), dicom_metadata.CallingAET),
             RemoteIP = COALESCE(NULLIF(excluded.RemoteIP, ''), dicom_metadata.RemoteIP),
             JsonDump = excluded.JsonDump,
+            ArtifactsPurged = 0,
+            ArtifactsPurgedAt = NULL,
             ProcessedAt = excluded.ProcessedAt
         """,
         (
@@ -653,7 +659,16 @@ def find_case_row_by_case_id(conn: sqlite3.Connection, case_id: str) -> sqlite3.
     try:
         row = conn.execute(
             """
-            SELECT StudyInstanceUID, IdJson, Weight, Height, PatientSex, CalculationResults, SMI
+            SELECT
+                StudyInstanceUID,
+                IdJson,
+                Weight,
+                Height,
+                PatientSex,
+                CalculationResults,
+                SMI,
+                ArtifactsPurged,
+                ArtifactsPurgedAt
             FROM dicom_metadata
             WHERE json_extract(IdJson, '$.CaseID') = ?
             """,
@@ -665,9 +680,70 @@ def find_case_row_by_case_id(conn: sqlite3.Connection, case_id: str) -> sqlite3.
         pass
 
     for row in conn.execute(
-        "SELECT StudyInstanceUID, IdJson, Weight, Height, PatientSex, CalculationResults, SMI FROM dicom_metadata"
+        """
+        SELECT
+            StudyInstanceUID,
+            IdJson,
+            Weight,
+            Height,
+            PatientSex,
+            CalculationResults,
+            SMI,
+            ArtifactsPurged,
+            ArtifactsPurgedAt
+        FROM dicom_metadata
+        """
     ).fetchall():
         metadata = json.loads(row["IdJson"]) if row["IdJson"] else {}
         if metadata.get("CaseID") == case_id:
             return row
     return None
+
+
+def list_protected_case_ids(conn: sqlite3.Connection) -> set[str]:
+    """Return case IDs that should not be purged while still active in queues."""
+    ensure_schema(conn)
+    protected: set[str] = set()
+    for table_name in ("segmentation_queue", "metrics_queue", "dicom_egress_queue"):
+        rows = conn.execute(
+            f"""
+            SELECT DISTINCT case_id
+            FROM {table_name}
+            WHERE status IN ('pending', 'claimed')
+            """
+        ).fetchall()
+        protected.update(str(row["case_id"]) for row in rows if row["case_id"])
+    return protected
+
+
+def purge_case_records(conn: sqlite3.Connection, case_id: str) -> str | None:
+    """Delete queue rows and mark the metadata row as purged for a case."""
+    ensure_schema(conn)
+    study_uid = None
+
+    case_row = find_case_row_by_case_id(conn, case_id)
+    if case_row:
+        study_uid = case_row["StudyInstanceUID"]
+    else:
+        fallback = conn.execute(
+            "SELECT StudyInstanceUID FROM dicom_metadata WHERE ClinicalName = ?",
+            (case_id,),
+        ).fetchone()
+        if fallback:
+            study_uid = fallback["StudyInstanceUID"]
+
+    conn.execute("DELETE FROM segmentation_queue WHERE case_id = ?", (case_id,))
+    conn.execute("DELETE FROM metrics_queue WHERE case_id = ?", (case_id,))
+    conn.execute("DELETE FROM dicom_egress_queue WHERE case_id = ?", (case_id,))
+    if study_uid:
+        conn.execute(
+            """
+            UPDATE dicom_metadata
+            SET ArtifactsPurged = 1,
+                ArtifactsPurgedAt = ?
+            WHERE StudyInstanceUID = ?
+            """,
+            (_now_local_timestamp(), study_uid),
+        )
+    conn.commit()
+    return study_uid

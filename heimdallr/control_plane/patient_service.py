@@ -100,7 +100,9 @@ class PatientService:
                     "elapsed_seconds": elapsed_seconds,
                     "has_results": bool(results),
                     "body_regions": results.get("body_regions", []),
-                    "has_hemorrhage": has_hemorrhage
+                    "has_hemorrhage": has_hemorrhage,
+                    "artifacts_purged": bool(row["ArtifactsPurged"]),
+                    "artifacts_purged_at": row["ArtifactsPurgedAt"],
                 })
                 
             # Sort alphabetically by the displayed name (first part of case_id)
@@ -128,6 +130,8 @@ class PatientService:
             metadata["Sex"] = row["PatientSex"]
         if row["SMI"] is not None:
             metadata["SMI"] = row["SMI"]
+        metadata["ArtifactsPurged"] = bool(row["ArtifactsPurged"])
+        metadata["ArtifactsPurgedAt"] = row["ArtifactsPurgedAt"]
         return metadata
 
     @staticmethod

@@ -55,11 +55,13 @@ runtime/studies/<case_id>/ + database/dicom.db
 
 5. **DICOM Egress** — Queue-driven outbound C-STORE worker that delivers generated DICOM artifacts such as Secondary Capture overlays to fixed remote SCP destinations.
 
-6. **Control Plane** — FastAPI application serving the web dashboard, upload endpoint, patient/results API, and PDF case report generation.
+6. **Space Manager** — Resident storage guard that monitors the filesystem hosting `runtime/studies/` and purges the oldest completed case directories when disk usage reaches a configurable host-local threshold.
 
-7. **Operations TUI** — Textual-based terminal dashboard with live process monitoring, queue inspection, and study browsing.
+7. **Control Plane** — FastAPI application serving the web dashboard, upload endpoint, patient/results API, and PDF case report generation.
 
-8. **De-identification Gateway** — OCR-based burned-in text detection and metadata scrubbing for outbound payloads (`services/deid_gateway.py`).
+8. **Operations TUI** — Textual-based terminal dashboard with live process monitoring, queue inspection, and study browsing.
+
+9. **De-identification Gateway** — OCR-based burned-in text detection and metadata scrubbing for outbound payloads (`services/deid_gateway.py`).
 
 ## Repository Layout
 
@@ -107,6 +109,7 @@ Heimdallr/
 │   ├── series_selection.json     #   Series selection strategy
 │   ├── segmentation_pipeline.example.json # Example TotalSegmentator task list
 │   ├── metrics_pipeline.example.json      # Example post-segmentation job list
+│   ├── space_manager.example.json         # Example runtime storage GC policy
 │   ├── dicom_egress.example.json          # Example outbound DICOM destinations
 │   └── presentation.example.json          # Example patient/presentation profiles
 ├── database/                     # Persistent storage
@@ -184,19 +187,25 @@ Start the baseline services in separate terminals:
 # 1) Control Plane — API + dashboard (default :8001)
 .venv/bin/python -m heimdallr.control_plane
 
-# 2) Segmentation Worker — segmentation pipeline
+# 2) Prepare Worker — study preparation watchdog
+.venv/bin/python -m heimdallr.prepare
+
+# 3) Segmentation Worker — segmentation pipeline
 .venv/bin/python -m heimdallr.segmentation
 
-# 3) Metrics Worker — post-segmentation measurements
+# 4) Metrics Worker — post-segmentation measurements
 .venv/bin/python -m heimdallr.metrics
 
-# 4) DICOM Listener — C-STORE intake (default :11114)
+# 5) DICOM Listener — C-STORE intake (default :11114)
 .venv/bin/python -m heimdallr.intake
 
-# 5) DICOM Egress Worker — outbound C-STORE delivery
+# 6) DICOM Egress Worker — outbound C-STORE delivery
 .venv/bin/python -m heimdallr.dicom_egress
 
-# 6) Operations TUI — terminal dashboard
+# 7) Space Manager — runtime/studies storage reclamation
+.venv/bin/python -m heimdallr.space_manager
+
+# 8) Operations TUI — terminal dashboard
 .venv/bin/python -m heimdallr.tui
 ```
 
@@ -246,6 +255,7 @@ Key environment variables:
 | `HEIMDALLR_DICOM_PORT` | `11114` | DICOM listener port |
 | `HEIMDALLR_DICOM_EGRESS_CONFIG` | `config/dicom_egress.json` | Outbound DICOM destination config |
 | `HEIMDALLR_PRESENTATION_CONFIG` | `config/presentation.json` | Patient name and locale presentation config |
+| `HEIMDALLR_SPACE_MANAGER_CONFIG` | `config/space_manager.json` | Runtime storage reclamation policy |
 | `HEIMDALLR_AE_TITLE` | `HEIMDALLR` | DICOM Application Entity title |
 | `HEIMDALLR_TIMEZONE` | `America/Sao_Paulo` | Operational timezone |
 | `HEIMDALLR_MAX_PARALLEL_CASES` | `3` | Concurrent segmentation slots |
@@ -258,14 +268,16 @@ Before enabling segmentation, metrics, outbound delivery, or customized display/
 ```bash
 cp config/segmentation_pipeline.example.json config/segmentation_pipeline.json
 cp config/metrics_pipeline.example.json config/metrics_pipeline.json
+cp config/space_manager.example.json config/space_manager.json
 cp config/dicom_egress.example.json config/dicom_egress.json
 cp config/presentation.example.json config/presentation.json
 ```
 
-These four JSON files are treated as host-local operational config and are ignored by Git:
+These five JSON files are treated as host-local operational config and are ignored by Git:
 
 - `config/segmentation_pipeline.json`
 - `config/metrics_pipeline.json`
+- `config/space_manager.json`
 - `config/dicom_egress.json`
 - `config/presentation.json`
 
