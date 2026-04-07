@@ -558,7 +558,7 @@ def main() -> int:
         upload_retries=args.upload_retries,
         upload_backoff=args.upload_backoff,
         handoff_mode=args.handoff_mode,
-        upload_staging_dir=Path(settings.UPLOAD_DIR),
+        upload_staging_dir=Path(settings.UPLOAD_FROM_PREPARE_DIR),
     )
 
     # Setup signal handlers for graceful shutdown
@@ -583,7 +583,7 @@ def main() -> int:
     if args.handoff_mode == "http_upload":
         print(f"  Upload URL: {args.upload_url}")
     else:
-        print(f"  Prepare spool: {settings.UPLOAD_DIR}")
+        print(f"  Prepare spool: {settings.UPLOAD_FROM_PREPARE_DIR}")
     print(f"  Idle timeout: {args.idle_seconds}s")
     print(f"Waiting for DICOM connections...")
 

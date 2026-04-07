@@ -83,6 +83,7 @@ class StageMetrics:
 class CaseOverview:
     case_id: str
     patient_name: str
+    origin: str
     modality: str
     accession_number: str
     study_date: str
@@ -143,8 +144,8 @@ def build_snapshot(
     pending_files = _collect_files(layout.pending_dir, suffix=".nii.gz")
     active_files = _collect_files(layout.active_dir, suffix=".nii.gz")
     failed_files = _collect_files(layout.failed_dir, suffix=".nii.gz")
-    upload_files = _collect_files(layout.uploads_dir, suffix=".zip", include_claimed=False)
-    claimed_uploads = _collect_files(layout.uploads_dir, suffix=".working", include_claimed=True)
+    upload_files = _collect_files(layout.uploads_dir, suffix=".zip", include_claimed=False, recursive=True)
+    claimed_uploads = _collect_files(layout.uploads_dir, suffix=".working", include_claimed=True, recursive=True)
     failed_uploads = _collect_files(layout.uploads_failed_dir, suffix=".zip", include_claimed=True)
     incoming_items = _collect_runtime_items(layout.dicom_incoming_dir)
     failed_dicom_items = _collect_runtime_items(layout.dicom_failed_dir)
@@ -172,6 +173,7 @@ def build_snapshot(
         case.update(
             {
                 "patient_name": study.get("patient_name") or case["patient_name"],
+                "origin": study.get("origin") or case["origin"],
                 "modality": study.get("modality") or case["modality"],
                 "accession_number": study.get("accession_number") or case["accession_number"],
                 "study_date": study.get("study_date") or case["study_date"],
@@ -594,6 +596,7 @@ def _finalize_case(case: dict[str, Any]) -> CaseOverview:
     return CaseOverview(
         case_id=case["case_id"],
         patient_name=case["patient_name"] or tui("snapshot.case.unknown"),
+        origin="" if stage_key == "processed" else case["origin"],
         modality=case["modality"] or "-",
         accession_number=case["accession_number"] or "-",
         study_date=case["study_date"] or "-",
@@ -663,6 +666,7 @@ def _empty_case(case_id: str) -> dict[str, Any]:
     return {
         "case_id": case_id,
         "patient_name": "",
+        "origin": "",
         "modality": "",
         "accession_number": "",
         "study_date": "",
@@ -685,6 +689,13 @@ def _empty_case(case_id: str) -> dict[str, Any]:
         "active_file": False,
         "failed_file": False,
     }
+
+
+def _normalize_case_origin(value: str) -> str:
+    normalized = str(value or "").strip().upper()
+    if normalized in {"P", "E"}:
+        return normalized
+    return ""
 
 
 def _load_segmentation_queue(db_path: Path) -> list[dict[str, Any]]:
@@ -754,6 +765,7 @@ def _load_studies(studies_dir: Path, now: datetime) -> dict[str, dict[str, Any]]
         pipeline = payload.get("Pipeline", {})
         studies[case_id] = {
             "patient_name": _display_patient_name(payload.get("PatientName", "")),
+            "origin": _normalize_case_origin(pipeline.get("prepare_input_origin", "")),
             "modality": payload.get("Modality", ""),
             "accession_number": payload.get("AccessionNumber", ""),
             "study_date": payload.get("StudyDate", ""),
@@ -846,10 +858,17 @@ def _tail_text(path: Path, limit: int) -> str:
     return _truncate(" ".join(content.split()), limit)
 
 
-def _collect_files(directory: Path, *, suffix: str, include_claimed: bool = False) -> list[Path]:
+def _collect_files(
+    directory: Path,
+    *,
+    suffix: str,
+    include_claimed: bool = False,
+    recursive: bool = False,
+) -> list[Path]:
     if not directory.exists():
         return []
-    files = [path for path in directory.iterdir() if path.is_file() and path.name.endswith(suffix)]
+    iterator = directory.rglob("*") if recursive else directory.iterdir()
+    files = [path for path in iterator if path.is_file() and path.name.endswith(suffix)]
     if not include_claimed:
         files = [path for path in files if not path.name.endswith(".working")]
     return sorted(files, key=lambda item: item.stat().st_mtime, reverse=True)

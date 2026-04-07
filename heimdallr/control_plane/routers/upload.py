@@ -16,10 +16,10 @@ async def upload_file(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Only .zip files are allowed.")
 
     upload_name = f"study_{settings.local_timestamp('%Y%m%d%H%M%S')}.zip"
-    file_path = settings.UPLOAD_DIR / upload_name
+    file_path = settings.UPLOAD_EXTERNAL_DIR / upload_name
     if file_path.exists():
         upload_name = f"study_{settings.local_timestamp('%Y%m%d%H%M%S_%f')}.zip"
-        file_path = settings.UPLOAD_DIR / upload_name
+        file_path = settings.UPLOAD_EXTERNAL_DIR / upload_name
 
     try:
         atomic_copy_stream(file_path, file.file)

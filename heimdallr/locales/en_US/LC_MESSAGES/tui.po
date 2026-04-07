@@ -24,6 +24,9 @@ msgstr "Intake · Prepare · Segmentation · Metrics"
 msgid "app.table.patient"
 msgstr "Patient"
 
+msgid "app.table.origin"
+msgstr "Src"
+
 msgid "app.table.stage"
 msgstr "Stage"
 
@@ -167,6 +170,9 @@ msgstr "Spotlight"
 
 msgid "app.case.stage"
 msgstr "Stage"
+
+msgid "app.case.origin"
+msgstr "Source"
 
 msgid "app.case.queue"
 msgstr "Queue"
