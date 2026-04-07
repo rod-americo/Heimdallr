@@ -126,10 +126,7 @@ Heimdallr/
 │   ├── intake/uploads/           #   Staged ZIP payloads
 │   ├── queue/{pending,active,failed}/
 │   └── studies/<case_id>/        #   Per-case artifacts, derived, metadata, logs
-├── requirements/                 # Dependency manifests
-│   ├── requirements.txt          #   Pinned production dependencies
-│   ├── operational-services.txt  #   Minimal operational subset
-│   └── totalsegmentator.txt      #   TotalSegmentator venv dependencies
+├── requirements.txt              # Unified single-venv dependency manifest
 ├── docs/                         # Extended documentation
 ├── .github/                      # Community standards and CI
 │   ├── SECURITY.md
@@ -153,7 +150,7 @@ Heimdallr/
 | Python `≥ 3.10` | Package requires `zoneinfo`, `tomllib` |
 | `dcm2niix` | Bundled in `bin/` or system PATH |
 | NVIDIA GPU | Recommended for TotalSegmentator |
-| TotalSegmentator license | Required for `tissue_types` task; registered in `.venv-totalseg` |
+| TotalSegmentator license | Required for `tissue_types` task; registered in `.venv` |
 
 ### Install
 
@@ -163,14 +160,17 @@ cd Heimdallr
 
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements/requirements.txt
+pip install -r requirements.txt
 ```
 
-For licensed TotalSegmentator tasks, register the license in the dedicated venv:
+For licensed TotalSegmentator tasks, register the license in the same venv:
 
 ```bash
-.venv-totalseg/bin/totalseg_set_license -l YOUR_LICENSE_KEY
+.venv/bin/totalseg_set_license -l YOUR_LICENSE_KEY
 ```
+
+All long-running services on a host should use the same interpreter:
+`.venv/bin/python`.
 
 ### Run
 

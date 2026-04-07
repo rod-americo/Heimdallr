@@ -57,7 +57,7 @@ def _config_float(env_name: str, config: dict, keys: tuple[str, ...], default: f
 BASE_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_RUNTIME_PYTHON = str(Path(sys.executable))
 DEFAULT_BIN_DIR = BASE_DIR / "bin"
-DEFAULT_TOTALSEG_VENV_DIR = BASE_DIR / ".venv-totalseg"
+DEFAULT_TOTALSEG_VENV_DIR = BASE_DIR / ".venv"
 DEFAULT_TOTALSEG_BIN_DIR = DEFAULT_TOTALSEG_VENV_DIR / "bin"
 DEFAULT_METRICS_PYTHON = str(
     (DEFAULT_TOTALSEG_BIN_DIR / "python")
