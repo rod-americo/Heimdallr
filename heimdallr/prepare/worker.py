@@ -863,10 +863,10 @@ def process_spooled_zip(zip_path: Path) -> bool:
 
 
 def iter_claimable_uploads():
-    """Yield claimed uploads first, then stable ready ZIPs from the intake spool."""
-    for path in sorted(settings.UPLOAD_DIR.glob(f"*.zip{CLAIM_SUFFIX}")):
+    """Yield claimed uploads first, then stable ready ZIPs from the intake spool in LIFO order."""
+    for path in sorted(settings.UPLOAD_DIR.glob(f"*.zip{CLAIM_SUFFIX}"), reverse=True):
         yield path
-    for path in sorted(settings.UPLOAD_DIR.glob("*.zip")):
+    for path in sorted(settings.UPLOAD_DIR.glob("*.zip"), reverse=True):
         if is_spooled_zip_stable(path):
             try:
                 yield claim_path(path)
