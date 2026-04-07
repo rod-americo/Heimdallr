@@ -9,6 +9,7 @@ python-multipart
 requests
 pydicom
 pynetdicom
+python-gdcm==3.2.2
 
 Pillow
 rich
