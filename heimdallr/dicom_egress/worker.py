@@ -4,12 +4,15 @@
 from __future__ import annotations
 
 import copy
+import shutil
+import subprocess
+import tempfile
 import time
 from pathlib import Path
 
 import pydicom
 from pynetdicom import AE, ALL_TRANSFER_SYNTAXES
-from pydicom.uid import UID
+from pydicom.uid import JPEGLosslessSV1, UID
 
 from heimdallr.dicom_egress.config import (
     dicom_egress_connect_timeout_seconds,
@@ -82,7 +85,54 @@ def _accepted_context_for_sop_class(assoc, sop_class_uid: str):
     return None
 
 
-def _prepare_dataset_for_peer(ds: pydicom.Dataset, accepted_transfer_syntax: UID) -> pydicom.Dataset:
+def _resolve_dcmcjpeg_bin() -> str | None:
+    configured = settings.DCMCJPEG_BIN
+    if not configured:
+        return None
+
+    configured_path = Path(configured)
+    if configured_path.is_absolute() or "/" in configured:
+        return str(configured_path) if configured_path.exists() else None
+
+    return shutil.which(configured)
+
+
+def _transcode_with_dcmcjpeg(source_path: Path, accepted_transfer_syntax: UID) -> pydicom.Dataset:
+    dcmcjpeg_bin = _resolve_dcmcjpeg_bin()
+    if not dcmcjpeg_bin:
+        raise RuntimeError(
+            "No dcmcjpeg binary available. Configure HEIMDALLR_DCMCJPEG_BIN or bundle "
+            "bin/linux-amd64/dcmcjpeg."
+        )
+
+    with tempfile.TemporaryDirectory(prefix="heimdallr-dcmcjpeg-") as tmpdir:
+        output_path = Path(tmpdir) / "transcoded.dcm"
+        result = subprocess.run(
+            [dcmcjpeg_bin, str(source_path), str(output_path)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            stderr = (result.stderr or result.stdout or "").strip()
+            raise RuntimeError(f"dcmcjpeg failed with exit code {result.returncode}: {stderr}")
+
+        transcoded = pydicom.dcmread(str(output_path))
+        transcoded_transfer_syntax = UID(transcoded.file_meta.TransferSyntaxUID)
+        if transcoded_transfer_syntax != accepted_transfer_syntax:
+            raise RuntimeError(
+                "dcmcjpeg produced unexpected transfer syntax "
+                f"'{transcoded_transfer_syntax.name}' instead of '{accepted_transfer_syntax.name}'"
+            )
+        return transcoded
+
+
+def _prepare_dataset_for_peer(
+    ds: pydicom.Dataset,
+    accepted_transfer_syntax: UID,
+    *,
+    source_path: Path | None = None,
+) -> pydicom.Dataset:
     current_transfer_syntax = UID(ds.file_meta.TransferSyntaxUID)
     if current_transfer_syntax == accepted_transfer_syntax:
         return ds
@@ -94,6 +144,16 @@ def _prepare_dataset_for_peer(ds: pydicom.Dataset, accepted_transfer_syntax: UID
     try:
         prepared.compress(str(accepted_transfer_syntax), generate_instance_uid=False)
     except Exception as exc:
+        if accepted_transfer_syntax == JPEGLosslessSV1 and source_path is not None:
+            try:
+                return _transcode_with_dcmcjpeg(source_path, accepted_transfer_syntax)
+            except Exception as external_exc:
+                raise RuntimeError(
+                    "Peer only accepted transfer syntax "
+                    f"'{accepted_transfer_syntax.name}' for SOP Class '{ds.SOPClassUID.name}', "
+                    "but local runtime could not transcode the dataset with pydicom or dcmcjpeg: "
+                    f"{external_exc}"
+                ) from external_exc
         raise RuntimeError(
             "Peer only accepted transfer syntax "
             f"'{accepted_transfer_syntax.name}' for SOP Class '{ds.SOPClassUID.name}', "
@@ -149,7 +209,11 @@ def send_dicom_export(
                 f"at {destination_called_aet}@{destination_host}:{destination_port}"
             )
 
-        prepared_ds = _prepare_dataset_for_peer(ds, accepted_context.transfer_syntax[0])
+        prepared_ds = _prepare_dataset_for_peer(
+            ds,
+            accepted_context.transfer_syntax[0],
+            source_path=artifact_abspath,
+        )
         status = assoc.send_c_store(prepared_ds)
     finally:
         assoc.release()

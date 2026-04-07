@@ -1,4 +1,5 @@
 import sqlite3
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -53,6 +54,26 @@ class TestDicomEgressWorker(unittest.TestCase):
 
         self.assertIn("Peer only accepted transfer syntax", str(ctx.exception))
         self.assertIn("encoder missing", str(ctx.exception))
+
+    def test_prepare_dataset_for_peer_falls_back_to_dcmcjpeg_for_jpeg_lossless_sv1(self):
+        ds = _build_secondary_capture_dataset()
+        transcoded = _build_secondary_capture_dataset()
+        transcoded.file_meta.TransferSyntaxUID = JPEGLosslessSV1
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_path = f"{tmpdir}/source.dcm"
+            ds.save_as(source_path, write_like_original=False)
+
+            with patch.object(Dataset, "compress", autospec=True, side_effect=NotImplementedError("encoder missing")):
+                with patch.object(worker, "_transcode_with_dcmcjpeg", return_value=transcoded) as transcode:
+                    prepared = worker._prepare_dataset_for_peer(
+                        ds,
+                        JPEGLosslessSV1,
+                        source_path=worker.Path(source_path),
+                    )
+
+        self.assertIs(prepared, transcoded)
+        transcode.assert_called_once_with(worker.Path(source_path), JPEGLosslessSV1)
 
 
 class TestStudyMetadataUpsert(unittest.TestCase):

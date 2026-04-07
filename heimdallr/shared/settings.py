@@ -271,6 +271,7 @@ def _resolve_binary(env_name: str, bundled_name: str, fallback_name: str) -> str
 
 
 DCM2NIIX_BIN = _resolve_binary("HEIMDALLR_DCM2NIIX_BIN", "dcm2niix", "dcm2niix")
+DCMCJPEG_BIN = _resolve_binary("HEIMDALLR_DCMCJPEG_BIN", "dcmcjpeg", "dcmcjpeg")
 TOTALSEG_BIN_DIR = Path(
     os.getenv(
         "HEIMDALLR_TOTALSEG_BIN_DIR",
