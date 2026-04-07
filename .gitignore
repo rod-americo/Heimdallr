@@ -53,6 +53,7 @@ upcoming_features.md
 
 # Host-local operational config
 config/dicom_egress.json
+config/integration_dispatch.json
 config/metrics_pipeline.json
 config/presentation.json
 config/segmentation_pipeline.json

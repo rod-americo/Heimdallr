@@ -11,9 +11,10 @@ Run as independent services:
 3. `python -m heimdallr.segmentation` (segmentation worker)
 4. `python -m heimdallr.metrics` (post-segmentation derived metrics worker)
 5. `python -m heimdallr.intake` (DICOM C-STORE intake)
-6. `python -m heimdallr.dicom_egress` (outbound DICOM artifact delivery)
-7. `python -m heimdallr.space_manager` (runtime/studies storage reclamation)
-8. `python -m heimdallr.tui` (optional operational dashboard)
+6. `python -m heimdallr.integration_dispatcher` (outbound webhook/event delivery)
+7. `python -m heimdallr.dicom_egress` (outbound DICOM artifact delivery)
+8. `python -m heimdallr.space_manager` (runtime/studies storage reclamation)
+9. `python -m heimdallr.tui` (optional operational dashboard)
 
 ## Repository File Map
 
@@ -23,6 +24,7 @@ Run as independent services:
 - `prepare/worker.py`: Series discovery and DICOM-to-NIfTI conversion.
 - `segmentation/worker.py`: Core segmentation worker logic.
 - `metrics/worker.py`: Post-segmentation derived metrics execution.
+- `integration_dispatcher/worker.py`: Queue-driven outbound webhook dispatcher.
 - `dicom_egress/worker.py`: Queue-driven outbound C-STORE dispatcher.
 - `shared/settings.py`: Centralized runtime settings and binary paths.
 
@@ -91,6 +93,7 @@ Common examples:
 export HEIMDALLR_AE_TITLE="HEIMDALLR"
 export HEIMDALLR_DICOM_PORT="11114"
 export HEIMDALLR_IDLE_SECONDS="30"
+export HEIMDALLR_INTEGRATION_DISPATCH_CONFIG="config/integration_dispatch.json"
 export HEIMDALLR_DICOM_EGRESS_CONFIG="config/dicom_egress.json"
 export HEIMDALLR_PRESENTATION_CONFIG="config/presentation.json"
 export HEIMDALLR_SEGMENTATION_PIPELINE_CONFIG="config/segmentation_pipeline.json"
@@ -104,17 +107,23 @@ Before enabling segmentation, metrics, outbound DICOM delivery, or customizing p
 cp config/segmentation_pipeline.example.json config/segmentation_pipeline.json
 cp config/metrics_pipeline.example.json config/metrics_pipeline.json
 cp config/space_manager.example.json config/space_manager.json
+cp config/integration_dispatch.example.json config/integration_dispatch.json
 cp config/dicom_egress.example.json config/dicom_egress.json
 cp config/presentation.example.json config/presentation.json
 ```
 
-These five JSON files are host-local operational config and are ignored by Git:
+These six JSON files are host-local operational config and are ignored by Git:
 
 - `config/segmentation_pipeline.json`
 - `config/metrics_pipeline.json`
 - `config/space_manager.json`
+- `config/integration_dispatch.json`
 - `config/dicom_egress.json`
 - `config/presentation.json`
+
+For outbound webhook authentication, prefer `headers_from_env` in
+`config/integration_dispatch.json` over hardcoding secrets directly in the
+JSON file.
 
 ## End-to-End Pipeline Flow
 
@@ -123,9 +132,10 @@ These five JSON files are host-local operational config and are ignored by Git:
 3. **Preparation**: `prepare` worker extracts ZIP, enumerates candidate series, converts them to NIfTI via `dcm2niix`, records phase metadata, and creates `metadata/id.json`.
 4. **Segmentation**: `segmentation` worker claims the case, selects the series using `config/series_selection.json`, runs segmentation (e.g., TotalSegmentator), and archives results in `runtime/studies/<CaseID>/derived/`.
 5. **Metrics**: `metrics` worker executes derived calculations (volumetry, density) and updates `metadata/resultados.json`.
-6. **DICOM Egress**: `metrics` enqueues generated DICOM artifacts into `dicom_egress_queue`, and `dicom_egress` delivers them to configured remote SCP destinations.
-7. **Storage Reclamation**: `space_manager` periodically checks filesystem usage and, above threshold, deletes the oldest non-active case directories under `runtime/studies/` while marking them as purged in SQLite.
-8. **Delivery**: Dashboard and APIs serve the final structured data and images.
+6. **Integration Dispatch**: `prepare` enqueues patient-identified events into `integration_dispatch_queue`, and `integration_dispatcher` delivers them to configured HTTP endpoints.
+7. **DICOM Egress**: `metrics` enqueues generated DICOM artifacts into `dicom_egress_queue`, and `dicom_egress` delivers them to configured remote SCP destinations.
+8. **Storage Reclamation**: `space_manager` periodically checks filesystem usage and, above threshold, deletes the oldest non-active case directories under `runtime/studies/` while marking them as purged in SQLite.
+9. **Delivery**: Dashboard and APIs serve the final structured data and images.
 
 ## Data Contracts
 
@@ -145,6 +155,7 @@ Central state for all studies, tracking pipeline stage, patient demographics, an
 Queue tables include:
 - `segmentation_queue`
 - `metrics_queue`
+- `integration_dispatch_queue`
 - `dicom_egress_queue`
 
 
@@ -236,6 +247,7 @@ Legacy compatibility wrapper:
 - **Keeping an experimental metric out of the default profile**: Place it under `heimdallr/metrics/jobs/tests/` or `heimdallr/metrics/analysis/` and use an explicit `jobs[].module` override only in host-local config.
 - **Changing segmentation tasks or CPU/GPU/threading policy**: Update the host-local `config/segmentation_pipeline.json` created from `config/segmentation_pipeline.example.json`.
 - **Changing enabled metrics or job parallelism**: Update the host-local `config/metrics_pipeline.json` created from `config/metrics_pipeline.example.json`.
+- **Changing outbound patient/event webhooks**: Update the host-local `config/integration_dispatch.json` created from `config/integration_dispatch.example.json`.
 - **Changing storage reclamation policy**: Update the host-local `config/space_manager.json` created from `config/space_manager.example.json`.
 - **Improving intake logic**: Edit `heimdallr/intake/gateway.py`.
 - **Changing outbound DICOM destinations**: Update the host-local `config/dicom_egress.json` created from `config/dicom_egress.example.json`.

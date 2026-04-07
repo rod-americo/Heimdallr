@@ -1,0 +1,25 @@
+{
+  "enabled": false,
+  "_comment": "Host-local outbound event/webhook delivery for external integrations. The prepare stage emits patient-identified events into the SQLite outbox, and heimdallr.integration_dispatcher posts them asynchronously.",
+  "scan_interval_seconds": 5,
+  "retry_attempts": 5,
+  "retry_backoff_seconds": 30,
+  "destinations": [
+    {
+      "name": "asha_patient_search",
+      "enabled": true,
+      "url": "http://127.0.0.1:8100/webhooks/heimdallr/patient-identified",
+      "method": "POST",
+      "timeout_seconds": 10,
+      "events": [
+        "patient_identified"
+      ],
+      "headers": {
+        "X-Heimdallr-Source": "prepare"
+      },
+      "headers_from_env": {
+        "Authorization": "HEIMDALLR_INTEGRATION_AUTH"
+      }
+    }
+  ]
+}

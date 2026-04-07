@@ -176,6 +176,39 @@ def ensure_schema(conn: sqlite3.Connection | None = None) -> None:
         ON dicom_egress_queue(status, next_attempt_at, created_at)
         """
     )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS integration_dispatch_queue (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_type TEXT NOT NULL,
+            event_version INTEGER NOT NULL DEFAULT 1,
+            event_key TEXT NOT NULL,
+            case_id TEXT,
+            study_uid TEXT,
+            destination_name TEXT NOT NULL,
+            destination_url TEXT NOT NULL,
+            http_method TEXT NOT NULL DEFAULT 'POST',
+            timeout_seconds INTEGER NOT NULL DEFAULT 10,
+            request_headers TEXT,
+            payload_json TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            attempts INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP,
+            claimed_at TIMESTAMP,
+            finished_at TIMESTAMP,
+            next_attempt_at TIMESTAMP,
+            response_status INTEGER,
+            error TEXT,
+            UNIQUE(event_key, destination_name)
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_integration_dispatch_queue_status_next_attempt
+        ON integration_dispatch_queue(status, next_attempt_at, created_at)
+        """
+    )
     _ensure_columns(cursor, "dicom_metadata", _DICOM_METADATA_COLUMNS)
     conn.commit()
     if owns_connection:
@@ -383,6 +416,85 @@ def enqueue_dicom_export(
     conn.commit()
 
 
+def enqueue_integration_dispatch(
+    conn: sqlite3.Connection,
+    *,
+    event_type: str,
+    event_version: int,
+    event_key: str,
+    case_id: str | None,
+    study_uid: str | None,
+    destination_name: str,
+    destination_url: str,
+    http_method: str,
+    timeout_seconds: int,
+    request_headers: dict[str, Any] | None,
+    payload: dict[str, Any],
+) -> None:
+    ensure_schema(conn)
+    created_at = _now_local_timestamp()
+    conn.execute(
+        """
+        INSERT INTO integration_dispatch_queue (
+            event_type,
+            event_version,
+            event_key,
+            case_id,
+            study_uid,
+            destination_name,
+            destination_url,
+            http_method,
+            timeout_seconds,
+            request_headers,
+            payload_json,
+            status,
+            attempts,
+            created_at,
+            claimed_at,
+            finished_at,
+            next_attempt_at,
+            response_status,
+            error
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, NULL, NULL, ?, NULL, NULL)
+        ON CONFLICT(event_key, destination_name) DO UPDATE SET
+            event_type = excluded.event_type,
+            event_version = excluded.event_version,
+            case_id = excluded.case_id,
+            study_uid = excluded.study_uid,
+            destination_url = excluded.destination_url,
+            http_method = excluded.http_method,
+            timeout_seconds = excluded.timeout_seconds,
+            request_headers = excluded.request_headers,
+            payload_json = excluded.payload_json,
+            status = 'pending',
+            attempts = 0,
+            created_at = excluded.created_at,
+            claimed_at = NULL,
+            finished_at = NULL,
+            next_attempt_at = excluded.next_attempt_at,
+            response_status = NULL,
+            error = NULL
+        """,
+        (
+            str(event_type),
+            int(event_version),
+            str(event_key),
+            str(case_id) if case_id is not None else None,
+            str(study_uid) if study_uid is not None else None,
+            str(destination_name),
+            str(destination_url),
+            str(http_method).upper(),
+            int(timeout_seconds),
+            json.dumps(request_headers or {}),
+            json.dumps(payload),
+            created_at,
+            created_at,
+        ),
+    )
+    conn.commit()
+
+
 def claim_next_pending_segmentation_queue_item(conn: sqlite3.Connection) -> tuple[int, str, str] | None:
     ensure_schema(conn)
     claimed_at = _now_local_timestamp()
@@ -509,6 +621,62 @@ def claim_next_pending_dicom_egress_queue_item(
     return row
 
 
+def claim_next_pending_integration_dispatch_queue_item(
+    conn: sqlite3.Connection,
+) -> tuple[int, str, int, str, str | None, str | None, str, str, str, int, str, str, int] | None:
+    ensure_schema(conn)
+    claimed_at = _now_local_timestamp()
+    cursor = conn.cursor()
+    cursor.execute("BEGIN IMMEDIATE")
+    cursor.execute(
+        """
+        SELECT
+            id,
+            event_type,
+            event_version,
+            event_key,
+            case_id,
+            study_uid,
+            destination_name,
+            destination_url,
+            http_method,
+            timeout_seconds,
+            request_headers,
+            payload_json,
+            attempts
+        FROM integration_dispatch_queue
+        WHERE status = 'pending'
+          AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
+        ORDER BY next_attempt_at ASC, created_at ASC, id ASC
+        LIMIT 1
+        """,
+        (claimed_at,),
+    )
+    row = cursor.fetchone()
+    if not row:
+        conn.commit()
+        return None
+
+    queue_id = row[0]
+    cursor.execute(
+        """
+        UPDATE integration_dispatch_queue
+        SET status = 'claimed',
+            claimed_at = ?,
+            attempts = attempts + 1,
+            response_status = NULL,
+            error = NULL
+        WHERE id = ? AND status = 'pending'
+        """,
+        (claimed_at, queue_id),
+    )
+    if cursor.rowcount != 1:
+        conn.rollback()
+        return None
+    conn.commit()
+    return row
+
+
 def mark_segmentation_queue_item_done(conn: sqlite3.Connection, queue_id: int) -> None:
     finished_at = _now_local_timestamp()
     conn.execute(
@@ -551,6 +719,28 @@ def mark_dicom_egress_queue_item_done(conn: sqlite3.Connection, queue_id: int) -
         WHERE id = ?
         """,
         (finished_at, queue_id),
+    )
+    conn.commit()
+
+
+def mark_integration_dispatch_queue_item_done(
+    conn: sqlite3.Connection,
+    queue_id: int,
+    *,
+    response_status: int | None,
+) -> None:
+    finished_at = _now_local_timestamp()
+    conn.execute(
+        """
+        UPDATE integration_dispatch_queue
+        SET status = 'done',
+            finished_at = ?,
+            next_attempt_at = NULL,
+            response_status = ?,
+            error = NULL
+        WHERE id = ?
+        """,
+        (finished_at, int(response_status) if response_status is not None else None, queue_id),
     )
     conn.commit()
 
@@ -611,6 +801,35 @@ def retry_dicom_egress_queue_item(
     conn.commit()
 
 
+def retry_integration_dispatch_queue_item(
+    conn: sqlite3.Connection,
+    queue_id: int,
+    error_message: Any,
+    *,
+    backoff_seconds: int,
+    response_status: int | None = None,
+) -> None:
+    conn.execute(
+        """
+        UPDATE integration_dispatch_queue
+        SET status = 'pending',
+            claimed_at = NULL,
+            finished_at = NULL,
+            next_attempt_at = ?,
+            response_status = ?,
+            error = ?
+        WHERE id = ?
+        """,
+        (
+            _future_local_timestamp(backoff_seconds),
+            int(response_status) if response_status is not None else None,
+            str(error_message)[:2000],
+            queue_id,
+        ),
+    )
+    conn.commit()
+
+
 def mark_dicom_egress_queue_item_error(
     conn: sqlite3.Connection,
     queue_id: int,
@@ -627,6 +846,34 @@ def mark_dicom_egress_queue_item_error(
         WHERE id = ?
         """,
         (finished_at, str(error_message)[:2000], queue_id),
+    )
+    conn.commit()
+
+
+def mark_integration_dispatch_queue_item_error(
+    conn: sqlite3.Connection,
+    queue_id: int,
+    error_message: Any,
+    *,
+    response_status: int | None = None,
+) -> None:
+    finished_at = _now_local_timestamp()
+    conn.execute(
+        """
+        UPDATE integration_dispatch_queue
+        SET status = 'error',
+            finished_at = ?,
+            next_attempt_at = NULL,
+            response_status = ?,
+            error = ?
+        WHERE id = ?
+        """,
+        (
+            finished_at,
+            int(response_status) if response_status is not None else None,
+            str(error_message)[:2000],
+            queue_id,
+        ),
     )
     conn.commit()
 
