@@ -39,6 +39,15 @@ dcm2niix
 This software uses dcm2niix for DICOM to NIfTI conversion. dcm2niix is
 licensed under the BSD 2-Clause License.
 
+DCMTK / dcmcjpeg
+----------------
+This software may distribute the `dcmcjpeg` utility from DCMTK for JPEG
+Lossless DICOM transcoding. DCMTK is distributed under a permissive license
+mix documented in `bin/licenses/dcmtk-license.txt`.
+
+This product includes software based in part on the work of the Independent
+JPEG Group.
+
 ChestXRayAnatomySegmentation (CXAS)
 ------------------------------------
 The CTR (Cardiothoracic Ratio / ICT) extraction module (ctr_api.py) is
