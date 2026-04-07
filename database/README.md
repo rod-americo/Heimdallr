@@ -14,6 +14,8 @@ Stores DICOM metadata and calculation results for all processed studies.
 |--------|------|-------------|
 | `StudyInstanceUID` | TEXT (PK) | Unique DICOM study identifier |
 | `PatientName` | TEXT | Full patient name from DICOM |
+| `PatientID` | TEXT | DICOM PatientID |
+| `PatientBirthDate` | TEXT | DICOM birth date (`YYYYMMDD`) when present |
 | `ClinicalName` | TEXT | Standardized format: `FirstNameInitials_YYYYMMDD_AccessionNumber` |
 | `AccessionNumber` | TEXT | Hospital/PACS accession number |
 | `StudyDate` | TEXT | Study date in YYYYMMDD format |  

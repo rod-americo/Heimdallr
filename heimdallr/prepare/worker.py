@@ -467,6 +467,7 @@ def process_zip(zip_path):
         global_meta = {
             "PatientName": "Unknown",
             "PatientID": "",
+            "PatientBirthDate": "",
             "PatientSex": "Unknown",
             "AccessionNumber": "000000",
             "StudyInstanceUID": "",
@@ -506,6 +507,7 @@ def process_zip(zip_path):
                                 if name_val:
                                     global_meta["PatientName"] = normalize_patient_name_for_prepare(name_val)
                                 global_meta["PatientID"] = str(get_tag_value(ds, "PatientID", "") or "")
+                                global_meta["PatientBirthDate"] = str(get_tag_value(ds, "PatientBirthDate", "") or "")
                                 global_meta["PatientSex"] = str(get_tag_value(ds, "PatientSex", "Unknown"))
                                 global_meta["AccessionNumber"] = str(get_tag_value(ds, "AccessionNumber", "000000"))
                                 global_meta["StudyInstanceUID"] = str(get_tag_value(ds, "StudyInstanceUID", ""))
@@ -577,6 +579,7 @@ def process_zip(zip_path):
         id_data = {
             "PatientName": global_meta["PatientName"],
             "PatientID": global_meta["PatientID"],
+            "PatientBirthDate": global_meta["PatientBirthDate"],
             "PatientSex": global_meta["PatientSex"],
             "AccessionNumber": global_meta["AccessionNumber"],
             "StudyInstanceUID": global_meta["StudyInstanceUID"],
@@ -589,6 +592,7 @@ def process_zip(zip_path):
         metadata_data = {
             "PatientName": global_meta["PatientName"],
             "PatientID": global_meta["PatientID"],
+            "PatientBirthDate": global_meta["PatientBirthDate"],
             "PatientSex": global_meta["PatientSex"],
             "StudyInstanceUID": global_meta["StudyInstanceUID"],
             "AccessionNumber": global_meta["AccessionNumber"],

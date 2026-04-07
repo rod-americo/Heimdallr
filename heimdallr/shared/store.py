@@ -15,6 +15,8 @@ from .sqlite import connect
 _DICOM_METADATA_COLUMNS = {
     "StudyInstanceUID": "TEXT PRIMARY KEY",
     "PatientName": "TEXT",
+    "PatientID": "TEXT",
+    "PatientBirthDate": "TEXT",
     "ClinicalName": "TEXT",
     "AccessionNumber": "TEXT",
     "StudyDate": "TEXT",
@@ -71,6 +73,8 @@ def ensure_schema(conn: sqlite3.Connection | None = None) -> None:
         CREATE TABLE IF NOT EXISTS dicom_metadata (
             StudyInstanceUID TEXT PRIMARY KEY,
             PatientName TEXT,
+            PatientID TEXT,
+            PatientBirthDate TEXT,
             ClinicalName TEXT,
             AccessionNumber TEXT,
             StudyDate TEXT,
@@ -188,6 +192,8 @@ def upsert_study_metadata(conn: sqlite3.Connection, metadata: dict[str, Any]) ->
         (
             StudyInstanceUID,
             PatientName,
+            PatientID,
+            PatientBirthDate,
             ClinicalName,
             AccessionNumber,
             StudyDate,
@@ -201,6 +207,8 @@ def upsert_study_metadata(conn: sqlite3.Connection, metadata: dict[str, Any]) ->
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(StudyInstanceUID) DO UPDATE SET
             PatientName = excluded.PatientName,
+            PatientID = excluded.PatientID,
+            PatientBirthDate = excluded.PatientBirthDate,
             ClinicalName = excluded.ClinicalName,
             AccessionNumber = excluded.AccessionNumber,
             StudyDate = excluded.StudyDate,
@@ -216,6 +224,8 @@ def upsert_study_metadata(conn: sqlite3.Connection, metadata: dict[str, Any]) ->
         (
             metadata["StudyInstanceUID"],
             metadata["PatientName"],
+            metadata.get("PatientID", ""),
+            metadata.get("PatientBirthDate", ""),
             metadata.get("ClinicalName", ""),
             metadata["AccessionNumber"],
             metadata.get("StudyDate", ""),
@@ -662,6 +672,8 @@ def find_case_row_by_case_id(conn: sqlite3.Connection, case_id: str) -> sqlite3.
             SELECT
                 StudyInstanceUID,
                 IdJson,
+                PatientID,
+                PatientBirthDate,
                 Weight,
                 Height,
                 PatientSex,
@@ -682,10 +694,12 @@ def find_case_row_by_case_id(conn: sqlite3.Connection, case_id: str) -> sqlite3.
     for row in conn.execute(
         """
         SELECT
-            StudyInstanceUID,
-            IdJson,
-            Weight,
-            Height,
+                StudyInstanceUID,
+                IdJson,
+                PatientID,
+                PatientBirthDate,
+                Weight,
+                Height,
             PatientSex,
             CalculationResults,
             SMI,
