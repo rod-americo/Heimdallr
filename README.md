@@ -176,7 +176,10 @@ All long-running services on a host should use the same interpreter:
 
 For DICOM peers that only accept `Secondary Capture` in JPEG Lossless transfer
 syntaxes, place `dcmcjpeg` in `bin/linux-amd64/dcmcjpeg` (or `bin/dcmcjpeg`)
-and keep the matching upstream notice under `bin/licenses/`.
+and keep the matching upstream notice under `bin/licenses/`. Distributions
+that carry this binary should also retain the DCMTK notice and the statement:
+"This product includes software based in part on the work of the Independent
+JPEG Group."
 
 ### Run
 

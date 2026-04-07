@@ -10,6 +10,10 @@ Current convention:
 - `licenses/dcm2niix-license.txt`: upstream license/notice file
 - `licenses/dcmtk-license.txt`: upstream license/notice file for `dcmcjpeg`
 
+When distributing `dcmcjpeg`, accompanying documentation should state:
+"This product includes software based in part on the work of the Independent
+JPEG Group."
+
 Resolution order for `dcm2niix`:
 
 1. `HEIMDALLR_DCM2NIIX_BIN`
