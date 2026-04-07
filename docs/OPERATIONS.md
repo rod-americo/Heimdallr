@@ -34,6 +34,18 @@ Run as independent services:
 
 ## Baseline Startup
 
+Single-venv host installation:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+.venv/bin/totalseg_set_license -l YOUR_LICENSE_KEY
+```
+
+All supervised services should point to the same interpreter:
+`.venv/bin/python`.
+
 ```bash
 # API + Dashboard
 source .venv/bin/activate

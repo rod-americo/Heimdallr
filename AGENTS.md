@@ -32,7 +32,7 @@ Format: `type(scope): summary`
 *   `docs`: Exclusive for root material (Markdown)
 *   `refactor`: Clean internal (architectural) adjustments
 *   `test`: Verifications and isolated proof scripts
-*   `chore`: Tooling, versioning, or environment updates in `requirements/`
+*   `chore`: Tooling, versioning, or environment updates in `requirements.txt`
 *   *(perf, ci, build, revert).*
 
 > [!WARNING]

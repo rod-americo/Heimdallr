@@ -84,7 +84,7 @@ PACS/Modality (DICOM) --> heimdallr/intake --> /upload (heimdallr/control_plane)
 
 - Python 3.10+
 - `dcm2niix`
-- TotalSegmentator runtime in `.venv-totalseg`
+- TotalSegmentator runtime in `.venv`
 - Optional OCR: `pytesseract` + `tesseract` system binary
 
 ## Operational Boundaries
