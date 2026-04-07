@@ -3,11 +3,13 @@
 
 from __future__ import annotations
 
+import copy
 import time
 from pathlib import Path
 
 import pydicom
 from pynetdicom import AE, ALL_TRANSFER_SYNTAXES
+from pydicom.uid import UID
 
 from heimdallr.dicom_egress.config import (
     dicom_egress_connect_timeout_seconds,
@@ -73,6 +75,34 @@ def _artifact_abspath(case_id: str, artifact_path: str) -> Path:
     return study_dir(case_id) / artifact_path
 
 
+def _accepted_context_for_sop_class(assoc, sop_class_uid: str):
+    for context in assoc.accepted_contexts:
+        if str(context.abstract_syntax) == str(sop_class_uid):
+            return context
+    return None
+
+
+def _prepare_dataset_for_peer(ds: pydicom.Dataset, accepted_transfer_syntax: UID) -> pydicom.Dataset:
+    current_transfer_syntax = UID(ds.file_meta.TransferSyntaxUID)
+    if current_transfer_syntax == accepted_transfer_syntax:
+        return ds
+
+    if not accepted_transfer_syntax.is_compressed:
+        return ds
+
+    prepared = copy.deepcopy(ds)
+    try:
+        prepared.compress(str(accepted_transfer_syntax), generate_instance_uid=False)
+    except Exception as exc:
+        raise RuntimeError(
+            "Peer only accepted transfer syntax "
+            f"'{accepted_transfer_syntax.name}' for SOP Class '{ds.SOPClassUID.name}', "
+            f"but local runtime could not transcode the dataset: {exc}"
+        ) from exc
+
+    return prepared
+
+
 def send_dicom_export(
     *,
     case_id: str,
@@ -112,7 +142,15 @@ def send_dicom_export(
         )
 
     try:
-        status = assoc.send_c_store(ds)
+        accepted_context = _accepted_context_for_sop_class(assoc, sop_class_uid)
+        if accepted_context is None:
+            raise RuntimeError(
+                f"Peer accepted no presentation context for SOP Class '{UID(sop_class_uid).name}' "
+                f"at {destination_called_aet}@{destination_host}:{destination_port}"
+            )
+
+        prepared_ds = _prepare_dataset_for_peer(ds, accepted_context.transfer_syntax[0])
+        status = assoc.send_c_store(prepared_ds)
     finally:
         assoc.release()
 

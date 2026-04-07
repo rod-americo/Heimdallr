@@ -204,7 +204,7 @@ def upsert_study_metadata(conn: sqlite3.Connection, metadata: dict[str, Any]) ->
             JsonDump,
             ProcessedAt
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(StudyInstanceUID) DO UPDATE SET
             PatientName = excluded.PatientName,
             PatientID = excluded.PatientID,
