@@ -189,6 +189,28 @@ def load_segmentation_pipeline_profile() -> tuple[str, dict]:
     return profile_name, profile
 
 
+def resolve_segmentation_plan(modality, selected_phase) -> tuple[str, list[dict]]:
+    """Resolve the active segmentation profile and enabled tasks for a case."""
+    profile_name, profile = load_segmentation_pipeline_profile()
+    required = profile.get("required", {})
+    required_modality = required.get("modality")
+    if required_modality and modality != required_modality:
+        raise RuntimeError(
+            f"Segmentation profile '{profile_name}' requires modality {required_modality}, got {modality}"
+        )
+
+    allowed_phases = [_normalize_phase(p) for p in required.get("selected_phase", [])]
+    if allowed_phases and _normalize_phase(selected_phase) not in allowed_phases:
+        raise RuntimeError(
+            f"Segmentation profile '{profile_name}' requires phase in {allowed_phases}, got {_normalize_phase(selected_phase)}"
+        )
+
+    tasks = [task for task in profile.get("tasks", []) if task.get("enabled", True)]
+    if not tasks:
+        raise RuntimeError(f"Segmentation profile '{profile_name}' has no enabled tasks")
+    return profile_name, tasks
+
+
 def _safe_float(value, default=0.0):
     try:
         return float(value)
@@ -400,23 +422,7 @@ def materialize_canonical_nifti(source_path, final_path):
 
 def run_segmentation_pipeline(case_id, modality, selected_phase, nifti_path, case_output, artifacts_dir, log_dir, logger):
     """Execute the configured segmentation task list for the selected series."""
-    profile_name, profile = load_segmentation_pipeline_profile()
-    required = profile.get("required", {})
-    required_modality = required.get("modality")
-    if required_modality and modality != required_modality:
-        raise RuntimeError(
-            f"Segmentation profile '{profile_name}' requires modality {required_modality}, got {modality}"
-        )
-
-    allowed_phases = [_normalize_phase(p) for p in required.get("selected_phase", [])]
-    if allowed_phases and _normalize_phase(selected_phase) not in allowed_phases:
-        raise RuntimeError(
-            f"Segmentation profile '{profile_name}' requires phase in {allowed_phases}, got {_normalize_phase(selected_phase)}"
-        )
-
-    tasks = [task for task in profile.get("tasks", []) if task.get("enabled", True)]
-    if not tasks:
-        raise RuntimeError(f"Segmentation profile '{profile_name}' has no enabled tasks")
+    profile_name, tasks = resolve_segmentation_plan(modality, selected_phase)
 
     logger.print(f"[Segmentation] Profile: {profile_name}")
     logger.print(f"[Segmentation] Selected phase: {_normalize_phase(selected_phase)}")
@@ -451,6 +457,57 @@ def run_segmentation_pipeline(case_id, modality, selected_phase, nifti_path, cas
             for task in tasks
         ],
     }
+
+
+def _segmentation_outputs_exist(case_output: Path, tasks: list[dict]) -> bool:
+    for task in tasks:
+        output_dir = case_output / task["output_dir"]
+        if not output_dir.exists():
+            return False
+        try:
+            next(output_dir.iterdir())
+        except StopIteration:
+            return False
+    return True
+
+
+def should_reuse_existing_segmentation(
+    study_uid: str | None,
+    case_output: Path,
+    selection_info: dict | None,
+    profile_name: str,
+    tasks: list[dict],
+) -> bool:
+    if not study_uid or not selection_info:
+        return False
+
+    selected_series_uid = selection_info.get("SelectedSeriesInstanceUID")
+    selected_slice_count = _safe_int(selection_info.get("SliceCount"), -1)
+    planned_task_names = [task["name"] for task in tasks]
+
+    conn = db_connect()
+    try:
+        row = store.get_recorded_segmentation_signature(conn, study_uid)
+    finally:
+        conn.close()
+
+    if not row or not row["SegmentationCompletedAt"]:
+        return False
+    if row["SegmentationSeriesInstanceUID"] != selected_series_uid:
+        return False
+    if _safe_int(row["SegmentationSliceCount"], -1) != selected_slice_count:
+        return False
+    if row["SegmentationProfile"] != profile_name:
+        return False
+
+    try:
+        recorded_tasks = json.loads(row["SegmentationTasks"] or "[]")
+    except Exception:
+        recorded_tasks = []
+    if recorded_tasks != planned_task_names:
+        return False
+
+    return _segmentation_outputs_exist(case_output, tasks)
 
 def run_task(task_name, input_file, output_folder, extra_args=None, max_retries=3, log_file=None):
     """
@@ -677,12 +734,14 @@ def segment_case(case_input):
 
         modality = "CT"
         selected_phase = "unknown"
+        study_uid = None
         id_json_path = study_id_json(case_id)
         if id_json_path.exists():
             try:
                 with open(id_json_path, "r") as f:
                     meta = json.load(f)
                 modality = meta.get("Modality", "CT")
+                study_uid = meta.get("StudyInstanceUID")
                 if selection_info is not None:
                     selected_phase = selection_info.get("SelectedPhase", "unknown")
 
@@ -703,19 +762,52 @@ def segment_case(case_input):
                 f"Selected series {selection_info['SelectedSeriesNumber']} "
                 f"({selection_info['SelectedPhase']}, {selection_info['SliceCount']} slices)"
             )
+        profile_name, planned_tasks = resolve_segmentation_plan(modality, selected_phase)
         seg_start_time = time.time()
-        segmentation_info = run_segmentation_pipeline(
-            case_id=case_id,
-            modality=modality,
-            selected_phase=selected_phase,
-            nifti_path=nifti_path,
-            case_output=case_output,
-            artifacts_dir=artifacts_dir,
-            log_dir=log_dir,
-            logger=logger,
-        )
-        seg_elapsed = time.time() - seg_start_time
-        logger.print(f"[Segmentation] ✓ Complete ({seg_elapsed:.1f}s)")
+        if should_reuse_existing_segmentation(study_uid, case_output, selection_info, profile_name, planned_tasks):
+            segmentation_info = {
+                "profile": profile_name,
+                "tasks": [
+                    {
+                        "name": task["name"],
+                        "output_dir": task["output_dir"],
+                        "extra_args": list(task.get("extra_args", [])),
+                        "license_required": bool(task.get("license_required")),
+                    }
+                    for task in planned_tasks
+                ],
+                "reused_existing_outputs": True,
+                "reuse_reason": "sqlite_signature_match",
+            }
+            seg_elapsed = time.time() - seg_start_time
+            logger.print("[Segmentation] Reusing existing outputs for identical selected series signature")
+            logger.print(f"[Segmentation] ✓ Complete ({seg_elapsed:.1f}s)")
+        else:
+            segmentation_info = run_segmentation_pipeline(
+                case_id=case_id,
+                modality=modality,
+                selected_phase=selected_phase,
+                nifti_path=nifti_path,
+                case_output=case_output,
+                artifacts_dir=artifacts_dir,
+                log_dir=log_dir,
+                logger=logger,
+            )
+            seg_elapsed = time.time() - seg_start_time
+            logger.print(f"[Segmentation] ✓ Complete ({seg_elapsed:.1f}s)")
+            if study_uid and selection_info is not None:
+                conn = db_connect()
+                try:
+                    store.update_segmentation_signature(
+                        conn,
+                        study_uid,
+                        series_instance_uid=selection_info.get("SelectedSeriesInstanceUID"),
+                        slice_count=_safe_int(selection_info.get("SliceCount"), 0),
+                        profile_name=segmentation_info["profile"],
+                        task_names=[task["name"] for task in segmentation_info["tasks"]],
+                    )
+                finally:
+                    conn.close()
         if not settings.VERBOSE_CONSOLE:
             logger.print(f"  → Logs: {log_dir.relative_to(settings.STUDIES_DIR.parent)}/")
 

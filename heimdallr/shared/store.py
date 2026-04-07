@@ -31,6 +31,11 @@ _DICOM_METADATA_COLUMNS = {
     "Weight": "REAL",
     "Height": "REAL",
     "SMI": "REAL",
+    "SegmentationSeriesInstanceUID": "TEXT",
+    "SegmentationSliceCount": "INTEGER",
+    "SegmentationProfile": "TEXT",
+    "SegmentationTasks": "TEXT",
+    "SegmentationCompletedAt": "TIMESTAMP",
     "ArtifactsPurged": "INTEGER DEFAULT 0",
     "ArtifactsPurgedAt": "TIMESTAMP",
     "ProcessedAt": "TIMESTAMP",
@@ -89,6 +94,11 @@ def ensure_schema(conn: sqlite3.Connection | None = None) -> None:
             Weight REAL,
             Height REAL,
             SMI REAL,
+            SegmentationSeriesInstanceUID TEXT,
+            SegmentationSliceCount INTEGER,
+            SegmentationProfile TEXT,
+            SegmentationTasks TEXT,
+            SegmentationCompletedAt TIMESTAMP,
             ArtifactsPurged INTEGER DEFAULT 0,
             ArtifactsPurgedAt TIMESTAMP,
             ProcessedAt TIMESTAMP
@@ -633,6 +643,55 @@ def update_id_json(conn: sqlite3.Connection, study_uid: str, metadata: dict[str,
     conn.execute(
         "UPDATE dicom_metadata SET IdJson = ?, Weight = ?, Height = ? WHERE StudyInstanceUID = ?",
         (json.dumps(metadata), metadata.get("Weight"), metadata.get("Height"), study_uid),
+    )
+    conn.commit()
+
+
+def get_recorded_segmentation_signature(conn: sqlite3.Connection, study_uid: str) -> sqlite3.Row | None:
+    ensure_schema(conn)
+    return conn.execute(
+        """
+        SELECT
+            SegmentationSeriesInstanceUID,
+            SegmentationSliceCount,
+            SegmentationProfile,
+            SegmentationTasks,
+            SegmentationCompletedAt
+        FROM dicom_metadata
+        WHERE StudyInstanceUID = ?
+        """,
+        (study_uid,),
+    ).fetchone()
+
+
+def update_segmentation_signature(
+    conn: sqlite3.Connection,
+    study_uid: str,
+    *,
+    series_instance_uid: str | None,
+    slice_count: int | None,
+    profile_name: str,
+    task_names: list[str],
+) -> None:
+    ensure_schema(conn)
+    conn.execute(
+        """
+        UPDATE dicom_metadata
+        SET SegmentationSeriesInstanceUID = ?,
+            SegmentationSliceCount = ?,
+            SegmentationProfile = ?,
+            SegmentationTasks = ?,
+            SegmentationCompletedAt = ?
+        WHERE StudyInstanceUID = ?
+        """,
+        (
+            series_instance_uid,
+            int(slice_count) if slice_count is not None else None,
+            profile_name,
+            json.dumps(task_names),
+            _now_local_timestamp(),
+            study_uid,
+        ),
     )
     conn.commit()
 
