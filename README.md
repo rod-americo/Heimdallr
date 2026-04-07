@@ -111,6 +111,7 @@ Heimdallr/
 ├── bin/                          # Bundled platform binaries
 │   ├── darwin-arm64/dcm2niix     #   macOS ARM
 │   ├── linux-amd64/dcm2niix      #   Linux x86_64
+│   ├── linux-amd64/dcmcjpeg      #   Linux x86_64 JPEG Lossless transcoder
 │   └── licenses/                 #   Upstream license files
 ├── scripts/                      # Operational and retroactive scripts
 │   ├── retroactive_recalculate_metrics.py
@@ -149,6 +150,7 @@ Heimdallr/
 |---|---|
 | Python `≥ 3.10` | Package requires `zoneinfo`, `tomllib` |
 | `dcm2niix` | Bundled in `bin/` or system PATH |
+| `dcmcjpeg` | Optional; bundled in `bin/` or system PATH for JPEG Lossless peers |
 | NVIDIA GPU | Recommended for TotalSegmentator |
 | TotalSegmentator license | Required for `tissue_types` task; registered in `.venv` |
 
@@ -171,6 +173,10 @@ For licensed TotalSegmentator tasks, register the license in the same venv:
 
 All long-running services on a host should use the same interpreter:
 `.venv/bin/python`.
+
+For DICOM peers that only accept `Secondary Capture` in JPEG Lossless transfer
+syntaxes, place `dcmcjpeg` in `bin/linux-amd64/dcmcjpeg` (or `bin/dcmcjpeg`)
+and keep the matching upstream notice under `bin/licenses/`.
 
 ### Run
 

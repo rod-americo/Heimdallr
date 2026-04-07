@@ -46,6 +46,11 @@ pip install -r requirements.txt
 All supervised services should point to the same interpreter:
 `.venv/bin/python`.
 
+For DICOM peers that only accept JPEG Lossless `Secondary Capture`, keep
+`dcmcjpeg` bundled in `bin/linux-amd64/dcmcjpeg` (or `bin/dcmcjpeg`). Heimdallr
+resolves this binary before falling back to the system `PATH`, and the matching
+upstream notice should live under `bin/licenses/`.
+
 ```bash
 # API + Dashboard
 source .venv/bin/activate
