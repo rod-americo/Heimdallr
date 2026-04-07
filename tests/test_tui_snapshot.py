@@ -46,6 +46,7 @@ class TestTuiSnapshot(unittest.TestCase):
                             "prepare_elapsed_time": "0:00:08.000000",
                             "segmentation_elapsed_time": "0:02:03.000000",
                             "elapsed_time": "0:02:11.000000",
+                            "prepare_input_origin": "P",
                         },
                         "AvailableSeries": [{}, {}],
                         "DiscardedSeries": [{}],
@@ -181,6 +182,8 @@ class TestTuiSnapshot(unittest.TestCase):
             self.assertTrue(any(case.case_id == "ProcessedCase_20260401_3" and case.stage_key == "processed" for case in snapshot.cases))
             self.assertTrue(any(case.case_id == "FailedCase_20260401_2" and case.stage_key == "failed" for case in snapshot.cases))
             self.assertTrue(any(alert.level == "warning" for alert in snapshot.alerts))
+            processed = next(item for item in snapshot.cases if item.case_id == "ProcessedCase_20260401_3")
+            self.assertEqual(processed.origin, "")
 
     def test_build_snapshot_computes_live_segmentation_elapsed_from_start_time(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -218,6 +221,7 @@ class TestTuiSnapshot(unittest.TestCase):
                             "prepare_elapsed_time": "0:00:40.000000",
                             "start_time": segmentation_start.isoformat(),
                             "segmentation_start_time": segmentation_start.isoformat(),
+                            "prepare_input_origin": "E",
                         },
                         "AvailableSeries": [{}],
                     }
@@ -242,6 +246,7 @@ class TestTuiSnapshot(unittest.TestCase):
             case = next(item for item in snapshot.cases if item.case_id == "LiveCase_20260401_9")
 
             self.assertEqual(case.stage_key, "segmentation")
+            self.assertEqual(case.origin, "E")
             self.assertEqual(case.prepare_elapsed, "0:00:40")
             self.assertNotEqual(case.segmentation_elapsed, "-")
             self.assertRegex(case.segmentation_elapsed, r"^\d+:\d{2}:\d{2}$")

@@ -456,6 +456,7 @@ def process_zip(zip_path):
     zip_path = Path(zip_path)
     if not zip_path.exists():
         raise FileNotFoundError(f"File {zip_path} not found.")
+    upload_origin = _upload_origin_from_spool_path(zip_path)
 
     print(f"=== Prepare Upload: {unclaim_path(zip_path).name} ===")
 
@@ -811,6 +812,7 @@ def process_zip(zip_path):
                 "prepare_elapsed_time": prepare_elapsed_str,
                 "prepare_stage_timings_seconds": stage_timings,
                 "prepare_stats": prepare_stats,
+                "prepare_input_origin": upload_origin,
             }
             if intake_manifest:
                 pipeline_data = output_meta["Pipeline"]
@@ -900,11 +902,27 @@ def process_spooled_zip(zip_path: Path) -> bool:
         return False
 
 
-def iter_claimable_uploads():
-    """Yield claimed uploads first, then stable ready ZIPs from the intake spool in LIFO order."""
-    for path in sorted(settings.UPLOAD_DIR.glob(f"*.zip{CLAIM_SUFFIX}"), reverse=True):
+def _spool_sort_key(path: Path) -> tuple[float, str]:
+    try:
+        stat = path.stat()
+        return (stat.st_mtime, path.name)
+    except FileNotFoundError:
+        return (float("inf"), path.name)
+
+
+def _upload_origin_from_spool_path(zip_path: Path) -> str:
+    base_path = unclaim_path(zip_path)
+    if base_path.parent == settings.UPLOAD_FROM_PREPARE_DIR:
+        return "P"
+    if base_path.parent == settings.UPLOAD_EXTERNAL_DIR:
+        return "E"
+    return ""
+
+
+def _iter_claimable_uploads_in_dir(spool_dir: Path):
+    for path in sorted(spool_dir.glob(f"*.zip{CLAIM_SUFFIX}"), key=_spool_sort_key):
         yield path
-    for path in sorted(settings.UPLOAD_DIR.glob("*.zip"), reverse=True):
+    for path in sorted(spool_dir.glob("*.zip"), key=_spool_sort_key):
         if is_spooled_zip_stable(path):
             try:
                 yield claim_path(path)
@@ -912,10 +930,21 @@ def iter_claimable_uploads():
                 continue
 
 
+def iter_claimable_uploads():
+    """Yield FIFO uploads, prioritizing from_prepare over external spool sources."""
+    for spool_dir in (
+        settings.UPLOAD_FROM_PREPARE_DIR,
+        settings.UPLOAD_EXTERNAL_DIR,
+        settings.UPLOAD_DIR,
+    ):
+        yield from _iter_claimable_uploads_in_dir(spool_dir)
+
+
 def watch_upload_spool() -> int:
     """Run the prepare watchdog loop over the upload spool."""
     print("Starting prepare watchdog...")
-    print(f"  Upload spool: {settings.UPLOAD_DIR}")
+    print(f"  Upload spool (from_prepare): {settings.UPLOAD_FROM_PREPARE_DIR}")
+    print(f"  Upload spool (external): {settings.UPLOAD_EXTERNAL_DIR}")
     print(f"  Failed spool: {settings.UPLOAD_FAILED_DIR}")
     print(f"  Stable age: {settings.PREPARE_STABLE_AGE_SECONDS}s")
     print(f"  Scan interval: {settings.PREPARE_SCAN_INTERVAL}s")

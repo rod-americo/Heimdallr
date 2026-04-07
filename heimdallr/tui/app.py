@@ -76,6 +76,7 @@ class HeimdallrDashboardApp(App[None]):
         table = self.query_one("#cases", DataTable)
         table.add_columns(
             tui("app.table.patient"),
+            tui("app.table.origin"),
             tui("app.table.stage"),
             tui("app.table.queue"),
             tui("app.table.prepare"),
@@ -261,6 +262,7 @@ class HeimdallrDashboardApp(App[None]):
             updated = case.updated_at.strftime("%d/%m %H:%M") if case.updated_at else "-"
             table.add_row(
                 case.patient_name,
+                case.origin or "-",
                 case.stage_label,
                 case.queue_status,
                 case.prepare_elapsed,
@@ -280,6 +282,7 @@ class HeimdallrDashboardApp(App[None]):
             return
         timeline = Table.grid(padding=(0, 1))
         timeline.add_row(Text(tui("app.case.stage"), style="#94a3b8"), Text(case.stage_label, style="bold #f8fafc"))
+        timeline.add_row(Text(tui("app.case.origin"), style="#94a3b8"), Text(case.origin or "-", style="#e2e8f0"))
         timeline.add_row(Text(tui("app.case.queue"), style="#94a3b8"), Text(case.queue_status, style="#e2e8f0"))
         timeline.add_row(Text(tui("app.case.prepare"), style="#94a3b8"), Text(case.prepare_elapsed, style="#e2e8f0"))
         timeline.add_row(Text(tui("app.case.segment"), style="#94a3b8"), Text(case.segmentation_elapsed, style="#e2e8f0"))

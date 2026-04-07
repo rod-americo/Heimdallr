@@ -74,6 +74,8 @@ QUEUE_DIR = RUNTIME_DIR / "queue"
 STUDIES_DIR = RUNTIME_DIR / "studies"
 
 UPLOAD_DIR = INTAKE_DIR / "uploads"
+UPLOAD_FROM_PREPARE_DIR = UPLOAD_DIR / "from_prepare"
+UPLOAD_EXTERNAL_DIR = UPLOAD_DIR / "external"
 UPLOAD_FAILED_DIR = INTAKE_DIR / "uploads_failed"
 DICOM_DIR = INTAKE_DIR / "dicom"
 INPUT_DIR = QUEUE_DIR / "pending"
@@ -309,6 +311,8 @@ def ensure_directories() -> None:
         QUEUE_DIR,
         STUDIES_DIR,
         UPLOAD_DIR,
+        UPLOAD_FROM_PREPARE_DIR,
+        UPLOAD_EXTERNAL_DIR,
         UPLOAD_FAILED_DIR,
         DICOM_DIR,
         OUTPUT_DIR,
