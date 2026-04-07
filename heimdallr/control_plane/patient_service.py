@@ -93,6 +93,8 @@ class PatientService:
                         row["PatientName"] or metadata.get("PatientName", "Unknown"),
                         settings.PATIENT_NAME_PROFILE,
                     ),
+                    "patient_id": row["PatientID"] or metadata.get("PatientID", ""),
+                    "patient_birth_date": row["PatientBirthDate"] or metadata.get("PatientBirthDate", ""),
                     "study_date": row["StudyDate"] or metadata.get("StudyDate", ""),
                     "accession": row["AccessionNumber"] or metadata.get("AccessionNumber", ""),
                     "modality": row["Modality"] or metadata.get("Modality", ""),
@@ -128,6 +130,10 @@ class PatientService:
             metadata["Height"] = row["Height"]
         if row["PatientSex"] is not None:
             metadata["Sex"] = row["PatientSex"]
+        if row["PatientID"] is not None:
+            metadata["PatientID"] = row["PatientID"]
+        if row["PatientBirthDate"] is not None:
+            metadata["PatientBirthDate"] = row["PatientBirthDate"]
         if row["SMI"] is not None:
             metadata["SMI"] = row["SMI"]
         metadata["ArtifactsPurged"] = bool(row["ArtifactsPurged"])

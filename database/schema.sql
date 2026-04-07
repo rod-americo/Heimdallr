@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS dicom_metadata (
     
     -- Patient Information
     PatientName TEXT,
+    PatientID TEXT,
+    PatientBirthDate TEXT,
     
     -- Clinical Naming (FirstNameInitials_YYYYMMDD_AccessionNumber)
     ClinicalName TEXT,
@@ -113,6 +115,8 @@ CREATE INDEX IF NOT EXISTS idx_dicom_egress_queue_status_next_attempt ON dicom_e
 
 -- StudyInstanceUID: Unique DICOM identifier (1.2.840.xxx...)
 -- PatientName: Full patient name from DICOM
+-- PatientID: DICOM PatientID
+-- PatientBirthDate: DICOM PatientBirthDate (YYYYMMDD when present)
 -- ClinicalName: Standardized filename format for easy identification
 -- AccessionNumber: Hospital/PACS accession number
 -- StudyDate: YYYYMMDD format
@@ -132,6 +136,8 @@ CREATE INDEX IF NOT EXISTS idx_dicom_egress_queue_status_next_attempt ON dicom_e
 -- IdJson example (complete id.json from output directory):
 -- {
 --   "PatientName": "John Doe",
+--   "PatientID": "1234567",
+--   "PatientBirthDate": "19800115",
 --   "AccessionNumber": "123456",
 --   "StudyInstanceUID": "1.2.840...",
 --   "Modality": "CT",
@@ -155,6 +161,8 @@ CREATE INDEX IF NOT EXISTS idx_dicom_egress_queue_status_next_attempt ON dicom_e
 -- JsonDump example (legacy, basic metadata):
 -- {
 --   "PatientName": "John Doe",
+--   "PatientID": "1234567",
+--   "PatientBirthDate": "19800115",
 --   "AccessionNumber": "123456",
 --   "StudyInstanceUID": "1.2.840...",
 --   "Modality": "CT",
@@ -166,7 +174,8 @@ CREATE INDEX IF NOT EXISTS idx_dicom_egress_queue_status_next_attempt ON dicom_e
 -- DicomMetadata example:
 -- {
 --   "PatientName": "John Doe",
---   "PatientAge": "045Y",
+--   "PatientID": "1234567",
+    --   "PatientAge": "045Y",
 --   "Modality": "CT",
 --   "SliceThickness": "1.0",
 --   "KVP": "120",

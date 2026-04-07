@@ -14,6 +14,8 @@ class PatientResponse(BaseModel):
     file_size_bytes: int
     file_size_mb: float
     patient_name: str
+    patient_id: str = ""
+    patient_birth_date: str = ""
     study_date: str
     accession: str
     modality: str
