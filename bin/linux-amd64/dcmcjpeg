@@ -3,6 +3,8 @@ set -euo pipefail
 
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="${SELF_DIR}/lib"
+DICT_DIR="${SELF_DIR}/share/libdcmtk17"
 export LD_LIBRARY_PATH="${LIB_DIR}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+export DCMDICTPATH="${DICT_DIR}/dicom.dic:${DICT_DIR}/private.dic${DCMDICTPATH:+:${DCMDICTPATH}}"
 
 exec "${SELF_DIR}/dcmcjpeg.bin" "$@"
