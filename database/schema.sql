@@ -35,6 +35,11 @@ CREATE TABLE IF NOT EXISTS dicom_metadata (
     Weight REAL,
     Height REAL,
     SMI REAL,
+    SegmentationSeriesInstanceUID TEXT,
+    SegmentationSliceCount INTEGER,
+    SegmentationProfile TEXT,
+    SegmentationTasks TEXT,
+    SegmentationCompletedAt TIMESTAMP,
     
     -- Timestamps
     ProcessedAt TIMESTAMP
