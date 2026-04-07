@@ -102,6 +102,34 @@ CREATE TABLE IF NOT EXISTS dicom_egress_queue (
 );
 
 -- ============================================================
+-- Integration Dispatch Queue: outbound webhook/API event delivery
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS integration_dispatch_queue (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_type TEXT NOT NULL,
+    event_version INTEGER NOT NULL DEFAULT 1,
+    event_key TEXT NOT NULL,
+    case_id TEXT,
+    study_uid TEXT,
+    destination_name TEXT NOT NULL,
+    destination_url TEXT NOT NULL,
+    http_method TEXT NOT NULL DEFAULT 'POST',
+    timeout_seconds INTEGER NOT NULL DEFAULT 10,
+    request_headers TEXT,
+    payload_json TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    attempts INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP,
+    claimed_at TIMESTAMP,
+    finished_at TIMESTAMP,
+    next_attempt_at TIMESTAMP,
+    response_status INTEGER,
+    error TEXT,
+    UNIQUE(event_key, destination_name)
+);
+
+-- ============================================================
 -- Indexes for Performance
 -- ============================================================
 
@@ -113,6 +141,7 @@ CREATE INDEX IF NOT EXISTS idx_processed_at ON dicom_metadata(ProcessedAt);
 CREATE INDEX IF NOT EXISTS idx_segmentation_queue_status_created ON segmentation_queue(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_metrics_queue_status_created ON metrics_queue(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_dicom_egress_queue_status_next_attempt ON dicom_egress_queue(status, next_attempt_at, created_at);
+CREATE INDEX IF NOT EXISTS idx_integration_dispatch_queue_status_next_attempt ON integration_dispatch_queue(status, next_attempt_at, created_at);
 
 -- ============================================================
 -- Schema Notes

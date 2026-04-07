@@ -30,6 +30,9 @@ heimdallr.segmentation      ← TotalSegmentator segmentation (parallel tasks)
 heimdallr.metrics         ← deterministic derived measurements (job-based)
       │ results + DICOM artifacts
       ▼
+heimdallr.integration_dispatcher ← outbound patient/event webhooks
+      │ queued HTTP deliveries
+      ▼
 heimdallr.dicom_egress   ← outbound C-STORE delivery worker
       │ queued deliveries
       ▼
@@ -40,7 +43,7 @@ runtime/studies/<case_id>/ + database/dicom.db
 
 1. **Ingestion** — DICOM C-STORE listener that groups instances by study, applies idle timeout, and hands off completed studies as ZIP payloads (local spool or HTTP upload).
 
-2. **Preparation** — Watchdog-based worker that unpacks uploads, enumerates series, detects contrast phase via TotalSegmentator, converts DICOM to NIfTI with `dcm2niix`, and queues the selected series for segmentation.
+2. **Preparation** — Watchdog-based worker that unpacks uploads, enumerates series, detects contrast phase via TotalSegmentator, converts DICOM to NIfTI with `dcm2niix`, records patient identity, and queues the prepared study for downstream segmentation and optional external integrations.
 
 3. **Segmentation** — Profile-driven TotalSegmentator execution with retry logic, support for licensed tasks (`tissue_types`), and parallel task scheduling.
 
@@ -51,11 +54,13 @@ runtime/studies/<case_id>/ + database/dicom.db
 
 5. **DICOM Egress** — Queue-driven outbound C-STORE worker that delivers generated DICOM artifacts such as Secondary Capture overlays to fixed remote SCP destinations.
 
-6. **Space Manager** — Resident storage guard that monitors the filesystem hosting `runtime/studies/` and purges the oldest completed case directories when disk usage reaches a configurable host-local threshold.
+6. **Integration Dispatch** — Queue-driven outbound webhook dispatcher that emits patient-identified events to one or more external applications after `prepare` resolves the study identity.
 
-7. **Control Plane** — FastAPI application serving the web dashboard, upload endpoint, patient/results API, and deterministic PDF export of case outputs.
+7. **Space Manager** — Resident storage guard that monitors the filesystem hosting `runtime/studies/` and purges the oldest completed case directories when disk usage reaches a configurable host-local threshold.
 
-8. **Operations TUI** — Textual-based terminal dashboard with live process monitoring, queue inspection, and study browsing.
+8. **Control Plane** — FastAPI application serving the web dashboard, upload endpoint, patient/results API, and deterministic PDF export of case outputs.
+
+9. **Operations TUI** — Textual-based terminal dashboard with live process monitoring, queue inspection, and study browsing.
 
 ## Repository Layout
 
@@ -83,6 +88,10 @@ Heimdallr/
 │   │   └── jobs/                 #   Individual production measurement modules
 │   │       └── tests/            #   Experimental jobs and validation helpers
 │   ├── deid_gateway.py           # OCR-based pixel/text de-identification helpers
+│   ├── integration_dispatcher/   # Outbound HTTP webhook/event dispatcher
+│   │   ├── worker.py             #   Queue-driven dispatcher
+│   │   ├── config.py             #   Destination config loader + routing helper
+│   │   └── events.py             #   Event payload builders
 │   ├── dicom_egress/             # Outbound DICOM artifact delivery worker
 │   │   ├── worker.py             #   Queue-driven C-STORE SCU dispatcher
 │   │   └── config.py             #   Destination config loader + routing helper
@@ -103,6 +112,7 @@ Heimdallr/
 │   ├── segmentation_pipeline.example.json # Example TotalSegmentator task list
 │   ├── metrics_pipeline.example.json      # Example post-segmentation job list
 │   ├── space_manager.example.json         # Example runtime storage GC policy
+│   ├── integration_dispatch.example.json  # Example outbound webhook endpoints
 │   ├── dicom_egress.example.json          # Example outbound DICOM destinations
 │   └── presentation.example.json          # Example patient/presentation profiles
 ├── database/                     # Persistent storage
@@ -204,10 +214,13 @@ Start the baseline services in separate terminals:
 # 6) DICOM Egress Worker — outbound C-STORE delivery
 .venv/bin/python -m heimdallr.dicom_egress
 
-# 7) Space Manager — runtime/studies storage reclamation
+# 7) Integration Dispatcher — outbound patient/event webhooks
+.venv/bin/python -m heimdallr.integration_dispatcher
+
+# 8) Space Manager — runtime/studies storage reclamation
 .venv/bin/python -m heimdallr.space_manager
 
-# 8) Operations TUI — terminal dashboard
+# 9) Operations TUI — terminal dashboard
 .venv/bin/python -m heimdallr.tui
 ```
 
@@ -255,6 +268,7 @@ Key environment variables:
 |---|---|---|
 | `HEIMDALLR_SERVER_PORT` | `8001` | Control plane HTTP port |
 | `HEIMDALLR_DICOM_PORT` | `11114` | DICOM listener port |
+| `HEIMDALLR_INTEGRATION_DISPATCH_CONFIG` | `config/integration_dispatch.json` | Outbound webhook/event config |
 | `HEIMDALLR_DICOM_EGRESS_CONFIG` | `config/dicom_egress.json` | Outbound DICOM destination config |
 | `HEIMDALLR_PRESENTATION_CONFIG` | `config/presentation.json` | Patient name and locale presentation config |
 | `HEIMDALLR_SPACE_MANAGER_CONFIG` | `config/space_manager.json` | Runtime storage reclamation policy |

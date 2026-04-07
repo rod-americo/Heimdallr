@@ -38,6 +38,8 @@ from zoneinfo import ZoneInfo
 
 from heimdallr.shared import settings
 from heimdallr.shared import store
+from heimdallr.integration_dispatcher.events import build_patient_identified_event
+from heimdallr.integration_dispatcher import enqueue_dispatches
 from heimdallr.shared.patient_names import normalize_patient_name_display
 from heimdallr.shared.paths import (
     study_artifacts_dir,
@@ -209,6 +211,28 @@ def enqueue_case_for_segmentation(case_id):
         print(f"  [DB] Segmentation queue updated for case {case_id}")
     except Exception as e:
         print(f"  [Warning] Failed to enqueue case {case_id}: {e}")
+
+
+def enqueue_patient_identified_dispatches(
+    *,
+    id_data: dict,
+    metadata_data: dict,
+    intake_manifest: dict | None,
+) -> int:
+    """Materialize patient-identification events into the integration outbox."""
+    event_key, payload = build_patient_identified_event(
+        id_data=id_data,
+        metadata_data=metadata_data,
+        intake_manifest=intake_manifest,
+    )
+    return enqueue_dispatches(
+        event_type="patient_identified",
+        event_version=1,
+        event_key=event_key,
+        case_id=str(id_data.get("CaseID", "") or "").strip() or None,
+        study_uid=str(id_data.get("StudyInstanceUID", "") or "").strip() or None,
+        payload=payload,
+    )
 
 
 def is_spooled_zip_stable(zip_path: Path, min_age_seconds: int | None = None) -> bool:
@@ -833,6 +857,20 @@ def process_zip(zip_path):
                     )
             except Exception as e:
                 print(f"  [Warning] Failed to update prepare timing in DB: {e}")
+
+            try:
+                enqueued_dispatches = enqueue_patient_identified_dispatches(
+                    id_data=output_meta,
+                    metadata_data=output_metadata,
+                    intake_manifest=intake_manifest,
+                )
+                if enqueued_dispatches:
+                    print(
+                        f"[Prepare] Enqueued {enqueued_dispatches} patient-identified "
+                        f"integration event(s) for {case_id}"
+                    )
+            except Exception as e:
+                print(f"  [Warning] Failed to enqueue integration events for {case_id}: {e}")
 
             print(f"[Prepare] ✓ Complete {case_id} ({prepare_elapsed_str})")
 
