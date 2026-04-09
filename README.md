@@ -67,89 +67,116 @@ runtime/studies/<case_id>/ + database/dicom.db
 ```
 Heimdallr/
 ├── heimdallr/                    # Main Python package
-│   ├── control_plane/            # FastAPI app factory, routers, PDF reports
+│   ├── control_plane/            # FastAPI control plane + patient/report views
 │   │   ├── routers/              #   dashboard, upload, patients
 │   │   ├── app.py                #   ASGI application factory
 │   │   ├── case_pdf_report.py    #   Per-case PDF report builder
-│   │   └── patient_service.py    #   Database-backed patient queries
+│   │   └── patient_service.py    #   SQLite-backed patient queries
 │   ├── intake/                   # DICOM C-STORE listener + study handoff
 │   │   └── gateway.py            #   HeimdallrDicomListener SCP
 │   ├── prepare/                  # Study preparation worker
 │   │   └── worker.py             #   ZIP unpack, phase detect, NIfTI convert
-│   ├── segmentation/             # Segmentation pipeline worker
-│   │   ├── worker.py             #   TotalSegmentator orchestration
+│   ├── segmentation/             # TotalSegmentator orchestration worker
+│   │   └── worker.py
 │   ├── metrics/                  # Post-segmentation metrics engine
 │   │   ├── analysis/             #   Pure post-segmentation analysis helpers
-│   │   │   ├── body_fat.py       #     Body composition analysis
-│   │   │   ├── bone_health.py    #     Bone mineral density routines
-│   │   │   ├── kidney_stone_triage.py # Renal stone burden scoring
-│   │   │   └── opportunistic_osteoporosis_composite.py # Experimental composite entrypoint
-│   │   ├── worker.py             #   Queue-driven job dispatcher
-│   │   └── jobs/                 #   Individual production measurement modules
-│   │       └── tests/            #   Experimental jobs and validation helpers
-│   ├── deid_gateway.py           # OCR-based pixel/text de-identification helpers
+│   │   ├── jobs/                 #   Production measurement modules
+│   │   │   └── tests/            #   Prototype and validation helpers
+│   │   └── worker.py             #   Queue-driven job dispatcher
 │   ├── integration_dispatcher/   # Outbound HTTP webhook/event dispatcher
-│   │   ├── worker.py             #   Queue-driven dispatcher
-│   │   ├── config.py             #   Destination config loader + routing helper
-│   │   └── events.py             #   Event payload builders
+│   │   ├── config.py             #   Destination config loader
+│   │   ├── events.py             #   Event payload builders
+│   │   ├── outbox.py             #   Delivery persistence helpers
+│   │   └── worker.py             #   Queue-driven dispatcher
 │   ├── dicom_egress/             # Outbound DICOM artifact delivery worker
-│   │   ├── worker.py             #   Queue-driven C-STORE SCU dispatcher
-│   │   └── config.py             #   Destination config loader + routing helper
-│   ├── shared/                   # Cross-cutting concerns
+│   │   ├── config.py             #   Destination config loader
+│   │   └── worker.py             #   Queue-driven C-STORE SCU dispatcher
+│   ├── space_manager/            # Runtime storage reclamation worker
+│   │   └── worker.py
+│   ├── shared/                   # Cross-cutting settings, IO, DB, i18n, schemas
 │   │   ├── settings.py           #   Centralized runtime settings
-│   │   ├── store.py              #   SQLite data access layer
-│   │   ├── paths.py              #   Canonical study path helpers
+│   │   ├── store.py              #   Operational SQLite store
+│   │   ├── sqlite.py             #   SQLite connection helpers
 │   │   ├── db.py                 #   FastAPI database dependency
+│   │   ├── paths.py              #   Canonical study path helpers
 │   │   ├── spool.py              #   Atomic file write utilities
-│   │   └── schemas/              #   Pydantic models
-│   └── tui/                      # Textual operations dashboard
-│       ├── app.py                #   TUI application
-│       ├── snapshot.py           #   Runtime state snapshot collector
-│       └── dashboard.tcss        #   Textual CSS stylesheet
-├── config/                       # JSON pipeline profiles
+│   │   ├── i18n.py               #   gettext bootstrap
+│   │   ├── patient_names.py      #   Patient name formatting helpers
+│   │   ├── dependencies.py       #   FastAPI dependency wiring
+│   │   └── schemas/              #   Shared Pydantic models
+│   ├── tui/                      # Textual operations dashboard
+│   │   ├── app.py                #   TUI application
+│   │   ├── i18n.py               #   TUI translation helpers
+│   │   ├── snapshot.py           #   Runtime state snapshot collector
+│   │   └── dashboard.tcss        #   Textual stylesheet
+│   ├── locales/                  # gettext catalogs for artifacts and TUI
+│   │   ├── en_US/LC_MESSAGES/
+│   │   └── pt_BR/LC_MESSAGES/
+│   └── deid_gateway.py           # OCR-based pixel/text de-identification
+├── config/                       # Versioned JSON templates and defaults
 │   ├── intake_pipeline.json      #   Listener and prepare watchdog tuning
 │   ├── series_selection.json     #   Series selection strategy
-│   ├── segmentation_pipeline.example.json # Example TotalSegmentator task list
-│   ├── metrics_pipeline.example.json      # Example post-segmentation job list
-│   ├── space_manager.example.json         # Example runtime storage GC policy
-│   ├── integration_dispatch.example.json  # Example outbound webhook endpoints
-│   ├── dicom_egress.example.json          # Example outbound DICOM destinations
-│   └── presentation.example.json          # Example patient/presentation profiles
-├── database/                     # Persistent storage
-│   ├── schema.sql                #   SQLite schema (dicom_metadata, segmentation/metrics/egress queues)
-│   └── README.md                 #   Schema documentation
-├── bin/                          # Bundled platform binaries
-│   ├── darwin-arm64/dcm2niix     #   macOS ARM
-│   ├── linux-amd64/dcm2niix      #   Linux x86_64
-│   ├── linux-amd64/dcmcjpeg      #   Linux x86_64 JPEG Lossless transcoder
-│   └── licenses/                 #   Upstream license files
-├── scripts/                      # Operational and retroactive scripts
+│   ├── segmentation_pipeline.example.json
+│   ├── metrics_pipeline.example.json
+│   ├── space_manager.example.json
+│   ├── integration_dispatch.example.json
+│   ├── dicom_egress.example.json
+│   └── presentation.example.json
+├── database/                     # Schema/docs; SQLite DB is created locally here
+│   ├── schema.sql
+│   └── README.md
+├── bin/                          # Bundled platform binaries and notices
+│   ├── README.md
+│   ├── darwin-arm64/dcm2niix
+│   ├── linux-amd64/
+│   │   ├── dcm2niix
+│   │   ├── dcmcjpeg
+│   │   ├── lib/
+│   │   └── share/
+│   └── licenses/
+├── scripts/                      # Operational and retroactive utilities
 │   ├── retroactive_recalculate_metrics.py
 │   ├── consolidate_metrics_csv.py
 │   ├── extract_prometheus_bmd.py
 │   ├── update_kvp_retroactive.py
 │   ├── bmd_roi_comparison_preview.py
 │   ├── retroactive_emphysema.py
-│   └── watch_heimdallr.py        #   Filesystem watcher for auto-upload
-├── static/                       # Web dashboard assets (HTML/CSS/JS)
+│   └── watch_heimdallr.py
+├── static/                       # Dashboard frontend assets
+│   ├── index.html
+│   ├── styles.css
+│   ├── css/components.css
+│   └── js/
+│       ├── app.js
+│       ├── api.js
+│       ├── state.js
+│       ├── utils.js
+│       └── components/
 ├── tests/                        # Unit and integration tests
 ├── runtime/                      # Transient runtime data (gitignored)
-│   ├── intake/uploads/           #   Staged ZIP payloads
+│   ├── intake/
+│   │   ├── dicom/{incoming,failed,state}/
+│   │   ├── uploads/{external,from_prepare}/
+│   │   └── uploads_failed/
 │   ├── queue/{pending,active,failed}/
-│   └── studies/<case_id>/        #   Per-case artifacts, derived, metadata, logs
-├── requirements.txt              # Unified single-venv dependency manifest
+│   └── studies/<case_id>/{artifacts,derived,logs,metadata}/
 ├── docs/                         # Extended documentation
+│   ├── API.md
+│   ├── ARCHITECTURE.md
+│   ├── OPERATIONS.md
+│   └── validation-stage-manual.md
 ├── .github/                      # Community standards and CI
 │   ├── SECURITY.md
 │   ├── CONTRIBUTING.md
 │   ├── CODEOWNERS
 │   ├── PULL_REQUEST_TEMPLATE.md
-│   ├── ISSUE_TEMPLATE/
+│   ├── ISSUE_TEMPLATE/bug_report.md
 │   └── workflows/ci.yml
+├── requirements.txt              # Unified dependency manifest
 ├── pyproject.toml                # Build system and package metadata
 ├── AGENTS.md                     # AI agent operating guidelines
 ├── LICENSE.md                    # Apache License 2.0
-└── NOTICE.md                    # Third-party attribution
+└── NOTICE.md                     # Third-party attribution
 ```
 
 ## Quick Start
