@@ -1,14 +1,59 @@
+import json
 import sqlite3
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
-from heimdallr.segmentation.worker import should_reuse_existing_segmentation
+from heimdallr.segmentation.worker import (
+    _record_segmentation_pipeline_state,
+    should_reuse_existing_segmentation,
+)
 from heimdallr.shared import store
 
 
 class TestSegmentationReuse(unittest.TestCase):
+    def test_record_segmentation_pipeline_state_closes_failed_stage(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            id_json_path = Path(tmpdir) / "id.json"
+            id_json_path.write_text(
+                json.dumps(
+                    {
+                        "CaseID": "case-1",
+                        "StudyInstanceUID": "1.2.3",
+                        "Pipeline": {
+                            "prepare_elapsed_time": "0:00:40",
+                            "prepare_start_time": "2026-04-10T16:59:00-03:00",
+                            "start_time": "2026-04-10T17:00:00-03:00",
+                            "segmentation_start_time": "2026-04-10T17:00:00-03:00",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            conn = MagicMock()
+            with (
+                patch("heimdallr.segmentation.worker.study_id_json", return_value=id_json_path),
+                patch("heimdallr.segmentation.worker.db_connect", return_value=conn),
+                patch("heimdallr.segmentation.worker.store.update_id_json"),
+            ):
+                _record_segmentation_pipeline_state(
+                    "case-1",
+                    status="error",
+                    end_dt=datetime.fromisoformat("2026-04-10T17:01:15-03:00"),
+                    error="segmentation failed",
+                )
+
+            payload = json.loads(id_json_path.read_text(encoding="utf-8"))
+            pipeline = payload["Pipeline"]
+            self.assertEqual(pipeline["segmentation_status"], "error")
+            self.assertEqual(pipeline["segmentation_error"], "segmentation failed")
+            self.assertEqual(pipeline["segmentation_end_time"], "2026-04-10T17:01:15-03:00")
+            self.assertEqual(pipeline["segmentation_elapsed_time"], "0:01:15")
+            self.assertEqual(pipeline["pipeline_active_elapsed_time"], "0:01:55")
+
     def test_reuses_when_sqlite_signature_matches_and_outputs_exist(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             case_output = Path(tmpdir) / "case"

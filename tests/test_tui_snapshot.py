@@ -253,6 +253,139 @@ class TestTuiSnapshot(unittest.TestCase):
             self.assertNotEqual(case.total_elapsed, "-")
             self.assertRegex(case.total_elapsed, r"^\d+:\d{2}:\d{2}$")
 
+    def test_build_snapshot_uses_fixed_elapsed_for_failed_stages_with_end_time(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            runtime = base / "runtime"
+            uploads = runtime / "intake" / "uploads"
+            uploads_failed = runtime / "intake" / "uploads_failed"
+            dicom_incoming = runtime / "intake" / "dicom" / "incoming"
+            dicom_failed = runtime / "intake" / "dicom" / "failed"
+            pending = runtime / "queue" / "pending"
+            active = runtime / "queue" / "active"
+            failed = runtime / "queue" / "failed"
+            studies = runtime / "studies"
+            for path in (uploads, uploads_failed, dicom_incoming, dicom_failed, pending, active, failed, studies):
+                path.mkdir(parents=True, exist_ok=True)
+
+            seg_case = studies / "SegError_20260410_1"
+            (seg_case / "metadata").mkdir(parents=True, exist_ok=True)
+            (seg_case / "logs").mkdir(parents=True, exist_ok=True)
+            (seg_case / "metadata" / "id.json").write_text(
+                json.dumps(
+                    {
+                        "CaseID": "SegError_20260410_1",
+                        "PatientName": "Seg Example",
+                        "Pipeline": {
+                            "segmentation_start_time": "2026-04-10T17:00:00-03:00",
+                            "segmentation_end_time": "2026-04-10T17:01:15-03:00",
+                            "segmentation_elapsed_time": "0:01:15",
+                            "segmentation_status": "error",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (seg_case / "logs" / "error.log").write_text("segmentation failed", encoding="utf-8")
+
+            metrics_case = studies / "MetricsError_20260410_2"
+            (metrics_case / "metadata").mkdir(parents=True, exist_ok=True)
+            (metrics_case / "logs").mkdir(parents=True, exist_ok=True)
+            (metrics_case / "metadata" / "id.json").write_text(
+                json.dumps(
+                    {
+                        "CaseID": "MetricsError_20260410_2",
+                        "PatientName": "Metrics Example",
+                        "Pipeline": {
+                            "segmentation_start_time": "2026-04-10T16:55:00-03:00",
+                            "segmentation_end_time": "2026-04-10T16:56:00-03:00",
+                            "segmentation_elapsed_time": "0:01:00",
+                            "metrics_start_time": "2026-04-10T17:00:00-03:00",
+                            "metrics_end_time": "2026-04-10T17:01:15-03:00",
+                            "metrics_elapsed_time": "0:01:15",
+                            "metrics_status": "error",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (metrics_case / "logs" / "error.log").write_text("metrics failed", encoding="utf-8")
+
+            db_path = base / "dicom.db"
+            with sqlite3.connect(db_path) as conn:
+                conn.execute(
+                    """
+                    CREATE TABLE segmentation_queue (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        case_id TEXT NOT NULL UNIQUE,
+                        input_path TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        created_at TEXT,
+                        claimed_at TEXT,
+                        finished_at TEXT,
+                        error TEXT
+                    )
+                    """
+                )
+                conn.execute(
+                    """
+                    CREATE TABLE metrics_queue (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        case_id TEXT NOT NULL UNIQUE,
+                        input_path TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        created_at TEXT,
+                        claimed_at TEXT,
+                        finished_at TEXT,
+                        error TEXT
+                    )
+                    """
+                )
+                conn.execute(
+                    """
+                    INSERT INTO segmentation_queue(case_id, input_path, status, created_at, finished_at, error)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    ("SegError_20260410_1", str(active / "SegError_20260410_1.nii.gz"), "error", "2026-04-10 17:00:00", "2026-04-10 17:01:15", "segmentation failed"),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO segmentation_queue(case_id, input_path, status, created_at, finished_at, error)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    ("MetricsError_20260410_2", str(active / "MetricsError_20260410_2.nii.gz"), "done", "2026-04-10 16:55:00", "2026-04-10 16:56:00", ""),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO metrics_queue(case_id, input_path, status, created_at, finished_at, error)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    ("MetricsError_20260410_2", str(active / "MetricsError_20260410_2.nii.gz"), "error", "2026-04-10 17:00:00", "2026-04-10 17:01:15", "metrics failed"),
+                )
+                conn.commit()
+
+            layout = RuntimeLayout(
+                runtime_dir=runtime,
+                intake_dir=runtime / "intake",
+                uploads_dir=uploads,
+                uploads_failed_dir=uploads_failed,
+                dicom_incoming_dir=dicom_incoming,
+                dicom_failed_dir=dicom_failed,
+                pending_dir=pending,
+                active_dir=active,
+                failed_dir=failed,
+                studies_dir=studies,
+            )
+
+            snapshot = build_snapshot(layout=layout, db_path=db_path)
+            seg_item = next(item for item in snapshot.cases if item.case_id == "SegError_20260410_1")
+            metrics_item = next(item for item in snapshot.cases if item.case_id == "MetricsError_20260410_2")
+
+            self.assertEqual(seg_item.stage_key, "failed")
+            self.assertEqual(seg_item.segmentation_elapsed, "0:01:15")
+            self.assertEqual(metrics_item.stage_key, "failed")
+            self.assertEqual(metrics_item.metrics_elapsed, "0:01:15")
+
 
 if __name__ == "__main__":
     unittest.main()

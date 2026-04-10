@@ -131,6 +131,39 @@ def _write_case_metadata(case_id: str, metadata: dict) -> None:
             conn.close()
 
 
+def _record_metrics_pipeline_state(
+    case_id: str,
+    *,
+    status: str,
+    end_dt: datetime.datetime,
+    error: str | None = None,
+) -> None:
+    metadata = _load_case_metadata(case_id)
+    pipeline = metadata.get("Pipeline", {})
+    if not isinstance(pipeline, dict):
+        pipeline = {}
+
+    pipeline["metrics_status"] = status
+    pipeline["metrics_end_time"] = end_dt.isoformat()
+    if error:
+        pipeline["metrics_error"] = error
+    elif status != "error":
+        pipeline.pop("metrics_error", None)
+
+    start_dt = _first_pipeline_datetime(pipeline, ("metrics_start_time",))
+    if start_dt is not None and end_dt >= start_dt:
+        pipeline["metrics_elapsed_time"] = str(end_dt - start_dt)
+    elif status == "error":
+        pipeline["metrics_elapsed_time"] = "Unknown start_time"
+
+    prepare_start_dt = _first_pipeline_datetime(pipeline, ("prepare_start_time",))
+    if prepare_start_dt is not None and end_dt >= prepare_start_dt:
+        pipeline["pipeline_end_to_end_elapsed_time"] = str(end_dt - prepare_start_dt)
+
+    metadata["Pipeline"] = pipeline
+    _write_case_metadata(case_id, metadata)
+
+
 def _upsert_results(case_id: str, metric_key: str, payload: dict, metadata: dict) -> None:
     results_path = study_results_json(case_id)
     if results_path.exists():
@@ -161,6 +194,18 @@ def _artifact_sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _first_pipeline_datetime(pipeline: dict, keys: tuple[str, ...]) -> datetime.datetime | None:
+    for key in keys:
+        raw_value = pipeline.get(key)
+        if not raw_value:
+            continue
+        try:
+            return datetime.datetime.fromisoformat(str(raw_value))
+        except ValueError:
+            continue
+    return None
 
 
 def _validate_case_against_profile(case_id: str, metadata: dict, profile_name: str, profile: dict) -> None:
@@ -537,6 +582,8 @@ def segment_case_metrics(case_input: Path) -> bool:
         pipeline = metadata.get("Pipeline", {})
         pipeline["metrics_start_time"] = start_dt.isoformat()
         pipeline["metrics_profile"] = profile_name
+        pipeline["metrics_status"] = "running"
+        pipeline.pop("metrics_error", None)
         metadata["Pipeline"] = pipeline
         _write_case_metadata(case_id, metadata)
 
@@ -564,6 +611,8 @@ def segment_case_metrics(case_input: Path) -> bool:
         pipeline = metadata.get("Pipeline", {})
         pipeline["metrics_end_time"] = end_dt.isoformat()
         pipeline["metrics_elapsed_time"] = str(end_dt - start_dt)
+        pipeline["metrics_status"] = "done"
+        pipeline.pop("metrics_error", None)
         pipeline["metrics_pipeline"] = {
             "profile": profile_name,
             "max_parallel_jobs": max_parallel_jobs,
@@ -587,6 +636,15 @@ def segment_case_metrics(case_input: Path) -> bool:
         logger.close()
         return True
     except Exception as exc:
+        try:
+            _record_metrics_pipeline_state(
+                case_id,
+                status="error",
+                end_dt=datetime.datetime.now(LOCAL_TZ),
+                error=str(exc),
+            )
+        except Exception:
+            pass
         logger.log(f"[Metrics] Error for {case_id}: {exc}")
         logger.close()
         return False
