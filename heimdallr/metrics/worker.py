@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import datetime
+import hashlib
 import importlib.util
 import json
 import re
@@ -152,6 +153,14 @@ def _upsert_results(case_id: str, metric_key: str, payload: dict, metadata: dict
             store.update_calculation_results(conn, study_uid, results)
         finally:
             conn.close()
+
+
+def _artifact_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _validate_case_against_profile(case_id: str, metadata: dict, profile_name: str, profile: dict) -> None:
@@ -487,7 +496,11 @@ def _enqueue_case_dicom_exports(
             if not artifact_abspath.exists():
                 logger.log(f"[Metrics] Skipping missing DICOM artifact: {artifact_abspath}")
                 continue
-            store.enqueue_dicom_export(conn, **item)
+            store.enqueue_dicom_export(
+                conn,
+                **item,
+                artifact_digest=_artifact_sha256(artifact_abspath),
+            )
             enqueued += 1
     finally:
         conn.close()
@@ -559,6 +572,17 @@ def segment_case_metrics(case_input: Path) -> bool:
         }
         metadata["Pipeline"] = pipeline
         _write_case_metadata(case_id, metadata)
+        study_uid = str(metadata.get("StudyInstanceUID", "") or "").strip()
+        if study_uid:
+            conn = db_connect()
+            try:
+                store.update_metrics_completion(
+                    conn,
+                    study_uid,
+                    profile_name=profile_name,
+                )
+            finally:
+                conn.close()
         logger.log(f"[Metrics] ✓ Complete ({pipeline['metrics_elapsed_time']})")
         logger.close()
         return True

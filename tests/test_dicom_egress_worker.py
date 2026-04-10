@@ -107,5 +107,109 @@ class TestStudyMetadataUpsert(unittest.TestCase):
             conn.close()
 
 
+class TestDicomEgressQueueDedup(unittest.TestCase):
+    def test_reenqueue_with_same_digest_keeps_done_status(self):
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        try:
+            store.ensure_schema(conn)
+            store.enqueue_dicom_export(
+                conn,
+                case_id="Case1",
+                study_uid="1.2.3",
+                artifact_path="artifacts/metrics/out.dcm",
+                artifact_type="secondary_capture",
+                destination_name="return_to_sender",
+                destination_host="127.0.0.1",
+                destination_port=104,
+                destination_called_aet="TEST",
+                source_calling_aet="SRC",
+                source_remote_ip="127.0.0.2",
+                artifact_digest="same",
+            )
+            queue_id = conn.execute(
+                "SELECT id FROM dicom_egress_queue WHERE case_id = 'Case1'"
+            ).fetchone()["id"]
+            store.mark_dicom_egress_queue_item_done(conn, queue_id)
+            finished_at = conn.execute(
+                "SELECT finished_at FROM dicom_egress_queue WHERE id = ?",
+                (queue_id,),
+            ).fetchone()["finished_at"]
+
+            store.enqueue_dicom_export(
+                conn,
+                case_id="Case1",
+                study_uid="1.2.3",
+                artifact_path="artifacts/metrics/out.dcm",
+                artifact_type="secondary_capture",
+                destination_name="return_to_sender",
+                destination_host="127.0.0.1",
+                destination_port=104,
+                destination_called_aet="TEST",
+                source_calling_aet="SRC",
+                source_remote_ip="127.0.0.2",
+                artifact_digest="same",
+            )
+
+            row = conn.execute(
+                "SELECT status, finished_at, artifact_digest FROM dicom_egress_queue WHERE id = ?",
+                (queue_id,),
+            ).fetchone()
+            self.assertEqual(row["status"], "done")
+            self.assertEqual(row["finished_at"], finished_at)
+            self.assertEqual(row["artifact_digest"], "same")
+        finally:
+            conn.close()
+
+    def test_reenqueue_with_changed_digest_resets_to_pending(self):
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        try:
+            store.ensure_schema(conn)
+            store.enqueue_dicom_export(
+                conn,
+                case_id="Case1",
+                study_uid="1.2.3",
+                artifact_path="artifacts/metrics/out.dcm",
+                artifact_type="secondary_capture",
+                destination_name="return_to_sender",
+                destination_host="127.0.0.1",
+                destination_port=104,
+                destination_called_aet="TEST",
+                source_calling_aet="SRC",
+                source_remote_ip="127.0.0.2",
+                artifact_digest="old",
+            )
+            queue_id = conn.execute(
+                "SELECT id FROM dicom_egress_queue WHERE case_id = 'Case1'"
+            ).fetchone()["id"]
+            store.mark_dicom_egress_queue_item_done(conn, queue_id)
+
+            store.enqueue_dicom_export(
+                conn,
+                case_id="Case1",
+                study_uid="1.2.3",
+                artifact_path="artifacts/metrics/out.dcm",
+                artifact_type="secondary_capture",
+                destination_name="return_to_sender",
+                destination_host="127.0.0.1",
+                destination_port=104,
+                destination_called_aet="TEST",
+                source_calling_aet="SRC",
+                source_remote_ip="127.0.0.2",
+                artifact_digest="new",
+            )
+
+            row = conn.execute(
+                "SELECT status, finished_at, artifact_digest FROM dicom_egress_queue WHERE id = ?",
+                (queue_id,),
+            ).fetchone()
+            self.assertEqual(row["status"], "pending")
+            self.assertIsNone(row["finished_at"])
+            self.assertEqual(row["artifact_digest"], "new")
+        finally:
+            conn.close()
+
+
 if __name__ == "__main__":
     unittest.main()
