@@ -242,14 +242,14 @@ def _render_slice_rgb(
         _ct_to_rgb(ct_slice),
         source_axis_codes=source_axis_codes,
         desired_row_code="P",
-        desired_col_code="R",
+        desired_col_code="L",
     )
     for organ_mask, color in masks_for_slice:
         display_mask = reorient_display_array(
             np.asarray(organ_mask, dtype=bool),
             source_axis_codes=source_axis_codes,
             desired_row_code="P",
-            desired_col_code="R",
+            desired_col_code="L",
         )
         rgb = _blend_mask(rgb, display_mask, color, alpha=0.33)
 
