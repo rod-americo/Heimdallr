@@ -386,6 +386,49 @@ class TestTuiSnapshot(unittest.TestCase):
             self.assertEqual(metrics_item.stage_key, "failed")
             self.assertEqual(metrics_item.metrics_elapsed, "0:01:15")
 
+    def test_build_snapshot_treats_retained_intake_failures_as_notes_not_alerts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            runtime = base / "runtime"
+            uploads = runtime / "intake" / "uploads"
+            uploads_failed = runtime / "intake" / "uploads_failed"
+            dicom_incoming = runtime / "intake" / "dicom" / "incoming"
+            dicom_failed = runtime / "intake" / "dicom" / "failed"
+            pending = runtime / "queue" / "pending"
+            active = runtime / "queue" / "active"
+            failed = runtime / "queue" / "failed"
+            studies = runtime / "studies"
+            for path in (uploads, uploads_failed, dicom_incoming, dicom_failed, pending, active, failed, studies):
+                path.mkdir(parents=True, exist_ok=True)
+
+            (uploads_failed / "old_case.zip").write_bytes(b"zip")
+            (dicom_failed / "old_study").mkdir(parents=True, exist_ok=True)
+
+            layout = RuntimeLayout(
+                runtime_dir=runtime,
+                intake_dir=runtime / "intake",
+                uploads_dir=uploads,
+                uploads_failed_dir=uploads_failed,
+                dicom_incoming_dir=dicom_incoming,
+                dicom_failed_dir=dicom_failed,
+                pending_dir=pending,
+                active_dir=active,
+                failed_dir=failed,
+                studies_dir=studies,
+            )
+
+            snapshot = build_snapshot(layout=layout, db_path=base / "missing.db")
+            intake_stage = next(stage for stage in snapshot.stages if stage.slug == "intake")
+            prepare_stage = next(stage for stage in snapshot.stages if stage.slug == "prepare")
+
+            self.assertEqual(intake_stage.state, "flow")
+            self.assertEqual(intake_stage.failed, 0)
+            self.assertIn("2 falhas de intake retidas", intake_stage.notes)
+            self.assertEqual(prepare_stage.state, "flow")
+            self.assertEqual(prepare_stage.failed, 0)
+            self.assertEqual(len(snapshot.alerts), 1)
+            self.assertEqual(snapshot.alerts[0].level, "ok")
+
 
 if __name__ == "__main__":
     unittest.main()
