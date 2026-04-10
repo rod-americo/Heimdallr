@@ -27,6 +27,10 @@ from heimdallr.metrics.jobs._l3_overlay_text import (
 from heimdallr.shared.paths import study_artifacts_dir, study_dir, study_metadata_json, study_nifti
 
 
+class MetricSkip(RuntimeError):
+    """Signal that a metrics job should be recorded as skipped, not failed."""
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--case-id", required=True, help="Study case identifier.")
@@ -57,7 +61,7 @@ def load_mask(mask_path: Path) -> tuple[nib.Nifti1Image, np.ndarray]:
 def compute_center_slice(mask_l3: np.ndarray) -> tuple[np.ndarray, int]:
     slice_indices = np.where(mask_l3.sum(axis=(0, 1)) > 0)[0]
     if len(slice_indices) == 0:
-        raise RuntimeError("L3 mask is empty")
+        raise MetricSkip("L3 mask is empty")
     center_idx = int(slice_indices[len(slice_indices) // 2])
     return slice_indices, center_idx
 
@@ -66,7 +70,7 @@ def sagittal_plane_from_mask(mask: np.ndarray) -> tuple[np.ndarray, int, str]:
     mask_bool = np.asarray(mask, dtype=bool)
     coords = np.argwhere(mask_bool)
     if coords.size == 0:
-        raise RuntimeError("L3 mask is empty")
+        raise MetricSkip("L3 mask is empty")
 
     x_min = int(coords[:, 0].min())
     x_max = int(coords[:, 0].max())
@@ -279,6 +283,31 @@ def create_secondary_capture(
     )
 
 
+def build_skip_payload(
+    *,
+    case_id: str,
+    reason: str,
+    result_relpath: str | None = None,
+    inputs: dict | None = None,
+) -> dict:
+    payload = {
+        "metric_key": "l3_muscle_area",
+        "status": "skipped",
+        "case_id": case_id,
+        "skip_reason": reason,
+        "measurement": {
+            "job_status": "skipped",
+        },
+        "artifacts": {},
+        "dicom_exports": [],
+    }
+    if inputs:
+        payload["inputs"] = inputs
+    if result_relpath:
+        payload["artifacts"]["result_json"] = result_relpath
+    return payload
+
+
 def main() -> int:
     args = parse_args()
     payload = {
@@ -307,6 +336,23 @@ def main() -> int:
 
         missing = [str(path) for path in (ct_path, metadata_path, l3_path, muscle_path) if not path.exists()]
         if missing:
+            if str(l3_path) in missing and len(missing) == 1:
+                payload = build_skip_payload(
+                    case_id=args.case_id,
+                    reason="L3 mask not available for this study",
+                    result_relpath=str(result_path.relative_to(case_dir)),
+                    inputs={
+                        "canonical_nifti": str(ct_path.relative_to(case_dir)),
+                        "vertebra_l3_mask": str(l3_path.relative_to(case_dir)),
+                        "skeletal_muscle_mask": str(muscle_path.relative_to(case_dir)),
+                    },
+                )
+                result_path.write_text(
+                    json.dumps(payload, indent=2, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+                print(json.dumps(payload, indent=2, ensure_ascii=False))
+                return 0
             raise RuntimeError(f"Required inputs not found: {missing}")
         case_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
 
@@ -418,6 +464,13 @@ def main() -> int:
             json.dumps(payload, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
+    except MetricSkip as exc:
+        payload = build_skip_payload(
+            case_id=args.case_id,
+            reason=str(exc),
+        )
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
+        return 0
     except Exception as exc:
         payload["error"] = str(exc)
         print(json.dumps(payload, indent=2, ensure_ascii=False))
