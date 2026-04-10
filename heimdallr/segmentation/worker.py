@@ -97,6 +97,85 @@ class PipelineLogger:
             self.log_file = None
 
 
+def _record_segmentation_pipeline_state(
+    case_id: str,
+    *,
+    status: str,
+    end_dt: datetime.datetime,
+    error: str | None = None,
+) -> None:
+    id_json_path = study_id_json(case_id)
+    if not id_json_path.exists():
+        return
+
+    with open(id_json_path, "r", encoding="utf-8") as handle:
+        meta = json.load(handle)
+
+    pipeline_data = meta.get("Pipeline", {})
+    if not isinstance(pipeline_data, dict):
+        pipeline_data = {}
+
+    pipeline_data["segmentation_status"] = status
+    pipeline_data["end_time"] = end_dt.isoformat()
+    pipeline_data["segmentation_end_time"] = end_dt.isoformat()
+    if error:
+        pipeline_data["segmentation_error"] = error
+    elif status != "error":
+        pipeline_data.pop("segmentation_error", None)
+
+    start_str = pipeline_data.get("start_time") or pipeline_data.get("segmentation_start_time")
+    if start_str:
+        try:
+            start_dt = datetime.datetime.fromisoformat(start_str)
+            elapsed_str = str(end_dt - start_dt)
+            pipeline_data["elapsed_time"] = elapsed_str
+            pipeline_data["segmentation_elapsed_time"] = elapsed_str
+        except Exception:
+            pipeline_data["elapsed_time"] = "Error parsing start_time"
+            pipeline_data["segmentation_elapsed_time"] = "Error parsing start_time"
+    elif status == "error":
+        pipeline_data["elapsed_time"] = "Unknown start_time"
+        pipeline_data["segmentation_elapsed_time"] = "Unknown start_time"
+
+    prepare_elapsed_seconds = parse_elapsed_seconds(
+        pipeline_data.get("prepare_elapsed_time")
+    )
+    segmentation_elapsed_seconds = parse_elapsed_seconds(
+        pipeline_data.get("segmentation_elapsed_time")
+    )
+    if (
+        prepare_elapsed_seconds is not None
+        and segmentation_elapsed_seconds is not None
+    ):
+        pipeline_data["pipeline_active_elapsed_time"] = format_elapsed_seconds(
+            prepare_elapsed_seconds + segmentation_elapsed_seconds
+        )
+
+    prepare_start_str = pipeline_data.get("prepare_start_time")
+    if prepare_start_str:
+        try:
+            prepare_start_dt = datetime.datetime.fromisoformat(prepare_start_str)
+            pipeline_data["pipeline_end_to_end_elapsed_time"] = str(
+                end_dt - prepare_start_dt
+            )
+        except Exception:
+            pipeline_data["pipeline_end_to_end_elapsed_time"] = (
+                "Error parsing prepare_start_time"
+            )
+
+    meta["Pipeline"] = pipeline_data
+    with open(id_json_path, "w", encoding="utf-8") as handle:
+        json.dump(meta, handle, indent=2)
+
+    study_uid = meta.get("StudyInstanceUID")
+    if study_uid:
+        conn = db_connect()
+        try:
+            store.update_id_json(conn, study_uid, meta)
+        finally:
+            conn.close()
+
+
 def ensure_segmentation_queue_table():
     """Ensure segmentation queue table/index exist for immediate dispatch flow."""
     conn = db_connect()
@@ -822,6 +901,8 @@ def segment_case(case_input):
                 end_dt = datetime.datetime.now(LOCAL_TZ)
                 pipeline_data["end_time"] = end_dt.isoformat()
                 pipeline_data["segmentation_end_time"] = end_dt.isoformat()
+                pipeline_data["segmentation_status"] = "done"
+                pipeline_data.pop("segmentation_error", None)
 
                 if start_str:
                     try:
@@ -935,6 +1016,15 @@ def segment_case(case_input):
         return True
 
     except Exception as e:
+        try:
+            _record_segmentation_pipeline_state(
+                case_id,
+                status="error",
+                end_dt=datetime.datetime.now(LOCAL_TZ),
+                error=str(e),
+            )
+        except Exception:
+            pass
         logger.print(f"Unhandled segmentation error for {case_id}: {e}")
         try:
             with open(error_log_path, "w") as f:

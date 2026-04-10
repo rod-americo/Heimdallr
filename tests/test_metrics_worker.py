@@ -1,11 +1,14 @@
+import json
 import tempfile
 import time
 import unittest
+from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from heimdallr.metrics.worker import (
     MetricsLogger,
+    _record_metrics_pipeline_state,
     _execute_jobs,
     _resolve_enabled_jobs,
     _resolve_job_module_name,
@@ -15,6 +18,42 @@ from heimdallr.metrics.worker import (
 
 
 class TestMetricsWorker(unittest.TestCase):
+    def test_record_metrics_pipeline_state_closes_failed_stage(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            id_json_path = Path(tmpdir) / "id.json"
+            id_json_path.write_text(
+                json.dumps(
+                    {
+                        "CaseID": "case-1",
+                        "StudyInstanceUID": "1.2.3",
+                        "Pipeline": {
+                            "metrics_start_time": "2026-04-10T17:00:00-03:00",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            conn = MagicMock()
+            with (
+                patch("heimdallr.metrics.worker.study_id_json", return_value=id_json_path),
+                patch("heimdallr.metrics.worker.db_connect", return_value=conn),
+                patch("heimdallr.metrics.worker.store.update_id_json"),
+            ):
+                _record_metrics_pipeline_state(
+                    "case-1",
+                    status="error",
+                    end_dt=datetime.fromisoformat("2026-04-10T17:01:15-03:00"),
+                    error="job failed",
+                )
+
+            payload = json.loads(id_json_path.read_text(encoding="utf-8"))
+            pipeline = payload["Pipeline"]
+            self.assertEqual(pipeline["metrics_status"], "error")
+            self.assertEqual(pipeline["metrics_error"], "job failed")
+            self.assertEqual(pipeline["metrics_end_time"], "2026-04-10T17:01:15-03:00")
+            self.assertEqual(pipeline["metrics_elapsed_time"], "0:01:15")
+
     def test_resolve_job_module_name_uses_conventional_module_path(self):
         module_name = _resolve_job_module_name({"name": "l3_muscle_area"})
 
