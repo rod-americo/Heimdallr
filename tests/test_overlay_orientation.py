@@ -6,30 +6,30 @@ from heimdallr.metrics.jobs._bone_job_common import reorient_display_array, reor
 
 
 class TestOverlayOrientation(unittest.TestCase):
-    def test_reorient_axial_ras_preserves_existing_clockwise_view(self):
+    def test_reorient_axial_ras_uses_radiological_left_right_convention(self):
         plane = np.array([[1, 2, 3], [4, 5, 6]], dtype=np.int16)
 
         display = reorient_display_array(
             plane,
             source_axis_codes=("R", "A"),
             desired_row_code="P",
-            desired_col_code="R",
+            desired_col_code="L",
         )
 
-        expected = np.rot90(plane)
+        expected = np.array([[6, 3], [5, 2], [4, 1]], dtype=np.int16)
         self.assertTrue(np.array_equal(display, expected))
 
-    def test_reorient_axial_lps_fixes_anterior_posterior_flip(self):
+    def test_reorient_axial_lps_uses_radiological_left_right_convention(self):
         plane = np.array([[1, 2, 3], [4, 5, 6]], dtype=np.int16)
 
         display = reorient_display_array(
             plane,
             source_axis_codes=("L", "P"),
             desired_row_code="P",
-            desired_col_code="R",
+            desired_col_code="L",
         )
 
-        expected = np.array([[4, 1], [5, 2], [6, 3]], dtype=np.int16)
+        expected = np.array([[1, 4], [2, 5], [3, 6]], dtype=np.int16)
         self.assertTrue(np.array_equal(display, expected))
 
     def test_reorient_sagittal_keeps_posterior_on_right_for_ps_planes(self):
