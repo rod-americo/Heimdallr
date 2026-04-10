@@ -22,6 +22,9 @@ from heimdallr.metrics.jobs._bone_job_common import (
     mask_complete,
     metric_output_dir,
     parse_args,
+    plane_source_axis_codes,
+    reorient_display_array,
+    reorient_display_spacing_mm,
     resolve_canonical_nifti,
     sagittal_plane_spacing_mm,
     write_payload,
@@ -52,27 +55,50 @@ def render_sagittal_overlay_rgb(
     title: str,
     summary_lines: list[str],
     plane_spacing_mm: tuple[float, float],
+    *,
+    source_axis_codes: tuple[str, str],
 ) -> np.ndarray:
-    rotated_ct = np.fliplr(np.rot90(np.asarray(ct_plane, dtype=np.float32)))
-    rotated_overlay = np.fliplr(np.rot90(np.asarray(overlay_mask, dtype=bool)))
-    rotated_outline = np.fliplr(np.rot90(np.asarray(mask_outline, dtype=bool)))
+    display_ct = reorient_display_array(
+        np.asarray(ct_plane, dtype=np.float32),
+        source_axis_codes=source_axis_codes,
+        desired_row_code="I",
+        desired_col_code="P",
+    )
+    display_overlay = reorient_display_array(
+        np.asarray(overlay_mask, dtype=bool),
+        source_axis_codes=source_axis_codes,
+        desired_row_code="I",
+        desired_col_code="P",
+    )
+    display_outline = reorient_display_array(
+        np.asarray(mask_outline, dtype=bool),
+        source_axis_codes=source_axis_codes,
+        desired_row_code="I",
+        desired_col_code="P",
+    )
+    display_spacing = reorient_display_spacing_mm(
+        plane_spacing_mm,
+        source_axis_codes=source_axis_codes,
+        desired_row_code="I",
+        desired_col_code="P",
+    )
     aspect = (
-        float(plane_spacing_mm[1]) / float(plane_spacing_mm[0])
-        if plane_spacing_mm[0] > 0 and plane_spacing_mm[1] > 0
+        float(display_spacing[1]) / float(display_spacing[0])
+        if display_spacing[0] > 0 and display_spacing[1] > 0
         else 1.0
     )
 
     fig, ax = plt.subplots(figsize=(7, 7), facecolor="black")
     ax.set_facecolor("black")
-    ax.imshow(rotated_ct, cmap="gray", vmin=-250.0, vmax=1250.0, interpolation="nearest", aspect=aspect)
+    ax.imshow(display_ct, cmap="gray", vmin=-250.0, vmax=1250.0, interpolation="nearest", aspect=aspect)
 
-    if rotated_overlay.any():
-        masked = np.ma.masked_where(~rotated_overlay, rotated_overlay.astype(np.uint8))
+    if display_overlay.any():
+        masked = np.ma.masked_where(~display_overlay, display_overlay.astype(np.uint8))
         ax.imshow(masked, cmap="cool", alpha=0.55, interpolation="nearest", aspect=aspect)
-        ax.contour(rotated_overlay, levels=[0.5], colors=["#66e0ff"], linewidths=1.1)
+        ax.contour(display_overlay, levels=[0.5], colors=["#66e0ff"], linewidths=1.1)
 
-    if rotated_outline.any():
-        ax.contour(rotated_outline, levels=[0.5], colors=["#ffd166"], linewidths=0.9)
+    if display_outline.any():
+        ax.contour(display_outline, levels=[0.5], colors=["#ffd166"], linewidths=0.9)
 
     ax.set_title(title, fontsize=13, color="white")
     ax.text(
@@ -184,6 +210,7 @@ def main() -> int:
         plane_index = int(roi_info["plane_index"])
         total_planes = int(ct_data.shape[0] if plane_axis == "x" else ct_data.shape[1])
         plane_spacing = sagittal_plane_spacing_mm(spacing, plane_axis)
+        plane_source_codes = plane_source_axis_codes(ct_img.affine, plane_axis)
         mask_plane = np.asarray(extract_plane(l1_mask, plane_axis, plane_index), dtype=bool)
         ct_plane = np.asarray(extract_plane(ct_data, plane_axis, plane_index), dtype=np.float32)
         slice_stats = calculate_mask_hu_statistics(ct_plane, roi_mask_2d)
@@ -213,6 +240,7 @@ def main() -> int:
                 title=title,
                 summary_lines=summary_lines,
                 plane_spacing_mm=plane_spacing,
+                source_axis_codes=plane_source_codes,
             )
             create_secondary_capture_from_rgb(
                 overlay_rgb,

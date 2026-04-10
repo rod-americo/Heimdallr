@@ -15,6 +15,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import nibabel as nib
 import numpy as np
+from nibabel.orientations import aff2axcodes
 
 from heimdallr.shared.paths import (
     study_artifacts_dir,
@@ -24,6 +25,25 @@ from heimdallr.shared.paths import (
     study_nifti,
     study_results_json,
 )
+
+
+_OPPOSITE_DIRECTION = {
+    "L": "R",
+    "R": "L",
+    "A": "P",
+    "P": "A",
+    "S": "I",
+    "I": "S",
+}
+
+_DIRECTION_FAMILY = {
+    "L": "lr",
+    "R": "lr",
+    "A": "ap",
+    "P": "ap",
+    "S": "si",
+    "I": "si",
+}
 
 
 def parse_args(description: str) -> argparse.Namespace:
@@ -85,6 +105,119 @@ def load_nifti_mask(mask_path: Path) -> tuple[nib.Nifti1Image, np.ndarray]:
 def load_ct_volume(ct_path: Path) -> tuple[nib.Nifti1Image, np.ndarray]:
     image = nib.load(str(ct_path))
     return image, np.asarray(image.get_fdata(), dtype=np.float32)
+
+
+def affine_axis_codes(affine: np.ndarray) -> tuple[str, str, str]:
+    codes = tuple(str(code) for code in aff2axcodes(affine))
+    if len(codes) != 3 or any(code not in _DIRECTION_FAMILY for code in codes):
+        raise RuntimeError(f"Unsupported affine axis codes: {codes}")
+    return codes
+
+
+def plane_source_axis_codes(affine: np.ndarray, plane_axis: str) -> tuple[str, str]:
+    axis_codes = affine_axis_codes(affine)
+    if plane_axis == "z":
+        return axis_codes[0], axis_codes[1]
+    if plane_axis == "x":
+        return axis_codes[1], axis_codes[2]
+    if plane_axis == "y":
+        return axis_codes[0], axis_codes[2]
+    raise ValueError(f"Unsupported plane axis: {plane_axis}")
+
+
+def _display_axis_transform(
+    source_axis_codes: tuple[str, str],
+    *,
+    desired_row_code: str,
+    desired_col_code: str,
+) -> tuple[bool, bool, bool, tuple[int, int]]:
+    row_code, col_code = source_axis_codes
+    desired_row_family = _DIRECTION_FAMILY[desired_row_code]
+    desired_col_family = _DIRECTION_FAMILY[desired_col_code]
+
+    if (
+        _DIRECTION_FAMILY[row_code] == desired_row_family
+        and _DIRECTION_FAMILY[col_code] == desired_col_family
+    ):
+        transpose = False
+        display_codes = (row_code, col_code)
+        spacing_order = (0, 1)
+    elif (
+        _DIRECTION_FAMILY[row_code] == desired_col_family
+        and _DIRECTION_FAMILY[col_code] == desired_row_family
+    ):
+        transpose = True
+        display_codes = (col_code, row_code)
+        spacing_order = (1, 0)
+    else:
+        raise RuntimeError(
+            f"Cannot orient plane with source axis codes {source_axis_codes} "
+            f"to desired display directions {(desired_row_code, desired_col_code)}"
+        )
+
+    row_display_code, col_display_code = display_codes
+    if row_display_code == desired_row_code:
+        flip_rows = False
+    elif row_display_code == _OPPOSITE_DIRECTION[desired_row_code]:
+        flip_rows = True
+    else:
+        raise RuntimeError(
+            f"Cannot orient plane row axis {row_display_code} to {desired_row_code}"
+        )
+
+    if col_display_code == desired_col_code:
+        flip_cols = False
+    elif col_display_code == _OPPOSITE_DIRECTION[desired_col_code]:
+        flip_cols = True
+    else:
+        raise RuntimeError(
+            f"Cannot orient plane col axis {col_display_code} to {desired_col_code}"
+        )
+
+    return transpose, flip_rows, flip_cols, spacing_order
+
+
+def reorient_display_array(
+    array: np.ndarray,
+    *,
+    source_axis_codes: tuple[str, str],
+    desired_row_code: str,
+    desired_col_code: str,
+) -> np.ndarray:
+    arr = np.asarray(array)
+    if arr.ndim not in (2, 3):
+        raise ValueError(f"Expected 2D or 3D display array, got shape {arr.shape}")
+
+    transpose, flip_rows, flip_cols, _spacing_order = _display_axis_transform(
+        source_axis_codes,
+        desired_row_code=desired_row_code,
+        desired_col_code=desired_col_code,
+    )
+    if transpose:
+        arr = arr.T if arr.ndim == 2 else np.transpose(arr, (1, 0, 2))
+    if flip_rows:
+        arr = np.flip(arr, axis=0)
+    if flip_cols:
+        arr = np.flip(arr, axis=1)
+    return np.ascontiguousarray(arr)
+
+
+def reorient_display_spacing_mm(
+    spacing_mm: tuple[float, float],
+    *,
+    source_axis_codes: tuple[str, str],
+    desired_row_code: str,
+    desired_col_code: str,
+) -> tuple[float, float]:
+    _transpose, _flip_rows, _flip_cols, spacing_order = _display_axis_transform(
+        source_axis_codes,
+        desired_row_code=desired_row_code,
+        desired_col_code=desired_col_code,
+    )
+    return (
+        float(spacing_mm[spacing_order[0]]),
+        float(spacing_mm[spacing_order[1]]),
+    )
 
 
 def mask_complete_along_axis(mask: np.ndarray, axis: int) -> bool:
