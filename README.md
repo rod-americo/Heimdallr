@@ -146,6 +146,7 @@ Heimdallr/
 │   ├── index.html
 │   ├── styles.css
 │   ├── css/components.css
+│   ├── branding/                 # Reusable logo and watermark PNG assets
 │   └── js/
 │       ├── app.js
 │       ├── api.js
@@ -163,6 +164,7 @@ Heimdallr/
 ├── docs/                         # Extended documentation
 │   ├── API.md
 │   ├── ARCHITECTURE.md
+│   ├── branding/README.md        # Brandbook summary + imported asset index
 │   ├── OPERATIONS.md
 │   └── validation-stage-manual.md
 ├── .github/                      # Community standards and CI
