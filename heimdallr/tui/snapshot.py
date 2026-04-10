@@ -387,8 +387,6 @@ def _build_intake_stage(
 ) -> StageMetrics:
     oldest = _oldest_age_seconds(upload_files + incoming_items + claimed_uploads, now)
     state = "flow"
-    if failed_uploads or failed_dicom_items:
-        state = "warning"
     if (upload_files or incoming_items) and not services["intake"]:
         state = "blocked"
     notes = [
@@ -406,7 +404,7 @@ def _build_intake_stage(
         queued=len(upload_files),
         active=len(claimed_uploads) + len(incoming_items),
         completed=0,
-        failed=len(failed_uploads) + len(failed_dicom_items),
+        failed=0,
         oldest_age_seconds=oldest,
         notes=notes,
     )
@@ -424,8 +422,6 @@ def _build_prepare_stage(
     queued = [case for case in cases if case.stage_key == "prepared"]
     oldest = _oldest_case_age_seconds(queued, now)
     state = "flow"
-    if failed_uploads:
-        state = "warning"
     if claimed_uploads and not services["prepare"]:
         state = "blocked"
     notes = [
@@ -443,7 +439,7 @@ def _build_prepare_stage(
         queued=len(queued),
         active=len(claimed_uploads),
         completed=len(prepared),
-        failed=len(failed_uploads),
+        failed=0,
         oldest_age_seconds=oldest,
         notes=notes,
     )
@@ -566,8 +562,6 @@ def _build_alerts(
     alerts: list[AlertItem] = []
     services_by_slug = {service.slug: service for service in services}
 
-    if intake_stage.failed:
-        alerts.append(AlertItem("warning", tui("snapshot.alert.intake_failures", count=intake_stage.failed)))
     if segmentation_stage.queued and not services_by_slug["segmentation"].running:
         alerts.append(AlertItem("warning", tui("snapshot.alert.segmentation_backlog_no_worker")))
     if metrics_stage.queued and not services_by_slug["metrics"].running:
