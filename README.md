@@ -199,9 +199,13 @@ Heimdallr/
 git clone git@github.com:rod-americo/Heimdallr.git
 cd Heimdallr
 
-python3 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+
+The unified runtime targets Python 3.12. The `dicom2nifti` fallback does not
+require a standalone binary in `bin/`; native JPEG/J2K support is provided by
+the `python-gdcm` wheel installed inside `.venv`.
 ```
 
 For licensed TotalSegmentator tasks, register the license in the same venv:
