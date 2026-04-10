@@ -15,21 +15,23 @@
 # limitations under the License.
 
 
-import os
-import sys
-import shutil
-import zipfile
-import subprocess
 import argparse
-import tempfile
-import json
-import re
-import numpy as np
 import datetime
+import importlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
 import time
+import zipfile
 from pathlib import Path
-import pydicom
 import concurrent.futures # Adicionado para multithreading
+import numpy as np
+import pydicom
+from pydicom.uid import JPEGLossless, JPEGLosslessSV1
 from zoneinfo import ZoneInfo
 
 # ============================================================
@@ -48,6 +50,7 @@ from heimdallr.shared.paths import (
     study_id_json,
     study_metadata_dir,
     study_metadata_json,
+    study_results_json,
 )
 from heimdallr.shared.spool import CLAIM_SUFFIX, claim_path, unclaim_path
 from heimdallr.shared.sqlite import connect as db_connect
@@ -58,6 +61,7 @@ OUTPUT_BASE_DIR = settings.OUTPUT_DIR
 TOTALSEG_GET_PHASE_BIN = settings.TOTALSEG_GET_PHASE_BIN
 INTAKE_MANIFEST_NAME = "_heimdallr_intake.json"
 LOCAL_TZ = ZoneInfo(settings.TIMEZONE)
+JPEG_LOSSLESS_TRANSFER_SYNTAXES = {str(JPEGLossless), str(JPEGLosslessSV1)}
 
 path_entries = [str(settings.TOTALSEG_BIN_DIR), str(Path(sys.executable).parent)]
 os.environ["PATH"] = os.pathsep.join(path_entries + [os.environ["PATH"]])
@@ -235,6 +239,130 @@ def enqueue_patient_identified_dispatches(
     )
 
 
+def _read_json_dict(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def _safe_int(value, default=-1):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _select_prepared_series_for_duplicate_check(case_id: str, id_data: dict):
+    from heimdallr.segmentation.worker import select_prepared_series
+
+    return select_prepared_series(case_id, id_data)
+
+
+def _resolve_segmentation_plan_for_duplicate_check(modality: str, selected_phase: str):
+    from heimdallr.segmentation.worker import resolve_segmentation_plan
+
+    return resolve_segmentation_plan(modality, selected_phase)
+
+
+def _segmentation_outputs_exist_for_duplicate_check(case_output: Path, tasks: list[dict]) -> bool:
+    for task in tasks:
+        output_dir = case_output / task["output_dir"]
+        if not output_dir.exists():
+            return False
+        try:
+            next(output_dir.iterdir())
+        except StopIteration:
+            return False
+    return True
+
+
+def _load_metrics_pipeline_profile_for_duplicate_check():
+    from heimdallr.metrics.worker import load_metrics_pipeline_profile
+
+    return load_metrics_pipeline_profile()
+
+
+def _completed_case_skip_context(case_id: str, id_data: dict) -> dict | None:
+    """Return duplicate-completion context when a case can skip segmentation."""
+    study_uid = str(id_data.get("StudyInstanceUID", "") or "").strip()
+    if not study_uid:
+        return None
+
+    try:
+        _, selection_info = _select_prepared_series_for_duplicate_check(case_id, id_data)
+        segmentation_profile, segmentation_tasks = _resolve_segmentation_plan_for_duplicate_check(
+            str(id_data.get("Modality", "") or "CT"),
+            str(selection_info.get("SelectedPhase", "") or "unknown"),
+        )
+        metrics_profile, _ = _load_metrics_pipeline_profile_for_duplicate_check()
+    except Exception:
+        return None
+
+    conn = db_connect()
+    try:
+        recorded = store.get_pipeline_completion_state(conn, study_uid)
+        if not recorded:
+            return None
+        if not recorded["SegmentationCompletedAt"]:
+            return None
+        if bool(recorded["ArtifactsPurged"]):
+            return None
+        metrics_completed = bool(recorded["MetricsCompletedAt"])
+        if not metrics_completed:
+            if not study_results_json(case_id).exists():
+                return None
+            if store.case_has_incomplete_metrics(conn, case_id):
+                return None
+        recorded_metrics_profile = str(recorded["MetricsProfile"] or "")
+        if recorded_metrics_profile and recorded_metrics_profile != metrics_profile:
+            return None
+        if str(recorded["SegmentationSeriesInstanceUID"] or "") != str(
+            selection_info.get("SelectedSeriesInstanceUID") or ""
+        ):
+            return None
+        if _safe_int(recorded["SegmentationSliceCount"]) != _safe_int(
+            selection_info.get("SliceCount")
+        ):
+            return None
+        if str(recorded["SegmentationProfile"] or "") != segmentation_profile:
+            return None
+        try:
+            recorded_tasks = json.loads(recorded["SegmentationTasks"] or "[]")
+        except Exception:
+            recorded_tasks = []
+        planned_task_names = [task["name"] for task in segmentation_tasks]
+        if recorded_tasks != planned_task_names:
+            return None
+        if store.case_has_incomplete_dicom_egress(conn, case_id):
+            return None
+    finally:
+        conn.close()
+
+    if not study_results_json(case_id).exists():
+        return None
+    if not _segmentation_outputs_exist_for_duplicate_check(study_dir(case_id), segmentation_tasks):
+        return None
+
+    return {
+        "selection_info": selection_info,
+        "segmentation_profile": segmentation_profile,
+        "segmentation_tasks": [
+            {
+                "name": task["name"],
+                "output_dir": task["output_dir"],
+                "extra_args": list(task.get("extra_args", [])),
+                "license_required": bool(task.get("license_required")),
+            }
+            for task in segmentation_tasks
+        ],
+        "metrics_profile": metrics_profile,
+    }
+
+
 def is_spooled_zip_stable(zip_path: Path, min_age_seconds: int | None = None) -> bool:
     """Return True when a staged ZIP is old enough to be safely claimed."""
     if min_age_seconds is None:
@@ -345,7 +473,14 @@ def process_ct_series_concurrency(uid, s_data, case_output_dir, temp_dir):
         
         # Convert
         convert_started = time.perf_counter()
-        if not convert_series(s_num, files, nii_path, temp_dir):
+        conversion = convert_series(
+            s_num,
+            files,
+            nii_path,
+            temp_dir,
+            modality=s_data["Modality"],
+        )
+        if not conversion:
             return None
         convert_seconds = round(time.perf_counter() - convert_started, 3)
             
@@ -375,6 +510,7 @@ def process_ct_series_concurrency(uid, s_data, case_output_dir, temp_dir):
             "description_raw": s_data.get("SeriesDescriptionOriginal", ""),
             "modality": s_data["Modality"],
             "phase": phase,
+            "convert_method": conversion["method"],
             "convert_seconds": convert_seconds,
             "phase_seconds": phase_seconds,
             "phase_detected": phase_detected,
@@ -424,7 +560,78 @@ def is_4d_series(files_list):
             pass
     return False
 
-def convert_series(series_id, files_list, output_nii_path, temp_dir):
+def _detect_series_transfer_syntax_uid(files_list):
+    """Return the transfer syntax UID used by the series, when readable."""
+    for file_path in files_list:
+        try:
+            ds = pydicom.dcmread(str(file_path), stop_before_pixels=True, force=True)
+        except Exception:
+            continue
+        file_meta = getattr(ds, "file_meta", None)
+        transfer_syntax_uid = getattr(file_meta, "TransferSyntaxUID", None)
+        if transfer_syntax_uid:
+            return str(transfer_syntax_uid)
+    return None
+
+
+def _summarize_command_output(*chunks, max_lines=4):
+    """Collapse stderr/stdout into a compact tail for operational logs."""
+    lines = []
+    for chunk in chunks:
+        if not chunk:
+            continue
+        for line in str(chunk).splitlines():
+            line = line.strip()
+            if line:
+                lines.append(line)
+    if not lines:
+        return None
+    return " | ".join(lines[-max_lines:])
+
+
+def _run_dcm2niix_conversion(dcm_in, dcm_out):
+    """Execute dcm2niix and capture stderr for diagnostics."""
+    return subprocess.run(
+        [
+            settings.DCM2NIIX_BIN,
+            "-z",
+            "y",
+            "-f",
+            "converted",
+            "-o",
+            str(dcm_out),
+            str(dcm_in),
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+
+def _convert_series_with_dicom2nifti(dcm_in, output_nii_path):
+    """Fallback converter for compressed CT series unsupported by dcm2niix."""
+    try:
+        dicom2nifti = importlib.import_module("dicom2nifti")
+    except ImportError as exc:
+        return f"dicom2nifti unavailable: {exc}"
+
+    try:
+        if output_nii_path.exists():
+            output_nii_path.unlink()
+        dicom2nifti.dicom_series_to_nifti(
+            str(dcm_in),
+            str(output_nii_path),
+            reorient_nifti=False,
+        )
+    except Exception as exc:
+        return str(exc)
+
+    if not output_nii_path.exists():
+        return "dicom2nifti completed without producing output"
+    return None
+
+
+def convert_series(series_id, files_list, output_nii_path, temp_dir, *, modality=None):
     """
     Converts a specific list of DICOM files to NIfTI.
     """
@@ -435,18 +642,52 @@ def convert_series(series_id, files_list, output_nii_path, temp_dir):
         
     dcm_out = temp_dir / f"nii_{series_id}"
     dcm_out.mkdir(exist_ok=True)
-    
-    subprocess.run([
-        settings.DCM2NIIX_BIN, "-z", "y", "-f", "converted", "-o", str(dcm_out), str(dcm_in)
-    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    
+
+    transfer_syntax_uid = _detect_series_transfer_syntax_uid(files_list)
+    dcm2niix_result = _run_dcm2niix_conversion(dcm_in, dcm_out)
     generated = list(dcm_out.glob("*.nii.gz"))
-    if not generated:
-        return False
-        
-    target_nii = max(generated, key=lambda p: p.stat().st_size)
-    shutil.move(str(target_nii), str(output_nii_path))
-    return True
+    if generated:
+        if dcm2niix_result.returncode != 0:
+            summary = _summarize_command_output(dcm2niix_result.stderr)
+            if summary:
+                print(
+                    f"    [Warning] dcm2niix returned exit status {dcm2niix_result.returncode} "
+                    f"for series {series_id} but produced output: {summary}"
+                )
+        target_nii = max(generated, key=lambda p: p.stat().st_size)
+        shutil.move(str(target_nii), str(output_nii_path))
+        return {
+            "method": "dcm2niix",
+            "transfer_syntax_uid": transfer_syntax_uid,
+        }
+
+    summary = _summarize_command_output(dcm2niix_result.stderr)
+    if dcm2niix_result.returncode != 0:
+        if summary:
+            print(f"    [Error] dcm2niix failed for series {series_id}: {summary}")
+        else:
+            print(
+                f"    [Error] dcm2niix failed for series {series_id} "
+                f"with exit status {dcm2niix_result.returncode}"
+            )
+    else:
+        print(f"    [Error] dcm2niix produced no NIfTI output for series {series_id}")
+
+    if modality == "CT" and transfer_syntax_uid in JPEG_LOSSLESS_TRANSFER_SYNTAXES:
+        print(
+            f"    [Prepare] Retrying series {series_id} with dicom2nifti "
+            f"for transfer syntax {transfer_syntax_uid}"
+        )
+        fallback_error = _convert_series_with_dicom2nifti(dcm_in, output_nii_path)
+        if not fallback_error:
+            print(f"    [Prepare] dicom2nifti fallback succeeded for series {series_id}")
+            return {
+                "method": "dicom2nifti",
+                "transfer_syntax_uid": transfer_syntax_uid,
+            }
+        print(f"    [Error] dicom2nifti fallback failed for series {series_id}: {fallback_error}")
+
+    return None
 
 def process_zip(zip_path):
     prepare_start_dt = datetime.datetime.now(LOCAL_TZ)
@@ -632,6 +873,17 @@ def process_zip(zip_path):
         if reference_dicom_context:
             metadata_data["ReferenceDicom"] = reference_dicom_context
 
+        existing_id_data = _read_json_dict(study_id_json(case_id))
+        if str(existing_id_data.get("StudyInstanceUID", "") or "") != str(
+            id_data.get("StudyInstanceUID", "") or ""
+        ):
+            existing_id_data = {}
+        existing_metadata_data = _read_json_dict(study_metadata_json(case_id))
+        if str(existing_metadata_data.get("StudyInstanceUID", "") or "") != str(
+            metadata_data.get("StudyInstanceUID", "") or ""
+        ):
+            existing_metadata_data = {}
+
         # Insert into DB immediately
         init_and_insert_db(id_data)
         if global_meta.get("StudyInstanceUID"):
@@ -697,8 +949,14 @@ def process_zip(zip_path):
                 nii_path = derived_series_dir / f"{storage_stem}.nii.gz"
 
                 print(f"    Converting Series {s_num}...")
-                success = convert_series(s_num, s_data["files"], nii_path, temp_dir)
-                if not success:
+                conversion = convert_series(
+                    s_num,
+                    s_data["files"],
+                    nii_path,
+                    temp_dir,
+                    modality=s_data["Modality"],
+                )
+                if not conversion:
                     continue
 
                 series_info = {
@@ -710,6 +968,7 @@ def process_zip(zip_path):
                     "SliceCount": len(s_data["files"]),
                     "Is4D": candidate["is_4d"],
                     "SelectionScore": candidate["score"],
+                    "ConvertMethod": conversion["method"],
                     "DerivedNiftiPath": str(nii_path.relative_to(derived_dir)),
                 }
                 available_series.append(series_info)
@@ -752,6 +1011,9 @@ def process_zip(zip_path):
             stage_timings["phase_detection_total_seconds"] = round(sum(float(c.get("phase_seconds", 0.0) or 0.0) for c in candidates), 3)
             stage_timings["candidate_series_total_seconds"] = round(sum(float(c.get("series_total_seconds", 0.0) or 0.0) for c in candidates), 3)
             prepare_stats["converted_series"] = len(candidates)
+            prepare_stats["fallback_converted_series"] = sum(
+                1 for c in candidates if c.get("convert_method") == "dicom2nifti"
+            )
             for candidate in candidates:
                 phase_data = {}
                 phase_json_path = candidate.get("phase_json_path")
@@ -792,30 +1054,49 @@ def process_zip(zip_path):
 
         # 5. Final Handover & Metadata Enrichment
         if available_series:
-            enqueue_case_for_segmentation(case_id)
-            print(f"[Prepare] Enqueued for segmentation: {case_id}")
-            print(f"\n  Ready: {study_dir(case_id)}")
-            print(str(study_dir(case_id)))
+            duplicate_skip_context = _completed_case_skip_context(
+                case_id,
+                {
+                    **id_data,
+                    "AvailableSeries": available_series,
+                    "DiscardedSeries": discarded_series,
+                },
+            )
+            if duplicate_skip_context:
+                print(
+                    f"[Prepare] Reusing completed pipeline for {case_id}; "
+                    "skipping segmentation enqueue"
+                )
+            else:
+                enqueue_case_for_segmentation(case_id)
+                print(f"[Prepare] Enqueued for segmentation: {case_id}")
+                print(f"\n  Ready: {study_dir(case_id)}")
+                print(str(study_dir(case_id)))
 
             prepare_end_dt = datetime.datetime.now(LOCAL_TZ)
             prepare_elapsed_str = str(prepare_end_dt - prepare_start_dt)
             stage_timings["total_prepare_seconds"] = round((prepare_end_dt - prepare_start_dt).total_seconds(), 3)
 
             # Enrichment: Add Selection Info to id.json
-            output_meta = id_data.copy()
-            output_metadata = metadata_data.copy()
+            output_meta = existing_id_data.copy() if duplicate_skip_context else id_data.copy()
+            output_metadata = existing_metadata_data.copy() if duplicate_skip_context else metadata_data.copy()
+            output_meta.update(id_data)
+            output_metadata.update(metadata_data)
             if reference_dicom_context:
                 output_metadata["ReferenceDicom"] = reference_dicom_context
-            output_meta["Pipeline"] = {
+
+            pipeline_data = {}
+            if duplicate_skip_context and isinstance(existing_id_data.get("Pipeline"), dict):
+                pipeline_data = dict(existing_id_data.get("Pipeline") or {})
+            pipeline_data.update({
                 "prepare_start_time": prepare_start_time_str,
                 "prepare_end_time": prepare_end_dt.isoformat(),
                 "prepare_elapsed_time": prepare_elapsed_str,
                 "prepare_stage_timings_seconds": stage_timings,
                 "prepare_stats": prepare_stats,
                 "prepare_input_origin": upload_origin,
-            }
+            })
             if intake_manifest:
-                pipeline_data = output_meta["Pipeline"]
                 pipeline_data["intake_first_instance_time"] = intake_manifest.get("first_instance_time")
                 pipeline_data["intake_last_instance_time"] = intake_manifest.get("last_instance_time")
                 pipeline_data["intake_receive_elapsed_time"] = intake_manifest.get("receive_elapsed_time")
@@ -835,6 +1116,19 @@ def process_zip(zip_path):
                         pipeline_data["handoff_to_prepare_elapsed_time"] = (
                             "Error parsing intake_handoff_time"
                         )
+            if duplicate_skip_context:
+                pipeline_data["series_selection"] = duplicate_skip_context["selection_info"]
+                pipeline_data["segmentation_skipped"] = True
+                pipeline_data["segmentation_skip_reason"] = "previous_pipeline_complete_signature_match"
+                pipeline_data["segmentation_skip_time"] = prepare_end_dt.isoformat()
+                pipeline_data["metrics_profile"] = duplicate_skip_context["metrics_profile"]
+                pipeline_data["segmentation_pipeline"] = {
+                    "profile": duplicate_skip_context["segmentation_profile"],
+                    "tasks": duplicate_skip_context["segmentation_tasks"],
+                    "reused_existing_outputs": True,
+                    "reuse_reason": "prepare_duplicate_complete",
+                }
+            output_meta["Pipeline"] = pipeline_data
             
             output_meta["AvailableSeries"] = available_series
             output_meta["DiscardedSeries"] = discarded_series
@@ -860,19 +1154,20 @@ def process_zip(zip_path):
             except Exception as e:
                 print(f"  [Warning] Failed to update prepare timing in DB: {e}")
 
-            try:
-                enqueued_dispatches = enqueue_patient_identified_dispatches(
-                    id_data=output_meta,
-                    metadata_data=output_metadata,
-                    intake_manifest=intake_manifest,
-                )
-                if enqueued_dispatches:
-                    print(
-                        f"[Prepare] Enqueued {enqueued_dispatches} patient-identified "
-                        f"integration event(s) for {case_id}"
+            if not duplicate_skip_context:
+                try:
+                    enqueued_dispatches = enqueue_patient_identified_dispatches(
+                        id_data=output_meta,
+                        metadata_data=output_metadata,
+                        intake_manifest=intake_manifest,
                     )
-            except Exception as e:
-                print(f"  [Warning] Failed to enqueue integration events for {case_id}: {e}")
+                    if enqueued_dispatches:
+                        print(
+                            f"[Prepare] Enqueued {enqueued_dispatches} patient-identified "
+                            f"integration event(s) for {case_id}"
+                        )
+                except Exception as e:
+                    print(f"  [Warning] Failed to enqueue integration events for {case_id}: {e}")
 
             print(f"[Prepare] ✓ Complete {case_id} ({prepare_elapsed_str})")
 
@@ -912,9 +1207,11 @@ def _spool_sort_key(path: Path) -> tuple[float, str]:
 
 def _upload_origin_from_spool_path(zip_path: Path) -> str:
     base_path = unclaim_path(zip_path)
-    if base_path.parent == settings.UPLOAD_FROM_PREPARE_DIR:
+    from_prepare_dir = getattr(settings, "UPLOAD_FROM_PREPARE_DIR", None)
+    external_dir = getattr(settings, "UPLOAD_EXTERNAL_DIR", None)
+    if from_prepare_dir is not None and base_path.parent == from_prepare_dir:
         return "P"
-    if base_path.parent == settings.UPLOAD_EXTERNAL_DIR:
+    if external_dir is not None and base_path.parent == external_dir:
         return "E"
     return ""
 
@@ -932,19 +1229,28 @@ def _iter_claimable_uploads_in_dir(spool_dir: Path):
 
 def iter_claimable_uploads():
     """Yield FIFO uploads, prioritizing from_prepare over external spool sources."""
+    seen = set()
     for spool_dir in (
-        settings.UPLOAD_FROM_PREPARE_DIR,
-        settings.UPLOAD_EXTERNAL_DIR,
+        getattr(settings, "UPLOAD_FROM_PREPARE_DIR", None),
+        getattr(settings, "UPLOAD_EXTERNAL_DIR", None),
         settings.UPLOAD_DIR,
     ):
+        if spool_dir is None:
+            continue
+        spool_key = str(spool_dir)
+        if spool_key in seen:
+            continue
+        seen.add(spool_key)
         yield from _iter_claimable_uploads_in_dir(spool_dir)
 
 
 def watch_upload_spool() -> int:
     """Run the prepare watchdog loop over the upload spool."""
+    from_prepare_dir = getattr(settings, "UPLOAD_FROM_PREPARE_DIR", settings.UPLOAD_DIR)
+    external_dir = getattr(settings, "UPLOAD_EXTERNAL_DIR", settings.UPLOAD_DIR)
     print("Starting prepare watchdog...")
-    print(f"  Upload spool (from_prepare): {settings.UPLOAD_FROM_PREPARE_DIR}")
-    print(f"  Upload spool (external): {settings.UPLOAD_EXTERNAL_DIR}")
+    print(f"  Upload spool (from_prepare): {from_prepare_dir}")
+    print(f"  Upload spool (external): {external_dir}")
     print(f"  Failed spool: {settings.UPLOAD_FAILED_DIR}")
     print(f"  Stable age: {settings.PREPARE_STABLE_AGE_SECONDS}s")
     print(f"  Scan interval: {settings.PREPARE_SCAN_INTERVAL}s")

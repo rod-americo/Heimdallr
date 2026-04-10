@@ -39,10 +39,14 @@ Run as independent services:
 Single-venv host installation:
 
 ```bash
-python3 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 .venv/bin/totalseg_set_license -l YOUR_LICENSE_KEY
+
+The unified runtime targets Python 3.12. `dicom2nifti` runs from the Python
+package itself; native GDCM libraries are expected to come from the
+`python-gdcm` wheel inside `.venv`, not from a separate binary under `bin/`.
 ```
 
 All supervised services should point to the same interpreter:

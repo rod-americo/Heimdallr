@@ -36,9 +36,15 @@ _DICOM_METADATA_COLUMNS = {
     "SegmentationProfile": "TEXT",
     "SegmentationTasks": "TEXT",
     "SegmentationCompletedAt": "TIMESTAMP",
+    "MetricsProfile": "TEXT",
+    "MetricsCompletedAt": "TIMESTAMP",
     "ArtifactsPurged": "INTEGER DEFAULT 0",
     "ArtifactsPurgedAt": "TIMESTAMP",
     "ProcessedAt": "TIMESTAMP",
+}
+
+_DICOM_EGRESS_QUEUE_COLUMNS = {
+    "artifact_digest": "TEXT",
 }
 
 
@@ -159,6 +165,7 @@ def ensure_schema(conn: sqlite3.Connection | None = None) -> None:
             destination_called_aet TEXT NOT NULL,
             source_calling_aet TEXT,
             source_remote_ip TEXT,
+            artifact_digest TEXT,
             status TEXT NOT NULL DEFAULT 'pending',
             attempts INTEGER NOT NULL DEFAULT 0,
             created_at TIMESTAMP,
@@ -210,6 +217,7 @@ def ensure_schema(conn: sqlite3.Connection | None = None) -> None:
         """
     )
     _ensure_columns(cursor, "dicom_metadata", _DICOM_METADATA_COLUMNS)
+    _ensure_columns(cursor, "dicom_egress_queue", _DICOM_EGRESS_QUEUE_COLUMNS)
     conn.commit()
     if owns_connection:
         conn.close()
@@ -357,6 +365,7 @@ def enqueue_dicom_export(
     destination_called_aet: str,
     source_calling_aet: str | None,
     source_remote_ip: str | None,
+    artifact_digest: str | None = None,
 ) -> None:
     ensure_schema(conn)
     created_at = _now_local_timestamp()
@@ -373,6 +382,7 @@ def enqueue_dicom_export(
             destination_called_aet,
             source_calling_aet,
             source_remote_ip,
+            artifact_digest,
             status,
             attempts,
             created_at,
@@ -381,7 +391,7 @@ def enqueue_dicom_export(
             next_attempt_at,
             error
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, NULL, NULL, ?, NULL)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, NULL, NULL, ?, NULL)
         ON CONFLICT(case_id, artifact_path, destination_name) DO UPDATE SET
             study_uid = excluded.study_uid,
             artifact_type = excluded.artifact_type,
@@ -390,13 +400,49 @@ def enqueue_dicom_export(
             destination_called_aet = excluded.destination_called_aet,
             source_calling_aet = excluded.source_calling_aet,
             source_remote_ip = excluded.source_remote_ip,
-            status = 'pending',
-            attempts = 0,
-            created_at = excluded.created_at,
-            claimed_at = NULL,
-            finished_at = NULL,
-            next_attempt_at = excluded.next_attempt_at,
-            error = NULL
+            artifact_digest = excluded.artifact_digest,
+            status = CASE
+                WHEN COALESCE(dicom_egress_queue.artifact_digest, '') = COALESCE(excluded.artifact_digest, '')
+                     AND dicom_egress_queue.status IN ('pending', 'claimed', 'done')
+                THEN dicom_egress_queue.status
+                ELSE 'pending'
+            END,
+            attempts = CASE
+                WHEN COALESCE(dicom_egress_queue.artifact_digest, '') = COALESCE(excluded.artifact_digest, '')
+                     AND dicom_egress_queue.status IN ('pending', 'claimed', 'done')
+                THEN dicom_egress_queue.attempts
+                ELSE 0
+            END,
+            created_at = CASE
+                WHEN COALESCE(dicom_egress_queue.artifact_digest, '') = COALESCE(excluded.artifact_digest, '')
+                     AND dicom_egress_queue.status IN ('pending', 'claimed', 'done')
+                THEN dicom_egress_queue.created_at
+                ELSE excluded.created_at
+            END,
+            claimed_at = CASE
+                WHEN COALESCE(dicom_egress_queue.artifact_digest, '') = COALESCE(excluded.artifact_digest, '')
+                     AND dicom_egress_queue.status IN ('claimed', 'done')
+                THEN dicom_egress_queue.claimed_at
+                ELSE NULL
+            END,
+            finished_at = CASE
+                WHEN COALESCE(dicom_egress_queue.artifact_digest, '') = COALESCE(excluded.artifact_digest, '')
+                     AND dicom_egress_queue.status = 'done'
+                THEN dicom_egress_queue.finished_at
+                ELSE NULL
+            END,
+            next_attempt_at = CASE
+                WHEN COALESCE(dicom_egress_queue.artifact_digest, '') = COALESCE(excluded.artifact_digest, '')
+                     AND dicom_egress_queue.status IN ('pending', 'claimed', 'done')
+                THEN dicom_egress_queue.next_attempt_at
+                ELSE excluded.next_attempt_at
+            END,
+            error = CASE
+                WHEN COALESCE(dicom_egress_queue.artifact_digest, '') = COALESCE(excluded.artifact_digest, '')
+                     AND dicom_egress_queue.status IN ('pending', 'claimed', 'done')
+                THEN dicom_egress_queue.error
+                ELSE NULL
+            END
         """,
         (
             str(case_id),
@@ -409,6 +455,7 @@ def enqueue_dicom_export(
             str(destination_called_aet),
             source_calling_aet or None,
             source_remote_ip or None,
+            artifact_digest or None,
             created_at,
             created_at,
         ),
@@ -911,6 +958,26 @@ def get_recorded_segmentation_signature(conn: sqlite3.Connection, study_uid: str
     ).fetchone()
 
 
+def get_pipeline_completion_state(conn: sqlite3.Connection, study_uid: str) -> sqlite3.Row | None:
+    ensure_schema(conn)
+    return conn.execute(
+        """
+        SELECT
+            SegmentationSeriesInstanceUID,
+            SegmentationSliceCount,
+            SegmentationProfile,
+            SegmentationTasks,
+            SegmentationCompletedAt,
+            MetricsProfile,
+            MetricsCompletedAt,
+            ArtifactsPurged
+        FROM dicom_metadata
+        WHERE StudyInstanceUID = ?
+        """,
+        (study_uid,),
+    ).fetchone()
+
+
 def update_segmentation_signature(
     conn: sqlite3.Connection,
     study_uid: str,
@@ -936,6 +1003,29 @@ def update_segmentation_signature(
             int(slice_count) if slice_count is not None else None,
             profile_name,
             json.dumps(task_names),
+            _now_local_timestamp(),
+            study_uid,
+        ),
+    )
+    conn.commit()
+
+
+def update_metrics_completion(
+    conn: sqlite3.Connection,
+    study_uid: str,
+    *,
+    profile_name: str,
+) -> None:
+    ensure_schema(conn)
+    conn.execute(
+        """
+        UPDATE dicom_metadata
+        SET MetricsProfile = ?,
+            MetricsCompletedAt = ?
+        WHERE StudyInstanceUID = ?
+        """,
+        (
+            str(profile_name),
             _now_local_timestamp(),
             study_uid,
         ),
@@ -1034,6 +1124,36 @@ def list_protected_case_ids(conn: sqlite3.Connection) -> set[str]:
         ).fetchall()
         protected.update(str(row["case_id"]) for row in rows if row["case_id"])
     return protected
+
+
+def case_has_incomplete_dicom_egress(conn: sqlite3.Connection, case_id: str) -> bool:
+    ensure_schema(conn)
+    row = conn.execute(
+        """
+        SELECT 1
+        FROM dicom_egress_queue
+        WHERE case_id = ?
+          AND status != 'done'
+        LIMIT 1
+        """,
+        (case_id,),
+    ).fetchone()
+    return row is not None
+
+
+def case_has_incomplete_metrics(conn: sqlite3.Connection, case_id: str) -> bool:
+    ensure_schema(conn)
+    row = conn.execute(
+        """
+        SELECT 1
+        FROM metrics_queue
+        WHERE case_id = ?
+          AND status != 'done'
+        LIMIT 1
+        """,
+        (case_id,),
+    ).fetchone()
+    return row is not None
 
 
 def purge_case_records(conn: sqlite3.Connection, case_id: str) -> str | None:
