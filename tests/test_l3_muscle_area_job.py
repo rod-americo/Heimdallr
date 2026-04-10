@@ -3,7 +3,10 @@ import unittest
 import numpy as np
 
 from heimdallr.metrics.jobs.l3_muscle_area import (
+    MetricSkip,
+    build_skip_payload,
     centered_slab_bounds,
+    compute_center_slice,
     render_overlay_rgb,
     sagittal_plane_from_mask,
     sagittal_slab_from_mask,
@@ -78,6 +81,32 @@ class TestL3MuscleAreaJob(unittest.TestCase):
         self.assertEqual(sagittal_ct.shape, (20, 14))
         self.assertEqual(sagittal_mask.shape, (20, 14))
         self.assertTrue(sagittal_mask.any())
+
+    def test_compute_center_slice_raises_skip_when_l3_is_empty(self):
+        mask = np.zeros((12, 18, 10), dtype=bool)
+
+        with self.assertRaisesRegex(MetricSkip, "L3 mask is empty"):
+            compute_center_slice(mask)
+
+    def test_build_skip_payload_marks_job_as_skipped(self):
+        payload = build_skip_payload(
+            case_id="Case1",
+            reason="L3 mask not available for this study",
+            result_relpath="artifacts/metrics/l3_muscle_area/result.json",
+            inputs={
+                "canonical_nifti": "derived/case.nii.gz",
+                "vertebra_l3_mask": "artifacts/total/vertebrae_L3.nii.gz",
+                "skeletal_muscle_mask": "artifacts/tissue_types/skeletal_muscle.nii.gz",
+            },
+        )
+
+        self.assertEqual(payload["status"], "skipped")
+        self.assertEqual(payload["measurement"]["job_status"], "skipped")
+        self.assertEqual(payload["skip_reason"], "L3 mask not available for this study")
+        self.assertEqual(
+            payload["artifacts"]["result_json"],
+            "artifacts/metrics/l3_muscle_area/result.json",
+        )
 
     def test_render_overlay_rgb_returns_combined_axial_and_sagittal_image(self):
         image = np.linspace(-200.0, 250.0, num=24 * 20 * 16, dtype=np.float32).reshape((24, 20, 16))
