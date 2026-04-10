@@ -19,7 +19,9 @@ from heimdallr.metrics.jobs._bone_job_common import (
     mask_complete,
     metric_output_dir,
     parse_args,
+    plane_source_axis_codes,
     read_json,
+    reorient_display_array,
     resolve_canonical_nifti,
     write_payload,
 )
@@ -110,21 +112,30 @@ def _compute_mask_measurement(
             "hu_std": None,
         }
 
-    voxel_volume_cm3 = float(spacing_xyz[0] * spacing_xyz[1] * spacing_xyz[2]) / 1000.0
-    observed_volume_cm3 = round(voxel_count * voxel_volume_cm3, 3)
     hu_values = ct_data[mask_bool]
     hu_mean = round(float(np.mean(hu_values)), 2) if hu_values.size else None
     hu_std = round(float(np.std(hu_values)), 2) if hu_values.size else None
     complete = mask_complete(mask_bool)
+    voxel_volume_cm3 = float(spacing_xyz[0] * spacing_xyz[1] * spacing_xyz[2]) / 1000.0
+    observed_volume_cm3 = round(voxel_count * voxel_volume_cm3, 3) if complete else None
+    occupied_indices = np.where(mask_bool.sum(axis=(0, 1)) > 0)[0]
+    axial_slice_extent = None
+    if occupied_indices.size > 0:
+        axial_slice_extent = {
+            "start": int(occupied_indices[0]),
+            "end": int(occupied_indices[-1]),
+        }
 
     return {
         "organ_key": organ_key,
         "organ_label": organ_label,
         "analysis_status": "complete" if complete else "incomplete",
         "complete": bool(complete),
+        "truncated_at_scan_bounds": not bool(complete),
+        "axial_slice_extent": axial_slice_extent,
         "voxel_count": voxel_count,
         "observed_volume_cm3": observed_volume_cm3,
-        "volume_cm3": observed_volume_cm3 if complete else None,
+        "volume_cm3": observed_volume_cm3,
         "hu_mean": hu_mean,
         "hu_std": hu_std,
     }
@@ -224,12 +235,23 @@ def _render_slice_rgb(
     ct_slice: np.ndarray,
     masks_for_slice: list[tuple[np.ndarray, tuple[int, int, int]]],
     summary_lines: list[str],
+    *,
+    source_axis_codes: tuple[str, str],
 ) -> np.ndarray:
-    rgb = _ct_to_rgb(ct_slice)
-    rgb = np.rot90(rgb, axes=(0, 1))
+    rgb = reorient_display_array(
+        _ct_to_rgb(ct_slice),
+        source_axis_codes=source_axis_codes,
+        desired_row_code="P",
+        desired_col_code="R",
+    )
     for organ_mask, color in masks_for_slice:
-        rotated_mask = np.rot90(np.asarray(organ_mask, dtype=bool))
-        rgb = _blend_mask(rgb, rotated_mask, color, alpha=0.33)
+        display_mask = reorient_display_array(
+            np.asarray(organ_mask, dtype=bool),
+            source_axis_codes=source_axis_codes,
+            desired_row_code="P",
+            desired_col_code="R",
+        )
+        rgb = _blend_mask(rgb, display_mask, color, alpha=0.33)
 
     image = Image.fromarray(rgb, mode="RGB")
     draw = ImageDraw.Draw(image, mode="RGBA")
@@ -243,8 +265,10 @@ def _render_slice_rgb(
         bbox = draw.textbbox((0, 0), line, font=font)
         max_width = max(max_width, bbox[2] - bbox[0])
         line_heights.append((bbox[3] - bbox[1]) + (8 if idx == 0 else 6))
-    box_width = min(image.width - 20, max_width + 24)
-    box_height = 18 + sum(line_heights) + 8
+    available_width = max(1, image.width - 20)
+    available_height = max(1, image.height - 20)
+    box_width = min(available_width, max_width + 24)
+    box_height = min(available_height, 18 + sum(line_heights) + 8)
     draw.rounded_rectangle(
         (10, 10, 10 + box_width, 10 + box_height),
         radius=8,
@@ -295,6 +319,7 @@ def main() -> int:
         case_metadata = _load_case_metadata(args.case_id, case_dir)
         ct_img, ct_data = load_ct_volume(ct_path)
         spacing_xyz = tuple(float(value) for value in ct_img.header.get_zooms()[:3])
+        axial_source_codes = plane_source_axis_codes(ct_img.affine, "z")
         organ_masks: dict[str, np.ndarray | None] = {}
         organ_measurements: dict[str, dict[str, Any]] = {}
 
@@ -372,6 +397,7 @@ def main() -> int:
                     _average_ct_slab(ct_data, source_indices),
                     masks_for_slice,
                     summary_lines,
+                    source_axis_codes=axial_source_codes,
                 )
                 if emit_dicom:
                     dicom_path = dicom_dir / f"overlay_{output_idx:04d}.dcm"

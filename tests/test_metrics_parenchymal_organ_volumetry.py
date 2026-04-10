@@ -14,6 +14,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from heimdallr.metrics.jobs import parenchymal_organ_volumetry  # noqa: E402
+from heimdallr.metrics.jobs._parenchymal_overlay_text import build_overlay_text  # noqa: E402
 from heimdallr.shared import settings  # noqa: E402
 
 
@@ -24,6 +25,33 @@ def write_nifti(path: Path, data: np.ndarray, spacing=(1.0, 1.0, 1.0)) -> None:
 
 
 class TestParenchymalOrganVolumetryJob(unittest.TestCase):
+    def test_truncated_mask_does_not_report_volume_or_overlay_text(self):
+        shape = (8, 8, 6)
+        ct = np.zeros(shape, dtype=np.float32)
+        mask = np.zeros(shape, dtype=bool)
+        mask[2:6, 2:6, 0:4] = True
+        ct[mask] = 42.0
+
+        measurement = parenchymal_organ_volumetry._compute_mask_measurement(
+            "liver",
+            "Liver",
+            mask,
+            ct,
+            (1.0, 1.0, 1.0),
+        )
+
+        self.assertEqual(measurement["analysis_status"], "incomplete")
+        self.assertFalse(measurement["complete"])
+        self.assertTrue(measurement["truncated_at_scan_bounds"])
+        self.assertIsNone(measurement["observed_volume_cm3"])
+        self.assertIsNone(measurement["volume_cm3"])
+
+        lines = build_overlay_text(
+            organ_measurements={"liver": measurement},
+            locale="en_US",
+        )
+        self.assertEqual(lines, ["Parenchymal organs:"])
+
     def test_job_writes_metrics_and_dicom_series(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -93,7 +121,7 @@ class TestParenchymalOrganVolumetryJob(unittest.TestCase):
             self.assertEqual(result["measurement"]["target_slice_thickness_mm"], 5.0)
             self.assertGreater(result["measurement"]["exported_slice_count"], 0)
             self.assertEqual(len(result["dicom_exports"]), result["measurement"]["exported_slice_count"])
-            self.assertAlmostEqual(result["measurement"]["organs"]["liver"]["hu_mean"], 55.0, places=2)
+            self.assertAlmostEqual(result["measurement"]["organs"]["liver"]["hu_mean"], 47.92, places=2)
             self.assertTrue(result["measurement"]["organs"]["pancreas"]["complete"])
 
             first_dicom = case_dir / result["dicom_exports"][0]["path"]

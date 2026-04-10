@@ -24,7 +24,9 @@ def build_overlay_text(
         if status == "missing":
             continue
 
-        volume_cm3 = measurement.get("observed_volume_cm3")
+        volume_cm3 = measurement.get("volume_cm3")
+        if volume_cm3 is None and status == "complete":
+            volume_cm3 = measurement.get("observed_volume_cm3")
         hu_mean = measurement.get("hu_mean")
         if volume_cm3 is None or hu_mean is None:
             continue
