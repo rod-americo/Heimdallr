@@ -4,6 +4,7 @@ import numpy as np
 
 from heimdallr.metrics.jobs.l3_muscle_area import (
     MetricSkip,
+    _overlay_display_directions,
     build_skip_payload,
     centered_slab_bounds,
     compute_center_slice,
@@ -117,6 +118,7 @@ class TestL3MuscleAreaJob(unittest.TestCase):
 
         rendered = render_overlay_rgb(
             image_data=image,
+            ct_affine=np.diag([1.0, 1.0, 2.5, 1.0]),
             l3_mask=l3_mask,
             muscle_mask=muscle_mask,
             slice_idx=8,
@@ -130,6 +132,10 @@ class TestL3MuscleAreaJob(unittest.TestCase):
         self.assertEqual(rendered.shape[2], 3)
         self.assertGreater(rendered.shape[1], rendered.shape[0])
         self.assertGreater(int(rendered.max()), int(rendered.min()))
+
+    def test_overlay_display_directions_supports_ap_and_lr_planes(self):
+        self.assertEqual(_overlay_display_directions(("A", "S")), ("I", "P"))
+        self.assertEqual(_overlay_display_directions(("R", "S")), ("I", "L"))
 
 
 if __name__ == "__main__":
