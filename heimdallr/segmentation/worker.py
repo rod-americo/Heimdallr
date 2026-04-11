@@ -23,6 +23,7 @@ cases to the metrics stage.
 
 import os
 import json
+import gzip
 import shutil
 import subprocess
 import threading
@@ -543,11 +544,24 @@ def _segmentation_outputs_exist(case_output: Path, tasks: list[dict]) -> bool:
         output_dir = case_output / task["output_dir"]
         if not output_dir.exists():
             return False
-        try:
-            next(output_dir.iterdir())
-        except StopIteration:
+        files = [path for path in output_dir.iterdir() if path.is_file()]
+        if not files:
             return False
+        for path in files:
+            if path.suffixes[-2:] == [".nii", ".gz"] and not _gzip_nifti_is_readable(path):
+                return False
     return True
+
+
+def _gzip_nifti_is_readable(path: Path) -> bool:
+    try:
+        with gzip.open(path, "rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                if not chunk:
+                    break
+        return True
+    except (OSError, EOFError):
+        return False
 
 
 def should_reuse_existing_segmentation(
