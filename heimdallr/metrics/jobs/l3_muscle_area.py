@@ -15,6 +15,11 @@ import matplotlib.pyplot as plt
 import nibabel as nib
 import numpy as np
 
+from heimdallr.metrics.jobs._bone_job_common import (
+    plane_source_axis_codes,
+    reorient_display_array,
+    reorient_display_spacing_mm,
+)
 from heimdallr.metrics.jobs._dicom_secondary_capture import (
     create_secondary_capture_from_rgb,
     parse_optional_float,
@@ -136,8 +141,17 @@ def sagittal_slab_from_mask(
     return sagittal_ct, sagittal_mask, (slab_start, slab_end), lateral_spacing
 
 
+def _overlay_display_directions(source_axis_codes: tuple[str, str]) -> tuple[str, str]:
+    if any(code in {"A", "P"} for code in source_axis_codes):
+        return "I", "P"
+    if any(code in {"L", "R"} for code in source_axis_codes):
+        return "I", "L"
+    raise RuntimeError(f"Unsupported plane axis codes for overlay: {source_axis_codes}")
+
+
 def render_overlay_rgb(
     image_data: np.ndarray,
+    ct_affine: np.ndarray,
     l3_mask: np.ndarray,
     muscle_mask: np.ndarray,
     slice_idx: int,
@@ -162,16 +176,78 @@ def render_overlay_rgb(
 
     ct_slice = np.clip(ct_slice, -160.0, 240.0)
     sagittal_ct = np.clip(sagittal_ct, -160.0, 240.0)
-    rotated_ct = np.rot90(ct_slice)
-    rotated_muscle = np.rot90(muscle_slice.astype(np.uint8))
-    rotated_l3 = np.rot90(l3_slice.astype(np.uint8))
-    rotated_sagittal_ct = np.fliplr(np.rot90(sagittal_ct))
-    rotated_sagittal_l3 = np.fliplr(np.rot90(sagittal_l3.astype(np.uint8)))
+    axial_source_axis_codes = plane_source_axis_codes(ct_affine, "z")
+    rotated_ct = reorient_display_array(
+        ct_slice,
+        source_axis_codes=axial_source_axis_codes,
+        desired_row_code="P",
+        desired_col_code="L",
+    )
+    rotated_muscle = reorient_display_array(
+        muscle_slice.astype(np.uint8),
+        source_axis_codes=axial_source_axis_codes,
+        desired_row_code="P",
+        desired_col_code="L",
+    )
+    rotated_l3 = reorient_display_array(
+        l3_slice.astype(np.uint8),
+        source_axis_codes=axial_source_axis_codes,
+        desired_row_code="P",
+        desired_col_code="L",
+    )
+
+    sagittal_source_axis_codes = plane_source_axis_codes(ct_affine, sagittal_axis)
+    sagittal_row_code, sagittal_col_code = _overlay_display_directions(sagittal_source_axis_codes)
+    rotated_sagittal_ct = reorient_display_array(
+        sagittal_ct,
+        source_axis_codes=sagittal_source_axis_codes,
+        desired_row_code=sagittal_row_code,
+        desired_col_code=sagittal_col_code,
+    )
+    rotated_sagittal_l3 = reorient_display_array(
+        sagittal_l3.astype(np.uint8),
+        source_axis_codes=sagittal_source_axis_codes,
+        desired_row_code=sagittal_row_code,
+        desired_col_code=sagittal_col_code,
+    )
+    sagittal_level_source = np.zeros_like(sagittal_l3, dtype=bool)
+    sagittal_level_source[:, slice_idx] = True
+    rotated_sagittal_level = reorient_display_array(
+        sagittal_level_source,
+        source_axis_codes=sagittal_source_axis_codes,
+        desired_row_code=sagittal_row_code,
+        desired_col_code=sagittal_col_code,
+    )
 
     spacing_x, spacing_y, spacing_z = (float(value) for value in spacing_mm)
-    axial_aspect = (spacing_y / spacing_x) if spacing_x > 0 and spacing_y > 0 else 1.0
-    sagittal_aspect = (spacing_z / lateral_spacing) if spacing_z > 0 and lateral_spacing > 0 else 1.0
-    slice_row = int(np.clip(sagittal_ct.shape[1] - 1 - slice_idx, 0, rotated_sagittal_ct.shape[0] - 1))
+    axial_spacing = reorient_display_spacing_mm(
+        (spacing_x, spacing_y),
+        source_axis_codes=axial_source_axis_codes,
+        desired_row_code="P",
+        desired_col_code="L",
+    )
+    axial_aspect = (
+        float(axial_spacing[1]) / float(axial_spacing[0])
+        if axial_spacing[0] > 0 and axial_spacing[1] > 0
+        else 1.0
+    )
+    sagittal_spacing = reorient_display_spacing_mm(
+        (lateral_spacing, spacing_z),
+        source_axis_codes=sagittal_source_axis_codes,
+        desired_row_code=sagittal_row_code,
+        desired_col_code=sagittal_col_code,
+    )
+    sagittal_aspect = (
+        float(sagittal_spacing[1]) / float(sagittal_spacing[0])
+        if sagittal_spacing[0] > 0 and sagittal_spacing[1] > 0
+        else 1.0
+    )
+    slice_row_candidates = np.where(rotated_sagittal_level.any(axis=1))[0]
+    slice_row = (
+        int(slice_row_candidates[len(slice_row_candidates) // 2])
+        if slice_row_candidates.size
+        else int(np.clip(rotated_sagittal_ct.shape[0] // 2, 0, rotated_sagittal_ct.shape[0] - 1))
+    )
 
     fig, (ax_axial, ax_sagittal) = plt.subplots(
         1,
@@ -403,6 +479,7 @@ def main() -> int:
             panel_titles = build_overlay_panel_titles(locale=artifact_locale)
             overlay_rgb = render_overlay_rgb(
                 ct_data,
+                ct_img.affine,
                 l3_mask,
                 muscle_mask,
                 slice_idx,
