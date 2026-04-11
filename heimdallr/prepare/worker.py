@@ -249,6 +249,65 @@ def _read_json_dict(path: Path) -> dict:
     return raw if isinstance(raw, dict) else {}
 
 
+def _read_study_json_if_matching(path: Path, study_uid: str) -> dict:
+    payload = _read_json_dict(path)
+    if str(payload.get("StudyInstanceUID", "") or "") != str(study_uid or ""):
+        return {}
+    return payload
+
+
+def _build_prepare_output_payloads(
+    *,
+    case_id: str,
+    id_data: dict,
+    metadata_data: dict,
+    available_series: list[dict],
+    discarded_series: list[dict],
+    prepare_pipeline_updates: dict,
+    duplicate_skip_context: dict | None,
+    reference_dicom_context: dict | None,
+) -> tuple[dict, dict]:
+    study_uid = str(id_data.get("StudyInstanceUID", "") or "")
+    latest_id_data = _read_study_json_if_matching(study_id_json(case_id), study_uid)
+    latest_metadata_data = _read_study_json_if_matching(
+        study_metadata_json(case_id),
+        str(metadata_data.get("StudyInstanceUID", "") or ""),
+    )
+
+    output_meta = latest_id_data.copy()
+    output_meta.update(id_data)
+
+    output_metadata = latest_metadata_data.copy()
+    output_metadata.update(metadata_data)
+    if reference_dicom_context:
+        output_metadata["ReferenceDicom"] = reference_dicom_context
+
+    pipeline_data = output_meta.get("Pipeline", {})
+    if not isinstance(pipeline_data, dict):
+        pipeline_data = {}
+    else:
+        pipeline_data = dict(pipeline_data)
+    pipeline_data.update(prepare_pipeline_updates)
+
+    if duplicate_skip_context:
+        pipeline_data["series_selection"] = duplicate_skip_context["selection_info"]
+        pipeline_data["segmentation_skipped"] = True
+        pipeline_data["segmentation_skip_reason"] = "previous_pipeline_complete_signature_match"
+        pipeline_data["segmentation_skip_time"] = prepare_pipeline_updates["prepare_end_time"]
+        pipeline_data["metrics_profile"] = duplicate_skip_context["metrics_profile"]
+        pipeline_data["segmentation_pipeline"] = {
+            "profile": duplicate_skip_context["segmentation_profile"],
+            "tasks": duplicate_skip_context["segmentation_tasks"],
+            "reused_existing_outputs": True,
+            "reuse_reason": "prepare_duplicate_complete",
+        }
+
+    output_meta["Pipeline"] = pipeline_data
+    output_meta["AvailableSeries"] = available_series
+    output_meta["DiscardedSeries"] = discarded_series
+    return output_meta, output_metadata
+
+
 def _safe_int(value, default=-1):
     try:
         return int(value)
@@ -873,17 +932,6 @@ def process_zip(zip_path):
         if reference_dicom_context:
             metadata_data["ReferenceDicom"] = reference_dicom_context
 
-        existing_id_data = _read_json_dict(study_id_json(case_id))
-        if str(existing_id_data.get("StudyInstanceUID", "") or "") != str(
-            id_data.get("StudyInstanceUID", "") or ""
-        ):
-            existing_id_data = {}
-        existing_metadata_data = _read_json_dict(study_metadata_json(case_id))
-        if str(existing_metadata_data.get("StudyInstanceUID", "") or "") != str(
-            metadata_data.get("StudyInstanceUID", "") or ""
-        ):
-            existing_metadata_data = {}
-
         # Insert into DB immediately
         init_and_insert_db(id_data)
         if global_meta.get("StudyInstanceUID"):
@@ -1062,76 +1110,49 @@ def process_zip(zip_path):
                     "DiscardedSeries": discarded_series,
                 },
             )
-            if duplicate_skip_context:
-                print(
-                    f"[Prepare] Reusing completed pipeline for {case_id}; "
-                    "skipping segmentation enqueue"
-                )
-            else:
-                enqueue_case_for_segmentation(case_id)
-                print(f"[Prepare] Enqueued for segmentation: {case_id}")
-                print(f"\n  Ready: {study_dir(case_id)}")
-                print(str(study_dir(case_id)))
-
             prepare_end_dt = datetime.datetime.now(LOCAL_TZ)
             prepare_elapsed_str = str(prepare_end_dt - prepare_start_dt)
             stage_timings["total_prepare_seconds"] = round((prepare_end_dt - prepare_start_dt).total_seconds(), 3)
 
-            # Enrichment: Add Selection Info to id.json
-            output_meta = existing_id_data.copy() if duplicate_skip_context else id_data.copy()
-            output_metadata = existing_metadata_data.copy() if duplicate_skip_context else metadata_data.copy()
-            output_meta.update(id_data)
-            output_metadata.update(metadata_data)
-            if reference_dicom_context:
-                output_metadata["ReferenceDicom"] = reference_dicom_context
-
-            pipeline_data = {}
-            if duplicate_skip_context and isinstance(existing_id_data.get("Pipeline"), dict):
-                pipeline_data = dict(existing_id_data.get("Pipeline") or {})
-            pipeline_data.update({
+            prepare_pipeline_updates = {
                 "prepare_start_time": prepare_start_time_str,
                 "prepare_end_time": prepare_end_dt.isoformat(),
                 "prepare_elapsed_time": prepare_elapsed_str,
                 "prepare_stage_timings_seconds": stage_timings,
                 "prepare_stats": prepare_stats,
                 "prepare_input_origin": upload_origin,
-            })
+            }
             if intake_manifest:
-                pipeline_data["intake_first_instance_time"] = intake_manifest.get("first_instance_time")
-                pipeline_data["intake_last_instance_time"] = intake_manifest.get("last_instance_time")
-                pipeline_data["intake_receive_elapsed_time"] = intake_manifest.get("receive_elapsed_time")
-                pipeline_data["intake_receive_elapsed_seconds"] = intake_manifest.get("receive_elapsed_seconds")
-                pipeline_data["intake_instance_count"] = intake_manifest.get("instance_count")
-                pipeline_data["intake_calling_aet"] = intake_manifest.get("calling_aet")
-                pipeline_data["intake_remote_ip"] = intake_manifest.get("remote_ip")
-                pipeline_data["intake_handoff_time"] = intake_manifest.get("handoff_time")
+                prepare_pipeline_updates["intake_first_instance_time"] = intake_manifest.get("first_instance_time")
+                prepare_pipeline_updates["intake_last_instance_time"] = intake_manifest.get("last_instance_time")
+                prepare_pipeline_updates["intake_receive_elapsed_time"] = intake_manifest.get("receive_elapsed_time")
+                prepare_pipeline_updates["intake_receive_elapsed_seconds"] = intake_manifest.get("receive_elapsed_seconds")
+                prepare_pipeline_updates["intake_instance_count"] = intake_manifest.get("instance_count")
+                prepare_pipeline_updates["intake_calling_aet"] = intake_manifest.get("calling_aet")
+                prepare_pipeline_updates["intake_remote_ip"] = intake_manifest.get("remote_ip")
+                prepare_pipeline_updates["intake_handoff_time"] = intake_manifest.get("handoff_time")
                 handoff_time = intake_manifest.get("handoff_time")
                 if handoff_time:
                     try:
                         handoff_dt = datetime.datetime.fromisoformat(handoff_time)
-                        pipeline_data["handoff_to_prepare_elapsed_time"] = str(
+                        prepare_pipeline_updates["handoff_to_prepare_elapsed_time"] = str(
                             prepare_start_dt - handoff_dt
                         )
                     except Exception:
-                        pipeline_data["handoff_to_prepare_elapsed_time"] = (
+                        prepare_pipeline_updates["handoff_to_prepare_elapsed_time"] = (
                             "Error parsing intake_handoff_time"
                         )
-            if duplicate_skip_context:
-                pipeline_data["series_selection"] = duplicate_skip_context["selection_info"]
-                pipeline_data["segmentation_skipped"] = True
-                pipeline_data["segmentation_skip_reason"] = "previous_pipeline_complete_signature_match"
-                pipeline_data["segmentation_skip_time"] = prepare_end_dt.isoformat()
-                pipeline_data["metrics_profile"] = duplicate_skip_context["metrics_profile"]
-                pipeline_data["segmentation_pipeline"] = {
-                    "profile": duplicate_skip_context["segmentation_profile"],
-                    "tasks": duplicate_skip_context["segmentation_tasks"],
-                    "reused_existing_outputs": True,
-                    "reuse_reason": "prepare_duplicate_complete",
-                }
-            output_meta["Pipeline"] = pipeline_data
-            
-            output_meta["AvailableSeries"] = available_series
-            output_meta["DiscardedSeries"] = discarded_series
+
+            output_meta, output_metadata = _build_prepare_output_payloads(
+                case_id=case_id,
+                id_data=id_data,
+                metadata_data=metadata_data,
+                available_series=available_series,
+                discarded_series=discarded_series,
+                prepare_pipeline_updates=prepare_pipeline_updates,
+                duplicate_skip_context=duplicate_skip_context,
+                reference_dicom_context=reference_dicom_context,
+            )
             
             # Save updated id.json
             with open(study_id_json(case_id), "w") as f:
@@ -1153,6 +1174,17 @@ def process_zip(zip_path):
                     )
             except Exception as e:
                 print(f"  [Warning] Failed to update prepare timing in DB: {e}")
+
+            if duplicate_skip_context:
+                print(
+                    f"[Prepare] Reusing completed pipeline for {case_id}; "
+                    "skipping segmentation enqueue"
+                )
+            else:
+                enqueue_case_for_segmentation(case_id)
+                print(f"[Prepare] Enqueued for segmentation: {case_id}")
+                print(f"\n  Ready: {study_dir(case_id)}")
+                print(str(study_dir(case_id)))
 
             if not duplicate_skip_context:
                 try:
