@@ -11,6 +11,7 @@ from heimdallr.metrics.analysis.bone_health import (
     compute_l1_volumetric_metrics,
     extract_study_technique_context,
 )
+from heimdallr.metrics.jobs.bone_health_l1_hu import render_sagittal_overlay_rgb
 
 
 class TestBoneHealthHelpers(unittest.TestCase):
@@ -123,6 +124,25 @@ class TestBoneHealthHelpers(unittest.TestCase):
         self.assertEqual(composite["opportunistic_osteoporosis_composite"], "high")
         self.assertGreaterEqual(composite["opportunistic_osteoporosis_composite_score"], 70)
         self.assertEqual(composite["opportunistic_osteoporosis_composite_density_label"], "osteoporosis")
+
+    def test_render_overlay_supports_lateral_superior_planes(self):
+        ct_plane = np.arange(12, dtype=np.float32).reshape(3, 4)
+        overlay_mask = np.zeros((3, 4), dtype=bool)
+        overlay_mask[1, 1:3] = True
+        outline_mask = overlay_mask.copy()
+
+        rgb = render_sagittal_overlay_rgb(
+            ct_plane=ct_plane,
+            overlay_mask=overlay_mask,
+            mask_outline=outline_mask,
+            title="L1",
+            summary_lines=["HU 150"],
+            plane_spacing_mm=(1.0, 1.0),
+            source_axis_codes=("L", "S"),
+        )
+
+        self.assertEqual(rgb.ndim, 3)
+        self.assertEqual(rgb.shape[2], 3)
 
 
 if __name__ == "__main__":
