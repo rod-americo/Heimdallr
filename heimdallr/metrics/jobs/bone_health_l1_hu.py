@@ -48,6 +48,14 @@ from heimdallr.shared.paths import study_artifacts_dir
 SERIES_NUMBER = 9106
 
 
+def _overlay_display_directions(source_axis_codes: tuple[str, str]) -> tuple[str, str]:
+    if any(code in {"A", "P"} for code in source_axis_codes):
+        return "I", "P"
+    if any(code in {"L", "R"} for code in source_axis_codes):
+        return "I", "L"
+    raise RuntimeError(f"Unsupported plane axis codes for overlay: {source_axis_codes}")
+
+
 def render_sagittal_overlay_rgb(
     ct_plane: np.ndarray,
     overlay_mask: np.ndarray,
@@ -58,29 +66,30 @@ def render_sagittal_overlay_rgb(
     *,
     source_axis_codes: tuple[str, str],
 ) -> np.ndarray:
+    desired_row_code, desired_col_code = _overlay_display_directions(source_axis_codes)
     display_ct = reorient_display_array(
         np.asarray(ct_plane, dtype=np.float32),
         source_axis_codes=source_axis_codes,
-        desired_row_code="I",
-        desired_col_code="P",
+        desired_row_code=desired_row_code,
+        desired_col_code=desired_col_code,
     )
     display_overlay = reorient_display_array(
         np.asarray(overlay_mask, dtype=bool),
         source_axis_codes=source_axis_codes,
-        desired_row_code="I",
-        desired_col_code="P",
+        desired_row_code=desired_row_code,
+        desired_col_code=desired_col_code,
     )
     display_outline = reorient_display_array(
         np.asarray(mask_outline, dtype=bool),
         source_axis_codes=source_axis_codes,
-        desired_row_code="I",
-        desired_col_code="P",
+        desired_row_code=desired_row_code,
+        desired_col_code=desired_col_code,
     )
     display_spacing = reorient_display_spacing_mm(
         plane_spacing_mm,
         source_axis_codes=source_axis_codes,
-        desired_row_code="I",
-        desired_col_code="P",
+        desired_row_code=desired_row_code,
+        desired_col_code=desired_col_code,
     )
     aspect = (
         float(display_spacing[1]) / float(display_spacing[0])
