@@ -1,6 +1,7 @@
 import sqlite3
 import tempfile
 import unittest
+import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -280,6 +281,80 @@ class TestPrepareDuplicateSkip(unittest.TestCase):
                 conn.close()
 
         self.assertIsNotNone(context)
+
+
+class TestPrepareMetadataMerge(unittest.TestCase):
+    def test_build_prepare_output_payloads_preserves_downstream_pipeline_updates(self):
+        case_id = "AliceE_20260410_1"
+        study_uid = "1.2.3"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            metadata_dir = root / case_id / "metadata"
+            metadata_dir.mkdir(parents=True, exist_ok=True)
+
+            current_id = {
+                "StudyInstanceUID": study_uid,
+                "CaseID": case_id,
+                "Pipeline": {
+                    "series_selection": {
+                        "SelectedSeriesInstanceUID": "1.2.3.4",
+                        "SelectedPhase": "native",
+                    },
+                    "segmentation_start_time": "2026-04-11T11:45:28-03:00",
+                    "segmentation_end_time": "2026-04-11T11:45:29-03:00",
+                    "metrics_start_time": "2026-04-11T11:45:29-03:00",
+                    "metrics_end_time": "2026-04-11T11:46:02-03:00",
+                    "metrics_status": "done",
+                },
+            }
+            current_metadata = {
+                "StudyInstanceUID": study_uid,
+                "CaseID": case_id,
+                "ReferenceDicom": {"SeriesInstanceUID": "1.2.3.4"},
+            }
+            (metadata_dir / "id.json").write_text(json.dumps(current_id), encoding="utf-8")
+            (metadata_dir / "metadata.json").write_text(json.dumps(current_metadata), encoding="utf-8")
+
+            with patch.object(worker, "study_id_json", return_value=metadata_dir / "id.json"):
+                with patch.object(
+                    worker,
+                    "study_metadata_json",
+                    return_value=metadata_dir / "metadata.json",
+                ):
+                    output_meta, output_metadata = worker._build_prepare_output_payloads(
+                        case_id=case_id,
+                        id_data={
+                            "StudyInstanceUID": study_uid,
+                            "CaseID": case_id,
+                            "AccessionNumber": "1",
+                        },
+                        metadata_data={
+                            "StudyInstanceUID": study_uid,
+                            "CaseID": case_id,
+                            "AccessionNumber": "1",
+                        },
+                        available_series=[{"SeriesNumber": "4"}],
+                        discarded_series=[{"SeriesNumber": "9000"}],
+                        prepare_pipeline_updates={
+                            "prepare_start_time": "2026-04-11T11:45:47-03:00",
+                            "prepare_end_time": "2026-04-11T11:46:42-03:00",
+                            "prepare_elapsed_time": "0:00:55",
+                        },
+                        duplicate_skip_context=None,
+                        reference_dicom_context={"SeriesInstanceUID": "1.2.3.4"},
+                    )
+
+        pipeline = output_meta["Pipeline"]
+        self.assertEqual(
+            pipeline["series_selection"]["SelectedSeriesInstanceUID"],
+            "1.2.3.4",
+        )
+        self.assertEqual(pipeline["metrics_end_time"], "2026-04-11T11:46:02-03:00")
+        self.assertEqual(pipeline["metrics_status"], "done")
+        self.assertEqual(pipeline["prepare_end_time"], "2026-04-11T11:46:42-03:00")
+        self.assertEqual(output_meta["AvailableSeries"], [{"SeriesNumber": "4"}])
+        self.assertEqual(output_meta["DiscardedSeries"], [{"SeriesNumber": "9000"}])
+        self.assertEqual(output_metadata["ReferenceDicom"]["SeriesInstanceUID"], "1.2.3.4")
 
 
 if __name__ == "__main__":
