@@ -315,6 +315,15 @@ def upsert_intake_metadata(
 def enqueue_segmentation_case(conn: sqlite3.Connection, case_id: str, input_path: str) -> None:
     ensure_schema(conn)
     created_at = _now_local_timestamp()
+    conn.execute("DELETE FROM metrics_queue WHERE case_id = ?", (str(case_id),))
+    conn.execute(
+        """
+        DELETE FROM dicom_egress_queue
+        WHERE case_id = ?
+          AND status != 'done'
+        """,
+        (str(case_id),),
+    )
     conn.execute(
         """
         INSERT INTO segmentation_queue (case_id, input_path, status, created_at)
@@ -540,6 +549,38 @@ def enqueue_integration_dispatch(
         ),
     )
     conn.commit()
+
+
+def reset_claimed_segmentation_queue_items(conn: sqlite3.Connection) -> int:
+    ensure_schema(conn)
+    cursor = conn.execute(
+        """
+        UPDATE segmentation_queue
+        SET status = 'pending',
+            claimed_at = NULL,
+            finished_at = NULL,
+            error = NULL
+        WHERE status = 'claimed'
+        """
+    )
+    conn.commit()
+    return int(cursor.rowcount or 0)
+
+
+def reset_claimed_metrics_queue_items(conn: sqlite3.Connection) -> int:
+    ensure_schema(conn)
+    cursor = conn.execute(
+        """
+        UPDATE metrics_queue
+        SET status = 'pending',
+            claimed_at = NULL,
+            finished_at = NULL,
+            error = NULL
+        WHERE status = 'claimed'
+        """
+    )
+    conn.commit()
+    return int(cursor.rowcount or 0)
 
 
 def claim_next_pending_segmentation_queue_item(conn: sqlite3.Connection) -> tuple[int, str, str] | None:

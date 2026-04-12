@@ -7,10 +7,28 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from heimdallr.shared import settings
-from heimdallr.tui.snapshot import RuntimeLayout, build_snapshot
+from heimdallr.tui.snapshot import RuntimeLayout, _derive_stage_key, build_snapshot
 
 
 class TestTuiSnapshot(unittest.TestCase):
+    def test_derive_stage_key_prefers_active_segmentation_over_stale_metrics_error(self):
+        stage = _derive_stage_key(
+            {
+                "segmentation_queue_status": "claimed",
+                "metrics_queue_status": "error",
+                "metrics_started": False,
+                "metrics_finished": False,
+                "has_results": False,
+                "failed_file": False,
+                "has_error_log": False,
+                "active_file": False,
+                "pending_file": False,
+                "path": None,
+            }
+        )
+
+        self.assertEqual(stage, "segmentation")
+
     def test_build_snapshot_classifies_pipeline_state(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)

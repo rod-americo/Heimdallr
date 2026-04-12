@@ -184,6 +184,15 @@ def ensure_segmentation_queue_table():
     conn.close()
 
 
+def reset_claimed_segmentation_queue_items():
+    """Recover orphaned claimed queue rows after a worker restart."""
+    conn = db_connect()
+    try:
+        return store.reset_claimed_segmentation_queue_items(conn)
+    finally:
+        conn.close()
+
+
 def claim_next_pending_segmentation_queue_item():
     """
     Atomically claim a pending queue item.
@@ -1064,6 +1073,9 @@ def main():
     """
     print("Starting input/ directory monitoring...")
     ensure_segmentation_queue_table()
+    recovered_claims = reset_claimed_segmentation_queue_items()
+    if recovered_claims:
+        print(f"[Segmentation] Recovered {recovered_claims} orphaned claimed queue item(s)")
     
     max_cases = settings.MAX_PARALLEL_CASES  # Maximum concurrent cases from config
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_cases)

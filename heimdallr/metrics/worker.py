@@ -74,6 +74,14 @@ def ensure_metrics_queue_table() -> None:
         conn.close()
 
 
+def reset_claimed_metrics_queue_items() -> int:
+    conn = db_connect()
+    try:
+        return store.reset_claimed_metrics_queue_items(conn)
+    finally:
+        conn.close()
+
+
 def claim_next_pending_metrics_queue_item():
     conn = db_connect()
     try:
@@ -653,6 +661,9 @@ def segment_case_metrics(case_input: Path) -> bool:
 def main() -> int:
     print("Starting metrics queue monitoring...")
     ensure_metrics_queue_table()
+    recovered_claims = reset_claimed_metrics_queue_items()
+    if recovered_claims:
+        print(f"[Metrics] Recovered {recovered_claims} orphaned claimed queue item(s)")
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
     segmentation_cases = set()
     lock = threading.Lock()

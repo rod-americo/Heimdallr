@@ -621,12 +621,12 @@ def _derive_stage_key(case: dict[str, Any]) -> str:
         return "processed"
     if metrics_queue_status in {"pending", "claimed"} or (metrics_started and not metrics_finished):
         return "metrics"
-    if segmentation_queue_status == "error" or metrics_queue_status == "error" or case["failed_file"] or case["has_error_log"]:
-        return "failed"
     if segmentation_queue_status == "claimed" or case["active_file"]:
         return "segmentation"
     if segmentation_queue_status == "pending" or case["pending_file"]:
         return "queued"
+    if segmentation_queue_status == "error" or metrics_queue_status == "error" or case["failed_file"] or case["has_error_log"]:
+        return "failed"
     if case["path"] is not None:
         return "prepared"
     return "intake"
