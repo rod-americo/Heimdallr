@@ -79,13 +79,10 @@ def ensure_metrics_queue_table() -> None:
         conn.close()
 
 
-def recover_stale_claimed_metrics_queue_items() -> int:
+def recover_claimed_metrics_queue_items() -> int:
     conn = db_connect()
     try:
-        return store.requeue_stale_claimed_metrics_items(
-            conn,
-            ttl_seconds=settings.METRICS_CLAIM_TTL_SECONDS,
-        )
+        return store.reset_claimed_metrics_queue_items(conn)
     finally:
         conn.close()
 
@@ -772,9 +769,9 @@ def main() -> int:
     print("Starting metrics queue monitoring...")
     _install_signal_handlers()
     ensure_metrics_queue_table()
-    recovered_claims = recover_stale_claimed_metrics_queue_items()
+    recovered_claims = recover_claimed_metrics_queue_items()
     if recovered_claims:
-        print(f"[Metrics] Recovered {recovered_claims} stale claimed queue item(s)")
+        print(f"[Metrics] Recovered {recovered_claims} claimed queue item(s) on startup")
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
     active_futures: set[concurrent.futures.Future] = set()
     lock = threading.Lock()
