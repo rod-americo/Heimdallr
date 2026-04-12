@@ -2,6 +2,7 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from heimdallr.shared import store
 
@@ -13,6 +14,56 @@ def _connect_row_db(path: Path) -> sqlite3.Connection:
 
 
 class TestStoreQueueRecovery(unittest.TestCase):
+    def test_enqueue_segmentation_case_preserves_fresh_claimed_row(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "dicom.db"
+            conn = _connect_row_db(db_path)
+            store.ensure_schema(conn)
+            conn.execute(
+                """
+                INSERT INTO segmentation_queue (case_id, input_path, status, created_at, claimed_at)
+                VALUES (?, ?, 'claimed', '2026-04-12 10:00:00', '2099-04-12 10:00:05')
+                """,
+                ("CaseFresh", "/tmp/original"),
+            )
+
+            with patch("heimdallr.shared.store.settings.SEGMENTATION_CLAIM_TTL_SECONDS", 900):
+                store.enqueue_segmentation_case(conn, "CaseFresh", "/tmp/new-path")
+
+            row = conn.execute(
+                "SELECT status, input_path, claimed_at FROM segmentation_queue WHERE case_id = ?",
+                ("CaseFresh",),
+            ).fetchone()
+            self.assertEqual(row["status"], "claimed")
+            self.assertEqual(row["input_path"], "/tmp/new-path")
+            self.assertEqual(row["claimed_at"], "2099-04-12 10:00:05")
+            conn.close()
+
+    def test_enqueue_case_for_metrics_preserves_fresh_claimed_row(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "dicom.db"
+            conn = _connect_row_db(db_path)
+            store.ensure_schema(conn)
+            conn.execute(
+                """
+                INSERT INTO metrics_queue (case_id, input_path, status, created_at, claimed_at)
+                VALUES (?, ?, 'claimed', '2026-04-12 10:00:00', '2099-04-12 10:00:05')
+                """,
+                ("CaseFreshMetrics", "/tmp/original"),
+            )
+
+            with patch("heimdallr.shared.store.settings.METRICS_CLAIM_TTL_SECONDS", 900):
+                store.enqueue_case_for_metrics(conn, "CaseFreshMetrics", "/tmp/new-path")
+
+            row = conn.execute(
+                "SELECT status, input_path, claimed_at FROM metrics_queue WHERE case_id = ?",
+                ("CaseFreshMetrics",),
+            ).fetchone()
+            self.assertEqual(row["status"], "claimed")
+            self.assertEqual(row["input_path"], "/tmp/new-path")
+            self.assertEqual(row["claimed_at"], "2099-04-12 10:00:05")
+            conn.close()
+
     def test_enqueue_segmentation_case_clears_downstream_non_done_state(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "dicom.db"
@@ -107,6 +158,60 @@ class TestStoreQueueRecovery(unittest.TestCase):
             self.assertIsNone(met_row["claimed_at"])
             self.assertIsNone(met_row["finished_at"])
             self.assertIsNone(met_row["error"])
+            conn.close()
+
+    def test_claim_next_pending_segmentation_queue_item_reclaims_stale_claim(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "dicom.db"
+            conn = _connect_row_db(db_path)
+            store.ensure_schema(conn)
+            conn.execute(
+                """
+                INSERT INTO segmentation_queue (case_id, input_path, status, created_at, claimed_at)
+                VALUES (?, ?, 'claimed', '2026-04-12 10:00:00', '2026-04-12 10:00:05')
+                """,
+                ("CaseSeg", "/tmp/seg"),
+            )
+
+            with patch("heimdallr.shared.store.settings.SEGMENTATION_CLAIM_TTL_SECONDS", 1):
+                claimed = store.claim_next_pending_segmentation_queue_item(conn)
+
+            self.assertIsNotNone(claimed)
+            self.assertEqual(claimed[1], "CaseSeg")
+            row = conn.execute(
+                "SELECT status, claimed_at, error FROM segmentation_queue WHERE case_id = ?",
+                ("CaseSeg",),
+            ).fetchone()
+            self.assertEqual(row["status"], "claimed")
+            self.assertIsNotNone(row["claimed_at"])
+            self.assertIsNone(row["error"])
+            conn.close()
+
+    def test_claim_next_pending_metrics_queue_item_reclaims_stale_claim(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "dicom.db"
+            conn = _connect_row_db(db_path)
+            store.ensure_schema(conn)
+            conn.execute(
+                """
+                INSERT INTO metrics_queue (case_id, input_path, status, created_at, claimed_at)
+                VALUES (?, ?, 'claimed', '2026-04-12 10:00:00', '2026-04-12 10:00:05')
+                """,
+                ("CaseMet", "/tmp/met"),
+            )
+
+            with patch("heimdallr.shared.store.settings.METRICS_CLAIM_TTL_SECONDS", 1):
+                claimed = store.claim_next_pending_metrics_queue_item(conn)
+
+            self.assertIsNotNone(claimed)
+            self.assertEqual(claimed[1], "CaseMet")
+            row = conn.execute(
+                "SELECT status, claimed_at, error FROM metrics_queue WHERE case_id = ?",
+                ("CaseMet",),
+            ).fetchone()
+            self.assertEqual(row["status"], "claimed")
+            self.assertIsNotNone(row["claimed_at"])
+            self.assertIsNone(row["error"])
             conn.close()
 
 

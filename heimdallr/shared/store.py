@@ -61,6 +61,33 @@ def _future_local_timestamp(seconds: int) -> str:
     return (datetime.now(LOCAL_TZ) + timedelta(seconds=seconds)).strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _parse_local_timestamp(value: Any) -> datetime | None:
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo is not None else value.replace(tzinfo=LOCAL_TZ)
+    text = str(value).strip()
+    if not text:
+        return None
+    for parser in (
+        datetime.fromisoformat,
+        lambda raw: datetime.strptime(raw, "%Y-%m-%d %H:%M:%S"),
+    ):
+        try:
+            parsed = parser(text)
+            return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=LOCAL_TZ)
+        except ValueError:
+            continue
+    return None
+
+
+def _is_stale_claimed_at(value: Any, *, ttl_seconds: int) -> bool:
+    claimed_at = _parse_local_timestamp(value)
+    if claimed_at is None:
+        return True
+    return (datetime.now(LOCAL_TZ) - claimed_at).total_seconds() >= max(int(ttl_seconds), 1)
+
+
 def ensure_schema(conn: sqlite3.Connection | None = None) -> None:
     owns_connection = conn is None
     if conn is None:
@@ -315,6 +342,29 @@ def upsert_intake_metadata(
 def enqueue_segmentation_case(conn: sqlite3.Connection, case_id: str, input_path: str) -> None:
     ensure_schema(conn)
     created_at = _now_local_timestamp()
+    existing = conn.execute(
+        """
+        SELECT status, claimed_at
+        FROM segmentation_queue
+        WHERE case_id = ?
+        """,
+        (str(case_id),),
+    ).fetchone()
+    if existing and existing["status"] == "claimed" and not _is_stale_claimed_at(
+        existing["claimed_at"],
+        ttl_seconds=settings.SEGMENTATION_CLAIM_TTL_SECONDS,
+    ):
+        conn.execute(
+            """
+            UPDATE segmentation_queue
+            SET input_path = ?
+            WHERE case_id = ?
+            """,
+            (str(input_path), str(case_id)),
+        )
+        conn.commit()
+        return
+
     conn.execute("DELETE FROM metrics_queue WHERE case_id = ?", (str(case_id),))
     conn.execute(
         """
@@ -344,6 +394,29 @@ def enqueue_segmentation_case(conn: sqlite3.Connection, case_id: str, input_path
 def enqueue_case_for_metrics(conn: sqlite3.Connection, case_id: str, input_path: str) -> None:
     ensure_schema(conn)
     created_at = _now_local_timestamp()
+    existing = conn.execute(
+        """
+        SELECT status, claimed_at
+        FROM metrics_queue
+        WHERE case_id = ?
+        """,
+        (str(case_id),),
+    ).fetchone()
+    if existing and existing["status"] == "claimed" and not _is_stale_claimed_at(
+        existing["claimed_at"],
+        ttl_seconds=settings.METRICS_CLAIM_TTL_SECONDS,
+    ):
+        conn.execute(
+            """
+            UPDATE metrics_queue
+            SET input_path = ?
+            WHERE case_id = ?
+            """,
+            (str(input_path), str(case_id)),
+        )
+        conn.commit()
+        return
+
     conn.execute(
         """
         INSERT INTO metrics_queue (case_id, input_path, status, created_at)
@@ -583,8 +656,104 @@ def reset_claimed_metrics_queue_items(conn: sqlite3.Connection) -> int:
     return int(cursor.rowcount or 0)
 
 
+def requeue_stale_claimed_segmentation_items(conn: sqlite3.Connection, *, ttl_seconds: int) -> int:
+    ensure_schema(conn)
+    rows = conn.execute(
+        """
+        SELECT id, claimed_at
+        FROM segmentation_queue
+        WHERE status = 'claimed'
+        """
+    ).fetchall()
+    stale_ids = [
+        int(row["id"])
+        for row in rows
+        if _is_stale_claimed_at(row["claimed_at"], ttl_seconds=ttl_seconds)
+    ]
+    if not stale_ids:
+        return 0
+    conn.executemany(
+        """
+        UPDATE segmentation_queue
+        SET status = 'pending',
+            claimed_at = NULL,
+            finished_at = NULL,
+            error = NULL
+        WHERE id = ?
+        """,
+        [(queue_id,) for queue_id in stale_ids],
+    )
+    conn.commit()
+    return len(stale_ids)
+
+
+def requeue_stale_claimed_metrics_items(conn: sqlite3.Connection, *, ttl_seconds: int) -> int:
+    ensure_schema(conn)
+    rows = conn.execute(
+        """
+        SELECT id, claimed_at
+        FROM metrics_queue
+        WHERE status = 'claimed'
+        """
+    ).fetchall()
+    stale_ids = [
+        int(row["id"])
+        for row in rows
+        if _is_stale_claimed_at(row["claimed_at"], ttl_seconds=ttl_seconds)
+    ]
+    if not stale_ids:
+        return 0
+    conn.executemany(
+        """
+        UPDATE metrics_queue
+        SET status = 'pending',
+            claimed_at = NULL,
+            finished_at = NULL,
+            error = NULL
+        WHERE id = ?
+        """,
+        [(queue_id,) for queue_id in stale_ids],
+    )
+    conn.commit()
+    return len(stale_ids)
+
+
+def touch_segmentation_queue_item_claim(conn: sqlite3.Connection, queue_id: int) -> bool:
+    ensure_schema(conn)
+    cursor = conn.execute(
+        """
+        UPDATE segmentation_queue
+        SET claimed_at = ?
+        WHERE id = ?
+          AND status = 'claimed'
+        """,
+        (_now_local_timestamp(), int(queue_id)),
+    )
+    conn.commit()
+    return cursor.rowcount == 1
+
+
+def touch_metrics_queue_item_claim(conn: sqlite3.Connection, queue_id: int) -> bool:
+    ensure_schema(conn)
+    cursor = conn.execute(
+        """
+        UPDATE metrics_queue
+        SET claimed_at = ?
+        WHERE id = ?
+          AND status = 'claimed'
+        """,
+        (_now_local_timestamp(), int(queue_id)),
+    )
+    conn.commit()
+    return cursor.rowcount == 1
+
+
 def claim_next_pending_segmentation_queue_item(conn: sqlite3.Connection) -> tuple[int, str, str] | None:
     ensure_schema(conn)
+    requeue_stale_claimed_segmentation_items(
+        conn,
+        ttl_seconds=settings.SEGMENTATION_CLAIM_TTL_SECONDS,
+    )
     claimed_at = _now_local_timestamp()
     cursor = conn.cursor()
     cursor.execute("BEGIN IMMEDIATE")
@@ -622,6 +791,10 @@ def claim_next_pending_segmentation_queue_item(conn: sqlite3.Connection) -> tupl
 
 def claim_next_pending_metrics_queue_item(conn: sqlite3.Connection) -> tuple[int, str, str] | None:
     ensure_schema(conn)
+    requeue_stale_claimed_metrics_items(
+        conn,
+        ttl_seconds=settings.METRICS_CLAIM_TTL_SECONDS,
+    )
     claimed_at = _now_local_timestamp()
     cursor = conn.cursor()
     cursor.execute("BEGIN IMMEDIATE")
