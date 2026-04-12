@@ -188,14 +188,11 @@ def ensure_segmentation_queue_table():
     conn.close()
 
 
-def recover_stale_claimed_segmentation_queue_items() -> int:
-    """Recover queue claims whose lease expired."""
+def recover_claimed_segmentation_queue_items() -> int:
+    """Recover claimed queue rows after a worker restart."""
     conn = db_connect()
     try:
-        return store.requeue_stale_claimed_segmentation_items(
-            conn,
-            ttl_seconds=settings.SEGMENTATION_CLAIM_TTL_SECONDS,
-        )
+        return store.reset_claimed_segmentation_queue_items(conn)
     finally:
         conn.close()
 
@@ -1248,9 +1245,9 @@ def main():
     print("Starting input/ directory monitoring...")
     _install_signal_handlers()
     ensure_segmentation_queue_table()
-    recovered_claims = recover_stale_claimed_segmentation_queue_items()
+    recovered_claims = recover_claimed_segmentation_queue_items()
     if recovered_claims:
-        print(f"[Segmentation] Recovered {recovered_claims} stale claimed queue item(s)")
+        print(f"[Segmentation] Recovered {recovered_claims} claimed queue item(s) on startup")
     
     max_cases = settings.MAX_PARALLEL_CASES  # Maximum concurrent cases from config
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_cases)
