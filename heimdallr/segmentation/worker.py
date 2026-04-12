@@ -25,6 +25,7 @@ import os
 import json
 import gzip
 import shutil
+import signal
 import subprocess
 import threading
 import sys
@@ -51,6 +52,9 @@ settings.configure_service_stdio()
 path_entries = [str(settings.TOTALSEG_BIN_DIR), str(Path(sys.executable).parent)]
 os.environ["PATH"] = os.pathsep.join(path_entries + [os.environ["PATH"]])
 LOCAL_TZ = ZoneInfo(settings.TIMEZONE)
+_ACTIVE_CHILD_PROCESSES: set[subprocess.Popen[str]] = set()
+_ACTIVE_CHILDREN_LOCK = threading.Lock()
+_SHUTDOWN_EVENT = threading.Event()
 
 # ============================================================
 # CONFIGURATION
@@ -184,11 +188,14 @@ def ensure_segmentation_queue_table():
     conn.close()
 
 
-def reset_claimed_segmentation_queue_items():
-    """Recover orphaned claimed queue rows after a worker restart."""
+def recover_stale_claimed_segmentation_queue_items() -> int:
+    """Recover queue claims whose lease expired."""
     conn = db_connect()
     try:
-        return store.reset_claimed_segmentation_queue_items(conn)
+        return store.requeue_stale_claimed_segmentation_items(
+            conn,
+            ttl_seconds=settings.SEGMENTATION_CLAIM_TTL_SECONDS,
+        )
     finally:
         conn.close()
 
@@ -203,6 +210,14 @@ def claim_next_pending_segmentation_queue_item():
     conn = db_connect()
     try:
         return store.claim_next_pending_segmentation_queue_item(conn)
+    finally:
+        conn.close()
+
+
+def touch_segmentation_queue_item_claim(queue_id: int) -> bool:
+    conn = db_connect()
+    try:
+        return store.touch_segmentation_queue_item_claim(conn, queue_id)
     finally:
         conn.close()
 
@@ -235,6 +250,105 @@ def mark_segmentation_queue_item_error(queue_id, error_message):
     conn = db_connect()
     store.mark_segmentation_queue_item_error(conn, queue_id, error_message)
     conn.close()
+
+
+def _latest_output_activity_timestamp(output_folder: Path) -> float:
+    if not output_folder.exists():
+        return 0.0
+    latest = output_folder.stat().st_mtime
+    for path in output_folder.iterdir():
+        try:
+            latest = max(latest, path.stat().st_mtime)
+        except FileNotFoundError:
+            continue
+    return latest
+
+
+def _register_child_process(process: subprocess.Popen[str]) -> None:
+    with _ACTIVE_CHILDREN_LOCK:
+        _ACTIVE_CHILD_PROCESSES.add(process)
+
+
+def _unregister_child_process(process: subprocess.Popen[str]) -> None:
+    with _ACTIVE_CHILDREN_LOCK:
+        _ACTIVE_CHILD_PROCESSES.discard(process)
+
+
+def _terminate_process_group(process: subprocess.Popen[str], *, reason: str, kill_after_seconds: float = 5.0) -> None:
+    if process.poll() is not None:
+        return
+
+    try:
+        pgid = os.getpgid(process.pid)
+    except ProcessLookupError:
+        return
+
+    print(f"[Segmentation] Terminating child process group {pgid}: {reason}")
+    try:
+        os.killpg(pgid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+
+    deadline = time.monotonic() + max(kill_after_seconds, 0.5)
+    while process.poll() is None and time.monotonic() < deadline:
+        time.sleep(0.2)
+
+    if process.poll() is not None:
+        return
+
+    try:
+        os.killpg(pgid, signal.SIGKILL)
+    except ProcessLookupError:
+        return
+
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        pass
+
+
+def _terminate_registered_child_processes(*, reason: str) -> None:
+    with _ACTIVE_CHILDREN_LOCK:
+        processes = list(_ACTIVE_CHILD_PROCESSES)
+    for process in processes:
+        _terminate_process_group(process, reason=reason)
+
+
+def _install_signal_handlers() -> None:
+    def _handle_signal(signum, _frame):
+        if _SHUTDOWN_EVENT.is_set():
+            return
+        _SHUTDOWN_EVENT.set()
+        print(f"[Segmentation] Received signal {signum}; stopping active child processes")
+        _terminate_registered_child_processes(reason=f"worker signal {signum}")
+
+    signal.signal(signal.SIGTERM, _handle_signal)
+    signal.signal(signal.SIGINT, _handle_signal)
+
+
+def _start_claim_heartbeat(queue_id: int, *, case_label: str) -> tuple[threading.Event, threading.Thread]:
+    stop_event = threading.Event()
+
+    def _heartbeat() -> None:
+        while not stop_event.wait(settings.SEGMENTATION_CLAIM_HEARTBEAT_SECONDS):
+            try:
+                if not touch_segmentation_queue_item_claim(queue_id):
+                    print(
+                        f"[Segmentation] Claim heartbeat lost for queue item {queue_id} ({case_label})"
+                    )
+                    return
+            except Exception as exc:
+                print(
+                    f"[Segmentation] Claim heartbeat error for queue item {queue_id} ({case_label}): {exc}"
+                )
+
+    thread = threading.Thread(
+        target=_heartbeat,
+        name=f"segmentation-heartbeat-{queue_id}",
+        daemon=True,
+    )
+    thread.start()
+    return stop_event, thread
 
 
 def enqueue_case_for_metrics(case_id, input_path):
@@ -651,80 +765,137 @@ def run_task(task_name, input_file, output_folder, extra_args=None, max_retries=
         # Console: show starting message
         print(f"[{task_name}] Starting...")
     
-    # Retry loop to handle transient race conditions on TotalSegmentator config.json
-    # We don't recreate the file as it contains important state (prediction_counter, license, etc.)
-    for attempt in range(max_retries):
-        try:
-            # Run with Popen to capture and filter output
-            process = subprocess.Popen(
-                cmd, 
-                stdout=subprocess.PIPE, 
-                stderr=subprocess.STDOUT,
-                text=True, 
-                bufsize=1  # Line-buffered output
-            )
-            
-            # Stream output line by line
-            output_lines = []
-            for line in process.stdout:
-                output_lines.append(line)
-                if log_handle:
-                    # Write to log file
-                    log_handle.write(line)
-                    log_handle.flush()
-                else:
-                    # Print to console
-                    print(line, end="")
-            
-            # Wait for process completion
-            process.wait()
-            if process.returncode != 0:
-                # Check if error is due to config.json race condition
-                full_output = ''.join(output_lines)
-                if 'JSONDecodeError' in full_output and 'config.json' in full_output and attempt < max_retries - 1:
-                    wait_time = (2 ** attempt) * 0.5  # 0.5s, 1s, 2s
-                    msg = f"[{task_name}] ⚠️  Config race condition detected. Retrying in {wait_time}s... (attempt {attempt + 1}/{max_retries})"
-                    if log_handle:
-                        log_handle.write(f"\n{msg}\n")
-                        log_handle.flush()
-                    print(msg)
-                    time.sleep(wait_time)  # Wait for other process to finish writing
-                    continue
-                else:
+    no_progress_timeout = max(1, settings.SEGMENTATION_NO_PROGRESS_TIMEOUT_SECONDS)
+
+    def _log_message(message: str) -> None:
+        if log_handle:
+            log_handle.write(message + "\n")
+            log_handle.flush()
+        print(message)
+
+    try:
+        # Retry loop to handle transient race conditions on TotalSegmentator config.json
+        # We don't recreate the file as it contains important state (prediction_counter, license, etc.)
+        for attempt in range(max_retries):
+            try:
+                output_lines: list[str] = []
+                process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    start_new_session=True,
+                )
+                _register_child_process(process)
+                progress_lock = threading.Lock()
+                last_stdout_progress = time.monotonic()
+                last_artifact_mtime = _latest_output_activity_timestamp(output_folder)
+                last_progress_at = time.monotonic()
+
+                def _stream_output() -> None:
+                    nonlocal last_stdout_progress, last_progress_at
+                    assert process.stdout is not None
+                    try:
+                        for line in process.stdout:
+                            output_lines.append(line)
+                            with progress_lock:
+                                last_stdout_progress = time.monotonic()
+                                last_progress_at = last_stdout_progress
+                            if log_handle:
+                                log_handle.write(line)
+                                log_handle.flush()
+                            else:
+                                print(line, end="")
+                    finally:
+                        process.stdout.close()
+
+                reader = threading.Thread(
+                    target=_stream_output,
+                    name=f"totalseg-output-{task_name}",
+                    daemon=True,
+                )
+                reader.start()
+
+                timed_out_message = None
+                try:
+                    while process.poll() is None:
+                        current_artifact_mtime = _latest_output_activity_timestamp(output_folder)
+                        with progress_lock:
+                            if current_artifact_mtime > last_artifact_mtime:
+                                last_artifact_mtime = current_artifact_mtime
+                                last_progress_at = time.monotonic()
+                            idle_seconds = time.monotonic() - max(last_progress_at, last_stdout_progress)
+
+                        if _SHUTDOWN_EVENT.wait(1.0):
+                            timed_out_message = (
+                                f"[{task_name}] Worker shutdown requested while task was still running"
+                            )
+                            _terminate_process_group(process, reason=timed_out_message)
+                            break
+
+                        if idle_seconds >= no_progress_timeout:
+                            timed_out_message = (
+                                f"[{task_name}] No stdout or artifact progress for "
+                                f"{no_progress_timeout}s; aborting task"
+                            )
+                            _log_message(timed_out_message)
+                            _terminate_process_group(process, reason=timed_out_message)
+                            break
+
+                    process.wait(timeout=5)
+                    reader.join(timeout=5)
+                finally:
+                    _unregister_child_process(process)
+
+                if timed_out_message is not None:
+                    raise TimeoutError(timed_out_message)
+
+                if process.returncode != 0:
+                    full_output = "".join(output_lines)
+                    if (
+                        "JSONDecodeError" in full_output
+                        and "config.json" in full_output
+                        and attempt < max_retries - 1
+                    ):
+                        wait_time = (2 ** attempt) * 0.5
+                        msg = (
+                            f"[{task_name}] Config race condition detected. Retrying in "
+                            f"{wait_time}s... (attempt {attempt + 1}/{max_retries})"
+                        )
+                        _log_message(msg)
+                        time.sleep(wait_time)
+                        continue
                     if log_handle:
                         log_handle.write(f"\nFailed with exit code: {process.returncode}\n")
-                        log_handle.close()
+                        log_handle.flush()
                     raise subprocess.CalledProcessError(process.returncode, cmd)
-            
-            # Success
-            if log_handle:
-                log_handle.write(f"\nFinished: {settings.local_timestamp()}\n")
-                log_handle.write(f"Exit code: 0\n")
-                log_handle.close()
-            else:
-                print(f"[{task_name}] Finished.")
-            return
-            
-        except subprocess.CalledProcessError:
-            if log_handle:
-                log_handle.close()
-            raise
-        except Exception as e:
-            if attempt < max_retries - 1:
-                msg = f"[{task_name}] Unexpected error: {e}. Retrying... (attempt {attempt + 1}/{max_retries})"
+
                 if log_handle:
-                    log_handle.write(f"\n{msg}\n")
+                    log_handle.write(f"\nFinished: {settings.local_timestamp()}\n")
+                    log_handle.write("Exit code: 0\n")
                     log_handle.flush()
-                print(msg)
-                time.sleep(2 ** attempt)
-            else:
-                if log_handle:
-                    log_handle.close()
+                else:
+                    print(f"[{task_name}] Finished.")
+                return
+            except subprocess.CalledProcessError:
                 raise
-    
-    # If we exhausted all retries
-    if log_handle:
-        log_handle.close()
+            except TimeoutError:
+                raise
+            except Exception as exc:
+                if attempt >= max_retries - 1:
+                    raise
+                msg = (
+                    f"[{task_name}] Unexpected error: {exc}. Retrying... "
+                    f"(attempt {attempt + 1}/{max_retries})"
+                )
+                _log_message(msg)
+                time.sleep(2 ** attempt)
+
+    finally:
+        if log_handle:
+            log_handle.close()
+
     raise RuntimeError(f"[{task_name}] Failed after {max_retries} attempts")
 
 
@@ -814,7 +985,10 @@ def segment_case(case_input):
             return False
     else:
         try:
-            nifti_path = claim_input_file(case_input)
+            if case_input.parent == SEGMENTATION_DIR and case_input.exists():
+                nifti_path = case_input
+            else:
+                nifti_path = claim_input_file(case_input)
         except FileNotFoundError:
             logger.print(f"Skipping case because input disappeared before claim: {case_input.name}")
             logger.close()
@@ -1072,22 +1246,37 @@ def main():
     Supports up to 3 simultaneous cases for optimal resource utilization.
     """
     print("Starting input/ directory monitoring...")
+    _install_signal_handlers()
     ensure_segmentation_queue_table()
-    recovered_claims = reset_claimed_segmentation_queue_items()
+    recovered_claims = recover_stale_claimed_segmentation_queue_items()
     if recovered_claims:
-        print(f"[Segmentation] Recovered {recovered_claims} orphaned claimed queue item(s)")
+        print(f"[Segmentation] Recovered {recovered_claims} stale claimed queue item(s)")
     
     max_cases = settings.MAX_PARALLEL_CASES  # Maximum concurrent cases from config
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_cases)
     
-    segmentation_files = set()  # Track files currently being processed
-    lock = threading.Lock()    # Thread-safe access to segmentation_files
+    active_futures: set[concurrent.futures.Future] = set()
+    lock = threading.Lock()
+
+    def _active_case_count() -> int:
+        with lock:
+            return len(active_futures)
+
+    def _submit_case(case_path: Path, *, queue_id: int | None = None) -> None:
+        if queue_id is None:
+            future = executor.submit(segment_case, case_path)
+        else:
+            future = executor.submit(_segment_case_with_heartbeat, case_path, queue_id)
+        with lock:
+            active_futures.add(future)
+        future.add_done_callback(
+            lambda fut, p=case_path, qid=queue_id: on_complete(fut, p, qid)
+        )
     
     def on_complete(fut, f_path, queue_id=None):
         """Callback when a case finishes segmentation."""
         with lock:
-            if f_path in segmentation_files:
-                segmentation_files.discard(f_path)
+            active_futures.discard(fut)
         try:
             ok = fut.result()  # Raise exception if case failed
             print(f"[Segmentation] {'Done' if ok else 'Failed'}: {f_path.name}")
@@ -1102,13 +1291,10 @@ def main():
             print(f"Error in case segmentation thread {f_path.name}: {e}")
 
     try:
-        while True:
+        while not _SHUTDOWN_EVENT.is_set():
             try:
                 # Priority path: consume explicit queue signals first.
-                while True:
-                    with lock:
-                        if len(segmentation_files) >= max_cases:
-                            break
+                while _active_case_count() < max_cases and not _SHUTDOWN_EVENT.is_set():
                     queue_item = claim_next_pending_segmentation_queue_item()
                     if not queue_item:
                         break
@@ -1117,46 +1303,43 @@ def main():
                     input_path = Path(input_path_str)
                     if not input_path.is_absolute():
                         input_path = INPUT_DIR / input_path.name
+                    if not input_path.exists() and not input_path.is_dir():
+                        claimed_input_path = SEGMENTATION_DIR / input_path.name
+                        if claimed_input_path.exists():
+                            input_path = claimed_input_path
 
                     if not input_path.exists():
                         mark_segmentation_queue_item_error(queue_id, f"Input file not found: {input_path}")
                         continue
 
-                    with lock:
-                        if input_path in segmentation_files:
-                            mark_segmentation_queue_item_error(queue_id, f"Input file already in segmentation set: {input_path.name}")
-                            continue
-                        print(f"[Segmentation] Claimed queue item: {input_path.name}")
-                        segmentation_files.add(input_path)
-                        future = executor.submit(segment_case, input_path)
-                        future.add_done_callback(lambda fut, p=input_path, qid=queue_id: on_complete(fut, p, qid))
+                    print(f"[Segmentation] Claimed queue item: {input_path.name}")
+                    _submit_case(input_path, queue_id=queue_id)
 
                 # List all NIfTI files in input directory
                 current_files = sorted(list(INPUT_DIR.glob("*.nii.gz")))
                 
                 for f in current_files:
-                    with lock:
-                        # If we're at max capacity, wait until next iteration
-                        if len(segmentation_files) >= max_cases:
-                            break
-                        
-                        # Skip if file is already being processed
-                        if f in segmentation_files:
-                            continue
+                    if _active_case_count() >= max_cases:
+                        break
 
-                        # Skip files that may still be mid-copy.
-                        if not is_file_stable(f):
-                            continue
+                    if not is_file_stable(f):
+                        continue
 
-                        # Skip files that already have a claimed twin in segmentation/.
-                        if (SEGMENTATION_DIR / f.name).exists():
-                            continue
-                            
-                        # Submit new case for segmentation
-                        print(f"[Segmentation] Claimed input file: {f.name}")
-                        segmentation_files.add(f)
-                        future = executor.submit(segment_case, f)
-                        future.add_done_callback(lambda fut, p=f: on_complete(fut, p, None))
+                    if (SEGMENTATION_DIR / f.name).exists():
+                        continue
+
+                    try:
+                        claimed_input = claim_input_file(f)
+                    except FileNotFoundError:
+                        continue
+                    except FileExistsError:
+                        continue
+                    except Exception as exc:
+                        print(f"[Segmentation] Failed to claim input file {f.name}: {exc}")
+                        continue
+
+                    print(f"[Segmentation] Claimed input file: {claimed_input.name}")
+                    _submit_case(claimed_input)
             
                 time.sleep(settings.SEGMENTATION_SCAN_INTERVAL)
                 
@@ -1166,8 +1349,20 @@ def main():
                 
     except KeyboardInterrupt:
         print("\nStopping monitoring...")
-        executor.shutdown(wait=False)
+        _SHUTDOWN_EVENT.set()
+    finally:
+        _terminate_registered_child_processes(reason="segmentation worker shutdown")
+        executor.shutdown(wait=False, cancel_futures=True)
         print("Executor shutdown complete.")
+
+
+def _segment_case_with_heartbeat(case_input: Path, queue_id: int) -> bool:
+    stop_event, heartbeat_thread = _start_claim_heartbeat(queue_id, case_label=case_input.name)
+    try:
+        return segment_case(case_input)
+    finally:
+        stop_event.set()
+        heartbeat_thread.join(timeout=5)
 
 if __name__ == "__main__":
     main()
