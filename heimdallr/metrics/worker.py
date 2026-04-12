@@ -8,7 +8,9 @@ import datetime
 import hashlib
 import importlib.util
 import json
+import os
 import re
+import signal
 import subprocess
 import threading
 import time
@@ -24,6 +26,9 @@ settings.configure_service_stdio()
 
 
 LOCAL_TZ = ZoneInfo(settings.TIMEZONE)
+_ACTIVE_CHILD_PROCESSES: set[subprocess.Popen[str]] = set()
+_ACTIVE_CHILDREN_LOCK = threading.Lock()
+_SHUTDOWN_EVENT = threading.Event()
 JOB_NAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 JOB_MODULE_PREFIX = "heimdallr.metrics.jobs."
 JOB_ALLOWED_MODULE_PREFIXES = (
@@ -74,10 +79,13 @@ def ensure_metrics_queue_table() -> None:
         conn.close()
 
 
-def reset_claimed_metrics_queue_items() -> int:
+def recover_stale_claimed_metrics_queue_items() -> int:
     conn = db_connect()
     try:
-        return store.reset_claimed_metrics_queue_items(conn)
+        return store.requeue_stale_claimed_metrics_items(
+            conn,
+            ttl_seconds=settings.METRICS_CLAIM_TTL_SECONDS,
+        )
     finally:
         conn.close()
 
@@ -86,6 +94,14 @@ def claim_next_pending_metrics_queue_item():
     conn = db_connect()
     try:
         return store.claim_next_pending_metrics_queue_item(conn)
+    finally:
+        conn.close()
+
+
+def touch_metrics_queue_item_claim(queue_id: int) -> bool:
+    conn = db_connect()
+    try:
+        return store.touch_metrics_queue_item_claim(conn, queue_id)
     finally:
         conn.close()
 
@@ -104,6 +120,89 @@ def mark_metrics_queue_item_error(queue_id: int, error_message) -> None:
         store.mark_metrics_queue_item_error(conn, queue_id, error_message)
     finally:
         conn.close()
+
+
+def _register_child_process(process: subprocess.Popen[str]) -> None:
+    with _ACTIVE_CHILDREN_LOCK:
+        _ACTIVE_CHILD_PROCESSES.add(process)
+
+
+def _unregister_child_process(process: subprocess.Popen[str]) -> None:
+    with _ACTIVE_CHILDREN_LOCK:
+        _ACTIVE_CHILD_PROCESSES.discard(process)
+
+
+def _terminate_process_group(process: subprocess.Popen[str], *, reason: str, kill_after_seconds: float = 5.0) -> None:
+    if process.poll() is not None:
+        return
+
+    try:
+        pgid = os.getpgid(process.pid)
+    except ProcessLookupError:
+        return
+
+    print(f"[Metrics] Terminating child process group {pgid}: {reason}")
+    try:
+        os.killpg(pgid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+
+    deadline = time.monotonic() + max(kill_after_seconds, 0.5)
+    while process.poll() is None and time.monotonic() < deadline:
+        time.sleep(0.2)
+
+    if process.poll() is not None:
+        return
+
+    try:
+        os.killpg(pgid, signal.SIGKILL)
+    except ProcessLookupError:
+        return
+
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        pass
+
+
+def _terminate_registered_child_processes(*, reason: str) -> None:
+    with _ACTIVE_CHILDREN_LOCK:
+        processes = list(_ACTIVE_CHILD_PROCESSES)
+    for process in processes:
+        _terminate_process_group(process, reason=reason)
+
+
+def _install_signal_handlers() -> None:
+    def _handle_signal(signum, _frame):
+        if _SHUTDOWN_EVENT.is_set():
+            return
+        _SHUTDOWN_EVENT.set()
+        print(f"[Metrics] Received signal {signum}; stopping active child processes")
+        _terminate_registered_child_processes(reason=f"worker signal {signum}")
+
+    signal.signal(signal.SIGTERM, _handle_signal)
+    signal.signal(signal.SIGINT, _handle_signal)
+
+
+def _start_claim_heartbeat(queue_id: int, *, case_label: str) -> tuple[threading.Event, threading.Thread]:
+    stop_event = threading.Event()
+
+    def _heartbeat() -> None:
+        while not stop_event.wait(settings.METRICS_CLAIM_HEARTBEAT_SECONDS):
+            try:
+                if not touch_metrics_queue_item_claim(queue_id):
+                    print(f"[Metrics] Claim heartbeat lost for queue item {queue_id} ({case_label})")
+                    return
+            except Exception as exc:
+                print(f"[Metrics] Claim heartbeat error for queue item {queue_id} ({case_label}): {exc}")
+
+    thread = threading.Thread(
+        target=_heartbeat,
+        name=f"metrics-heartbeat-{queue_id}",
+        daemon=True,
+    )
+    thread.start()
+    return stop_event, thread
 
 
 def load_metrics_pipeline_profile() -> tuple[str, dict]:
@@ -250,7 +349,18 @@ def _run_job(case_id: str, job: dict, log_dir: Path) -> dict:
         "--job-config-json",
         json.dumps(job),
     ]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+    )
+    _register_child_process(proc)
+    try:
+        stdout, stderr = proc.communicate()
+    finally:
+        _unregister_child_process(proc)
 
     job_log_path = log_dir / f"metrics_{job_name}.log"
     job_log_path.write_text(
@@ -259,10 +369,10 @@ def _run_job(case_id: str, job: dict, log_dir: Path) -> dict:
                 f"Command: {' '.join(cmd)}",
                 "",
                 "=== STDOUT ===",
-                proc.stdout.rstrip(),
+                stdout.rstrip(),
                 "",
                 "=== STDERR ===",
-                proc.stderr.rstrip(),
+                stderr.rstrip(),
                 "",
                 f"Exit code: {proc.returncode}",
             ]
@@ -271,7 +381,7 @@ def _run_job(case_id: str, job: dict, log_dir: Path) -> dict:
         encoding="utf-8",
     )
 
-    stdout = proc.stdout.strip()
+    stdout = stdout.strip()
     if not stdout:
         raise RuntimeError(f"Metrics job '{job_name}' produced no stdout")
 
@@ -660,17 +770,30 @@ def segment_case_metrics(case_input: Path) -> bool:
 
 def main() -> int:
     print("Starting metrics queue monitoring...")
+    _install_signal_handlers()
     ensure_metrics_queue_table()
-    recovered_claims = reset_claimed_metrics_queue_items()
+    recovered_claims = recover_stale_claimed_metrics_queue_items()
     if recovered_claims:
-        print(f"[Metrics] Recovered {recovered_claims} orphaned claimed queue item(s)")
+        print(f"[Metrics] Recovered {recovered_claims} stale claimed queue item(s)")
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-    segmentation_cases = set()
+    active_futures: set[concurrent.futures.Future] = set()
     lock = threading.Lock()
+
+    def _active_case_count() -> int:
+        with lock:
+            return len(active_futures)
+
+    def _submit_case(case_path: Path, *, queue_id: int) -> None:
+        future = executor.submit(_segment_case_metrics_with_heartbeat, case_path, queue_id)
+        with lock:
+            active_futures.add(future)
+        future.add_done_callback(
+            lambda fut, p=case_path, qid=queue_id: on_complete(fut, p, qid)
+        )
 
     def on_complete(fut, case_path: Path, queue_id: int | None = None):
         with lock:
-            segmentation_cases.discard(case_path)
+            active_futures.discard(fut)
         try:
             ok = fut.result()
             print(f"[Metrics] {'Done' if ok else 'Failed'}: {case_path.name}")
@@ -685,11 +808,9 @@ def main() -> int:
             print(f"Error in metrics thread {case_path.name}: {exc}")
 
     try:
-        while True:
+        while not _SHUTDOWN_EVENT.is_set():
             try:
-                with lock:
-                    busy = len(segmentation_cases) >= 1
-                if not busy:
+                if _active_case_count() < 1:
                     queue_item = claim_next_pending_metrics_queue_item()
                     if queue_item:
                         queue_id, _, input_path_str = queue_item
@@ -698,12 +819,7 @@ def main() -> int:
                             mark_metrics_queue_item_error(queue_id, f"Input path not found: {case_path}")
                         else:
                             print(f"[Metrics] Claimed queue item: {case_path.name}")
-                            with lock:
-                                segmentation_cases.add(case_path)
-                            future = executor.submit(segment_case_metrics, case_path)
-                            future.add_done_callback(
-                                lambda fut, p=case_path, qid=queue_id: on_complete(fut, p, qid)
-                            )
+                            _submit_case(case_path, queue_id=queue_id)
 
                 time.sleep(settings.METRICS_SCAN_INTERVAL)
             except Exception as exc:
@@ -711,5 +827,17 @@ def main() -> int:
                 time.sleep(settings.METRICS_SCAN_INTERVAL)
     except KeyboardInterrupt:
         print("\nStopping metrics monitoring...")
-        executor.shutdown(wait=False)
-        return 0
+        _SHUTDOWN_EVENT.set()
+    finally:
+        _terminate_registered_child_processes(reason="metrics worker shutdown")
+        executor.shutdown(wait=False, cancel_futures=True)
+    return 0
+
+
+def _segment_case_metrics_with_heartbeat(case_input: Path, queue_id: int) -> bool:
+    stop_event, heartbeat_thread = _start_claim_heartbeat(queue_id, case_label=case_input.name)
+    try:
+        return segment_case_metrics(case_input)
+    finally:
+        stop_event.set()
+        heartbeat_thread.join(timeout=5)
