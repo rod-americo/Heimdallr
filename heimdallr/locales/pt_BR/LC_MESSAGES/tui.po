@@ -24,8 +24,8 @@ msgstr "Intake · Preparo · Segmentação · Métricas"
 msgid "app.table.patient"
 msgstr "Paciente"
 
-msgid "app.table.origin"
-msgstr "Orig"
+msgid "app.table.accession"
+msgstr "AN"
 
 msgid "app.table.stage"
 msgstr "Etapa"
@@ -369,11 +369,20 @@ msgstr "Nenhuma condição de bloqueio detectada no snapshot atual."
 msgid "snapshot.case.signal.results_ready"
 msgstr "results.json pronto"
 
+msgid "snapshot.case.signal.results_ready_reused"
+msgstr "results.json pronto com segmentação reaproveitada"
+
 msgid "snapshot.case.signal.segmentation_metrics"
 msgstr "segmentação + métricas"
 
+msgid "snapshot.case.signal.segmentation_reused"
+msgstr "segmentação reaproveitada"
+
 msgid "snapshot.case.signal.metrics_running"
 msgstr "execução de métricas"
+
+msgid "snapshot.case.signal.metrics_running_reused"
+msgstr "métricas após segmentação reaproveitada"
 
 msgid "snapshot.case.signal.waiting_slot"
 msgstr "aguardando slot de segmentação"
@@ -383,6 +392,9 @@ msgstr "{count} séries prontas"
 
 msgid "snapshot.case.signal.awaiting_metadata"
 msgstr "aguardando metadados de intake"
+
+msgid "snapshot.case.elapsed.reused"
+msgstr "reuso ({value})"
 
 msgid "snapshot.case.unknown"
 msgstr "Desconhecido"

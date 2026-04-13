@@ -76,7 +76,7 @@ class HeimdallrDashboardApp(App[None]):
         table = self.query_one("#cases", DataTable)
         table.add_columns(
             tui("app.table.patient"),
-            tui("app.table.origin"),
+            tui("app.table.accession"),
             tui("app.table.stage"),
             tui("app.table.queue"),
             tui("app.table.prepare"),
@@ -262,7 +262,7 @@ class HeimdallrDashboardApp(App[None]):
             updated = case.updated_at.strftime("%d/%m %H:%M") if case.updated_at else "-"
             table.add_row(
                 case.patient_name,
-                case.origin or "-",
+                case.accession_number or "-",
                 case.stage_label,
                 case.queue_status,
                 case.prepare_elapsed,
