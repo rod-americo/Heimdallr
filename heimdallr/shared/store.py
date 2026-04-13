@@ -35,6 +35,7 @@ _DICOM_METADATA_COLUMNS = {
     "SegmentationSliceCount": "INTEGER",
     "SegmentationProfile": "TEXT",
     "SegmentationTasks": "TEXT",
+    "SegmentationElapsedTime": "TEXT",
     "SegmentationCompletedAt": "TIMESTAMP",
     "MetricsProfile": "TEXT",
     "MetricsCompletedAt": "TIMESTAMP",
@@ -1164,6 +1165,7 @@ def get_recorded_segmentation_signature(conn: sqlite3.Connection, study_uid: str
             SegmentationSliceCount,
             SegmentationProfile,
             SegmentationTasks,
+            SegmentationElapsedTime,
             SegmentationCompletedAt
         FROM dicom_metadata
         WHERE StudyInstanceUID = ?
@@ -1181,6 +1183,7 @@ def get_pipeline_completion_state(conn: sqlite3.Connection, study_uid: str) -> s
             SegmentationSliceCount,
             SegmentationProfile,
             SegmentationTasks,
+            SegmentationElapsedTime,
             SegmentationCompletedAt,
             MetricsProfile,
             MetricsCompletedAt,
@@ -1200,6 +1203,7 @@ def update_segmentation_signature(
     slice_count: int | None,
     profile_name: str,
     task_names: list[str],
+    elapsed_time: str | None = None,
 ) -> None:
     ensure_schema(conn)
     conn.execute(
@@ -1209,6 +1213,7 @@ def update_segmentation_signature(
             SegmentationSliceCount = ?,
             SegmentationProfile = ?,
             SegmentationTasks = ?,
+            SegmentationElapsedTime = ?,
             SegmentationCompletedAt = ?
         WHERE StudyInstanceUID = ?
         """,
@@ -1217,6 +1222,7 @@ def update_segmentation_signature(
             int(slice_count) if slice_count is not None else None,
             profile_name,
             json.dumps(task_names),
+            str(elapsed_time) if elapsed_time else None,
             _now_local_timestamp(),
             study_uid,
         ),

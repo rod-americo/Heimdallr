@@ -50,6 +50,7 @@ class TestPrepareDuplicateSkip(unittest.TestCase):
                     slice_count=476,
                     profile_name="ct_native_segmentation_only",
                     task_names=["total", "tissue_types"],
+                    elapsed_time="0:04:12",
                 )
                 store.update_metrics_completion(
                     conn,
@@ -101,6 +102,7 @@ class TestPrepareDuplicateSkip(unittest.TestCase):
         self.assertEqual(context["segmentation_profile"], "ct_native_segmentation_only")
         self.assertEqual(context["metrics_profile"], "ct_native_basic_metrics")
         self.assertEqual(context["selection_info"]["SelectedSeriesInstanceUID"], "1.2.3.4.5")
+        self.assertEqual(context["segmentation_original_elapsed_time"], "0:04:12")
 
     def test_skips_when_egress_is_incomplete(self):
         case_id = "AliceE_20260410_1"
@@ -131,6 +133,7 @@ class TestPrepareDuplicateSkip(unittest.TestCase):
                     slice_count=476,
                     profile_name="ct_native_segmentation_only",
                     task_names=["total", "tissue_types"],
+                    elapsed_time="0:04:12",
                 )
                 store.update_metrics_completion(
                     conn,
@@ -236,6 +239,7 @@ class TestPrepareDuplicateSkip(unittest.TestCase):
                     slice_count=476,
                     profile_name="ct_native_segmentation_only",
                     task_names=["total", "tissue_types"],
+                    elapsed_time="0:04:12",
                 )
                 store.enqueue_case_for_metrics(
                     conn,
@@ -319,6 +323,7 @@ class TestPrepareDuplicateSkip(unittest.TestCase):
                     slice_count=476,
                     profile_name="ct_native_segmentation_only",
                     task_names=["total", "tissue_types"],
+                    elapsed_time="0:04:12",
                 )
                 store.enqueue_case_for_metrics(
                     conn,
@@ -378,6 +383,56 @@ class TestPrepareDuplicateSkip(unittest.TestCase):
 
 
 class TestPrepareMetadataMerge(unittest.TestCase):
+    def test_build_prepare_output_payloads_carries_original_elapsed_for_duplicate_skip(self):
+        case_id = "AliceE_20260410_1"
+        study_uid = "1.2.3"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            metadata_dir = root / case_id / "metadata"
+            metadata_dir.mkdir(parents=True, exist_ok=True)
+
+            with patch.object(worker, "study_id_json", return_value=metadata_dir / "id.json"):
+                with patch.object(
+                    worker,
+                    "study_metadata_json",
+                    return_value=metadata_dir / "metadata.json",
+                ):
+                    output_meta, _ = worker._build_prepare_output_payloads(
+                        case_id=case_id,
+                        id_data={
+                            "StudyInstanceUID": study_uid,
+                            "CaseID": case_id,
+                            "AccessionNumber": "1",
+                        },
+                        metadata_data={
+                            "StudyInstanceUID": study_uid,
+                            "CaseID": case_id,
+                            "AccessionNumber": "1",
+                        },
+                        available_series=[{"SeriesNumber": "4"}],
+                        discarded_series=[],
+                        prepare_pipeline_updates={
+                            "prepare_start_time": "2026-04-11T11:45:47-03:00",
+                            "prepare_end_time": "2026-04-11T11:46:42-03:00",
+                            "prepare_elapsed_time": "0:00:55",
+                        },
+                        duplicate_skip_context={
+                            "selection_info": {"SelectedSeriesInstanceUID": "1.2.3.4"},
+                            "segmentation_profile": "ct_native_segmentation_only",
+                            "segmentation_tasks": [{"name": "total", "output_dir": "artifacts/total"}],
+                            "segmentation_skip_reason": "previous_pipeline_complete_signature_match",
+                            "segmentation_reuse_reason": "prepare_duplicate_complete",
+                            "segmentation_original_elapsed_time": "0:04:12",
+                            "metrics_profile": "ct_native_basic_metrics",
+                        },
+                        reference_dicom_context=None,
+                    )
+
+        self.assertEqual(
+            output_meta["Pipeline"]["segmentation_original_elapsed_time"],
+            "0:04:12",
+        )
+
     def test_build_prepare_output_payloads_preserves_downstream_pipeline_updates(self):
         case_id = "AliceE_20260410_1"
         study_uid = "1.2.3"

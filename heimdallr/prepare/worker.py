@@ -301,6 +301,10 @@ def _build_prepare_output_payloads(
             "reused_existing_outputs": True,
             "reuse_reason": duplicate_skip_context["segmentation_reuse_reason"],
         }
+        if duplicate_skip_context.get("segmentation_original_elapsed_time"):
+            pipeline_data["segmentation_original_elapsed_time"] = duplicate_skip_context[
+                "segmentation_original_elapsed_time"
+            ]
 
     output_meta["Pipeline"] = pipeline_data
     output_meta["AvailableSeries"] = available_series
@@ -429,6 +433,7 @@ def _completed_case_skip_context(case_id: str, id_data: dict) -> dict | None:
         "segmentation_profile": segmentation_profile,
         "segmentation_skip_reason": skip_reason,
         "segmentation_reuse_reason": reuse_reason,
+        "segmentation_original_elapsed_time": str(recorded["SegmentationElapsedTime"] or "") or None,
         "segmentation_tasks": [
             {
                 "name": task["name"],

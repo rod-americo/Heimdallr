@@ -87,10 +87,11 @@ class TestSegmentationReuse(unittest.TestCase):
                     slice_count=476,
                     profile_name="ct_native_segmentation_only",
                     task_names=["total", "tissue_types"],
+                    elapsed_time="0:03:21",
                 )
 
                 with patch("heimdallr.segmentation.worker.db_connect", return_value=conn):
-                    reused = should_reuse_existing_segmentation(
+                    reused, elapsed = should_reuse_existing_segmentation(
                         "1.2.3",
                         case_output,
                         {
@@ -107,6 +108,7 @@ class TestSegmentationReuse(unittest.TestCase):
                 conn.close()
 
         self.assertTrue(reused)
+        self.assertEqual(elapsed, "0:03:21")
 
     def test_does_not_reuse_when_slice_count_changes(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -140,10 +142,11 @@ class TestSegmentationReuse(unittest.TestCase):
                     slice_count=476,
                     profile_name="ct_native_segmentation_only",
                     task_names=["total", "tissue_types"],
+                    elapsed_time="0:03:21",
                 )
 
                 with patch("heimdallr.segmentation.worker.db_connect", return_value=conn):
-                    reused = should_reuse_existing_segmentation(
+                    reused, elapsed = should_reuse_existing_segmentation(
                         "1.2.3",
                         case_output,
                         {
@@ -160,6 +163,7 @@ class TestSegmentationReuse(unittest.TestCase):
                 conn.close()
 
         self.assertFalse(reused)
+        self.assertIsNone(elapsed)
 
     def test_does_not_reuse_when_existing_nifti_is_truncated(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -194,10 +198,11 @@ class TestSegmentationReuse(unittest.TestCase):
                     slice_count=476,
                     profile_name="ct_native_segmentation_only",
                     task_names=["total", "tissue_types"],
+                    elapsed_time="0:03:21",
                 )
 
                 with patch("heimdallr.segmentation.worker.db_connect", return_value=conn):
-                    reused = should_reuse_existing_segmentation(
+                    reused, elapsed = should_reuse_existing_segmentation(
                         "1.2.3",
                         case_output,
                         {
@@ -214,6 +219,7 @@ class TestSegmentationReuse(unittest.TestCase):
                 conn.close()
 
         self.assertFalse(reused)
+        self.assertIsNone(elapsed)
 
 
 if __name__ == "__main__":

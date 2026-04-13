@@ -372,17 +372,26 @@ msgstr "results.json ready"
 msgid "snapshot.case.signal.results_ready_reused"
 msgstr "results ready from reused segmentation"
 
+msgid "snapshot.case.signal.results_ready_prepare_duplicate"
+msgstr "results ready from prepare-level duplicate skip"
+
 msgid "snapshot.case.signal.segmentation_metrics"
 msgstr "segmentation + metrics"
 
 msgid "snapshot.case.signal.segmentation_reused"
 msgstr "reused segmentation outputs"
 
+msgid "snapshot.case.signal.prepare_duplicate_skipped"
+msgstr "duplicate skipped in prepare"
+
 msgid "snapshot.case.signal.metrics_running"
 msgstr "metrics running"
 
 msgid "snapshot.case.signal.metrics_running_reused"
 msgstr "metrics running after reused segmentation"
+
+msgid "snapshot.case.signal.metrics_running_prepare_duplicate"
+msgstr "metrics running after prepare-level duplicate skip"
 
 msgid "snapshot.case.signal.waiting_slot"
 msgstr "waiting for segmentation slot"
@@ -395,6 +404,9 @@ msgstr "awaiting intake metadata"
 
 msgid "snapshot.case.elapsed.reused"
 msgstr "reused ({value})"
+
+msgid "snapshot.case.elapsed.prepare_duplicate"
+msgstr "duplicate ({value})"
 
 msgid "snapshot.case.unknown"
 msgstr "Unknown"
