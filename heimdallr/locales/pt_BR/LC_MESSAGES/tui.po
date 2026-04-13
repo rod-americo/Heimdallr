@@ -372,17 +372,26 @@ msgstr "results.json pronto"
 msgid "snapshot.case.signal.results_ready_reused"
 msgstr "results.json pronto com segmentação reaproveitada"
 
+msgid "snapshot.case.signal.results_ready_prepare_duplicate"
+msgstr "results.json pronto com duplicata ignorada no preparo"
+
 msgid "snapshot.case.signal.segmentation_metrics"
 msgstr "segmentação + métricas"
 
 msgid "snapshot.case.signal.segmentation_reused"
 msgstr "segmentação reaproveitada"
 
+msgid "snapshot.case.signal.prepare_duplicate_skipped"
+msgstr "duplicata ignorada no preparo"
+
 msgid "snapshot.case.signal.metrics_running"
 msgstr "execução de métricas"
 
 msgid "snapshot.case.signal.metrics_running_reused"
 msgstr "métricas após segmentação reaproveitada"
+
+msgid "snapshot.case.signal.metrics_running_prepare_duplicate"
+msgstr "métricas após duplicata ignorada no preparo"
 
 msgid "snapshot.case.signal.waiting_slot"
 msgstr "aguardando slot de segmentação"
@@ -395,6 +404,9 @@ msgstr "aguardando metadados de intake"
 
 msgid "snapshot.case.elapsed.reused"
 msgstr "reuso ({value})"
+
+msgid "snapshot.case.elapsed.prepare_duplicate"
+msgstr "duplicata ({value})"
 
 msgid "snapshot.case.unknown"
 msgstr "Desconhecido"

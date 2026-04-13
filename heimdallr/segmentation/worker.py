@@ -690,9 +690,9 @@ def should_reuse_existing_segmentation(
     selection_info: dict | None,
     profile_name: str,
     tasks: list[dict],
-) -> bool:
+) -> tuple[bool, str | None]:
     if not study_uid or not selection_info:
-        return False
+        return False, None
 
     selected_series_uid = selection_info.get("SelectedSeriesInstanceUID")
     selected_slice_count = _safe_int(selection_info.get("SliceCount"), -1)
@@ -705,22 +705,25 @@ def should_reuse_existing_segmentation(
         conn.close()
 
     if not row or not row["SegmentationCompletedAt"]:
-        return False
+        return False, None
     if row["SegmentationSeriesInstanceUID"] != selected_series_uid:
-        return False
+        return False, None
     if _safe_int(row["SegmentationSliceCount"], -1) != selected_slice_count:
-        return False
+        return False, None
     if row["SegmentationProfile"] != profile_name:
-        return False
+        return False, None
 
     try:
         recorded_tasks = json.loads(row["SegmentationTasks"] or "[]")
     except Exception:
         recorded_tasks = []
     if recorded_tasks != planned_task_names:
-        return False
+        return False, None
 
-    return _segmentation_outputs_exist(case_output, tasks)
+    outputs_exist = _segmentation_outputs_exist(case_output, tasks)
+    if not outputs_exist:
+        return False, None
+    return True, str(row["SegmentationElapsedTime"] or "") or None
 
 def run_task(task_name, input_file, output_folder, extra_args=None, max_retries=3, log_file=None):
     """
@@ -1037,7 +1040,14 @@ def segment_case(case_input):
             )
         profile_name, planned_tasks = resolve_segmentation_plan(modality, selected_phase)
         seg_start_time = time.time()
-        if should_reuse_existing_segmentation(study_uid, case_output, selection_info, profile_name, planned_tasks):
+        should_reuse, recorded_elapsed_time = should_reuse_existing_segmentation(
+            study_uid,
+            case_output,
+            selection_info,
+            profile_name,
+            planned_tasks,
+        )
+        if should_reuse:
             segmentation_info = {
                 "profile": profile_name,
                 "tasks": [
@@ -1052,6 +1062,8 @@ def segment_case(case_input):
                 "reused_existing_outputs": True,
                 "reuse_reason": "sqlite_signature_match",
             }
+            if recorded_elapsed_time:
+                segmentation_info["original_elapsed_time"] = recorded_elapsed_time
             seg_elapsed = time.time() - seg_start_time
             logger.print("[Segmentation] Reusing existing outputs for identical selected series signature")
             logger.print(f"[Segmentation] ✓ Complete ({seg_elapsed:.1f}s)")
@@ -1078,6 +1090,7 @@ def segment_case(case_input):
                         slice_count=_safe_int(selection_info.get("SliceCount"), 0),
                         profile_name=segmentation_info["profile"],
                         task_names=[task["name"] for task in segmentation_info["tasks"]],
+                        elapsed_time=str(datetime.timedelta(seconds=round(seg_elapsed, 6))),
                     )
                 finally:
                     conn.close()
@@ -1138,6 +1151,11 @@ def segment_case(case_input):
                         )
 
                 pipeline_data["segmentation_pipeline"] = segmentation_info
+                original_elapsed_time = segmentation_info.get("original_elapsed_time")
+                if segmentation_info.get("reused_existing_outputs") and original_elapsed_time:
+                    pipeline_data["segmentation_original_elapsed_time"] = str(original_elapsed_time)
+                elif not segmentation_info.get("reused_existing_outputs"):
+                    pipeline_data["segmentation_original_elapsed_time"] = elapsed_str
 
                 meta["Pipeline"] = pipeline_data
                 with open(id_json_path, "w") as f:

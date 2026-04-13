@@ -56,11 +56,13 @@ class TestTuiSnapshot(unittest.TestCase):
                         "StudyDate": "20260413",
                         "Pipeline": {
                             "segmentation_elapsed_time": "0:00:08.000000",
+                            "segmentation_original_elapsed_time": "0:03:21",
                             "metrics_start_time": "2026-04-13T12:07:40-03:00",
                             "metrics_end_time": "2026-04-13T12:07:57-03:00",
                             "metrics_elapsed_time": "0:00:17.000000",
                             "segmentation_pipeline": {
                                 "reused_existing_outputs": True,
+                                "reuse_reason": "sqlite_signature_match",
                             },
                         },
                         "AvailableSeries": [{}],
@@ -88,8 +90,67 @@ class TestTuiSnapshot(unittest.TestCase):
 
             case = next(item for item in snapshot.cases if item.case_id == "ReuseCase_20260413_1")
             self.assertEqual(case.stage_key, "processed")
-            self.assertEqual(case.segmentation_elapsed, "reuso (0:00:08)")
+            self.assertEqual(case.segmentation_elapsed, "reuso (0:03:21)")
             self.assertEqual(case.signal, "results.json pronto com segmentação reaproveitada")
+
+    def test_build_snapshot_marks_prepare_duplicate_skip_separately(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            runtime = base / "runtime"
+            uploads = runtime / "intake" / "uploads"
+            uploads_failed = runtime / "intake" / "uploads_failed"
+            dicom_incoming = runtime / "intake" / "dicom" / "incoming"
+            dicom_failed = runtime / "intake" / "dicom" / "failed"
+            pending = runtime / "queue" / "pending"
+            active = runtime / "queue" / "active"
+            failed = runtime / "queue" / "failed"
+            studies = runtime / "studies"
+            for path in (uploads, uploads_failed, dicom_incoming, dicom_failed, pending, active, failed, studies):
+                path.mkdir(parents=True, exist_ok=True)
+
+            case_dir = studies / "DupCase_20260413_1"
+            (case_dir / "metadata").mkdir(parents=True, exist_ok=True)
+            (case_dir / "metadata" / "id.json").write_text(
+                json.dumps(
+                    {
+                        "CaseID": "DupCase_20260413_1",
+                        "PatientName": "Dup Example",
+                        "AccessionNumber": "456",
+                        "Modality": "CT",
+                        "StudyDate": "20260413",
+                        "Pipeline": {
+                            "segmentation_elapsed_time": "0:00:05.000000",
+                            "segmentation_original_elapsed_time": "0:04:12",
+                            "segmentation_pipeline": {
+                                "reused_existing_outputs": True,
+                                "reuse_reason": "prepare_duplicate_complete",
+                            },
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (case_dir / "metadata" / "resultados.json").write_text("{}", encoding="utf-8")
+
+            snapshot = build_snapshot(
+                layout=RuntimeLayout(
+                    runtime_dir=runtime,
+                    intake_dir=runtime / "intake",
+                    uploads_dir=uploads,
+                    uploads_failed_dir=uploads_failed,
+                    dicom_incoming_dir=dicom_incoming,
+                    dicom_failed_dir=dicom_failed,
+                    pending_dir=pending,
+                    active_dir=active,
+                    failed_dir=failed,
+                    studies_dir=studies,
+                ),
+                db_path=base / "missing.db",
+            )
+
+            case = next(item for item in snapshot.cases if item.case_id == "DupCase_20260413_1")
+            self.assertEqual(case.segmentation_elapsed, "duplicata (0:04:12)")
+            self.assertEqual(case.signal, "results.json pronto com duplicata ignorada no preparo")
 
     def test_build_snapshot_classifies_pipeline_state(self):
         with tempfile.TemporaryDirectory() as tmp:
