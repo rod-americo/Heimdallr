@@ -102,7 +102,7 @@ class TestPrepareDuplicateSkip(unittest.TestCase):
         self.assertEqual(context["metrics_profile"], "ct_native_basic_metrics")
         self.assertEqual(context["selection_info"]["SelectedSeriesInstanceUID"], "1.2.3.4.5")
 
-    def test_does_not_skip_when_egress_is_incomplete(self):
+    def test_skips_when_egress_is_incomplete(self):
         case_id = "AliceE_20260410_1"
         study_uid = "1.2.3"
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -197,7 +197,15 @@ class TestPrepareDuplicateSkip(unittest.TestCase):
             finally:
                 conn.close()
 
-        self.assertIsNone(context)
+        self.assertIsNotNone(context)
+        self.assertEqual(
+            context["segmentation_skip_reason"],
+            "matching_segmentation_egress_error_signature_match",
+        )
+        self.assertEqual(
+            context["segmentation_reuse_reason"],
+            "prepare_duplicate_egress_error",
+        )
 
     def test_accepts_legacy_completed_case_without_metrics_timestamp(self):
         case_id = "AliceE_20260410_1"
@@ -281,6 +289,92 @@ class TestPrepareDuplicateSkip(unittest.TestCase):
                 conn.close()
 
         self.assertIsNotNone(context)
+
+    def test_skips_when_matching_metrics_is_already_in_progress(self):
+        case_id = "AliceE_20260410_1"
+        study_uid = "1.2.3"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            self._build_completed_case(root, case_id)
+
+            conn = sqlite3.connect(":memory:")
+            conn.row_factory = sqlite3.Row
+            try:
+                store.ensure_schema(conn)
+                store.upsert_study_metadata(
+                    conn,
+                    {
+                        "StudyInstanceUID": study_uid,
+                        "PatientName": "Alice Example",
+                        "ClinicalName": case_id,
+                        "AccessionNumber": "1",
+                        "StudyDate": "20260410",
+                        "Modality": "CT",
+                    },
+                )
+                store.update_segmentation_signature(
+                    conn,
+                    study_uid,
+                    series_instance_uid="1.2.3.4.5",
+                    slice_count=476,
+                    profile_name="ct_native_segmentation_only",
+                    task_names=["total", "tissue_types"],
+                )
+                store.enqueue_case_for_metrics(
+                    conn,
+                    case_id,
+                    str(root / "studies" / case_id),
+                )
+
+                with patch.object(worker.settings, "STUDIES_DIR", root / "studies"):
+                    with patch.object(worker, "db_connect", return_value=conn):
+                        with patch.object(
+                            worker,
+                            "_select_prepared_series_for_duplicate_check",
+                            return_value=(
+                                root / "studies" / case_id / "derived" / "series" / "selected.nii.gz",
+                                {
+                                    "SelectedSeriesInstanceUID": "1.2.3.4.5",
+                                    "SelectedPhase": "native",
+                                    "SliceCount": 476,
+                                },
+                            ),
+                        ):
+                            with patch.object(
+                                worker,
+                                "_resolve_segmentation_plan_for_duplicate_check",
+                                return_value=(
+                                    "ct_native_segmentation_only",
+                                    [
+                                        {"name": "total", "output_dir": "artifacts/total"},
+                                        {"name": "tissue_types", "output_dir": "artifacts/tissue_types"},
+                                    ],
+                                ),
+                            ):
+                                with patch.object(
+                                    worker,
+                                    "_load_metrics_pipeline_profile_for_duplicate_check",
+                                    return_value=("ct_native_basic_metrics", {}),
+                                ):
+                                    context = worker._completed_case_skip_context(
+                                        case_id,
+                                        {
+                                            "StudyInstanceUID": study_uid,
+                                            "Modality": "CT",
+                                        },
+                                    )
+            finally:
+                conn.close()
+
+        self.assertIsNotNone(context)
+        self.assertEqual(
+            context["segmentation_skip_reason"],
+            "matching_segmentation_metrics_in_progress_signature_match",
+        )
+        self.assertEqual(
+            context["segmentation_reuse_reason"],
+            "prepare_duplicate_metrics_in_progress",
+        )
 
 
 class TestPrepareMetadataMerge(unittest.TestCase):
