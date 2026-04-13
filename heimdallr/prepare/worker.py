@@ -292,14 +292,14 @@ def _build_prepare_output_payloads(
     if duplicate_skip_context:
         pipeline_data["series_selection"] = duplicate_skip_context["selection_info"]
         pipeline_data["segmentation_skipped"] = True
-        pipeline_data["segmentation_skip_reason"] = "previous_pipeline_complete_signature_match"
+        pipeline_data["segmentation_skip_reason"] = duplicate_skip_context["segmentation_skip_reason"]
         pipeline_data["segmentation_skip_time"] = prepare_pipeline_updates["prepare_end_time"]
         pipeline_data["metrics_profile"] = duplicate_skip_context["metrics_profile"]
         pipeline_data["segmentation_pipeline"] = {
             "profile": duplicate_skip_context["segmentation_profile"],
             "tasks": duplicate_skip_context["segmentation_tasks"],
             "reused_existing_outputs": True,
-            "reuse_reason": "prepare_duplicate_complete",
+            "reuse_reason": duplicate_skip_context["segmentation_reuse_reason"],
         }
 
     output_meta["Pipeline"] = pipeline_data
@@ -370,8 +370,13 @@ def _completed_case_skip_context(case_id: str, id_data: dict) -> dict | None:
             return None
         if bool(recorded["ArtifactsPurged"]):
             return None
+        metrics_statuses = store.get_case_metrics_queue_statuses(conn, case_id)
+        egress_statuses = store.get_case_dicom_egress_statuses(conn, case_id)
         metrics_completed = bool(recorded["MetricsCompletedAt"])
-        if not metrics_completed:
+        metrics_has_active_or_done_queue = bool(
+            metrics_statuses.intersection({"pending", "claimed", "done"})
+        )
+        if not metrics_completed and not metrics_has_active_or_done_queue:
             if not study_results_json(case_id).exists():
                 return None
             if store.case_has_incomplete_metrics(conn, case_id):
@@ -396,19 +401,34 @@ def _completed_case_skip_context(case_id: str, id_data: dict) -> dict | None:
         planned_task_names = [task["name"] for task in segmentation_tasks]
         if recorded_tasks != planned_task_names:
             return None
-        if store.case_has_incomplete_dicom_egress(conn, case_id):
-            return None
     finally:
         conn.close()
 
-    if not study_results_json(case_id).exists():
+    if not study_results_json(case_id).exists() and not metrics_has_active_or_done_queue:
         return None
     if not _segmentation_outputs_exist_for_duplicate_check(study_dir(case_id), segmentation_tasks):
         return None
 
+    skip_reason = "previous_pipeline_complete_signature_match"
+    reuse_reason = "prepare_duplicate_complete"
+    if metrics_statuses.intersection({"pending", "claimed"}):
+        skip_reason = "matching_segmentation_metrics_in_progress_signature_match"
+        reuse_reason = "prepare_duplicate_metrics_in_progress"
+    elif egress_statuses.intersection({"pending", "claimed"}):
+        skip_reason = "matching_segmentation_egress_in_progress_signature_match"
+        reuse_reason = "prepare_duplicate_egress_in_progress"
+    elif egress_statuses.intersection({"error"}):
+        skip_reason = "matching_segmentation_egress_error_signature_match"
+        reuse_reason = "prepare_duplicate_egress_error"
+    elif metrics_statuses.intersection({"done"}) or metrics_completed:
+        skip_reason = "matching_segmentation_metrics_done_signature_match"
+        reuse_reason = "prepare_duplicate_metrics_done"
+
     return {
         "selection_info": selection_info,
         "segmentation_profile": segmentation_profile,
+        "segmentation_skip_reason": skip_reason,
+        "segmentation_reuse_reason": reuse_reason,
         "segmentation_tasks": [
             {
                 "name": task["name"],
