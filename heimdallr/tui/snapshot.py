@@ -181,6 +181,7 @@ def build_snapshot(
                 "segmentation_elapsed": study.get("segmentation_elapsed") or case["segmentation_elapsed"],
                 "metrics_elapsed": study.get("metrics_elapsed") or case["metrics_elapsed"],
                 "total_elapsed": study.get("total_elapsed") or case["total_elapsed"],
+                "segmentation_reused": study.get("segmentation_reused", case["segmentation_reused"]),
                 "selected_series": study.get("selected_series", case["selected_series"]),
                 "discarded_series": study.get("discarded_series", case["discarded_series"]),
                 "path": study.get("path") or case["path"],
@@ -601,7 +602,7 @@ def _finalize_case(case: dict[str, Any]) -> CaseOverview:
         signal=signal,
         updated_at=updated_at,
         prepare_elapsed=_display_duration(case["prepare_elapsed"]),
-        segmentation_elapsed=_display_duration(case["segmentation_elapsed"]),
+        segmentation_elapsed=_display_segmentation_elapsed(case),
         metrics_elapsed=_display_duration(case["metrics_elapsed"]),
         total_elapsed=_display_duration(case["total_elapsed"] or case["segmentation_elapsed"] or case["prepare_elapsed"]),
         selected_series=case["selected_series"],
@@ -635,6 +636,12 @@ def _derive_stage_key(case: dict[str, Any]) -> str:
 def _derive_case_signal(case: dict[str, Any], stage_key: str) -> str:
     if case["error"]:
         return _truncate(case["error"], 52)
+    if case["segmentation_reused"]:
+        if stage_key == "processed":
+            return tui("snapshot.case.signal.results_ready_reused")
+        if stage_key == "metrics":
+            return tui("snapshot.case.signal.metrics_running_reused")
+        return tui("snapshot.case.signal.segmentation_reused")
     if stage_key == "processed":
         return tui("snapshot.case.signal.results_ready")
     if stage_key == "metrics":
@@ -673,6 +680,7 @@ def _empty_case(case_id: str) -> dict[str, Any]:
         "total_elapsed": "",
         "metrics_started": False,
         "metrics_finished": False,
+        "segmentation_reused": False,
         "selected_series": 0,
         "discarded_series": 0,
         "path": None,
@@ -757,6 +765,11 @@ def _load_studies(studies_dir: Path, now: datetime) -> dict[str, dict[str, Any]]
         payload = _read_json(id_json_path)
         case_id = payload.get("CaseID") or study_dir.name
         pipeline = payload.get("Pipeline", {})
+        segmentation_pipeline = pipeline.get("segmentation_pipeline", {})
+        segmentation_reused = (
+            isinstance(segmentation_pipeline, dict)
+            and bool(segmentation_pipeline.get("reused_existing_outputs"))
+        )
         studies[case_id] = {
             "patient_name": _display_patient_name(payload.get("PatientName", "")),
             "origin": _normalize_case_origin(pipeline.get("prepare_input_origin", "")),
@@ -793,6 +806,7 @@ def _load_studies(studies_dir: Path, now: datetime) -> dict[str, dict[str, Any]]
             ),
             "metrics_started": bool(pipeline.get("metrics_start_time")),
             "metrics_finished": bool(pipeline.get("metrics_end_time")),
+            "segmentation_reused": segmentation_reused,
             "selected_series": len(payload.get("AvailableSeries", [])),
             "discarded_series": len(payload.get("DiscardedSeries", [])),
             "updated_at": _latest_mtime([id_json_path, results_path if results_path.exists() else None, log_error if log_error.exists() else None]),
@@ -1009,6 +1023,13 @@ def _display_duration(value: str | None) -> str:
     hours, remainder = divmod(total, 3600)
     minutes, seconds = divmod(remainder, 60)
     return f"{hours}:{minutes:02d}:{seconds:02d}"
+
+
+def _display_segmentation_elapsed(case: dict[str, Any]) -> str:
+    rendered = _display_duration(case["segmentation_elapsed"])
+    if not case["segmentation_reused"]:
+        return rendered
+    return tui("snapshot.case.elapsed.reused", value=rendered)
 
 
 def _safe_mean(values: list[float]) -> float | None:
