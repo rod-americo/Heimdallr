@@ -1,8 +1,14 @@
 # Heimdallr
 
-**Open-source radiological image MLOps infrastructure — intake, segmentation, quantitative analysis, and DICOM artifact delivery**
+**Open-source radiological image MLOps infrastructure for DICOM intake, deterministic preparation, TotalSegmentator orchestration, quantitative analysis, and outbound artifact delivery**
 
-Heimdallr is a production-oriented radiology pipeline that connects DICOM intake, study preparation, TotalSegmentator-backed segmentation, deterministic quantitative analysis, and outbound DICOM artifact delivery into a single modular Python package. The architecture is cloud-native (12-Factor), with zero `.env` files and configuration driven entirely by `HEIMDALLR_*` environment variables and JSON profiles.
+Heimdallr is a production-oriented radiology pipeline packaged as a single Python application stack. It receives DICOM studies, stages them for preparation, converts selected series to NIfTI, runs TotalSegmentator-backed segmentation, computes deterministic quantitative outputs, persists metadata/results in SQLite, and optionally dispatches outbound DICOM artifacts and webhook events to external systems.
+
+The project follows a cloud-native / 12-Factor style:
+- zero `.env` files
+- a single `.venv` runtime
+- host-injected `HEIMDALLR_*` environment variables
+- host-local operational JSON under `config/`
 
 > **Scope boundary** — Heimdallr handles the open-source imaging infrastructure only. Proprietary clinical support, LLM-assisted reporting, and intelligence layers belong to the companion **Asha** repository.
 
@@ -12,173 +18,133 @@ Heimdallr is a production-oriented radiology pipeline that connects DICOM intake
 PACS / Modality
       │ DICOM C-STORE
       ▼
-heimdallr.intake          ← DICOM listener (SCP)
+heimdallr.intake                 ← DICOM listener (SCP)
       │ ZIP + manifest
       ▼
-runtime/intake/uploads/   ← staging spool
-      │ prepare watchdog
+runtime/intake/uploads/from_prepare/   ← listener handoff spool (priority FIFO)
+runtime/intake/uploads/external/       ← external ZIP spool (secondary FIFO)
+      │
       ▼
-heimdallr.prepare         ← series enumeration, phase detection, DICOM → NIfTI
-      │ selected series
+heimdallr.prepare                ← ZIP unpack, metadata extraction,
+      │                             DICOM → NIfTI, phase detection
+      ├──────────────► heimdallr.integration_dispatcher
+      │               patient-identified outbound webhooks
+      │
       ▼
 runtime/queue/pending/
-      │ claimed
+      │
       ▼
-heimdallr.segmentation      ← TotalSegmentator segmentation (parallel tasks)
-      │ masks
+heimdallr.segmentation           ← TotalSegmentator orchestration
+      │ masks / segmentation artifacts
       ▼
-heimdallr.metrics         ← deterministic derived measurements (job-based)
-      │ results + DICOM artifacts
-      ▼
-heimdallr.integration_dispatcher ← outbound patient/event webhooks
-      │ queued HTTP deliveries
-      ▼
-heimdallr.dicom_egress   ← outbound C-STORE delivery worker
-      │ queued deliveries
+heimdallr.metrics                ← deterministic derived measurements
+      ├──────────────► heimdallr.dicom_egress
+      │               outbound C-STORE delivery
+      │
       ▼
 runtime/studies/<case_id>/ + database/dicom.db
+      ▲
+      │
+heimdallr.space_manager          ← runtime/studies retention / purge guard
 ```
 
 ## Current Capabilities
 
-1. **Ingestion** — DICOM C-STORE listener that groups instances by study, applies idle timeout, and hands off completed studies as ZIP payloads (local spool or HTTP upload).
+1. **Ingestion**
+   - DICOM C-STORE listener (`heimdallr.intake`)
+   - study grouping by `StudyInstanceUID`
+   - idle-time handoff as ZIP
+   - local spool or HTTP upload handoff modes
 
-2. **Preparation** — Watchdog-based worker that unpacks uploads, enumerates series, detects contrast phase via TotalSegmentator, converts DICOM to NIfTI with `dcm2niix`, records patient identity, and queues the prepared study for downstream segmentation and optional external integrations.
+2. **Preparation**
+   - watchdog-based ZIP consumer (`heimdallr.prepare`)
+   - dual-source upload spool:
+     - `runtime/intake/uploads/from_prepare/`
+     - `runtime/intake/uploads/external/`
+   - FIFO within each source, with `from_prepare` prioritized over `external`
+   - DICOM metadata extraction, patient normalization, phase detection, DICOM → NIfTI conversion
+   - emission of outbound `patient_identified` integration events
 
-3. **Segmentation** — Profile-driven TotalSegmentator execution with retry logic, support for licensed tasks (`tissue_types`), and parallel task scheduling.
+3. **Segmentation**
+   - profile-driven TotalSegmentator execution (`heimdallr.segmentation`)
+   - support for licensed tasks such as `tissue_types`
+   - configurable task-level parallelism
+   - duplicate-skip reuse when the same selected series and slice count were already segmented successfully
 
-4. **Quantitative Metrics** — Job-based post-segmentation engine with the following modules:
-   - `l3_muscle_area` — L3-level skeletal muscle area and sarcopenia metrics
-   - `parenchymal_organ_volumetry` — Organ volumetry and derived overlays
-   - `bone_health_l1_hu` — L1 trabecular HU-based BMD estimation
+4. **Quantitative Metrics**
+   - job-based post-segmentation engine (`heimdallr.metrics`)
+   - dynamic job resolution from the metrics pipeline config
+   - current production-facing jobs:
+     - `l3_muscle_area`
+     - `parenchymal_organ_volumetry`
+     - `bone_health_l1_hu`
 
-5. **DICOM Egress** — Queue-driven outbound C-STORE worker that delivers generated DICOM artifacts such as Secondary Capture overlays to fixed remote SCP destinations.
+5. **DICOM Egress**
+   - queue-driven outbound C-STORE worker (`heimdallr.dicom_egress`)
+   - per-destination retries and error isolation
+   - JPEG Lossless fallback support for peers that require compressed Secondary Capture
 
-6. **Integration Dispatch** — Queue-driven outbound webhook dispatcher that emits patient-identified events to one or more external applications after `prepare` resolves the study identity.
+6. **Integration Dispatch**
+   - queue-driven outbound webhook/event dispatcher (`heimdallr.integration_dispatcher`)
+   - async delivery after `prepare`
+   - retry/backoff and multi-destination support
 
-7. **Space Manager** — Resident storage guard that monitors the filesystem hosting `runtime/studies/` and purges the oldest completed case directories when disk usage reaches a configurable host-local threshold.
+7. **Space Manager**
+   - resident storage guard (`heimdallr.space_manager`)
+   - monitors the filesystem that hosts `runtime/studies/`
+   - purges oldest completed studies when a host-local disk usage threshold is exceeded
 
-8. **Control Plane** — FastAPI application serving the web dashboard, upload endpoint, patient/results API, and deterministic PDF export of case outputs.
+8. **Control Plane**
+   - FastAPI application serving dashboard, upload ingress, patient/results API, artifact download, and deterministic PDF export
 
-9. **Operations TUI** — Textual-based terminal dashboard with live process monitoring, queue inspection, and study browsing.
+9. **Operations TUI**
+   - Textual dashboard with live service radar, queue pressure, case spotlight, and upload-origin markers (`P` / `E`)
 
 ## Repository Layout
 
-```
+This tree reflects the maintained, versioned structure of the repository.
+
+```text
 Heimdallr/
-├── heimdallr/                    # Main Python package
-│   ├── control_plane/            # FastAPI control plane + patient/report views
-│   │   ├── routers/              #   dashboard, upload, patients
-│   │   ├── app.py                #   ASGI application factory
-│   │   ├── case_pdf_report.py    #   Per-case PDF report builder
-│   │   └── patient_service.py    #   SQLite-backed patient queries
-│   ├── intake/                   # DICOM C-STORE listener + study handoff
-│   │   └── gateway.py            #   HeimdallrDicomListener SCP
-│   ├── prepare/                  # Study preparation worker
-│   │   └── worker.py             #   ZIP unpack, phase detect, NIfTI convert
-│   ├── segmentation/             # TotalSegmentator orchestration worker
-│   │   └── worker.py
-│   ├── metrics/                  # Post-segmentation metrics engine
-│   │   ├── analysis/             #   Pure post-segmentation analysis helpers
-│   │   ├── jobs/                 #   Production measurement modules
-│   │   │   └── tests/            #   Prototype and validation helpers
-│   │   └── worker.py             #   Queue-driven job dispatcher
-│   ├── integration_dispatcher/   # Outbound HTTP webhook/event dispatcher
-│   │   ├── config.py             #   Destination config loader
-│   │   ├── events.py             #   Event payload builders
-│   │   ├── outbox.py             #   Delivery persistence helpers
-│   │   └── worker.py             #   Queue-driven dispatcher
-│   ├── dicom_egress/             # Outbound DICOM artifact delivery worker
-│   │   ├── config.py             #   Destination config loader
-│   │   └── worker.py             #   Queue-driven C-STORE SCU dispatcher
-│   ├── space_manager/            # Runtime storage reclamation worker
-│   │   └── worker.py
-│   ├── shared/                   # Cross-cutting settings, IO, DB, i18n, schemas
-│   │   ├── settings.py           #   Centralized runtime settings
-│   │   ├── store.py              #   Operational SQLite store
-│   │   ├── sqlite.py             #   SQLite connection helpers
-│   │   ├── db.py                 #   FastAPI database dependency
-│   │   ├── paths.py              #   Canonical study path helpers
-│   │   ├── spool.py              #   Atomic file write utilities
-│   │   ├── i18n.py               #   gettext bootstrap
-│   │   ├── patient_names.py      #   Patient name formatting helpers
-│   │   ├── dependencies.py       #   FastAPI dependency wiring
-│   │   └── schemas/              #   Shared Pydantic models
-│   ├── tui/                      # Textual operations dashboard
-│   │   ├── app.py                #   TUI application
-│   │   ├── i18n.py               #   TUI translation helpers
-│   │   ├── snapshot.py           #   Runtime state snapshot collector
-│   │   └── dashboard.tcss        #   Textual stylesheet
-│   ├── locales/                  # gettext catalogs for artifacts and TUI
-│   │   ├── en_US/LC_MESSAGES/
-│   │   └── pt_BR/LC_MESSAGES/
-│   └── deid_gateway.py           # OCR-based pixel/text de-identification
-├── config/                       # Versioned JSON templates and defaults
-│   ├── intake_pipeline.json      #   Listener and prepare watchdog tuning
-│   ├── series_selection.json     #   Series selection strategy
-│   ├── segmentation_pipeline.example.json
-│   ├── metrics_pipeline.example.json
-│   ├── space_manager.example.json
-│   ├── integration_dispatch.example.json
-│   ├── dicom_egress.example.json
-│   └── presentation.example.json
-├── database/                     # Schema/docs; SQLite DB is created locally here
-│   ├── schema.sql
-│   └── README.md
-├── bin/                          # Bundled platform binaries and notices
-│   ├── README.md
+├── heimdallr/                      # Main Python package
+│   ├── control_plane/              # FastAPI API, dashboard, upload ingress, PDF export
+│   ├── intake/                     # DICOM SCP listener and study handoff
+│   ├── prepare/                    # ZIP watchdog, metadata extraction, DICOM→NIfTI
+│   ├── segmentation/               # TotalSegmentator orchestration
+│   ├── metrics/                    # Deterministic post-segmentation jobs
+│   │   ├── analysis/               #   Shared analysis helpers
+│   │   └── jobs/                   #   Production jobs + experimental jobs/tests
+│   ├── integration_dispatcher/     # Outbound webhook/event delivery worker
+│   ├── dicom_egress/               # Outbound DICOM C-STORE worker
+│   ├── space_manager/              # Disk-usage guard for runtime/studies
+│   ├── shared/                     # Settings, SQLite store, paths, i18n, schemas
+│   ├── tui/                        # Textual operations dashboard
+│   ├── locales/                    # gettext catalogs (`artifacts`, `tui`)
+│   └── deid_gateway.py             # OCR-based de-identification helper
+├── config/                         # Versioned defaults + host-local example JSON
+│   ├── intake_pipeline.json        #   versioned listener/prepare defaults
+│   ├── series_selection.json       #   versioned series selection rules
+│   └── *.example.json              #   host-local operational config templates
+├── database/                       # SQLite schema and documentation
+├── bin/                            # Bundled runtime binaries and notices
 │   ├── darwin-arm64/dcm2niix
-│   ├── linux-amd64/
-│   │   ├── dcm2niix
-│   │   ├── dcmcjpeg
-│   │   ├── lib/
-│   │   └── share/
+│   ├── linux-amd64/dcm2niix
+│   ├── linux-amd64/dcmcjpeg*       #   plus shared libraries and dictionaries
 │   └── licenses/
-├── scripts/                      # Operational and retroactive utilities
-│   ├── retroactive_recalculate_metrics.py
-│   ├── consolidate_metrics_csv.py
-│   ├── extract_prometheus_bmd.py
-│   ├── update_kvp_retroactive.py
-│   ├── bmd_roi_comparison_preview.py
-│   ├── retroactive_emphysema.py
-│   └── watch_heimdallr.py
-├── static/                       # Dashboard frontend assets
-│   ├── index.html
-│   ├── styles.css
-│   ├── css/components.css
-│   ├── branding/                 # Reusable logo and watermark PNG assets
-│   └── js/
-│       ├── app.js
-│       ├── api.js
-│       ├── state.js
-│       ├── utils.js
-│       └── components/
-├── tests/                        # Unit and integration tests
-├── runtime/                      # Transient runtime data (gitignored)
-│   ├── intake/
-│   │   ├── dicom/{incoming,failed,state}/
-│   │   ├── uploads/{external,from_prepare}/
-│   │   └── uploads_failed/
+├── scripts/                        # Retroactive and operational utilities
+├── static/                         # Dashboard frontend assets and branding
+├── tests/                          # Unit and integration coverage
+├── runtime/                        # Generated runtime data (gitignored)
+│   ├── intake/uploads/{from_prepare,external}/
 │   ├── queue/{pending,active,failed}/
-│   └── studies/<case_id>/{artifacts,derived,logs,metadata}/
-├── docs/                         # Extended documentation
-│   ├── API.md
-│   ├── ARCHITECTURE.md
-│   ├── branding/README.md        # Brandbook summary + imported asset index
-│   ├── OPERATIONS.md
-│   └── validation-stage-manual.md
-├── .github/                      # Community standards and CI
-│   ├── SECURITY.md
-│   ├── CONTRIBUTING.md
-│   ├── CODEOWNERS
-│   ├── PULL_REQUEST_TEMPLATE.md
-│   ├── ISSUE_TEMPLATE/bug_report.md
-│   └── workflows/ci.yml
-├── requirements.txt              # Unified dependency manifest
-├── pyproject.toml                # Build system and package metadata
-├── AGENTS.md                     # AI agent operating guidelines
-├── LICENSE.md                    # Apache License 2.0
-└── NOTICE.md                     # Third-party attribution
+│   └── studies/<case_id>/
+├── docs/                           # Architecture, API, operations, branding notes
+├── .github/                        # Community standards and CI
+├── requirements.txt                # Unified single-venv dependency manifest
+├── pyproject.toml                  # Packaging metadata
+├── AGENTS.md                       # Repo-specific agent instructions
+├── LICENSE.md
+└── NOTICE.md
 ```
 
 ## Quick Start
@@ -187,11 +153,12 @@ Heimdallr/
 
 | Requirement | Notes |
 |---|---|
-| Python `≥ 3.10` | Package requires `zoneinfo`, `tomllib` |
-| `dcm2niix` | Bundled in `bin/` or system PATH |
-| `dcmcjpeg` | Optional; bundled in `bin/` or system PATH for JPEG Lossless peers |
-| NVIDIA GPU | Recommended for TotalSegmentator |
-| TotalSegmentator license | Required for `tissue_types` task; registered in `.venv` |
+| Python `3.12` | `pyproject.toml` currently requires `>=3.12,<3.13` |
+| Single `.venv` | All services should run from the same interpreter |
+| `dcm2niix` | Bundled in `bin/` or resolvable from `PATH` |
+| `dcmcjpeg` | Optional; used for JPEG Lossless fallback during DICOM egress |
+| NVIDIA GPU | Optional but recommended for TotalSegmentator |
+| TotalSegmentator license | Required for licensed tasks such as `tissue_types` |
 
 ### Install
 
@@ -201,12 +168,15 @@ cd Heimdallr
 
 python3.12 -m venv .venv
 source .venv/bin/activate
+python -m pip install --upgrade pip
 pip install -r requirements.txt
-
-The unified runtime targets Python 3.12. The `dicom2nifti` fallback does not
-require a standalone binary in `bin/`; native JPEG/J2K support is provided by
-the `python-gdcm` wheel installed inside `.venv`.
 ```
+
+The runtime is single-venv. There is no longer a supported split between a
+"light" service venv and a separate TotalSegmentator venv.
+
+`dicom2nifti` fallback support comes from the `python-gdcm` wheel installed in
+the same `.venv`; no additional standalone helper is required for that path.
 
 For licensed TotalSegmentator tasks, register the license in the same venv:
 
@@ -226,7 +196,7 @@ JPEG Group."
 
 ### Run
 
-Start the baseline services in separate terminals:
+Start the services in separate terminals or service units:
 
 ```bash
 # 1) Control Plane — API + dashboard (default :8001)
@@ -257,6 +227,19 @@ Start the baseline services in separate terminals:
 .venv/bin/python -m heimdallr.tui
 ```
 
+The minimum processing stack for a headless host is usually:
+- `heimdallr.intake`
+- `heimdallr.prepare`
+- `heimdallr.segmentation`
+- `heimdallr.metrics`
+- `heimdallr.dicom_egress`
+
+Add these when needed:
+- `heimdallr.integration_dispatcher`
+- `heimdallr.space_manager`
+- `heimdallr.control_plane`
+- `heimdallr.tui`
+
 ### Access
 
 | Endpoint | URL |
@@ -272,7 +255,7 @@ Start the baseline services in separate terminals:
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/upload` | Accept a `.zip` study payload |
+| `POST` | `/upload` | Accept a `.zip` study payload into the external spool |
 | `GET` | `/` | Dashboard shell |
 | `GET` | `/api/tools/uploader` | Download the CLI uploader script |
 
@@ -280,7 +263,7 @@ Start the baseline services in separate terminals:
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/api/patients` | List all processed patients |
+| `GET` | `/api/patients` | List processed patients/cases |
 | `GET` | `/api/patients/{case_id}/results` | Case calculation results |
 | `GET` | `/api/patients/{case_id}/metadata` | DICOM and pipeline metadata |
 | `GET` | `/api/patients/{case_id}/nifti` | Download canonical NIfTI |
@@ -293,14 +276,48 @@ Start the baseline services in separate terminals:
 
 ## Configuration
 
-All settings are read from environment variables (`HEIMDALLR_*`) or JSON profiles under `config/`. There are **no `.env` files** — values are injected by the host system, `launchd`, `systemd`, or Docker.
+All settings are read from `HEIMDALLR_*` environment variables or JSON profiles
+under `config/`. There are **no `.env` files**. Sensitive or host-specific
+values are injected by the host system, `launchd`, `systemd`, `skuld`, or
+containers.
 
-Key environment variables:
+### Versioned Configuration
+
+These files are part of the repository contract:
+- `config/intake_pipeline.json`
+- `config/series_selection.json`
+
+### Host-Local Operational Configuration
+
+These files are expected to vary per host and are ignored by Git:
+- `config/segmentation_pipeline.json`
+- `config/metrics_pipeline.json`
+- `config/integration_dispatch.json`
+- `config/space_manager.json`
+- `config/dicom_egress.json`
+- `config/presentation.json`
+
+Create them from the example templates:
+
+```bash
+cp config/segmentation_pipeline.example.json config/segmentation_pipeline.json
+cp config/metrics_pipeline.example.json config/metrics_pipeline.json
+cp config/integration_dispatch.example.json config/integration_dispatch.json
+cp config/space_manager.example.json config/space_manager.json
+cp config/dicom_egress.example.json config/dicom_egress.json
+cp config/presentation.example.json config/presentation.json
+```
+
+### Key Environment Variables
 
 | Variable | Default | Description |
 |---|---|---|
 | `HEIMDALLR_SERVER_PORT` | `8001` | Control plane HTTP port |
 | `HEIMDALLR_DICOM_PORT` | `11114` | DICOM listener port |
+| `HEIMDALLR_INTAKE_PIPELINE_CONFIG` | `config/intake_pipeline.json` | Intake/prepare watchdog config |
+| `HEIMDALLR_SEGMENTATION_PIPELINE_CONFIG` | `config/segmentation_pipeline.json` | Segmentation profile config |
+| `HEIMDALLR_SERIES_SELECTION_CONFIG` | `config/series_selection.json` | Series selection rules |
+| `HEIMDALLR_METRICS_PIPELINE_CONFIG` | `config/metrics_pipeline.json` | Metrics profile config |
 | `HEIMDALLR_INTEGRATION_DISPATCH_CONFIG` | `config/integration_dispatch.json` | Outbound webhook/event config |
 | `HEIMDALLR_DICOM_EGRESS_CONFIG` | `config/dicom_egress.json` | Outbound DICOM destination config |
 | `HEIMDALLR_PRESENTATION_CONFIG` | `config/presentation.json` | Patient name and locale presentation config |
@@ -309,28 +326,12 @@ Key environment variables:
 | `HEIMDALLR_TIMEZONE` | `America/Sao_Paulo` | Operational timezone |
 | `HEIMDALLR_MAX_PARALLEL_CASES` | `3` | Concurrent segmentation slots |
 | `HEIMDALLR_DICOM_HANDOFF_MODE` | `local_prepare` | `local_prepare` or `http_upload` |
-| `HEIMDALLR_METRICS_MODULES` | *(see settings.py)* | Comma-separated enabled metrics |
-| `TOTALSEGMENTATOR_LICENSE` | — | TotalSegmentator license key |
+| `HEIMDALLR_DCM2NIIX_BIN` | auto | Override bundled/system `dcm2niix` |
+| `HEIMDALLR_DCMCJPEG_BIN` | auto | Override bundled/system `dcmcjpeg` |
+| `TOTALSEGMENTATOR_LICENSE` | — | Optional direct license injection |
 
-Before enabling segmentation, metrics, outbound delivery, or customized display/locale on a host, create the local config files from the versioned examples:
-
-```bash
-cp config/segmentation_pipeline.example.json config/segmentation_pipeline.json
-cp config/metrics_pipeline.example.json config/metrics_pipeline.json
-cp config/space_manager.example.json config/space_manager.json
-cp config/dicom_egress.example.json config/dicom_egress.json
-cp config/presentation.example.json config/presentation.json
-```
-
-These five JSON files are treated as host-local operational config and are ignored by Git:
-
-- `config/segmentation_pipeline.json`
-- `config/metrics_pipeline.json`
-- `config/space_manager.json`
-- `config/dicom_egress.json`
-- `config/presentation.json`
-
-See [`heimdallr/shared/settings.py`](heimdallr/shared/settings.py) for the complete reference.
+See [`heimdallr/shared/settings.py`](heimdallr/shared/settings.py) for the
+complete reference.
 
 ## Operational Scripts
 
@@ -341,6 +342,7 @@ See [`heimdallr/shared/settings.py`](heimdallr/shared/settings.py) for the compl
 | `scripts/extract_prometheus_bmd.py` | Extract BMD values for Prometheus ingestion |
 | `scripts/update_kvp_retroactive.py` | Backfill kVp values from DICOM metadata |
 | `scripts/bmd_roi_comparison_preview.py` | Visual preview of BMD ROI placement |
+| `scripts/retroactive_emphysema.py` | Retroactive emphysema calculations |
 | `scripts/watch_heimdallr.py` | Filesystem watcher for auto-upload from drop folder |
 
 Experimental metrics jobs are not part of the default profile. Keep them under
@@ -356,6 +358,7 @@ Experimental metrics jobs are not part of the default profile. Keep them under
 | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) | Operations runbook |
 | [`docs/validation-stage-manual.md`](docs/validation-stage-manual.md) | Validation stage manual |
 | [`database/README.md`](database/README.md) | Database schema documentation |
+| [`docs/branding/README.md`](docs/branding/README.md) | Brand asset inventory |
 
 ## Governance
 
@@ -371,4 +374,7 @@ Experimental metrics jobs are not part of the default profile. Keep them under
 
 Heimdallr is distributed under the [Apache License 2.0](LICENSE.md).
 
-Third-party components carry additional licensing requirements. In particular, **TotalSegmentator** requires a valid license for commercial use. Review [`NOTICE.md`](NOTICE.md) for the complete attribution list before production deployment.
+Third-party components carry additional licensing requirements. In particular,
+**TotalSegmentator** requires a valid license for commercial use. Review
+[`NOTICE.md`](NOTICE.md) for the complete attribution list before production
+deployment.
