@@ -1370,6 +1370,32 @@ def case_has_incomplete_metrics(conn: sqlite3.Connection, case_id: str) -> bool:
     return row is not None
 
 
+def get_case_metrics_queue_statuses(conn: sqlite3.Connection, case_id: str) -> set[str]:
+    ensure_schema(conn)
+    rows = conn.execute(
+        """
+        SELECT DISTINCT status
+        FROM metrics_queue
+        WHERE case_id = ?
+        """,
+        (case_id,),
+    ).fetchall()
+    return {str(row[0]) for row in rows if row and row[0]}
+
+
+def get_case_dicom_egress_statuses(conn: sqlite3.Connection, case_id: str) -> set[str]:
+    ensure_schema(conn)
+    rows = conn.execute(
+        """
+        SELECT DISTINCT status
+        FROM dicom_egress_queue
+        WHERE case_id = ?
+        """,
+        (case_id,),
+    ).fetchall()
+    return {str(row[0]) for row in rows if row and row[0]}
+
+
 def purge_case_records(conn: sqlite3.Connection, case_id: str) -> str | None:
     """Delete queue rows and mark the metadata row as purged for a case."""
     ensure_schema(conn)
