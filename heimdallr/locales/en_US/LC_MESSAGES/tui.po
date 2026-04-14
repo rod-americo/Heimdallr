@@ -282,6 +282,12 @@ msgstr "{count} uploads currently claimed"
 msgid "snapshot.intake.note.active_dicom"
 msgstr "{count} active DICOM landing items"
 
+msgid "snapshot.intake.note.idle_window"
+msgstr "handoff after {idle} without new images"
+
+msgid "snapshot.intake.note.awaiting_idle_window"
+msgstr "estimated quiet-window remaining: {remaining}"
+
 msgid "snapshot.intake.note.failures_retained"
 msgstr "{count} intake failures retained"
 

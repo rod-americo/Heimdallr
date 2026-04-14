@@ -1,6 +1,6 @@
 {
   "dicom_listener": {
-    "idle_seconds": 10,
+    "idle_seconds": 600,
     "scan_seconds": 5
   },
   "prepare_watchdog": {
