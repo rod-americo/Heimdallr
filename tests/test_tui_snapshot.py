@@ -9,10 +9,20 @@ from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 from heimdallr.shared import settings
-from heimdallr.tui.snapshot import RuntimeLayout, _derive_stage_key, build_snapshot
+from heimdallr.tui.snapshot import (
+    RuntimeLayout,
+    _derive_stage_key,
+    _format_process_elapsed,
+    build_snapshot,
+)
 
 
 class TestTuiSnapshot(unittest.TestCase):
+    def test_format_process_elapsed_shortens_ps_etime(self):
+        self.assertEqual(_format_process_elapsed("1-21:10:49"), "1d 21:10")
+        self.assertEqual(_format_process_elapsed("17:52:00"), "17:52")
+        self.assertEqual(_format_process_elapsed("05:09"), "0:05")
+
     def test_derive_stage_key_prefers_active_segmentation_over_stale_metrics_error(self):
         stage = _derive_stage_key(
             {
