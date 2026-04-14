@@ -506,5 +506,52 @@ class TestPrepareMetadataMerge(unittest.TestCase):
         self.assertEqual(output_metadata["ReferenceDicom"]["SeriesInstanceUID"], "1.2.3.4")
 
 
+class TestPrepareManifestSuppression(unittest.TestCase):
+    def test_should_skip_duplicate_prepare_manifest_for_ready_case(self):
+        case_id = "AliceE_20260410_1"
+        study_uid = "1.2.3"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            metadata_dir = root / "studies" / case_id / "metadata"
+            metadata_dir.mkdir(parents=True, exist_ok=True)
+            (metadata_dir / "id.json").write_text(
+                json.dumps({"StudyInstanceUID": study_uid}),
+                encoding="utf-8",
+            )
+
+            conn = sqlite3.connect(":memory:")
+            conn.row_factory = sqlite3.Row
+            try:
+                store.ensure_schema(conn)
+                store.register_study_handoff(
+                    conn,
+                    study_uid=study_uid,
+                    manifest_digest="digest-1",
+                    instance_count=100,
+                    calling_aet="SRC",
+                    remote_ip="10.0.0.1",
+                )
+                store.update_study_handoff_state(
+                    conn,
+                    study_uid=study_uid,
+                    manifest_digest="digest-1",
+                    case_id=case_id,
+                    status="prepared",
+                    last_error=None,
+                )
+
+                with patch.object(worker.settings, "STUDIES_DIR", root / "studies"):
+                    with patch.object(worker, "db_connect", return_value=conn):
+                        suppressed = worker._should_skip_duplicate_prepare_manifest(
+                            study_uid=study_uid,
+                            manifest_digest="digest-1",
+                            case_id=case_id,
+                        )
+            finally:
+                conn.close()
+
+        self.assertTrue(suppressed)
+
+
 if __name__ == "__main__":
     unittest.main()

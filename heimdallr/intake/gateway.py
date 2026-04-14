@@ -52,6 +52,7 @@ from pynetdicom.sop_class import Verification
 
 from heimdallr.shared import settings, store
 from heimdallr.shared.spool import atomic_write_bytes
+from heimdallr.shared.study_manifest import build_study_manifest_digest
 from heimdallr.shared.sqlite import connect as db_connect
 
 settings.configure_service_stdio()
@@ -177,11 +178,17 @@ def write_instance(ds: Dataset, out_dir: Path) -> Path:
     return out_path
 
 
-def build_intake_manifest(study: StudyState, *, handoff_ts: float) -> dict:
+def build_intake_manifest(
+    study: StudyState,
+    *,
+    handoff_ts: float,
+    manifest_digest: str | None = None,
+) -> dict:
     """Build a transport manifest for prepare to persist intake timings."""
     receive_elapsed_seconds = max(0.0, study.last_update_ts - study.first_update_ts)
     return {
         "study_uid": study.study_uid,
+        "manifest_digest": str(manifest_digest or "").strip() or None,
         "first_instance_time": isoformat_local(study.first_update_ts),
         "last_instance_time": isoformat_local(study.last_update_ts),
         "receive_elapsed_seconds": round(receive_elapsed_seconds, 3),
@@ -420,7 +427,17 @@ class HeimdallrDicomListener:
             st.locked = True
             try:
                 handoff_ts = now()
-                intake_manifest = build_intake_manifest(st, handoff_ts=handoff_ts)
+                manifest_digest = build_study_manifest_digest(
+                    st.path,
+                    study_uid=st.study_uid,
+                    calling_aet=st.calling_aet,
+                    instance_count=st.instance_count,
+                )
+                intake_manifest = build_intake_manifest(
+                    st,
+                    handoff_ts=handoff_ts,
+                    manifest_digest=manifest_digest,
+                )
                 # Create ZIP archive
                 zip_bytes = zip_study(st.path, intake_manifest=intake_manifest)
 
@@ -431,6 +448,26 @@ class HeimdallrDicomListener:
                 for attempt in range(1, self.upload_retries + 1):
                     try:
                         if self.handoff_mode == "local_prepare":
+                            conn = db_connect()
+                            try:
+                                should_handoff, existing = store.register_study_handoff(
+                                    conn,
+                                    study_uid=st.study_uid,
+                                    manifest_digest=manifest_digest,
+                                    instance_count=st.instance_count,
+                                    calling_aet=st.calling_aet,
+                                    remote_ip=st.remote_ip,
+                                )
+                            finally:
+                                conn.close()
+                            if not should_handoff:
+                                existing_status = str(existing["status"] or "") if existing else "prepared"
+                                print(
+                                    f"↺ Study {study_uid} duplicate suppressed before prepare "
+                                    f"(status={existing_status})"
+                                )
+                                ok = True
+                                break
                             staged_name = f"study_{settings.local_timestamp('%Y%m%d%H%M%S')}_{study_uid}.zip"
                             staged_zip = self.upload_staging_dir / staged_name
                             atomic_write_bytes(staged_zip, zip_bytes)

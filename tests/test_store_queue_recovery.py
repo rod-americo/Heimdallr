@@ -14,6 +14,82 @@ def _connect_row_db(path: Path) -> sqlite3.Connection:
 
 
 class TestStoreQueueRecovery(unittest.TestCase):
+    def test_register_study_handoff_suppresses_prepared_duplicate(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "dicom.db"
+            conn = _connect_row_db(db_path)
+            store.ensure_schema(conn)
+
+            accepted, row = store.register_study_handoff(
+                conn,
+                study_uid="1.2.3",
+                manifest_digest="abc",
+                instance_count=100,
+                calling_aet="SRC",
+                remote_ip="10.0.0.1",
+            )
+            self.assertTrue(accepted)
+            self.assertEqual(row["status"], "pending_prepare")
+
+            store.update_study_handoff_state(
+                conn,
+                study_uid="1.2.3",
+                manifest_digest="abc",
+                case_id="CaseA",
+                status="prepared",
+                last_error=None,
+            )
+
+            accepted, row = store.register_study_handoff(
+                conn,
+                study_uid="1.2.3",
+                manifest_digest="abc",
+                instance_count=100,
+                calling_aet="SRC",
+                remote_ip="10.0.0.1",
+            )
+            self.assertFalse(accepted)
+            self.assertEqual(row["status"], "prepared")
+            self.assertEqual(row["duplicate_count"], 1)
+            conn.close()
+
+    def test_register_study_handoff_allows_retry_after_error(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "dicom.db"
+            conn = _connect_row_db(db_path)
+            store.ensure_schema(conn)
+
+            store.register_study_handoff(
+                conn,
+                study_uid="1.2.3",
+                manifest_digest="abc",
+                instance_count=100,
+                calling_aet="SRC",
+                remote_ip="10.0.0.1",
+            )
+            store.update_study_handoff_state(
+                conn,
+                study_uid="1.2.3",
+                manifest_digest="abc",
+                case_id="CaseA",
+                status="error",
+                last_error="prepare failed",
+            )
+
+            accepted, row = store.register_study_handoff(
+                conn,
+                study_uid="1.2.3",
+                manifest_digest="abc",
+                instance_count=101,
+                calling_aet="SRC",
+                remote_ip="10.0.0.1",
+            )
+            self.assertTrue(accepted)
+            self.assertEqual(row["status"], "pending_prepare")
+            self.assertEqual(row["instance_count"], 101)
+            self.assertIsNone(row["last_error"])
+            conn.close()
+
     def test_enqueue_segmentation_case_preserves_fresh_claimed_row(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "dicom.db"

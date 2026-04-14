@@ -53,6 +53,7 @@ from heimdallr.shared.paths import (
     study_results_json,
 )
 from heimdallr.shared.spool import CLAIM_SUFFIX, claim_path, unclaim_path
+from heimdallr.shared.study_manifest import build_study_manifest_digest
 from heimdallr.shared.sqlite import connect as db_connect
 
 settings.configure_service_stdio()
@@ -254,6 +255,60 @@ def _read_study_json_if_matching(path: Path, study_uid: str) -> dict:
     if str(payload.get("StudyInstanceUID", "") or "") != str(study_uid or ""):
         return {}
     return payload
+
+
+def _delete_spooled_zip(zip_path: Path) -> None:
+    if not zip_path.exists():
+        return
+    try:
+        zip_path.unlink()
+        print(f"  Deleted input ZIP: {zip_path}")
+    except Exception as exc:
+        print(f"  Warning: Could not delete input ZIP: {exc}")
+
+
+def _extract_manifest_fingerprint(intake_manifest: dict) -> tuple[str, str]:
+    study_uid = str(intake_manifest.get("study_uid", "") or "").strip()
+    manifest_digest = str(intake_manifest.get("manifest_digest", "") or "").strip()
+    return study_uid, manifest_digest
+
+
+def _load_intake_manifest_from_zip(zip_path: Path) -> dict:
+    try:
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            try:
+                with zf.open(INTAKE_MANIFEST_NAME, "r") as manifest_file:
+                    payload = json.load(manifest_file)
+            except KeyError:
+                return {}
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _existing_case_ready_for_duplicate_prepare(case_id: str, study_uid: str) -> bool:
+    return bool(_read_study_json_if_matching(study_id_json(case_id), study_uid))
+
+
+def _should_skip_duplicate_prepare_manifest(
+    *,
+    study_uid: str,
+    manifest_digest: str,
+    case_id: str,
+) -> bool:
+    if not study_uid or not manifest_digest:
+        return False
+    conn = db_connect()
+    try:
+        existing_handoff = store.get_study_handoff_state(conn, study_uid, manifest_digest)
+        if not existing_handoff:
+            return False
+        if not store.is_suppressed_study_handoff_status(existing_handoff["status"]):
+            return False
+        existing_case_id = str(existing_handoff["case_id"] or case_id or "").strip() or case_id
+        return _existing_case_ready_for_duplicate_prepare(existing_case_id, study_uid)
+    finally:
+        conn.close()
 
 
 def _build_prepare_output_payloads(
@@ -912,10 +967,47 @@ def process_zip(zip_path):
             f"[Prepare] Case {clinical_name}: modality={exam_modality}, "
             f"series={prepare_stats['series_kept_for_conversion']}"
         )
-        
+
         # Override CaseID with ClinicalName
         case_id = clinical_name
-        
+        study_uid = str(global_meta.get("StudyInstanceUID", "") or "").strip()
+        manifest_study_uid, manifest_digest = _extract_manifest_fingerprint(intake_manifest)
+        if not manifest_study_uid:
+            manifest_study_uid = study_uid
+        if not manifest_digest and manifest_study_uid:
+            manifest_digest = build_study_manifest_digest(
+                extract_dir,
+                study_uid=manifest_study_uid,
+                calling_aet=str(intake_manifest.get("calling_aet", "") or "").strip() or None,
+                instance_count=_safe_int(intake_manifest.get("instance_count"), 0),
+                ignored_names={INTAKE_MANIFEST_NAME},
+            )
+            intake_manifest["manifest_digest"] = manifest_digest
+        if manifest_study_uid and manifest_digest:
+            if _should_skip_duplicate_prepare_manifest(
+                study_uid=manifest_study_uid,
+                manifest_digest=manifest_digest,
+                case_id=case_id,
+            ):
+                print(
+                    f"[Prepare] Duplicate manifest suppressed for {case_id}; "
+                    "existing prepared study already available"
+                )
+                _delete_spooled_zip(zip_path)
+                return
+            conn = db_connect()
+            try:
+                store.update_study_handoff_state(
+                    conn,
+                    study_uid=manifest_study_uid,
+                    manifest_digest=manifest_digest,
+                    case_id=case_id,
+                    status="preparing",
+                    last_error=None,
+                )
+            finally:
+                conn.close()
+
         case_output_dir = study_artifacts_dir(case_id)
         case_output_dir.mkdir(parents=True, exist_ok=True)
         study_metadata_dir(case_id).mkdir(parents=True, exist_ok=True)
@@ -1211,6 +1303,20 @@ def process_zip(zip_path):
                 print(f"\n  Ready: {study_dir(case_id)}")
                 print(str(study_dir(case_id)))
 
+            if manifest_study_uid and manifest_digest:
+                conn = db_connect()
+                try:
+                    store.update_study_handoff_state(
+                        conn,
+                        study_uid=manifest_study_uid,
+                        manifest_digest=manifest_digest,
+                        case_id=case_id,
+                        status="prepared",
+                        last_error=None,
+                    )
+                finally:
+                    conn.close()
+
             if not duplicate_skip_context:
                 try:
                     enqueued_dispatches = enqueue_patient_identified_dispatches(
@@ -1232,21 +1338,30 @@ def process_zip(zip_path):
              raise PrepareError("No series were successfully converted.")
 
     # Clean up input ZIP
-    if zip_path.exists():
-        try:
-            zip_path.unlink()
-            print(f"  Deleted input ZIP: {zip_path}")
-        except Exception as e:
-            print(f"  Warning: Could not delete input ZIP: {e}")
+    _delete_spooled_zip(zip_path)
 
 
 def process_spooled_zip(zip_path: Path) -> bool:
     """Process a claimed spool ZIP and keep the watchdog alive on failures."""
+    intake_manifest = _load_intake_manifest_from_zip(zip_path)
+    manifest_study_uid, manifest_digest = _extract_manifest_fingerprint(intake_manifest)
     try:
         print(f"[Prepare] Claimed upload: {unclaim_path(zip_path).name}")
         process_zip(zip_path)
         return True
     except Exception as exc:
+        if manifest_study_uid and manifest_digest:
+            conn = db_connect()
+            try:
+                store.update_study_handoff_state(
+                    conn,
+                    study_uid=manifest_study_uid,
+                    manifest_digest=manifest_digest,
+                    status="error",
+                    last_error=str(exc),
+                )
+            finally:
+                conn.close()
         failed_path = move_failed_upload(zip_path) if zip_path.exists() else None
         print(f"✗ Prepare failed for {unclaim_path(zip_path).name}: {exc}")
         if failed_path is not None:
