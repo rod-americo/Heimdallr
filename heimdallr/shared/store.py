@@ -48,6 +48,16 @@ _DICOM_EGRESS_QUEUE_COLUMNS = {
     "artifact_digest": "TEXT",
 }
 
+_STUDY_HANDOFF_COLUMNS = {
+    "case_id": "TEXT",
+    "instance_count": "INTEGER",
+    "calling_aet": "TEXT",
+    "remote_ip": "TEXT",
+    "duplicate_count": "INTEGER NOT NULL DEFAULT 0",
+    "last_error": "TEXT",
+}
+
+_SUPPRESSED_HANDOFF_STATUSES = frozenset({"pending_prepare", "preparing", "prepared"})
 
 LOCAL_TZ = ZoneInfo(settings.TIMEZONE)
 
@@ -244,8 +254,34 @@ def ensure_schema(conn: sqlite3.Connection | None = None) -> None:
         ON integration_dispatch_queue(status, next_attempt_at, created_at)
         """
     )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS study_handoff_state (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            study_uid TEXT NOT NULL,
+            manifest_digest TEXT NOT NULL,
+            case_id TEXT,
+            status TEXT NOT NULL DEFAULT 'pending_prepare',
+            instance_count INTEGER,
+            calling_aet TEXT,
+            remote_ip TEXT,
+            duplicate_count INTEGER NOT NULL DEFAULT 0,
+            first_seen_at TIMESTAMP,
+            last_seen_at TIMESTAMP,
+            last_error TEXT,
+            UNIQUE(study_uid, manifest_digest)
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_study_handoff_state_status_seen
+        ON study_handoff_state(status, last_seen_at, first_seen_at)
+        """
+    )
     _ensure_columns(cursor, "dicom_metadata", _DICOM_METADATA_COLUMNS)
     _ensure_columns(cursor, "dicom_egress_queue", _DICOM_EGRESS_QUEUE_COLUMNS)
+    _ensure_columns(cursor, "study_handoff_state", _STUDY_HANDOFF_COLUMNS)
     conn.commit()
     if owns_connection:
         conn.close()
@@ -390,6 +426,148 @@ def enqueue_segmentation_case(conn: sqlite3.Connection, case_id: str, input_path
         (str(case_id), str(input_path), created_at),
     )
     conn.commit()
+
+
+def get_study_handoff_state(
+    conn: sqlite3.Connection,
+    study_uid: str,
+    manifest_digest: str,
+) -> sqlite3.Row | None:
+    ensure_schema(conn)
+    return conn.execute(
+        """
+        SELECT *
+        FROM study_handoff_state
+        WHERE study_uid = ?
+          AND manifest_digest = ?
+        """,
+        (str(study_uid or ""), str(manifest_digest or "")),
+    ).fetchone()
+
+
+def register_study_handoff(
+    conn: sqlite3.Connection,
+    *,
+    study_uid: str,
+    manifest_digest: str,
+    instance_count: int | None,
+    calling_aet: str | None,
+    remote_ip: str | None,
+) -> tuple[bool, sqlite3.Row | None]:
+    ensure_schema(conn)
+    timestamp = _now_local_timestamp()
+    existing = get_study_handoff_state(conn, study_uid, manifest_digest)
+    if existing and str(existing["status"] or "") in _SUPPRESSED_HANDOFF_STATUSES:
+        conn.execute(
+            """
+            UPDATE study_handoff_state
+            SET last_seen_at = ?,
+                duplicate_count = COALESCE(duplicate_count, 0) + 1,
+                instance_count = COALESCE(?, instance_count),
+                calling_aet = COALESCE(NULLIF(?, ''), calling_aet),
+                remote_ip = COALESCE(NULLIF(?, ''), remote_ip)
+            WHERE study_uid = ?
+              AND manifest_digest = ?
+            """,
+            (
+                timestamp,
+                int(instance_count) if instance_count is not None else None,
+                calling_aet or "",
+                remote_ip or "",
+                str(study_uid or ""),
+                str(manifest_digest or ""),
+            ),
+        )
+        conn.commit()
+        return False, get_study_handoff_state(conn, study_uid, manifest_digest)
+
+    if existing:
+        conn.execute(
+            """
+            UPDATE study_handoff_state
+            SET status = 'pending_prepare',
+                instance_count = COALESCE(?, instance_count),
+                calling_aet = COALESCE(NULLIF(?, ''), calling_aet),
+                remote_ip = COALESCE(NULLIF(?, ''), remote_ip),
+                last_seen_at = ?,
+                last_error = NULL
+            WHERE study_uid = ?
+              AND manifest_digest = ?
+            """,
+            (
+                int(instance_count) if instance_count is not None else None,
+                calling_aet or "",
+                remote_ip or "",
+                timestamp,
+                str(study_uid or ""),
+                str(manifest_digest or ""),
+            ),
+        )
+    else:
+        conn.execute(
+            """
+            INSERT INTO study_handoff_state (
+                study_uid,
+                manifest_digest,
+                status,
+                instance_count,
+                calling_aet,
+                remote_ip,
+                duplicate_count,
+                first_seen_at,
+                last_seen_at,
+                last_error
+            )
+            VALUES (?, ?, 'pending_prepare', ?, NULLIF(?, ''), NULLIF(?, ''), 0, ?, ?, NULL)
+            """,
+            (
+                str(study_uid or ""),
+                str(manifest_digest or ""),
+                int(instance_count) if instance_count is not None else None,
+                calling_aet or "",
+                remote_ip or "",
+                timestamp,
+                timestamp,
+            ),
+        )
+    conn.commit()
+    return True, get_study_handoff_state(conn, study_uid, manifest_digest)
+
+
+def update_study_handoff_state(
+    conn: sqlite3.Connection,
+    *,
+    study_uid: str,
+    manifest_digest: str,
+    status: str,
+    case_id: str | None = None,
+    last_error: str | None = None,
+) -> None:
+    ensure_schema(conn)
+    conn.execute(
+        """
+        UPDATE study_handoff_state
+        SET status = ?,
+            case_id = COALESCE(NULLIF(?, ''), case_id),
+            last_seen_at = ?,
+            last_error = ?
+        WHERE study_uid = ?
+          AND manifest_digest = ?
+        """,
+        (
+            str(status or ""),
+            case_id or "",
+            _now_local_timestamp(),
+            str(last_error) if last_error is not None else None,
+            str(study_uid or ""),
+            str(manifest_digest or ""),
+        ),
+    )
+    conn.commit()
+
+
+def is_suppressed_study_handoff_status(status: str | None) -> bool:
+    return str(status or "") in _SUPPRESSED_HANDOFF_STATUSES
 
 
 def enqueue_case_for_metrics(conn: sqlite3.Connection, case_id: str, input_path: str) -> None:
