@@ -353,8 +353,8 @@ def _compact_signal(service) -> str:
     if "•" in detail:
         parts = [part.strip() for part in detail.split("•")]
         if len(parts) >= 2:
-            return _truncate_text(f"{parts[0]} • {parts[1]}", 28)
-    return _truncate_text(detail, 28)
+            return f"{parts[0]} • {parts[1]}"
+    return detail
 
 
 def _truncate_text(value: str, limit: int) -> str:
