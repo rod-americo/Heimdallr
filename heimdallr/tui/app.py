@@ -350,6 +350,8 @@ def _compact_signal(service) -> str:
     if not service.details:
         return "-"
     detail = service.details[0]
+    if getattr(service, "slug", "") in {"intake", "space_manager"}:
+        return detail
     if "•" in detail:
         parts = [part.strip() for part in detail.split("•")]
         if len(parts) >= 2:
