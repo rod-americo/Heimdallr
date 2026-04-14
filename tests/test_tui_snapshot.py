@@ -609,12 +609,17 @@ class TestTuiSnapshot(unittest.TestCase):
                 snapshot = build_snapshot(layout=layout, db_path=base / "missing.db")
 
             intake_stage = next(stage for stage in snapshot.stages if stage.slug == "intake")
+            intake_service = next(service for service in snapshot.services if service.slug == "intake")
             self.assertIn("handoff após 10m sem novas imagens", intake_stage.notes)
             self.assertTrue(
                 any(
                     note.startswith("janela de silêncio restante estimada:")
                     for note in intake_stage.notes
                 )
+            )
+            self.assertEqual(intake_service.details[0], "handoff após 10m sem novas imagens")
+            self.assertTrue(
+                intake_service.details[1].startswith("janela de silêncio restante estimada:")
             )
 
 
