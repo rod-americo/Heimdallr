@@ -1,9 +1,11 @@
 import json
+import os
 import sqlite3
 import tempfile
 import unittest
 from datetime import datetime, timedelta
 from pathlib import Path
+from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 from heimdallr.shared import settings
@@ -569,6 +571,51 @@ class TestTuiSnapshot(unittest.TestCase):
             self.assertEqual(prepare_stage.failed, 0)
             self.assertEqual(len(snapshot.alerts), 1)
             self.assertEqual(snapshot.alerts[0].level, "ok")
+
+    def test_build_snapshot_shows_intake_idle_window_notes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            runtime = base / "runtime"
+            uploads = runtime / "intake" / "uploads"
+            uploads_failed = runtime / "intake" / "uploads_failed"
+            dicom_incoming = runtime / "intake" / "dicom" / "incoming"
+            dicom_failed = runtime / "intake" / "dicom" / "failed"
+            pending = runtime / "queue" / "pending"
+            active = runtime / "queue" / "active"
+            failed = runtime / "queue" / "failed"
+            studies = runtime / "studies"
+            for path in (uploads, uploads_failed, dicom_incoming, dicom_failed, pending, active, failed, studies):
+                path.mkdir(parents=True, exist_ok=True)
+
+            incoming_file = dicom_incoming / "study_partial"
+            incoming_file.write_text("partial", encoding="utf-8")
+            stale_ts = datetime.now(ZoneInfo(settings.TIMEZONE)).timestamp() - 120
+            os.utime(incoming_file, (stale_ts, stale_ts))
+
+            layout = RuntimeLayout(
+                runtime_dir=runtime,
+                intake_dir=runtime / "intake",
+                uploads_dir=uploads,
+                uploads_failed_dir=uploads_failed,
+                dicom_incoming_dir=dicom_incoming,
+                dicom_failed_dir=dicom_failed,
+                pending_dir=pending,
+                active_dir=active,
+                failed_dir=failed,
+                studies_dir=studies,
+            )
+
+            with patch.object(settings, "DICOM_IDLE_SECONDS", 600):
+                snapshot = build_snapshot(layout=layout, db_path=base / "missing.db")
+
+            intake_stage = next(stage for stage in snapshot.stages if stage.slug == "intake")
+            self.assertIn("handoff após 10m sem novas imagens", intake_stage.notes)
+            self.assertTrue(
+                any(
+                    note.startswith("janela de silêncio restante estimada:")
+                    for note in intake_stage.notes
+                )
+            )
 
 
 if __name__ == "__main__":
