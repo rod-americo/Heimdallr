@@ -309,6 +309,7 @@ class HeimdallrDicomListener:
         # Active studies being received
         self.studies: Dict[str, StudyState] = {}
         self._stop = False
+        self._force_flush_requested = False
 
         # Ensure all directories exist
         for p in (incoming_dir, failed_dir, state_dir, upload_staging_dir):
@@ -317,6 +318,16 @@ class HeimdallrDicomListener:
     def stop(self) -> None:
         """Signal listener to stop (called by signal handlers)."""
         self._stop = True
+
+    def request_force_flush(self) -> None:
+        """Request an immediate flush of all currently tracked studies."""
+        self._force_flush_requested = True
+
+    def consume_force_flush(self) -> bool:
+        """Return and clear the force-flush request flag."""
+        requested = self._force_flush_requested
+        self._force_flush_requested = False
+        return requested
 
     def on_c_store(self, event) -> int:
         """
@@ -405,7 +416,7 @@ class HeimdallrDicomListener:
             # Unexpected error: return segmentation failure status
             return 0xA700
 
-    def scan_and_flush(self) -> None:
+    def scan_and_flush(self, *, force: bool = False) -> None:
         """
         Scan active studies and upload those that have been idle.
         
@@ -420,7 +431,7 @@ class HeimdallrDicomListener:
                 continue
                 
             # Skip studies that are still receiving images
-            if st.last_update_ts > cutoff:
+            if not force and st.last_update_ts > cutoff:
                 continue
 
             # Study is idle: process and upload
@@ -570,6 +581,12 @@ def main() -> int:
     ap.add_argument("--state-dir", default=str(settings.DICOM_STATE_DIR), help="State directory")
     ap.add_argument("--idle-seconds", type=int, default=settings.DICOM_IDLE_SECONDS, help="Study idle timeout")
     ap.add_argument("--scan-seconds", type=int, default=settings.DICOM_SCAN_SECONDS, help="Scan interval")
+    ap.add_argument(
+        "--flush-now",
+        action="store_true",
+        default=settings.DICOM_FORCE_FLUSH_ON_START,
+        help="Force immediate handoff of all currently tracked studies on startup",
+    )
     ap.add_argument("--upload-url", default=settings.DICOM_UPLOAD_URL, help="Upload endpoint URL")
     ap.add_argument("--upload-token", default=settings.DICOM_UPLOAD_TOKEN, help="Optional auth token")
     ap.add_argument("--upload-timeout", type=int, default=settings.DICOM_UPLOAD_TIMEOUT, help="Upload timeout (seconds)")
@@ -603,8 +620,15 @@ def main() -> int:
         print("\nShutting down...")
         listener.stop()
 
+    def _flush_handler(signum, frame) -> None:
+        print("\nForce flush requested for intake studies...")
+        listener.request_force_flush()
+
     signal.signal(signal.SIGINT, _sig_handler)
     signal.signal(signal.SIGTERM, _sig_handler)
+    sigusr1 = getattr(signal, "SIGUSR1", None)
+    if sigusr1 is not None:
+        signal.signal(sigusr1, _flush_handler)
 
     # Configure event handlers
     handlers = [(evt.EVT_C_STORE, listener.on_c_store)]
@@ -622,12 +646,17 @@ def main() -> int:
     else:
         print(f"  Prepare spool: {settings.UPLOAD_FROM_PREPARE_DIR}")
     print(f"  Idle timeout: {args.idle_seconds}s")
+    print(f"  Force flush on start: {'yes' if args.flush_now else 'no'}")
     print(f"Waiting for DICOM connections...")
 
     try:
         # Main loop: periodically scan for idle studies
         while not listener._stop:
-            listener.scan_and_flush()
+            force_flush = listener.consume_force_flush()
+            if args.flush_now:
+                force_flush = True
+                args.flush_now = False
+            listener.scan_and_flush(force=force_flush)
             time.sleep(args.scan_seconds)
     finally:
         scp.shutdown()

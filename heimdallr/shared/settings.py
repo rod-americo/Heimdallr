@@ -54,6 +54,18 @@ def _config_float(env_name: str, config: dict, keys: tuple[str, ...], default: f
     return float(configured)
 
 
+def _config_bool(env_name: str, config: dict, keys: tuple[str, ...], default: bool) -> bool:
+    explicit = os.getenv(env_name)
+    if explicit is not None:
+        return explicit.strip().lower() in {"1", "true", "yes", "on"}
+    configured = _get_nested_config(config, *keys)
+    if configured is None:
+        return bool(default)
+    if isinstance(configured, bool):
+        return configured
+    return str(configured).strip().lower() in {"1", "true", "yes", "on"}
+
+
 BASE_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_RUNTIME_PYTHON = str(Path(sys.executable))
 DEFAULT_BIN_DIR = BASE_DIR / "bin"
@@ -110,13 +122,19 @@ DICOM_IDLE_SECONDS = _config_int(
     "HEIMDALLR_IDLE_SECONDS",
     INTAKE_PIPELINE_CONFIG,
     ("dicom_listener", "idle_seconds"),
-    30,
+    600,
 )
 DICOM_SCAN_SECONDS = _config_int(
     "HEIMDALLR_SCAN_SECONDS",
     INTAKE_PIPELINE_CONFIG,
     ("dicom_listener", "scan_seconds"),
     5,
+)
+DICOM_FORCE_FLUSH_ON_START = _config_bool(
+    "HEIMDALLR_INTAKE_FORCE_FLUSH_ON_START",
+    INTAKE_PIPELINE_CONFIG,
+    ("dicom_listener", "force_flush_on_start"),
+    False,
 )
 DICOM_UPLOAD_URL = os.getenv("HEIMDALLR_UPLOAD_URL", f"http://127.0.0.1:{SERVER_PORT}/upload")
 DICOM_UPLOAD_TOKEN = os.getenv("HEIMDALLR_UPLOAD_TOKEN")

@@ -395,6 +395,7 @@ def _build_intake_stage(
     now: datetime,
 ) -> StageMetrics:
     oldest = _oldest_age_seconds(upload_files + incoming_items + claimed_uploads, now)
+    oldest_incoming = _oldest_age_seconds(incoming_items, now)
     state = "flow"
     if (upload_files or incoming_items) and not services["intake"]:
         state = "blocked"
@@ -402,8 +403,19 @@ def _build_intake_stage(
         tui("snapshot.intake.note.zips_staged", count=len(upload_files)),
         tui("snapshot.intake.note.uploads_claimed", count=len(claimed_uploads)),
         tui("snapshot.intake.note.active_dicom", count=len(incoming_items)),
+        tui(
+            "snapshot.intake.note.idle_window",
+            idle=_friendly_age(float(settings.DICOM_IDLE_SECONDS)),
+        ),
         tui("snapshot.intake.note.failures_retained", count=len(failed_uploads) + len(failed_dicom_items)),
     ]
+    if incoming_items and oldest_incoming is not None and oldest_incoming < settings.DICOM_IDLE_SECONDS:
+        notes.append(
+            tui(
+                "snapshot.intake.note.awaiting_idle_window",
+                remaining=_friendly_age(settings.DICOM_IDLE_SECONDS - oldest_incoming),
+            )
+        )
     if upload_files:
         notes.append(tui("snapshot.intake.note.oldest_upload", age=_friendly_age(oldest)))
     return StageMetrics(
