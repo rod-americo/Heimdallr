@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 import json
 from pathlib import Path
+import shutil
 import sqlite3
 import statistics
 import subprocess
@@ -76,6 +77,7 @@ class StageMetrics:
     completed: int
     failed: int
     oldest_age_seconds: float | None
+    newest_age_seconds: float | None = None
     notes: list[str] = field(default_factory=list)
 
 
@@ -356,19 +358,24 @@ def _build_services(
         "prepare": service_label("prepare"),
         "segmentation": service_label("segmentation"),
         "metrics": service_label("metrics"),
+        "space_manager": service_label("space_manager"),
     }
     statuses: list[ServiceStatus] = []
     for slug, processes in process_scan.items():
-        stage = case_by_stage[slug]
+        stage = case_by_stage.get(slug)
         running = bool(processes)
         details = []
-        if slug == "intake":
-            details.extend(stage.notes[:2])
+        if slug == "intake" and processes:
+            details.append(_build_intake_service_detail(processes[0], intake_stage))
+        elif slug == "space_manager" and processes:
+            details.append(_build_space_manager_service_detail(processes[0]))
         for item in processes[:3]:
+            if slug in {"intake", "space_manager"} and details:
+                break
             details.append(
                 tui("snapshot.service.detail", pid=item["pid"], etime=item["etime"], command=item["command"])
             )
-        if not details and stage.queued + stage.active == 0:
+        if not details and (stage is None or stage.queued + stage.active == 0):
             details.append(tui("snapshot.service.no_pressure"))
         elif not details:
             details.append(tui("snapshot.service.backlog_without_worker"))
@@ -398,6 +405,7 @@ def _build_intake_stage(
 ) -> StageMetrics:
     oldest = _oldest_age_seconds(upload_files + incoming_items + claimed_uploads, now)
     oldest_incoming = _oldest_age_seconds(incoming_items, now)
+    newest_incoming = _newest_age_seconds(incoming_items, now)
     state = "flow"
     if (upload_files or incoming_items) and not services["intake"]:
         state = "blocked"
@@ -433,7 +441,38 @@ def _build_intake_stage(
         completed=0,
         failed=0,
         oldest_age_seconds=oldest,
+        newest_age_seconds=newest_incoming,
         notes=notes,
+    )
+
+
+def _build_intake_service_detail(process: dict[str, str], stage: StageMetrics) -> str:
+    detail = tui("snapshot.service.detail_short", pid=process["pid"], etime=process["etime"])
+    active_age = stage.newest_age_seconds
+    if stage.active and active_age is not None:
+        since_last = _friendly_age(active_age)
+        remaining_seconds = max(0.0, float(settings.DICOM_IDLE_SECONDS) - active_age)
+        remaining = _friendly_age(remaining_seconds)
+        return tui(
+            "snapshot.service.intake_wait_detail",
+            detail=detail,
+            since_last=since_last,
+            remaining=remaining,
+        )
+    return tui(
+        "snapshot.service.intake_idle_detail",
+        detail=detail,
+        idle=_friendly_age(float(settings.DICOM_IDLE_SECONDS)),
+    )
+
+
+def _build_space_manager_service_detail(process: dict[str, str]) -> str:
+    detail = tui("snapshot.service.detail_short", pid=process["pid"], etime=process["etime"])
+    free_bytes = _disk_free_bytes(settings.STUDIES_DIR)
+    return tui(
+        "snapshot.service.space_detail",
+        detail=detail,
+        free=_bytes_human(free_bytes) if free_bytes is not None else no_data(),
     )
 
 
@@ -468,6 +507,7 @@ def _build_prepare_stage(
         completed=len(prepared),
         failed=0,
         oldest_age_seconds=oldest,
+        newest_age_seconds=None,
         notes=notes,
     )
 
@@ -523,6 +563,7 @@ def _build_segmentation_stage(
         completed=len(completed),
         failed=len(failed_ids | failed_case_ids),
         oldest_age_seconds=oldest,
+        newest_age_seconds=None,
         notes=notes,
     )
 
@@ -572,6 +613,7 @@ def _build_metrics_stage(
         completed=len(completed),
         failed=queue_status_counts.get("error", 0),
         oldest_age_seconds=oldest,
+        newest_age_seconds=None,
         notes=notes,
     )
 
@@ -932,7 +974,7 @@ def _collect_runtime_items(directory: Path) -> list[Path]:
 
 
 def _scan_system_processes() -> dict[str, list[dict[str, str]]]:
-    groups = {"intake": [], "prepare": [], "segmentation": [], "metrics": []}
+    groups = {"intake": [], "prepare": [], "segmentation": [], "metrics": [], "space_manager": []}
     try:
         result = subprocess.run(
             ["ps", "-axo", "pid=,etime=,command="],
@@ -973,6 +1015,7 @@ def _service_patterns() -> dict[str, tuple[str, ...]]:
         "prepare": ("-m heimdallr.prepare", "heimdallr/prepare", "prepare/worker.py"),
         "segmentation": ("-m heimdallr.segmentation", "heimdallr/segmentation"),
         "metrics": ("-m heimdallr.metrics", "heimdallr/metrics", "metrics/worker.py"),
+        "space_manager": ("-m heimdallr.space_manager", "heimdallr/space_manager", "space_manager/worker.py"),
     }
 
 
@@ -1101,6 +1144,17 @@ def _oldest_age_seconds(paths: list[Path], now: datetime) -> float | None:
     return max(ages) if ages else None
 
 
+def _newest_age_seconds(paths: list[Path], now: datetime) -> float | None:
+    ages = []
+    for path in paths:
+        try:
+            mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=LOCAL_TZ)
+        except OSError:
+            continue
+        ages.append((now - mtime).total_seconds())
+    return min(ages) if ages else None
+
+
 def _oldest_case_age_seconds(cases: list[CaseOverview], now: datetime) -> float | None:
     ages = []
     for case in cases:
@@ -1124,6 +1178,23 @@ def _friendly_age(seconds: float | None) -> str:
     if hours:
         return f"{hours}h {minutes:02d}m"
     return f"{minutes}m"
+
+
+def _disk_free_bytes(path: Path) -> int | None:
+    try:
+        return int(shutil.disk_usage(path).free)
+    except OSError:
+        return None
+
+
+def _bytes_human(value: int) -> str:
+    suffixes = ["B", "KB", "MB", "GB", "TB", "PB"]
+    size = float(max(value, 0))
+    for suffix in suffixes:
+        if size < 1024.0 or suffix == suffixes[-1]:
+            return f"{size:.1f}{suffix}"
+        size /= 1024.0
+    return f"{size:.1f}PB"
 
 
 def _format_process_elapsed(value: str) -> str:

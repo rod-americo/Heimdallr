@@ -216,6 +216,9 @@ msgstr "Segmentação"
 msgid "service.metrics"
 msgstr "Métricas"
 
+msgid "service.space_manager"
+msgstr "Espaço"
+
 msgid "stage_state.flow"
 msgstr "FLUXO"
 
@@ -261,6 +264,9 @@ msgstr "Processado"
 msgid "snapshot.service.detail"
 msgstr "PID {pid} • ativo há {etime} • {command}"
 
+msgid "snapshot.service.detail_short"
+msgstr "PID {pid} • ativo há {etime}"
+
 msgid "snapshot.service.no_pressure"
 msgstr "Nenhuma pressão no pipeline detectada."
 
@@ -272,6 +278,15 @@ msgstr "ativo"
 
 msgid "snapshot.service.not_detected"
 msgstr "não detectado"
+
+msgid "snapshot.service.intake_wait_detail"
+msgstr "{detail} • última imagem há {since_last} • handoff em {remaining}"
+
+msgid "snapshot.service.intake_idle_detail"
+msgstr "{detail} • handoff após {idle} sem novas imagens"
+
+msgid "snapshot.service.space_detail"
+msgstr "{detail} • livre {free}"
 
 msgid "snapshot.intake.note.zips_staged"
 msgstr "{count} ZIPs prontos para preparo"

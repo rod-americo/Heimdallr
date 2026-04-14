@@ -616,10 +616,22 @@ class TestTuiSnapshot(unittest.TestCase):
             )
 
             with patch.object(settings, "DICOM_IDLE_SECONDS", 600):
-                snapshot = build_snapshot(layout=layout, db_path=base / "missing.db")
+                with patch(
+                    "heimdallr.tui.snapshot._scan_system_processes",
+                    return_value={
+                        "intake": [{"pid": "111", "etime": "1:23", "command": "python -m heimdallr.intake"}],
+                        "prepare": [],
+                        "segmentation": [],
+                        "metrics": [],
+                        "space_manager": [{"pid": "222", "etime": "2:34", "command": "python -m heimdallr.space_manager"}],
+                    },
+                ):
+                    with patch("heimdallr.tui.snapshot._disk_free_bytes", return_value=64 * 1024**3):
+                        snapshot = build_snapshot(layout=layout, db_path=base / "missing.db")
 
             intake_stage = next(stage for stage in snapshot.stages if stage.slug == "intake")
             intake_service = next(service for service in snapshot.services if service.slug == "intake")
+            space_service = next(service for service in snapshot.services if service.slug == "space_manager")
             self.assertIn("handoff após 10m sem novas imagens", intake_stage.notes)
             self.assertTrue(
                 any(
@@ -627,9 +639,11 @@ class TestTuiSnapshot(unittest.TestCase):
                     for note in intake_stage.notes
                 )
             )
-            self.assertEqual(intake_service.details[0], "handoff após 10m sem novas imagens")
-            self.assertTrue(
-                intake_service.details[1].startswith("janela de silêncio restante estimada:")
+            self.assertTrue(intake_service.details[0].startswith("PID 111 • ativo há 1:23 • última imagem há 2m"))
+            self.assertRegex(intake_service.details[0], r"handoff em [78]m$")
+            self.assertEqual(
+                space_service.details[0],
+                "PID 222 • ativo há 2:34 • livre 64.0GB",
             )
 
 

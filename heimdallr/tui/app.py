@@ -131,7 +131,7 @@ class HeimdallrDashboardApp(App[None]):
         table.add_column(tui("app.radar.active"), justify="right", no_wrap=True)
         table.add_column(tui("app.radar.signal"), style="#94a3b8")
         for service in self.snapshot.services:
-            stage = stage_by_slug[service.slug]
+            stage = stage_by_slug.get(service.slug)
             signal = _compact_signal(service)
             status = (
                 f"[#4ade80]{tui('app.service.live')}[/]"
@@ -142,8 +142,8 @@ class HeimdallrDashboardApp(App[None]):
                 service.label,
                 status,
                 str(service.instances),
-                str(stage.queued),
-                str(stage.active),
+                str(stage.queued if stage is not None else 0),
+                str(stage.active if stage is not None else 0),
                 signal,
             )
         self.query_one("#radar", RichPanel).set_renderable(
