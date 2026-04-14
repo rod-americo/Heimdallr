@@ -956,7 +956,13 @@ def _scan_system_processes() -> dict[str, list[dict[str, str]]]:
         normalized = command.lower()
         for slug, patterns in _service_patterns().items():
             if any(pattern in normalized for pattern in patterns):
-                groups[slug].append({"pid": pid, "etime": etime, "command": _truncate(command, 92)})
+                groups[slug].append(
+                    {
+                        "pid": pid,
+                        "etime": _format_process_elapsed(etime),
+                        "command": _truncate(command, 92),
+                    }
+                )
                 break
     return groups
 
@@ -1118,6 +1124,40 @@ def _friendly_age(seconds: float | None) -> str:
     if hours:
         return f"{hours}h {minutes:02d}m"
     return f"{minutes}m"
+
+
+def _format_process_elapsed(value: str) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return raw
+
+    days = 0
+    clock = raw
+    if "-" in raw:
+        day_text, _, clock = raw.partition("-")
+        try:
+            days = int(day_text)
+        except ValueError:
+            return raw
+
+    parts = clock.split(":")
+    try:
+        if len(parts) == 3:
+            hours = int(parts[0])
+            minutes = int(parts[1])
+        elif len(parts) == 2:
+            hours = 0
+            minutes = int(parts[0])
+        else:
+            return raw
+    except ValueError:
+        return raw
+
+    if days:
+        total_hours = hours + days * 24
+        display_days, rem_hours = divmod(total_hours, 24)
+        return f"{display_days}d {rem_hours:02d}:{minutes:02d}"
+    return f"{hours}:{minutes:02d}"
 
 
 def _truncate(value: str, limit: int) -> str:
