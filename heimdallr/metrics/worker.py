@@ -321,7 +321,7 @@ def _validate_case_against_profile(case_id: str, metadata: dict, profile_name: s
             f"Metrics profile '{profile_name}' requires modality {required_modality}, got {modality}"
         )
 
-    required_phases = {str(item).strip().lower() for item in required.get("selected_phase", [])}
+    required_phases = _expand_allowed_phases_with_portal_fallback(required.get("selected_phase", []))
     selected_phase = (
         metadata.get("Pipeline", {})
         .get("series_selection", {})
@@ -331,6 +331,13 @@ def _validate_case_against_profile(case_id: str, metadata: dict, profile_name: s
         raise RuntimeError(
             f"Metrics profile '{profile_name}' requires phase in {sorted(required_phases)}, got {selected_phase or 'unknown'}"
         )
+
+
+def _expand_allowed_phases_with_portal_fallback(phases) -> set[str]:
+    allowed = {str(item).strip().lower() for item in phases if str(item).strip()}
+    if "native" in allowed:
+        allowed.add("portal_venous")
+    return allowed
 
 
 def _run_job(case_id: str, job: dict, log_dir: Path) -> dict:

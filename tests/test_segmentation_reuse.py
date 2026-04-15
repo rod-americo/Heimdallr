@@ -9,12 +9,29 @@ from unittest.mock import MagicMock, patch
 
 from heimdallr.segmentation.worker import (
     _record_segmentation_pipeline_state,
+    resolve_segmentation_plan,
     should_reuse_existing_segmentation,
 )
 from heimdallr.shared import store
 
 
 class TestSegmentationReuse(unittest.TestCase):
+    def test_resolve_segmentation_plan_accepts_portal_venous_fallback(self):
+        with patch(
+            "heimdallr.segmentation.worker.load_segmentation_pipeline_profile",
+            return_value=(
+                "ct_native_segmentation_only",
+                {
+                    "required": {"modality": "CT", "selected_phase": ["native"]},
+                    "tasks": [{"name": "total", "enabled": True}],
+                },
+            ),
+        ):
+            profile_name, tasks = resolve_segmentation_plan("CT", "portal_venous")
+
+        self.assertEqual(profile_name, "ct_native_segmentation_only")
+        self.assertEqual(tasks, [{"name": "total", "enabled": True}])
+
     def test_record_segmentation_pipeline_state_closes_failed_stage(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             id_json_path = Path(tmpdir) / "id.json"

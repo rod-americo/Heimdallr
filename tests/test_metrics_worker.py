@@ -10,6 +10,7 @@ from heimdallr.metrics.worker import (
     MetricsLogger,
     _record_metrics_pipeline_state,
     _execute_jobs,
+    _validate_case_against_profile,
     _resolve_enabled_jobs,
     _resolve_job_module_name,
     _resolve_max_parallel_jobs,
@@ -113,6 +114,23 @@ class TestMetricsWorker(unittest.TestCase):
 
     def test_resolve_max_parallel_jobs_uses_profile_execution(self):
         self.assertEqual(_resolve_max_parallel_jobs({"execution": {"max_parallel_jobs": 3}}), 3)
+
+    def test_validate_case_against_profile_accepts_portal_venous_fallback(self):
+        metadata = {
+            "Modality": "CT",
+            "Pipeline": {
+                "series_selection": {
+                    "SelectedPhase": "portal_venous",
+                }
+            },
+        }
+
+        _validate_case_against_profile(
+            "case-1",
+            metadata,
+            "ct_native_basic_metrics",
+            {"required": {"modality": "CT", "selected_phase": ["native"]}},
+        )
 
     def test_execute_jobs_runs_independent_jobs_before_dependents(self):
         jobs = _resolve_enabled_jobs(
