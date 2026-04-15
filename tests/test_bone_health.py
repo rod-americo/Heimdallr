@@ -11,11 +11,16 @@ from heimdallr.metrics.analysis.bone_health import (
     compute_l1_volumetric_metrics,
     extract_study_technique_context,
 )
+from heimdallr.metrics.jobs._bone_job_common import display_aspect_from_spacing_mm
 from heimdallr.metrics.jobs.bone_health_l1_hu import render_sagittal_overlay_rgb
 from heimdallr.metrics.jobs._bone_health_overlay_text import build_overlay_text, hu_mean_color
 
 
 class TestBoneHealthHelpers(unittest.TestCase):
+    def test_display_aspect_uses_row_over_column_spacing(self):
+        self.assertEqual(display_aspect_from_spacing_mm((5.0, 1.0)), 5.0)
+        self.assertEqual(display_aspect_from_spacing_mm((1.0, 5.0)), 0.2)
+
     def test_extract_study_technique_context_prefers_results(self):
         id_data = {
             "Modality": "CT",

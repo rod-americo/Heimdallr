@@ -14,6 +14,7 @@ import numpy as np
 
 from heimdallr.metrics.jobs._bone_job_common import (
     build_l1_sagittal_roi,
+    display_aspect_from_spacing_mm,
     extract_plane,
     load_case_json_bundle,
     load_ct_volume,
@@ -92,11 +93,7 @@ def render_sagittal_overlay_rgb(
         desired_row_code=desired_row_code,
         desired_col_code=desired_col_code,
     )
-    aspect = (
-        float(display_spacing[1]) / float(display_spacing[0])
-        if display_spacing[0] > 0 and display_spacing[1] > 0
-        else 1.0
-    )
+    aspect = display_aspect_from_spacing_mm(display_spacing)
 
     fig, ax = plt.subplots(figsize=(7, 7), facecolor="black")
     ax.set_facecolor("black")

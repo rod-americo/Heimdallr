@@ -16,6 +16,7 @@ import nibabel as nib
 import numpy as np
 
 from heimdallr.metrics.jobs._bone_job_common import (
+    display_aspect_from_spacing_mm,
     plane_source_axis_codes,
     reorient_display_array,
     reorient_display_spacing_mm,
@@ -226,22 +227,14 @@ def render_overlay_rgb(
         desired_row_code="P",
         desired_col_code="L",
     )
-    axial_aspect = (
-        float(axial_spacing[1]) / float(axial_spacing[0])
-        if axial_spacing[0] > 0 and axial_spacing[1] > 0
-        else 1.0
-    )
+    axial_aspect = display_aspect_from_spacing_mm(axial_spacing)
     sagittal_spacing = reorient_display_spacing_mm(
         (lateral_spacing, spacing_z),
         source_axis_codes=sagittal_source_axis_codes,
         desired_row_code=sagittal_row_code,
         desired_col_code=sagittal_col_code,
     )
-    sagittal_aspect = (
-        float(sagittal_spacing[1]) / float(sagittal_spacing[0])
-        if sagittal_spacing[0] > 0 and sagittal_spacing[1] > 0
-        else 1.0
-    )
+    sagittal_aspect = display_aspect_from_spacing_mm(sagittal_spacing)
     slice_row_candidates = np.where(rotated_sagittal_level.any(axis=1))[0]
     slice_row = (
         int(slice_row_candidates[len(slice_row_candidates) // 2])

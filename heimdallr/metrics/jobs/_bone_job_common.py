@@ -220,6 +220,14 @@ def reorient_display_spacing_mm(
     )
 
 
+def display_aspect_from_spacing_mm(spacing_mm: tuple[float, float]) -> float:
+    row_spacing_mm = float(spacing_mm[0])
+    col_spacing_mm = float(spacing_mm[1])
+    if row_spacing_mm <= 0 or col_spacing_mm <= 0:
+        return 1.0
+    return row_spacing_mm / col_spacing_mm
+
+
 def mask_complete_along_axis(mask: np.ndarray, axis: int) -> bool:
     mask_bool = np.asarray(mask, dtype=bool)
     if mask_bool.ndim != 3 or not np.any(mask_bool):
