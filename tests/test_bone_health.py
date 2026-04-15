@@ -12,6 +12,7 @@ from heimdallr.metrics.analysis.bone_health import (
     extract_study_technique_context,
 )
 from heimdallr.metrics.jobs.bone_health_l1_hu import render_sagittal_overlay_rgb
+from heimdallr.metrics.jobs._bone_health_overlay_text import build_overlay_text, hu_mean_color
 
 
 class TestBoneHealthHelpers(unittest.TestCase):
@@ -136,13 +137,33 @@ class TestBoneHealthHelpers(unittest.TestCase):
             overlay_mask=overlay_mask,
             mask_outline=outline_mask,
             title="L1",
-            summary_lines=["HU 150"],
+            summary_lines=[
+                {"text": "Mean: 150 HU", "color": "#ffd166"},
+            ],
             plane_spacing_mm=(1.0, 1.0),
             source_axis_codes=("L", "S"),
         )
 
         self.assertEqual(rgb.ndim, 3)
         self.assertEqual(rgb.shape[2], 3)
+
+    def test_hu_mean_color_uses_requested_thresholds(self):
+        self.assertEqual(hu_mean_color(170.0), "white")
+        self.assertEqual(hu_mean_color(160.0), "#ffd166")
+        self.assertEqual(hu_mean_color(110.0), "#ffd166")
+        self.assertEqual(hu_mean_color(109.0), "#ef4444")
+
+    def test_build_overlay_text_colors_mean_line_by_band(self):
+        title, summary_lines = build_overlay_text(
+            hu_mean=125.0,
+            hu_std=18.0,
+            locale="pt_BR",
+        )
+
+        self.assertEqual(title, "Atenuação trabecular em L1")
+        self.assertEqual(len(summary_lines), 1)
+        self.assertEqual(summary_lines[0]["text"], "Média: 125 UH")
+        self.assertEqual(summary_lines[0]["color"], "#ffd166")
 
 
 if __name__ == "__main__":
