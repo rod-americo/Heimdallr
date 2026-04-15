@@ -30,6 +30,7 @@ from heimdallr.metrics.jobs._bone_job_common import (
     write_payload,
 )
 from heimdallr.metrics.jobs._bone_health_overlay_text import (
+    OverlayLine,
     build_overlay_text,
     derivation_description,
     resolve_artifact_locale,
@@ -61,7 +62,7 @@ def render_sagittal_overlay_rgb(
     overlay_mask: np.ndarray,
     mask_outline: np.ndarray,
     title: str,
-    summary_lines: list[str],
+    summary_lines: list[OverlayLine],
     plane_spacing_mm: tuple[float, float],
     *,
     source_axis_codes: tuple[str, str],
@@ -110,22 +111,7 @@ def render_sagittal_overlay_rgb(
         ax.contour(display_outline, levels=[0.5], colors=["#ffd166"], linewidths=0.9)
 
     ax.set_title(title, fontsize=13, color="white")
-    ax.text(
-        0.03,
-        0.97,
-        "\n".join(summary_lines),
-        transform=ax.transAxes,
-        ha="left",
-        va="top",
-        fontsize=10,
-        color="white",
-        bbox={
-            "boxstyle": "round,pad=0.4",
-            "facecolor": "black",
-            "alpha": 0.55,
-            "edgecolor": "none",
-        },
-    )
+    _draw_summary_lines(ax, summary_lines)
     ax.axis("off")
     fig.tight_layout()
     fig.canvas.draw()
@@ -133,6 +119,33 @@ def render_sagittal_overlay_rgb(
     rgb = np.ascontiguousarray(rgba[:, :, :3])
     plt.close(fig)
     return rgb
+
+
+def _draw_summary_lines(ax, summary_lines: list[OverlayLine]) -> None:
+    x = 0.03
+    y = 0.97
+    line_gap = 0.043
+    fontsize = 10
+    bbox = {
+        "boxstyle": "round,pad=0.32",
+        "facecolor": "black",
+        "alpha": 0.55,
+        "edgecolor": "none",
+    }
+
+    for index, line in enumerate(summary_lines):
+        line_y = y - (index * line_gap)
+        ax.text(
+            x,
+            line_y,
+            line.get("text", ""),
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            fontsize=fontsize,
+            color=line.get("color", "white"),
+            bbox=bbox,
+        )
 
 
 def main() -> int:

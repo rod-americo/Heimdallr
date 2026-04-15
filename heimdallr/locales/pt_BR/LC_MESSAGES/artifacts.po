@@ -57,8 +57,14 @@ msgstr "Reconstrução axial de 5 mm com overlays de órgãos parenquimatosos (f
 msgid "bone_health.overlay.title"
 msgstr "Atenuação trabecular em L1"
 
+msgid "bone_health.overlay.hu_mean_label"
+msgstr "Média: "
+
 msgid "bone_health.overlay.hu_mean"
 msgstr "Média: {value} UH"
+
+msgid "bone_health.overlay.hu_std_label"
+msgstr "DP: "
 
 msgid "bone_health.overlay.hu_std"
 msgstr "DP: {value} UH"
