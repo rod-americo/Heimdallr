@@ -85,6 +85,64 @@ class TestSeriesSelection(unittest.TestCase):
         self.assertEqual(selected_path.name, "accepted.nii.gz")
         self.assertEqual(selection_info["SelectedSeriesInstanceUID"], "1.2.3.good")
 
+    def test_falls_back_to_portal_venous_when_native_is_missing(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            case_id = "case-series-selection"
+            derived_dir = root / "runtime" / "studies" / case_id / "derived" / "series"
+            derived_dir.mkdir(parents=True, exist_ok=True)
+
+            portal_path = derived_dir / "portal.nii.gz"
+            portal_path.write_bytes(b"ok")
+
+            config_path = root / "series_selection.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "default_profile": "ct_test",
+                        "profiles": {
+                            "ct_test": {
+                                "required": {"modality": "CT", "min_slices": 120},
+                                "hard_reject": {},
+                                "phase_priority": ["native", "portal_venous"],
+                                "text_hints": {
+                                    "description_avoid": [],
+                                    "kernel_avoid": [],
+                                },
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            id_data = {
+                "AvailableSeries": [
+                    {
+                        "SeriesInstanceUID": "1.2.3.portal",
+                        "SeriesNumber": "5",
+                        "DerivedNiftiPath": "series/portal.nii.gz",
+                        "Modality": "CT",
+                        "SliceCount": 180,
+                        "DetectedPhase": "portal_venous",
+                        "PhaseDetected": True,
+                        "PhaseData": {"probability": 0.95},
+                        "SeriesDescription": "PORTAL Body 2.0 CE",
+                        "ConvolutionKernel": "FC18",
+                    }
+                ]
+            }
+
+            with patch.object(settings, "STUDIES_DIR", root / "runtime" / "studies"), patch.object(
+                settings,
+                "SERIES_SELECTION_CONFIG_PATH",
+                config_path,
+            ):
+                selected_path, selection_info = select_prepared_series(case_id, id_data)
+
+        self.assertEqual(selected_path.name, "portal.nii.gz")
+        self.assertEqual(selection_info["SelectedPhase"], "portal_venous")
+
 
 if __name__ == "__main__":
     unittest.main()
