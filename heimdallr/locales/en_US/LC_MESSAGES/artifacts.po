@@ -57,8 +57,14 @@ msgstr "5 mm axial reconstruction with parenchymal-organ overlays (liver, spleen
 msgid "bone_health.overlay.title"
 msgstr "L1 Trabecular Attenuation"
 
+msgid "bone_health.overlay.hu_mean_label"
+msgstr "Mean: "
+
 msgid "bone_health.overlay.hu_mean"
 msgstr "Mean: {value} HU"
+
+msgid "bone_health.overlay.hu_std_label"
+msgstr "SD: "
 
 msgid "bone_health.overlay.hu_std"
 msgstr "SD: {value} HU"
