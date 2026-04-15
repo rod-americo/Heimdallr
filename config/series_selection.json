@@ -24,7 +24,8 @@
         ]
       },
       "phase_priority": [
-        "native"
+        "native",
+        "portal_venous"
       ],
       "text_hints": {
         "description_avoid": [

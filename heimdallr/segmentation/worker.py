@@ -399,10 +399,11 @@ def resolve_segmentation_plan(modality, selected_phase) -> tuple[str, list[dict]
             f"Segmentation profile '{profile_name}' requires modality {required_modality}, got {modality}"
         )
 
-    allowed_phases = [_normalize_phase(p) for p in required.get("selected_phase", [])]
-    if allowed_phases and _normalize_phase(selected_phase) not in allowed_phases:
+    allowed_phases = _expand_allowed_phases_with_portal_fallback(required.get("selected_phase", []))
+    normalized_selected_phase = _normalize_phase(selected_phase)
+    if allowed_phases and normalized_selected_phase not in allowed_phases:
         raise RuntimeError(
-            f"Segmentation profile '{profile_name}' requires phase in {allowed_phases}, got {_normalize_phase(selected_phase)}"
+            f"Segmentation profile '{profile_name}' requires phase in {allowed_phases}, got {normalized_selected_phase}"
         )
 
     tasks = [task for task in profile.get("tasks", []) if task.get("enabled", True)]
@@ -428,6 +429,13 @@ def _safe_int(value, default=0):
 def _normalize_phase(value):
     raw = str(value or "").strip().lower()
     return raw or "unknown"
+
+
+def _expand_allowed_phases_with_portal_fallback(phases):
+    allowed = [_normalize_phase(item) for item in phases]
+    if "native" in allowed and "portal_venous" not in allowed:
+        allowed.append("portal_venous")
+    return allowed
 
 
 def _text_tokens(series):
