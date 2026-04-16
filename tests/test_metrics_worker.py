@@ -242,22 +242,16 @@ class TestMetricsWorker(unittest.TestCase):
             )
             results_json_path.write_text("{}", encoding="utf-8")
             pdf_path = artifacts_dir / "artifact_instructions.pdf"
-            sc_dir = artifacts_dir / "dicom_sc"
-            sc_paths = [sc_dir / f"page_{idx:02d}.dcm" for idx in range(1, 3)]
+            dicom_path = artifacts_dir / "artifact_instructions.dcm"
 
             def fake_build_pdf(_case_id: str) -> Path:
                 artifacts_dir.mkdir(parents=True, exist_ok=True)
                 pdf_path.write_bytes(b"%PDF-1.4\n%mock\n")
                 return pdf_path
 
-            def fake_build_sc(_case_id: str):
-                sc_dir.mkdir(parents=True, exist_ok=True)
-                for path in sc_paths:
-                    path.write_bytes(b"DICM")
-                return {
-                    "series_instance_uid": "1.2.3.4",
-                    "paths": sc_paths,
-                }
+            def fake_create_dicom(**kwargs):
+                dicom_path.parent.mkdir(parents=True, exist_ok=True)
+                Path(kwargs["output_path"]).write_bytes(b"DICM")
 
             with (
                 patch("heimdallr.metrics.worker.study_id_json", return_value=id_json_path),
@@ -275,7 +269,7 @@ class TestMetricsWorker(unittest.TestCase):
                 ),
                 patch("heimdallr.metrics.worker._enqueue_case_dicom_exports", return_value=0) as enqueue_mock,
                 patch("heimdallr.metrics.worker.build_artifact_instructions_pdf", side_effect=fake_build_pdf),
-                patch("heimdallr.metrics.worker.build_artifact_instructions_secondary_capture", side_effect=fake_build_sc),
+                patch("heimdallr.metrics.worker.create_encapsulated_pdf_dicom", side_effect=fake_create_dicom),
                 patch("heimdallr.metrics.worker.db_connect") as mock_connect,
                 patch("heimdallr.metrics.worker.store.update_metrics_completion"),
                 patch("heimdallr.metrics.worker.store.update_calculation_results"),
@@ -286,16 +280,14 @@ class TestMetricsWorker(unittest.TestCase):
 
             self.assertTrue(ok)
             self.assertTrue(pdf_path.exists())
-            for path in sc_paths:
-                self.assertTrue(path.exists())
+            self.assertTrue(dicom_path.exists())
             enqueue_call = enqueue_mock.call_args
             self.assertIsNotNone(enqueue_call)
             enqueued_exports = enqueue_call.args[2]
             self.assertEqual(
                 enqueued_exports,
                 [
-                    {"path": "artifacts/metrics/instructions/dicom_sc/page_01.dcm", "kind": "secondary_capture"},
-                    {"path": "artifacts/metrics/instructions/dicom_sc/page_02.dcm", "kind": "secondary_capture"},
+                    {"path": "artifacts/metrics/instructions/artifact_instructions.dcm", "kind": "encapsulated_pdf"},
                 ],
             )
 
@@ -309,14 +301,10 @@ class TestMetricsWorker(unittest.TestCase):
                 },
             )
             self.assertEqual(
-                results_payload["artifacts"]["artifact_instructions_sc"],
+                results_payload["artifacts"]["artifact_instructions_dicom"],
                 {
-                    "paths": [
-                        "artifacts/metrics/instructions/dicom_sc/page_01.dcm",
-                        "artifacts/metrics/instructions/dicom_sc/page_02.dcm",
-                    ],
-                    "kind": "secondary_capture",
-                    "series_instance_uid": "1.2.3.4",
+                    "path": "artifacts/metrics/instructions/artifact_instructions.dcm",
+                    "kind": "encapsulated_pdf",
                     "locale": "pt_BR",
                 },
             )
@@ -331,14 +319,10 @@ class TestMetricsWorker(unittest.TestCase):
                 },
             )
             self.assertEqual(
-                metadata_payload["Pipeline"]["metrics_pipeline"]["instruction_sc"],
+                metadata_payload["Pipeline"]["metrics_pipeline"]["instruction_dicom"],
                 {
-                    "paths": [
-                        "artifacts/metrics/instructions/dicom_sc/page_01.dcm",
-                        "artifacts/metrics/instructions/dicom_sc/page_02.dcm",
-                    ],
-                    "kind": "secondary_capture",
-                    "series_instance_uid": "1.2.3.4",
+                    "path": "artifacts/metrics/instructions/artifact_instructions.dcm",
+                    "kind": "encapsulated_pdf",
                     "locale": "pt_BR",
                 },
             )

@@ -19,8 +19,8 @@ from zoneinfo import ZoneInfo
 
 from heimdallr.metrics.artifact_instructions_pdf import (
     build_artifact_instructions_pdf,
-    build_artifact_instructions_secondary_capture,
 )
+from heimdallr.metrics.jobs._dicom_encapsulated_pdf import create_encapsulated_pdf_dicom
 from heimdallr.dicom_egress.config import build_egress_queue_items
 from heimdallr.shared import settings, store
 from heimdallr.shared.paths import study_dir, study_id_json, study_logs_dir, study_results_json
@@ -338,25 +338,44 @@ def _generate_instruction_pdf_artifact(case_id: str, metadata: dict, logger: Met
     return artifact_payload
 
 
-def _generate_instruction_sc_artifact(case_id: str, metadata: dict, logger: MetricsLogger) -> dict | None:
-    try:
-        generated = build_artifact_instructions_secondary_capture(case_id)
-    except Exception as exc:
-        logger.log(f"[Metrics] Warning: failed to generate instruction Secondary Capture series: {exc}")
+def _generate_instruction_dicom_artifact(
+    case_id: str,
+    metadata: dict,
+    logger: MetricsLogger,
+    instruction_pdf: dict | None,
+) -> dict | None:
+    if not instruction_pdf:
         return None
 
-    paths = [
-        _artifact_relpath(case_id, Path(path))
-        for path in generated.get("paths", [])
-    ]
+    pdf_relpath = str(instruction_pdf.get("path", "") or "").strip()
+    if not pdf_relpath:
+        return None
+
+    case_root = study_dir(case_id)
+    pdf_path = case_root / pdf_relpath
+    dicom_path = case_root / "artifacts" / "metrics" / "instructions" / "artifact_instructions.dcm"
+
+    try:
+        create_encapsulated_pdf_dicom(
+            pdf_path=pdf_path,
+            output_path=dicom_path,
+            case_metadata=metadata,
+            series_description="Heimdallr Artifact Instructions",
+            document_title="Heimdallr Artifact Instructions",
+            series_number=941,
+            instance_number=1,
+        )
+    except Exception as exc:
+        logger.log(f"[Metrics] Warning: failed to generate instruction Encapsulated PDF DICOM: {exc}")
+        return None
+
     artifact_payload = {
-        "paths": paths,
-        "kind": "secondary_capture",
-        "series_instance_uid": str(generated.get("series_instance_uid", "") or ""),
+        "path": _artifact_relpath(case_id, dicom_path),
+        "kind": "encapsulated_pdf",
         "locale": settings.ARTIFACTS_LOCALE,
     }
-    _record_metrics_artifact(case_id, "artifact_instructions_sc", artifact_payload, metadata)
-    logger.log(f"[Metrics] Generated instruction SC series with {len(paths)} page(s)")
+    _record_metrics_artifact(case_id, "artifact_instructions_dicom", artifact_payload, metadata)
+    logger.log(f"[Metrics] Generated instruction Encapsulated PDF DICOM: {artifact_payload['path']}")
     return artifact_payload
 
 
@@ -798,15 +817,14 @@ def segment_case_metrics(case_input: Path) -> bool:
             metadata=metadata,
         )
         instruction_pdf = _generate_instruction_pdf_artifact(case_id, metadata, logger)
-        instruction_sc = _generate_instruction_sc_artifact(case_id, metadata, logger)
-        if instruction_sc:
-            for path in instruction_sc.get("paths", []):
-                dicom_exports.append(
-                    {
-                        "path": str(path),
-                        "kind": str(instruction_sc["kind"]),
-                    }
-                )
+        instruction_dicom = _generate_instruction_dicom_artifact(case_id, metadata, logger, instruction_pdf)
+        if instruction_dicom:
+            dicom_exports.append(
+                {
+                    "path": str(instruction_dicom["path"]),
+                    "kind": str(instruction_dicom["kind"]),
+                }
+            )
 
         try:
             enqueued_dicom_exports = _enqueue_case_dicom_exports(
@@ -830,7 +848,7 @@ def segment_case_metrics(case_input: Path) -> bool:
             "max_parallel_jobs": max_parallel_jobs,
             "jobs": completed_jobs,
             "instruction_pdf": instruction_pdf,
-            "instruction_sc": instruction_sc,
+            "instruction_dicom": instruction_dicom,
             "dicom_egress_items_enqueued": enqueued_dicom_exports,
         }
         metadata["Pipeline"] = pipeline
