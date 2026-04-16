@@ -352,6 +352,7 @@ def build_l1_axial_roi(mask_l1: np.ndarray, spacing_mm: tuple[float, float, floa
 def build_l1_sagittal_roi(
     mask_l1: np.ndarray,
     spacing_mm: tuple[float, float, float],
+    affine: np.ndarray | None = None,
     erosion_mm: float = 5.0,
     roi_radius_mm: float = 6.0,
 ) -> tuple[np.ndarray | None, dict[str, Any]]:
@@ -364,11 +365,24 @@ def build_l1_sagittal_roi(
     plane_spacing = sagittal_plane_spacing_mm(spacing_mm, plane_axis)
     min_spacing = max(min(plane_spacing), 1e-6)
     erosion_iters = max(1, int(round(float(erosion_mm) / min_spacing)))
-    ap_profile = plane_mask.sum(axis=1).astype(np.float64)
-    edge_width = max(1, int(round(ap_profile.size * 0.18)))
-    low_edge = float(np.median(ap_profile[:edge_width]))
-    high_edge = float(np.median(ap_profile[-edge_width:]))
-    anterior_is_low_index = high_edge > low_edge
+    orientation_source = "edge_profile"
+    if affine is not None:
+        row_axis_code, _ = plane_source_axis_codes(np.asarray(affine, dtype=np.float64), plane_axis)
+        if row_axis_code in {"A", "P"}:
+            anterior_is_low_index = row_axis_code == "P"
+            orientation_source = "affine_axis_codes"
+        else:
+            ap_profile = plane_mask.sum(axis=1).astype(np.float64)
+            edge_width = max(1, int(round(ap_profile.size * 0.18)))
+            low_edge = float(np.median(ap_profile[:edge_width]))
+            high_edge = float(np.median(ap_profile[-edge_width:]))
+            anterior_is_low_index = high_edge > low_edge
+    else:
+        ap_profile = plane_mask.sum(axis=1).astype(np.float64)
+        edge_width = max(1, int(round(ap_profile.size * 0.18)))
+        low_edge = float(np.median(ap_profile[:edge_width]))
+        high_edge = float(np.median(ap_profile[-edge_width:]))
+        anterior_is_low_index = high_edge > low_edge
 
     eroded_2d = binary_erosion(plane_mask, iterations=erosion_iters)
 
@@ -462,6 +476,7 @@ def build_l1_sagittal_roi(
         "max_inscribed_radius_mm": round(float(max_inscribed_radius_mm), 2),
         "roi_ap_center_fraction": round(float(ap_center_fraction), 4),
         "anterior_is_low_index": bool(anterior_is_low_index),
+        "orientation_source": orientation_source,
         "plane_spacing_mm": {
             "row": round(float(plane_spacing[0]), 4),
             "col": round(float(plane_spacing[1]), 4),
