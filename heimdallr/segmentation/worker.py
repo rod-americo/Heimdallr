@@ -45,6 +45,10 @@ from heimdallr.shared.paths import (
     study_logs_dir,
     study_metadata_dir,
 )
+from heimdallr.shared.segmentation_coverage import (
+    SEGMENTATION_COVERAGE_CHEST_ONLY,
+    classify_segmentation_coverage,
+)
 from heimdallr.shared.sqlite import connect as db_connect
 
 settings.configure_service_stdio()
@@ -490,6 +494,43 @@ def _series_hard_reject_reason(series, rules):
     return None
 
 
+def _series_region_hint(series: dict) -> str:
+    description = str(series.get("SeriesDescription", "") or "").lower()
+    if any(token in description for token in ("abdome", "abdomen", "abdominal")):
+        return "abdomen"
+    if any(token in description for token in ("torax", "tórax", "thorax", "chest", "pulmao", "pulmão", "mediast")):
+        return "chest"
+    return "unknown"
+
+
+def _choose_follow_up_candidate_after_chest_only(
+    selected: dict,
+    candidates: list[dict],
+    previous_series_uid: str | None,
+) -> dict:
+    selected_uid = str(selected["series"].get("SeriesInstanceUID") or "")
+    previous_uid = str(previous_series_uid or "")
+    if not previous_uid or selected_uid != previous_uid:
+        return selected
+
+    alternative_candidates = [
+        candidate
+        for candidate in candidates
+        if str(candidate["series"].get("SeriesInstanceUID") or "") != previous_uid
+    ]
+    if not alternative_candidates:
+        return selected
+
+    abdominal_candidates = [
+        candidate
+        for candidate in alternative_candidates
+        if _series_region_hint(candidate["series"]) == "abdomen"
+    ]
+    if abdominal_candidates:
+        return abdominal_candidates[0]
+    return alternative_candidates[0]
+
+
 def select_prepared_series(case_id, id_data):
     """
     Select the NIfTI series to process from a prepared study.
@@ -610,6 +651,25 @@ def select_prepared_series(case_id, id_data):
         )
     )
     selected = candidates[0]
+    recorded = None
+    study_uid = str(id_data.get("StudyInstanceUID", "") or "").strip()
+    if study_uid:
+        conn = db_connect()
+        try:
+            recorded = store.get_recorded_segmentation_signature(conn, study_uid)
+        finally:
+            conn.close()
+        if (
+            recorded
+            and str(recorded["SegmentationCoverageClass"] or "") == SEGMENTATION_COVERAGE_CHEST_ONLY
+        ):
+            follow_up_selected = _choose_follow_up_candidate_after_chest_only(
+                selected,
+                candidates,
+                recorded["SegmentationSeriesInstanceUID"],
+            )
+            if follow_up_selected is not selected:
+                selected = follow_up_selected
     selected_series = dict(selected["series"])
     selection_info = {
         "Profile": profile_name,
@@ -627,6 +687,15 @@ def select_prepared_series(case_id, id_data):
             + (
                 f", fallback={selected['fallback_reason']}"
                 if selected.get("fallback_reason")
+                else ""
+            )
+            + (
+                f", follow_up_after={recorded['SegmentationCoverageClass']}"
+                if study_uid
+                and recorded
+                and str(recorded["SegmentationCoverageClass"] or "") == SEGMENTATION_COVERAGE_CHEST_ONLY
+                and str(selected_series.get("SeriesInstanceUID") or "")
+                != str(recorded["SegmentationSeriesInstanceUID"] or "")
                 else ""
             )
         ),
@@ -1114,6 +1183,7 @@ def segment_case(case_input):
             seg_elapsed = time.time() - seg_start_time
             logger.print(f"[Segmentation] ✓ Complete ({seg_elapsed:.1f}s)")
             if study_uid and selection_info is not None:
+                coverage_class = classify_segmentation_coverage(artifacts_dir / "total")
                 conn = db_connect()
                 try:
                     store.update_segmentation_signature(
@@ -1124,6 +1194,7 @@ def segment_case(case_input):
                         profile_name=segmentation_info["profile"],
                         task_names=[task["name"] for task in segmentation_info["tasks"]],
                         elapsed_time=str(datetime.timedelta(seconds=round(seg_elapsed, 6))),
+                        coverage_class=coverage_class,
                     )
                 finally:
                     conn.close()
