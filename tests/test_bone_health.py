@@ -166,6 +166,15 @@ class TestBoneHealthHelpers(unittest.TestCase):
         roi_mask, roi_info = build_l1_sagittal_roi(
             mask,
             spacing_mm=(1.0, 1.0, 1.0),
+            affine=np.array(
+                [
+                    [-1.0, 0.0, 0.0, 0.0],
+                    [0.0, -1.0, 0.0, 0.0],
+                    [0.0, 0.0, 1.0, 0.0],
+                    [0.0, 0.0, 0.0, 1.0],
+                ],
+                dtype=float,
+            ),
             erosion_mm=1.0,
             roi_radius_mm=2.0,
         )
@@ -173,6 +182,7 @@ class TestBoneHealthHelpers(unittest.TestCase):
         self.assertIsNotNone(roi_mask)
         self.assertEqual(roi_info["status"], "ok")
         self.assertTrue(roi_info["anterior_is_low_index"])
+        self.assertEqual(roi_info["orientation_source"], "affine_axis_codes")
         self.assertLess(roi_info["roi_center_2d"]["row"], 8.0)
 
     def test_hu_mean_color_uses_requested_thresholds(self):

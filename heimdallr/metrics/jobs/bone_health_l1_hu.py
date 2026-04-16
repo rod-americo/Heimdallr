@@ -204,6 +204,7 @@ def main() -> int:
         roi_mask_2d, roi_info = build_l1_sagittal_roi(
             l1_mask,
             spacing,
+            affine=ct_img.affine,
             erosion_mm=float(job_config.get("erosion_mm", 5.0)),
             roi_radius_mm=float(job_config.get("roi_radius_mm", 6.0)),
         )
