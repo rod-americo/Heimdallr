@@ -401,7 +401,7 @@ def resolve_segmentation_plan(modality, selected_phase) -> tuple[str, list[dict]
 
     allowed_phases = _expand_allowed_phases_with_portal_fallback(required.get("selected_phase", []))
     normalized_selected_phase = _normalize_phase(selected_phase)
-    if allowed_phases and normalized_selected_phase not in allowed_phases:
+    if allowed_phases and not _phase_allowed_with_fallback(allowed_phases, normalized_selected_phase):
         raise RuntimeError(
             f"Segmentation profile '{profile_name}' requires phase in {allowed_phases}, got {normalized_selected_phase}"
         )
@@ -431,11 +431,23 @@ def _normalize_phase(value):
     return raw or "unknown"
 
 
+def _is_contrast_phase(value) -> bool:
+    phase = _normalize_phase(value)
+    return any(token in phase for token in ("arterial", "venous", "portal", "delayed", "contrast", "enhanced", "post"))
+
+
 def _expand_allowed_phases_with_portal_fallback(phases):
     allowed = [_normalize_phase(item) for item in phases]
     if "native" in allowed and "portal_venous" not in allowed:
         allowed.append("portal_venous")
     return allowed
+
+
+def _phase_allowed_with_fallback(allowed_phases, selected_phase) -> bool:
+    normalized_selected_phase = _normalize_phase(selected_phase)
+    if normalized_selected_phase in allowed_phases:
+        return True
+    return "native" in allowed_phases and _is_contrast_phase(normalized_selected_phase)
 
 
 def _text_tokens(series):
@@ -494,6 +506,7 @@ def select_prepared_series(case_id, id_data):
     text_hints = profile.get("text_hints", {})
     phase_priority = [_normalize_phase(p) for p in profile.get("phase_priority", ["unknown"])]
     phase_rank = {phase: idx for idx, phase in enumerate(phase_priority)}
+    contrast_fallback_rank = len(phase_priority)
     derived_dir = study_derived_dir(case_id)
 
     candidates = []
@@ -547,7 +560,13 @@ def select_prepared_series(case_id, id_data):
             continue
 
         phase = _normalize_phase(series.get("DetectedPhase"))
-        if phase not in phase_rank:
+        fallback_reason = None
+        if phase in phase_rank:
+            resolved_phase_rank = phase_rank.get(phase, len(phase_priority))
+        elif "native" in phase_priority and _is_contrast_phase(phase):
+            resolved_phase_rank = contrast_fallback_rank
+            fallback_reason = "contrast_fallback"
+        else:
             rejected.append(
                 {
                     "SeriesInstanceUID": series.get("SeriesInstanceUID"),
@@ -570,7 +589,8 @@ def select_prepared_series(case_id, id_data):
                 "phase_probability": probability,
                 "slice_count": slice_count,
                 "text_penalty": text_penalty,
-                "phase_rank": phase_rank.get(phase, len(phase_priority)),
+                "phase_rank": resolved_phase_rank,
+                "fallback_reason": fallback_reason,
             }
         )
 
@@ -604,6 +624,11 @@ def select_prepared_series(case_id, id_data):
         "SelectionReason": (
             f"phase={selected['phase']}, detected={selected['phase_detected']}, "
             f"probability={selected['phase_probability']}, slices={selected['slice_count']}"
+            + (
+                f", fallback={selected['fallback_reason']}"
+                if selected.get("fallback_reason")
+                else ""
+            )
         ),
         "RejectedSeries": rejected,
     }

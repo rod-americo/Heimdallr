@@ -28,7 +28,17 @@ def build_overlay_text(
         if volume_cm3 is None and status == "complete":
             volume_cm3 = measurement.get("observed_volume_cm3")
         hu_mean = measurement.get("hu_mean")
-        if volume_cm3 is None or hu_mean is None:
+        if volume_cm3 is None:
+            continue
+
+        if hu_mean is None:
+            summary_lines.append(
+                translate(
+                    f"parenchymal.overlay.organ.{organ_key}.volume_only",
+                    locale=locale,
+                    volume=format_integer(volume_cm3, locale=locale),
+                )
+            )
             continue
 
         summary_lines.append(

@@ -30,6 +30,7 @@ from heimdallr.metrics.jobs._l3_overlay_text import (
     build_overlay_text,
     resolve_artifact_locale,
 )
+from heimdallr.metrics.analysis.bone_health import extract_study_technique_context
 from heimdallr.shared.paths import study_artifacts_dir, study_dir, study_metadata_json, study_nifti
 
 
@@ -64,12 +65,49 @@ def load_mask(mask_path: Path) -> tuple[nib.Nifti1Image, np.ndarray]:
     return image, data > 0
 
 
+def _load_case_metadata(case_id: str, case_dir: Path) -> tuple[dict, str]:
+    id_json_path = case_dir / "metadata" / "id.json"
+    metadata_json_path = study_metadata_json(case_id)
+    merged: dict = {}
+    metadata_source = "id_json"
+    if id_json_path.exists():
+        merged.update(json.loads(id_json_path.read_text(encoding="utf-8")))
+    if metadata_json_path.exists():
+        merged.update(json.loads(metadata_json_path.read_text(encoding="utf-8")))
+        metadata_source = "metadata_json"
+    return merged, metadata_source
+
+
 def compute_center_slice(mask_l3: np.ndarray) -> tuple[np.ndarray, int]:
     slice_indices = np.where(mask_l3.sum(axis=(0, 1)) > 0)[0]
     if len(slice_indices) == 0:
         raise MetricSkip("L3 mask is empty")
     center_idx = int(slice_indices[len(slice_indices) // 2])
     return slice_indices, center_idx
+
+
+def calculate_mask_hu_statistics(image_slice: np.ndarray, mask_slice: np.ndarray) -> dict[str, float | int | None]:
+    mask_bool = np.asarray(mask_slice, dtype=bool)
+    voxels = np.asarray(image_slice, dtype=np.float32)[mask_bool]
+    if voxels.size == 0:
+        return {"voxel_count": 0, "mean_hu": None, "std_hu": None}
+    return {
+        "voxel_count": int(voxels.size),
+        "mean_hu": round(float(np.mean(voxels)), 2),
+        "std_hu": round(float(np.std(voxels)), 2),
+    }
+
+
+def _selected_phase_from_metadata(case_metadata: dict) -> str:
+    return str(
+        (
+            case_metadata.get("Pipeline", {})
+            .get("series_selection", {})
+            .get("SelectedPhase")
+        )
+        or case_metadata.get("SelectedPhase")
+        or ""
+    ).strip()
 
 
 def sagittal_plane_from_mask(mask: np.ndarray) -> tuple[np.ndarray, int, str]:
@@ -347,6 +385,11 @@ def create_secondary_capture(
                 if measurement.get("smi_cm2_m2") is not None
                 else ""
             )
+            + (
+                f", density={measurement['skeletal_muscle_density_hu_mean']:.2f} HU"
+                if measurement.get("skeletal_muscle_density_hu_mean") is not None
+                else ""
+            )
             + ")"
         ),
     )
@@ -393,17 +436,17 @@ def main() -> int:
         metric_dir.mkdir(parents=True, exist_ok=True)
 
         ct_path = study_nifti(args.case_id)
-        metadata_path = study_metadata_json(args.case_id)
-        metadata_source = "metadata_json"
-        if not metadata_path.exists():
-            metadata_path = case_dir / "metadata" / "id.json"
-            metadata_source = "id_json"
         l3_path = artifacts_dir / "total" / "vertebrae_L3.nii.gz"
         muscle_path = artifacts_dir / "tissue_types" / "skeletal_muscle.nii.gz"
         result_path = metric_dir / "result.json"
         overlay_sc_path = metric_dir / "overlay_sc.dcm"
 
-        missing = [str(path) for path in (ct_path, metadata_path, l3_path, muscle_path) if not path.exists()]
+        id_json_path = case_dir / "metadata" / "id.json"
+        metadata_json_path = study_metadata_json(args.case_id)
+        metadata_exists = metadata_json_path.exists() or id_json_path.exists()
+        missing = [str(path) for path in (ct_path, l3_path, muscle_path) if not path.exists()]
+        if not metadata_exists:
+            missing.append(str(metadata_json_path))
         if missing:
             if str(l3_path) in missing and len(missing) == 1:
                 payload = build_skip_payload(
@@ -423,7 +466,13 @@ def main() -> int:
                 print(json.dumps(payload, indent=2, ensure_ascii=False))
                 return 0
             raise RuntimeError(f"Required inputs not found: {missing}")
-        case_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        case_metadata, metadata_source = _load_case_metadata(args.case_id, case_dir)
+        selected_phase = _selected_phase_from_metadata(case_metadata)
+        technique_context = extract_study_technique_context(
+            id_data=case_metadata,
+            results={"SelectedPhase": selected_phase},
+        )
+        suppress_density = technique_context.get("contrast") is True
 
         ct_img = nib.load(str(ct_path))
         ct_data = np.asarray(ct_img.get_fdata(), dtype=np.float32)
@@ -436,6 +485,7 @@ def main() -> int:
             )
 
         l3_slice_indices, slice_idx = compute_center_slice(l3_mask)
+        ct_slice = np.asarray(ct_data[:, :, slice_idx], dtype=np.float32)
         muscle_slice = muscle_mask[:, :, slice_idx]
         total_slices = int(ct_data.shape[2])
         probable_viewer_slice_index_one_based = total_slices - slice_idx
@@ -444,12 +494,22 @@ def main() -> int:
         pixel_area_mm2 = spacing_x * spacing_y
         muscle_pixels = int(np.count_nonzero(muscle_slice))
         muscle_area_cm2 = (muscle_pixels * pixel_area_mm2) / 100.0
+        if suppress_density:
+            muscle_density_stats = {"voxel_count": muscle_pixels, "mean_hu": None, "std_hu": None}
+        else:
+            muscle_density_stats = calculate_mask_hu_statistics(ct_slice, muscle_slice)
         height_m = parse_optional_float(case_metadata.get("Height"))
+        weight_kg = parse_optional_float(
+            case_metadata.get("Weight") or case_metadata.get("PatientWeight")
+        )
         smi_cm2_m2 = None
         height_source = None
+        bmi_kg_m2 = None
         if height_m is not None and 0.8 <= height_m <= 2.5:
             smi_cm2_m2 = muscle_area_cm2 / (height_m**2)
             height_source = metadata_source
+            if weight_kg is not None and 20.0 <= weight_kg <= 400.0:
+                bmi_kg_m2 = weight_kg / (height_m**2)
 
         center_world = nib.affines.apply_affine(
             ct_img.affine,
@@ -465,6 +525,7 @@ def main() -> int:
                 slice_idx=slice_idx,
                 probable_viewer_slice_index_one_based=probable_viewer_slice_index_one_based,
                 muscle_area_cm2=muscle_area_cm2,
+                muscle_density_hu_mean=muscle_density_stats["mean_hu"],
                 height_m=height_m,
                 smi_cm2_m2=smi_cm2_m2,
                 locale=artifact_locale,
@@ -483,6 +544,11 @@ def main() -> int:
             )
             measurement_stub = {
                 "skeletal_muscle_area_cm2": float(muscle_area_cm2),
+                "skeletal_muscle_density_hu_mean": (
+                    float(muscle_density_stats["mean_hu"])
+                    if muscle_density_stats["mean_hu"] is not None
+                    else None
+                ),
                 "smi_cm2_m2": float(smi_cm2_m2) if smi_cm2_m2 is not None else None,
             }
             create_secondary_capture(overlay_rgb, overlay_sc_path, case_metadata, measurement_stub)
@@ -510,7 +576,14 @@ def main() -> int:
                 },
                 "pixel_area_mm2": pixel_area_mm2,
                 "skeletal_muscle_area_cm2": muscle_area_cm2,
+                "skeletal_muscle_density_hu_mean": muscle_density_stats["mean_hu"],
+                "skeletal_muscle_density_hu_std": muscle_density_stats["std_hu"],
                 "height_m": height_m,
+                "weight_kg": weight_kg,
+                "bmi_kg_m2": bmi_kg_m2,
+                "patient_sex": case_metadata.get("PatientSex") or case_metadata.get("Sex"),
+                "selected_phase": selected_phase or None,
+                "density_suppressed_due_to_contrast": bool(suppress_density),
                 "height_source": height_source,
                 "smi_cm2_m2": smi_cm2_m2,
                 "center_world_mm": {
