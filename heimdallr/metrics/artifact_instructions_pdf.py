@@ -12,8 +12,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 from PIL import Image, ImageDraw, ImageFont
+from pydicom.uid import generate_uid
 
+from heimdallr.metrics.jobs._dicom_secondary_capture import create_secondary_capture_from_rgb
 from heimdallr.shared import settings
 from heimdallr.shared.i18n import format_decimal, normalize_locale, translate
 from heimdallr.shared.paths import study_artifacts_dir, study_dir, study_id_json
@@ -769,6 +772,20 @@ def _collect_modules(case_dir: Path) -> list[InstructionModule]:
     return modules
 
 
+def _prepare_render_context(case_id: str) -> tuple[dict[str, Any], list[InstructionModule], str, str]:
+    locale = _pdf_locale()
+    case_folder = study_dir(case_id)
+    metadata = _safe_json(study_id_json(case_id))
+    modules = _collect_modules(case_folder)
+    if not modules:
+        raise RuntimeError(f"No completed metric modules found for {case_id}")
+    accession_number = str(metadata.get("AccessionNumber", "") or "-")
+    study_date = _format_study_date(metadata.get("StudyDate", ""))
+    patient_name = normalize_patient_name_display(str(metadata.get("PatientName", "") or ""), settings.PATIENT_NAME_PROFILE)
+    subtitle = _t("pdf.subtitle", locale=locale, accession_number=accession_number, study_date=study_date)
+    return metadata, modules, patient_name, subtitle
+
+
 def _render_cover(case_id: str, metadata: dict[str, Any], modules: list[InstructionModule]) -> Image.Image:
     locale = _pdf_locale()
     page, draw = _page()
@@ -853,27 +870,20 @@ def _render_module_page(
     return page
 
 
-def build_artifact_instructions_pdf(case_id: str, output_path: Path | None = None) -> Path:
-    locale = _pdf_locale()
-    case_folder = study_dir(case_id)
-    metadata = _safe_json(study_id_json(case_id))
-    modules = _collect_modules(case_folder)
-    if not modules:
-        raise RuntimeError(f"No completed metric modules found for {case_id}")
+def build_artifact_instruction_pages(case_id: str) -> list[Image.Image]:
+    metadata, modules, patient_name, subtitle = _prepare_render_context(case_id)
+    pages = [_render_cover(case_id, metadata, modules)]
+    for index, module in enumerate(modules, start=2):
+        pages.append(_render_module_page(case_id, subtitle, patient_name, module, index))
+    return pages
 
+
+def build_artifact_instructions_pdf(case_id: str, output_path: Path | None = None) -> Path:
     if output_path is None:
         output_path = study_artifacts_dir(case_id) / "metrics" / "instructions" / "artifact_instructions.pdf"
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    accession_number = str(metadata.get("AccessionNumber", "") or "-")
-    study_date = _format_study_date(metadata.get("StudyDate", ""))
-    patient_name = normalize_patient_name_display(str(metadata.get("PatientName", "") or ""), settings.PATIENT_NAME_PROFILE)
-    subtitle = _t("pdf.subtitle", locale=locale, accession_number=accession_number, study_date=study_date)
-
-    pages = [_render_cover(case_id, metadata, modules)]
-    for index, module in enumerate(modules, start=2):
-        pages.append(_render_module_page(case_id, subtitle, patient_name, module, index))
-
+    pages = build_artifact_instruction_pages(case_id)
     pages[0].save(
         output_path,
         "PDF",
@@ -882,6 +892,40 @@ def build_artifact_instructions_pdf(case_id: str, output_path: Path | None = Non
         append_images=pages[1:],
     )
     return output_path
+
+
+def build_artifact_instructions_secondary_capture(
+    case_id: str,
+    output_dir: Path | None = None,
+) -> dict[str, Any]:
+    if output_dir is None:
+        output_dir = study_artifacts_dir(case_id) / "metrics" / "instructions" / "dicom_sc"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    metadata, _modules, _patient_name, _subtitle = _prepare_render_context(case_id)
+    pages = build_artifact_instruction_pages(case_id)
+    series_uid = generate_uid()
+    page_paths: list[Path] = []
+
+    for index, page in enumerate(pages, start=1):
+        output_path = output_dir / f"page_{index:02d}.dcm"
+        rgb = np.asarray(page.convert("RGB"), dtype=np.uint8)
+        create_secondary_capture_from_rgb(
+            rgb,
+            output_path,
+            metadata,
+            series_instance_uid=series_uid,
+            series_description="Heimdallr Artifact Instructions SC",
+            series_number=941,
+            instance_number=index,
+            derivation_description="Rasterized Secondary Capture pages derived from Heimdallr artifact instruction layout.",
+        )
+        page_paths.append(output_path)
+
+    return {
+        "series_instance_uid": series_uid,
+        "paths": page_paths,
+    }
 
 
 def main() -> int:
