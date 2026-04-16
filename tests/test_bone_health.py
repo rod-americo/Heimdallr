@@ -11,7 +11,10 @@ from heimdallr.metrics.analysis.bone_health import (
     compute_l1_volumetric_metrics,
     extract_study_technique_context,
 )
-from heimdallr.metrics.jobs._bone_job_common import display_aspect_from_spacing_mm
+from heimdallr.metrics.jobs._bone_job_common import (
+    build_l1_sagittal_roi,
+    display_aspect_from_spacing_mm,
+)
 from heimdallr.metrics.jobs.bone_health_l1_hu import render_sagittal_overlay_rgb
 from heimdallr.metrics.jobs._bone_health_overlay_text import build_overlay_text, hu_mean_color
 
@@ -151,6 +154,26 @@ class TestBoneHealthHelpers(unittest.TestCase):
 
         self.assertEqual(rgb.ndim, 3)
         self.assertEqual(rgb.shape[2], 3)
+
+    def test_build_l1_sagittal_roi_prefers_ventral_component(self):
+        mask = np.zeros((9, 18, 18), dtype=bool)
+
+        # Ventral vertebral body component on a single sagittal plane.
+        mask[4, 2:7, 6:12] = True
+        # Larger dorsal component that should be ignored after erosion.
+        mask[4, 10:17, 5:13] = True
+
+        roi_mask, roi_info = build_l1_sagittal_roi(
+            mask,
+            spacing_mm=(1.0, 1.0, 1.0),
+            erosion_mm=1.0,
+            roi_radius_mm=2.0,
+        )
+
+        self.assertIsNotNone(roi_mask)
+        self.assertEqual(roi_info["status"], "ok")
+        self.assertTrue(roi_info["anterior_is_low_index"])
+        self.assertLess(roi_info["roi_center_2d"]["row"], 8.0)
 
     def test_hu_mean_color_uses_requested_thresholds(self):
         self.assertEqual(hu_mean_color(170.0), "white")
