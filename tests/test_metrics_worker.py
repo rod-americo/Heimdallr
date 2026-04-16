@@ -214,7 +214,7 @@ class TestMetricsWorker(unittest.TestCase):
             starts[("parenchymal_organ_volumetry", "end")],
         )
 
-    def test_segment_case_metrics_generates_instruction_pdf_before_egress(self):
+    def test_segment_case_metrics_generates_instruction_sc_by_default(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             case_id = "CasePDF_20260415_1"
@@ -242,6 +242,135 @@ class TestMetricsWorker(unittest.TestCase):
             )
             results_json_path.write_text("{}", encoding="utf-8")
             pdf_path = artifacts_dir / "artifact_instructions.pdf"
+            sc_dir = artifacts_dir / "dicom_sc"
+            sc_paths = [sc_dir / f"page_{idx:02d}.dcm" for idx in range(1, 3)]
+
+            def fake_build_pdf(_case_id: str) -> Path:
+                artifacts_dir.mkdir(parents=True, exist_ok=True)
+                pdf_path.write_bytes(b"%PDF-1.4\n%mock\n")
+                return pdf_path
+
+            def fake_build_sc(_case_id: str):
+                sc_dir.mkdir(parents=True, exist_ok=True)
+                for path in sc_paths:
+                    path.write_bytes(b"DICM")
+                return {
+                    "series_instance_uid": "1.2.3.4",
+                    "paths": sc_paths,
+                }
+
+            with (
+                patch("heimdallr.metrics.worker.study_id_json", return_value=id_json_path),
+                patch("heimdallr.metrics.worker.study_results_json", return_value=results_json_path),
+                patch("heimdallr.metrics.worker.study_logs_dir", return_value=logs_dir),
+                patch("heimdallr.metrics.worker.study_dir", return_value=case_dir),
+                patch("heimdallr.metrics.worker.load_metrics_pipeline_profile", return_value=("test_profile", {"jobs": [{"name": "l3_muscle_area"}]})),
+                patch("heimdallr.metrics.worker._validate_case_against_profile"),
+                patch("heimdallr.metrics.worker._resolve_enabled_jobs", return_value=[{"name": "l3_muscle_area"}]),
+                patch("heimdallr.metrics.worker._validate_job_dependency_graph"),
+                patch("heimdallr.metrics.worker._resolve_max_parallel_jobs", return_value=1),
+                patch(
+                    "heimdallr.metrics.worker._execute_jobs",
+                    return_value=([{"name": "l3_muscle_area", "status": "done"}], []),
+                ),
+                patch("heimdallr.metrics.worker._enqueue_case_dicom_exports", return_value=0) as enqueue_mock,
+                patch("heimdallr.metrics.worker.build_artifact_instructions_pdf", side_effect=fake_build_pdf),
+                patch("heimdallr.metrics.worker.build_artifact_instructions_secondary_capture", side_effect=fake_build_sc),
+                patch("heimdallr.metrics.worker.db_connect") as mock_connect,
+                patch("heimdallr.metrics.worker.store.update_metrics_completion"),
+                patch("heimdallr.metrics.worker.store.update_calculation_results"),
+                patch("heimdallr.metrics.worker.store.update_id_json"),
+            ):
+                mock_connect.return_value = MagicMock()
+                ok = segment_case_metrics(case_dir)
+
+            self.assertTrue(ok)
+            self.assertTrue(pdf_path.exists())
+            for path in sc_paths:
+                self.assertTrue(path.exists())
+            enqueue_call = enqueue_mock.call_args
+            self.assertIsNotNone(enqueue_call)
+            enqueued_exports = enqueue_call.args[2]
+            self.assertEqual(
+                enqueued_exports,
+                [
+                    {"path": "artifacts/metrics/instructions/dicom_sc/page_01.dcm", "kind": "secondary_capture"},
+                    {"path": "artifacts/metrics/instructions/dicom_sc/page_02.dcm", "kind": "secondary_capture"},
+                ],
+            )
+
+            results_payload = json.loads(results_json_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                results_payload["artifacts"]["artifact_instructions_pdf"],
+                {
+                    "path": "artifacts/metrics/instructions/artifact_instructions.pdf",
+                    "kind": "pdf",
+                    "locale": "pt_BR",
+                },
+            )
+            self.assertEqual(
+                results_payload["artifacts"]["artifact_instructions_sc"],
+                {
+                    "paths": [
+                        "artifacts/metrics/instructions/dicom_sc/page_01.dcm",
+                        "artifacts/metrics/instructions/dicom_sc/page_02.dcm",
+                    ],
+                    "kind": "secondary_capture",
+                    "series_instance_uid": "1.2.3.4",
+                    "locale": "pt_BR",
+                },
+            )
+
+            metadata_payload = json.loads(id_json_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                metadata_payload["Pipeline"]["metrics_pipeline"]["instruction_pdf"],
+                {
+                    "path": "artifacts/metrics/instructions/artifact_instructions.pdf",
+                    "kind": "pdf",
+                    "locale": "pt_BR",
+                },
+            )
+            self.assertEqual(
+                metadata_payload["Pipeline"]["metrics_pipeline"]["instruction_dicom"],
+                {
+                    "paths": [
+                        "artifacts/metrics/instructions/dicom_sc/page_01.dcm",
+                        "artifacts/metrics/instructions/dicom_sc/page_02.dcm",
+                    ],
+                    "kind": "secondary_capture",
+                    "series_instance_uid": "1.2.3.4",
+                    "locale": "pt_BR",
+                },
+            )
+
+    def test_segment_case_metrics_allows_encapsulated_pdf_instruction_export(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            case_id = "CasePDF_20260415_2"
+            case_dir = root / case_id
+            metadata_dir = case_dir / "metadata"
+            logs_dir = case_dir / "logs"
+            artifacts_dir = case_dir / "artifacts" / "metrics" / "instructions"
+            metadata_dir.mkdir(parents=True, exist_ok=True)
+            logs_dir.mkdir(parents=True, exist_ok=True)
+            id_json_path = metadata_dir / "id.json"
+            results_json_path = metadata_dir / "resultados.json"
+            id_json_path.write_text(
+                json.dumps(
+                    {
+                        "CaseID": case_id,
+                        "StudyInstanceUID": "1.2.4",
+                        "PatientName": "Alice Example",
+                        "AccessionNumber": "123",
+                        "StudyDate": "20260415",
+                        "Modality": "CT",
+                        "Pipeline": {"series_selection": {"SelectedPhase": "native"}},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            results_json_path.write_text("{}", encoding="utf-8")
+            pdf_path = artifacts_dir / "artifact_instructions.pdf"
             dicom_path = artifacts_dir / "artifact_instructions.dcm"
 
             def fake_build_pdf(_case_id: str) -> Path:
@@ -258,7 +387,10 @@ class TestMetricsWorker(unittest.TestCase):
                 patch("heimdallr.metrics.worker.study_results_json", return_value=results_json_path),
                 patch("heimdallr.metrics.worker.study_logs_dir", return_value=logs_dir),
                 patch("heimdallr.metrics.worker.study_dir", return_value=case_dir),
-                patch("heimdallr.metrics.worker.load_metrics_pipeline_profile", return_value=("test_profile", {"jobs": [{"name": "l3_muscle_area"}]})),
+                patch(
+                    "heimdallr.metrics.worker.load_metrics_pipeline_profile",
+                    return_value=("test_profile", {"execution": {"instruction_dicom_kind": "encapsulated_pdf"}, "jobs": [{"name": "l3_muscle_area"}]}),
+                ),
                 patch("heimdallr.metrics.worker._validate_case_against_profile"),
                 patch("heimdallr.metrics.worker._resolve_enabled_jobs", return_value=[{"name": "l3_muscle_area"}]),
                 patch("heimdallr.metrics.worker._validate_job_dependency_graph"),
@@ -281,50 +413,10 @@ class TestMetricsWorker(unittest.TestCase):
             self.assertTrue(ok)
             self.assertTrue(pdf_path.exists())
             self.assertTrue(dicom_path.exists())
-            enqueue_call = enqueue_mock.call_args
-            self.assertIsNotNone(enqueue_call)
-            enqueued_exports = enqueue_call.args[2]
+            enqueued_exports = enqueue_mock.call_args.args[2]
             self.assertEqual(
                 enqueued_exports,
-                [
-                    {"path": "artifacts/metrics/instructions/artifact_instructions.dcm", "kind": "encapsulated_pdf"},
-                ],
-            )
-
-            results_payload = json.loads(results_json_path.read_text(encoding="utf-8"))
-            self.assertEqual(
-                results_payload["artifacts"]["artifact_instructions_pdf"],
-                {
-                    "path": "artifacts/metrics/instructions/artifact_instructions.pdf",
-                    "kind": "pdf",
-                    "locale": "pt_BR",
-                },
-            )
-            self.assertEqual(
-                results_payload["artifacts"]["artifact_instructions_dicom"],
-                {
-                    "path": "artifacts/metrics/instructions/artifact_instructions.dcm",
-                    "kind": "encapsulated_pdf",
-                    "locale": "pt_BR",
-                },
-            )
-
-            metadata_payload = json.loads(id_json_path.read_text(encoding="utf-8"))
-            self.assertEqual(
-                metadata_payload["Pipeline"]["metrics_pipeline"]["instruction_pdf"],
-                {
-                    "path": "artifacts/metrics/instructions/artifact_instructions.pdf",
-                    "kind": "pdf",
-                    "locale": "pt_BR",
-                },
-            )
-            self.assertEqual(
-                metadata_payload["Pipeline"]["metrics_pipeline"]["instruction_dicom"],
-                {
-                    "path": "artifacts/metrics/instructions/artifact_instructions.dcm",
-                    "kind": "encapsulated_pdf",
-                    "locale": "pt_BR",
-                },
+                [{"path": "artifacts/metrics/instructions/artifact_instructions.dcm", "kind": "encapsulated_pdf"}],
             )
 
 

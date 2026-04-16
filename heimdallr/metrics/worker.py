@@ -19,6 +19,7 @@ from zoneinfo import ZoneInfo
 
 from heimdallr.metrics.artifact_instructions_pdf import (
     build_artifact_instructions_pdf,
+    build_artifact_instructions_secondary_capture,
 )
 from heimdallr.metrics.jobs._dicom_encapsulated_pdf import create_encapsulated_pdf_dicom
 from heimdallr.dicom_egress.config import build_egress_queue_items
@@ -343,15 +344,39 @@ def _generate_instruction_dicom_artifact(
     metadata: dict,
     logger: MetricsLogger,
     instruction_pdf: dict | None,
+    *,
+    delivery_kind: str,
 ) -> dict | None:
     if not instruction_pdf:
+        return None
+
+    case_root = study_dir(case_id)
+    if delivery_kind == "secondary_capture":
+        try:
+            generated = build_artifact_instructions_secondary_capture(case_id)
+        except Exception as exc:
+            logger.log(f"[Metrics] Warning: failed to generate instruction Secondary Capture series: {exc}")
+            return None
+
+        paths = [_artifact_relpath(case_id, Path(path)) for path in generated.get("paths", [])]
+        artifact_payload = {
+            "paths": paths,
+            "kind": "secondary_capture",
+            "series_instance_uid": str(generated.get("series_instance_uid", "") or ""),
+            "locale": settings.ARTIFACTS_LOCALE,
+        }
+        _record_metrics_artifact(case_id, "artifact_instructions_sc", artifact_payload, metadata)
+        logger.log(f"[Metrics] Generated instruction SC series with {len(paths)} page(s)")
+        return artifact_payload
+
+    if delivery_kind != "encapsulated_pdf":
+        logger.log(f"[Metrics] Warning: unsupported instruction DICOM delivery kind: {delivery_kind}")
         return None
 
     pdf_relpath = str(instruction_pdf.get("path", "") or "").strip()
     if not pdf_relpath:
         return None
 
-    case_root = study_dir(case_id)
     pdf_path = case_root / pdf_relpath
     dicom_path = case_root / "artifacts" / "metrics" / "instructions" / "artifact_instructions.dcm"
 
@@ -658,6 +683,16 @@ def _resolve_max_parallel_jobs(profile: dict) -> int:
         raise RuntimeError(f"Invalid max_parallel_jobs value: {value!r}")
 
 
+def _resolve_instruction_dicom_kind(profile: dict) -> str:
+    execution = profile.get("execution", {})
+    if not isinstance(execution, dict):
+        execution = {}
+    value = str(execution.get("instruction_dicom_kind", "secondary_capture") or "secondary_capture").strip()
+    if value not in {"secondary_capture", "encapsulated_pdf"}:
+        raise RuntimeError(f"Invalid instruction_dicom_kind value: {value!r}")
+    return value
+
+
 def _execute_jobs(
     case_id: str,
     jobs: list[dict],
@@ -793,12 +828,14 @@ def segment_case_metrics(case_input: Path) -> bool:
             return True
         _validate_job_dependency_graph(jobs)
         max_parallel_jobs = _resolve_max_parallel_jobs(profile)
+        instruction_dicom_kind = _resolve_instruction_dicom_kind(profile)
 
         start_dt = datetime.datetime.now(LOCAL_TZ)
         logger.log(f"=== Metrics Case: {case_id} ===")
         logger.log(f"[Metrics] Profile: {profile_name}")
         logger.log(f"[Metrics] Jobs: {', '.join(job['name'] for job in jobs)}")
         logger.log(f"[Metrics] Max parallel jobs: {max_parallel_jobs}")
+        logger.log(f"[Metrics] Instruction DICOM kind: {instruction_dicom_kind}")
 
         pipeline = metadata.get("Pipeline", {})
         pipeline["metrics_start_time"] = start_dt.isoformat()
@@ -817,14 +854,29 @@ def segment_case_metrics(case_input: Path) -> bool:
             metadata=metadata,
         )
         instruction_pdf = _generate_instruction_pdf_artifact(case_id, metadata, logger)
-        instruction_dicom = _generate_instruction_dicom_artifact(case_id, metadata, logger, instruction_pdf)
+        instruction_dicom = _generate_instruction_dicom_artifact(
+            case_id,
+            metadata,
+            logger,
+            instruction_pdf,
+            delivery_kind=instruction_dicom_kind,
+        )
         if instruction_dicom:
-            dicom_exports.append(
-                {
-                    "path": str(instruction_dicom["path"]),
-                    "kind": str(instruction_dicom["kind"]),
-                }
-            )
+            if instruction_dicom["kind"] == "secondary_capture":
+                for path in instruction_dicom.get("paths", []):
+                    dicom_exports.append(
+                        {
+                            "path": str(path),
+                            "kind": "secondary_capture",
+                        }
+                    )
+            else:
+                dicom_exports.append(
+                    {
+                        "path": str(instruction_dicom["path"]),
+                        "kind": str(instruction_dicom["kind"]),
+                    }
+                )
 
         try:
             enqueued_dicom_exports = _enqueue_case_dicom_exports(
@@ -846,6 +898,7 @@ def segment_case_metrics(case_input: Path) -> bool:
         pipeline["metrics_pipeline"] = {
             "profile": profile_name,
             "max_parallel_jobs": max_parallel_jobs,
+            "instruction_dicom_kind": instruction_dicom_kind,
             "jobs": completed_jobs,
             "instruction_pdf": instruction_pdf,
             "instruction_dicom": instruction_dicom,
