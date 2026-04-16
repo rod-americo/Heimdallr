@@ -17,7 +17,17 @@ def build_overlay_text(
     locale: str,
 ) -> list[str]:
     """Build compact summary lines for hepatic-segment overlays."""
-    lines = ["Liver segments (5 mm)"]
+    roman_labels = {
+        "liver_segment_1": "I",
+        "liver_segment_2": "II",
+        "liver_segment_3": "III",
+        "liver_segment_4": "IV",
+        "liver_segment_5": "V",
+        "liver_segment_6": "VI",
+        "liver_segment_7": "VII",
+        "liver_segment_8": "VIII",
+    }
+    lines = ["Segmentos hepáticos:"]
     for segment_key in (
         "liver_segment_1",
         "liver_segment_2",
@@ -32,6 +42,6 @@ def build_overlay_text(
         volume_cm3 = measurement.get("volume_cm3")
         if volume_cm3 is None:
             continue
-        label = segment_key.removeprefix("liver_segment_").strip()
-        lines.append(f"S{label}: {format_integer(volume_cm3, locale=locale)} cm³")
+        label = roman_labels[segment_key]
+        lines.append(f"{label}: {format_integer(volume_cm3, locale=locale)} cm³")
     return lines
