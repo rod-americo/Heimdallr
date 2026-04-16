@@ -23,9 +23,9 @@ class TestLiverSegmentsOverlayText(unittest.TestCase):
         self.assertEqual(
             lines,
             [
-                "Liver segments (5 mm)",
-                "S1: 89 cm³",
-                "S2: 1.355 cm³",
+                "Segmentos hepáticos:",
+                "I: 89 cm³",
+                "II: 1.355 cm³",
             ],
         )
 
