@@ -29,6 +29,22 @@ class TestLiverSegmentsOverlayText(unittest.TestCase):
             ],
         )
 
+    def test_build_overlay_text_uses_english_translation(self):
+        lines = build_overlay_text(
+            segment_measurements={
+                "liver_segment_4": {"volume_cm3": 204.0},
+            },
+            locale="en_US",
+        )
+
+        self.assertEqual(
+            lines,
+            [
+                "Hepatic segments:",
+                "IV: 204 cm³",
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

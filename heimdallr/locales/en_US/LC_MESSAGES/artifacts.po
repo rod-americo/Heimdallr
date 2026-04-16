@@ -88,6 +88,33 @@ msgstr "Heimdallr L1 Bone Health Sagittal Overlay"
 msgid "bone_health.overlay.derivation_description"
 msgstr "Burned-in sagittal L1 trabecular ROI generated from Heimdallr bone health metric (HU={hu_mean})"
 
+msgid "liver_segments.overlay.title"
+msgstr "Hepatic segments:"
+
+msgid "liver_segments.overlay.liver_segment_1"
+msgstr "I: {volume} cm³"
+
+msgid "liver_segments.overlay.liver_segment_2"
+msgstr "II: {volume} cm³"
+
+msgid "liver_segments.overlay.liver_segment_3"
+msgstr "III: {volume} cm³"
+
+msgid "liver_segments.overlay.liver_segment_4"
+msgstr "IV: {volume} cm³"
+
+msgid "liver_segments.overlay.liver_segment_5"
+msgstr "V: {volume} cm³"
+
+msgid "liver_segments.overlay.liver_segment_6"
+msgstr "VI: {volume} cm³"
+
+msgid "liver_segments.overlay.liver_segment_7"
+msgstr "VII: {volume} cm³"
+
+msgid "liver_segments.overlay.liver_segment_8"
+msgstr "VIII: {volume} cm³"
+
 msgid "vertebral_fracture.overlay.title"
 msgstr "Vertebral fracture screen"
 
