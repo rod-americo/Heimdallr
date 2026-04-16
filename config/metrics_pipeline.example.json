@@ -15,7 +15,8 @@
         ]
       },
       "execution": {
-        "max_parallel_jobs": 4
+        "max_parallel_jobs": 4,
+        "instruction_dicom_kind": "secondary_capture"
       },
       "jobs": [
         {
