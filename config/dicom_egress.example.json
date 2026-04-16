@@ -12,7 +12,8 @@
       "port": 104,
       "called_aet": "REMOTE_AET",
       "artifact_types": [
-        "secondary_capture"
+        "secondary_capture",
+        "encapsulated_pdf"
       ]
     }
   ]

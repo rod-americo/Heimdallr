@@ -17,6 +17,8 @@ import time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from heimdallr.metrics.artifact_instructions_pdf import build_artifact_instructions_pdf
+from heimdallr.metrics.jobs._dicom_encapsulated_pdf import create_encapsulated_pdf_dicom
 from heimdallr.dicom_egress.config import build_egress_queue_items
 from heimdallr.shared import settings, store
 from heimdallr.shared.paths import study_dir, study_id_json, study_logs_dir, study_results_json
@@ -270,6 +272,14 @@ def _record_metrics_pipeline_state(
 
 def _upsert_results(case_id: str, metric_key: str, payload: dict, metadata: dict) -> None:
     results_path = study_results_json(case_id)
+    results = _load_results(case_id)
+
+    results.setdefault("metrics", {})[metric_key] = payload
+    _write_results(case_id, results, metadata)
+
+
+def _load_results(case_id: str) -> dict:
+    results_path = study_results_json(case_id)
     if results_path.exists():
         try:
             results = json.loads(results_path.read_text(encoding="utf-8"))
@@ -279,8 +289,11 @@ def _upsert_results(case_id: str, metric_key: str, payload: dict, metadata: dict
         results = {}
     if not isinstance(results, dict):
         results = {}
+    return results
 
-    results.setdefault("metrics", {})[metric_key] = payload
+
+def _write_results(case_id: str, results: dict, metadata: dict) -> None:
+    results_path = study_results_json(case_id)
     results_path.write_text(json.dumps(results, indent=2), encoding="utf-8")
 
     study_uid = metadata.get("StudyInstanceUID")
@@ -290,6 +303,74 @@ def _upsert_results(case_id: str, metric_key: str, payload: dict, metadata: dict
             store.update_calculation_results(conn, study_uid, results)
         finally:
             conn.close()
+
+
+def _record_metrics_artifact(case_id: str, artifact_key: str, artifact_payload: dict, metadata: dict) -> None:
+    results = _load_results(case_id)
+    results.setdefault("artifacts", {})[artifact_key] = artifact_payload
+    _write_results(case_id, results, metadata)
+
+
+def _artifact_relpath(case_id: str, artifact_path: Path) -> str:
+    case_root = study_dir(case_id)
+    try:
+        return str(artifact_path.relative_to(case_root))
+    except ValueError:
+        return str(artifact_path)
+
+
+def _generate_instruction_pdf_artifact(case_id: str, metadata: dict, logger: MetricsLogger) -> dict | None:
+    try:
+        pdf_path = build_artifact_instructions_pdf(case_id)
+    except Exception as exc:
+        logger.log(f"[Metrics] Warning: failed to generate instruction PDF: {exc}")
+        return None
+
+    artifact_payload = {
+        "path": _artifact_relpath(case_id, pdf_path),
+        "kind": "pdf",
+        "locale": settings.ARTIFACTS_LOCALE,
+    }
+    _record_metrics_artifact(case_id, "artifact_instructions_pdf", artifact_payload, metadata)
+    logger.log(f"[Metrics] Generated instruction PDF: {artifact_payload['path']}")
+    return artifact_payload
+
+
+def _generate_instruction_pdf_dicom_artifact(
+    case_id: str,
+    metadata: dict,
+    logger: MetricsLogger,
+    *,
+    pdf_artifact: dict | None,
+) -> dict | None:
+    if not pdf_artifact:
+        return None
+
+    pdf_path = study_dir(case_id) / str(pdf_artifact.get("path", "") or "")
+    output_path = study_dir(case_id) / "artifacts" / "metrics" / "instructions" / "artifact_instructions.dcm"
+    try:
+        create_encapsulated_pdf_dicom(
+            pdf_path,
+            output_path,
+            metadata,
+            series_description="Heimdallr Artifact Instructions PDF",
+            document_title="Heimdallr Artifact Instructions",
+            series_number=940,
+            instance_number=1,
+        )
+    except Exception as exc:
+        logger.log(f"[Metrics] Warning: failed to generate Encapsulated PDF DICOM: {exc}")
+        return None
+
+    artifact_payload = {
+        "path": _artifact_relpath(case_id, output_path),
+        "kind": "encapsulated_pdf",
+        "source_pdf": str(pdf_artifact.get("path", "") or ""),
+        "locale": settings.ARTIFACTS_LOCALE,
+    }
+    _record_metrics_artifact(case_id, "artifact_instructions_dicom", artifact_payload, metadata)
+    logger.log(f"[Metrics] Generated Encapsulated PDF DICOM: {artifact_payload['path']}")
+    return artifact_payload
 
 
 def _artifact_sha256(path: Path) -> str:
@@ -327,7 +408,7 @@ def _validate_case_against_profile(case_id: str, metadata: dict, profile_name: s
         .get("series_selection", {})
         .get("SelectedPhase", "")
     ).strip().lower()
-    if required_phases and selected_phase not in required_phases:
+    if required_phases and not _phase_allowed_with_fallback(required_phases, selected_phase):
         raise RuntimeError(
             f"Metrics profile '{profile_name}' requires phase in {sorted(required_phases)}, got {selected_phase or 'unknown'}"
         )
@@ -338,6 +419,18 @@ def _expand_allowed_phases_with_portal_fallback(phases) -> set[str]:
     if "native" in allowed:
         allowed.add("portal_venous")
     return allowed
+
+
+def _is_contrast_phase(value: str) -> bool:
+    phase = str(value or "").strip().lower()
+    return any(token in phase for token in ("arterial", "venous", "portal", "delayed", "contrast", "enhanced", "post"))
+
+
+def _phase_allowed_with_fallback(allowed_phases: set[str], selected_phase: str) -> bool:
+    normalized_selected_phase = str(selected_phase or "").strip().lower()
+    if normalized_selected_phase in allowed_phases:
+        return True
+    return "native" in allowed_phases and _is_contrast_phase(normalized_selected_phase)
 
 
 def _run_job(case_id: str, job: dict, log_dir: Path) -> dict:
@@ -717,6 +810,20 @@ def segment_case_metrics(case_input: Path) -> bool:
             logger=logger,
             metadata=metadata,
         )
+        instruction_pdf = _generate_instruction_pdf_artifact(case_id, metadata, logger)
+        instruction_dicom = _generate_instruction_pdf_dicom_artifact(
+            case_id,
+            metadata,
+            logger,
+            pdf_artifact=instruction_pdf,
+        )
+        if instruction_dicom:
+            dicom_exports.append(
+                {
+                    "path": str(instruction_dicom["path"]),
+                    "kind": str(instruction_dicom["kind"]),
+                }
+            )
 
         try:
             enqueued_dicom_exports = _enqueue_case_dicom_exports(
@@ -739,6 +846,8 @@ def segment_case_metrics(case_input: Path) -> bool:
             "profile": profile_name,
             "max_parallel_jobs": max_parallel_jobs,
             "jobs": completed_jobs,
+            "instruction_pdf": instruction_pdf,
+            "instruction_dicom": instruction_dicom,
             "dicom_egress_items_enqueued": enqueued_dicom_exports,
         }
         metadata["Pipeline"] = pipeline

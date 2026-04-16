@@ -16,6 +16,7 @@ def build_overlay_text(
     slice_idx: int,
     probable_viewer_slice_index_one_based: int,
     muscle_area_cm2: float,
+    muscle_density_hu_mean: float | None,
     height_m: float | None,
     smi_cm2_m2: float | None,
     locale: str,
@@ -31,6 +32,15 @@ def build_overlay_text(
         translate("l3.overlay.nifti_slice", locale=locale, value=slice_idx),
         translate("l3.overlay.viewer_slice", locale=locale, value=probable_viewer_slice_index_one_based),
     ]
+    if muscle_density_hu_mean is not None:
+        summary_lines.insert(
+            1,
+            translate(
+                "l3.overlay.density",
+                locale=locale,
+                value=format_decimal(muscle_density_hu_mean, 0, locale=locale),
+            ),
+        )
     if height_m is not None:
         summary_lines.append(
             translate(

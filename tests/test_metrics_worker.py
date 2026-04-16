@@ -15,6 +15,7 @@ from heimdallr.metrics.worker import (
     _resolve_job_module_name,
     _resolve_max_parallel_jobs,
     _validate_job_dependency_graph,
+    segment_case_metrics,
 )
 
 
@@ -132,6 +133,23 @@ class TestMetricsWorker(unittest.TestCase):
             {"required": {"modality": "CT", "selected_phase": ["native"]}},
         )
 
+    def test_validate_case_against_profile_accepts_any_contrast_fallback(self):
+        metadata = {
+            "Modality": "CT",
+            "Pipeline": {
+                "series_selection": {
+                    "SelectedPhase": "arterial",
+                }
+            },
+        }
+
+        _validate_case_against_profile(
+            "case-1",
+            metadata,
+            "ct_native_basic_metrics",
+            {"required": {"modality": "CT", "selected_phase": ["native"]}},
+        )
+
     def test_execute_jobs_runs_independent_jobs_before_dependents(self):
         jobs = _resolve_enabled_jobs(
             {
@@ -195,6 +213,119 @@ class TestMetricsWorker(unittest.TestCase):
             starts[("opportunistic_osteoporosis_composite", "start")],
             starts[("parenchymal_organ_volumetry", "end")],
         )
+
+    def test_segment_case_metrics_generates_instruction_pdf_before_egress(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            case_id = "CasePDF_20260415_1"
+            case_dir = root / case_id
+            metadata_dir = case_dir / "metadata"
+            logs_dir = case_dir / "logs"
+            artifacts_dir = case_dir / "artifacts" / "metrics" / "instructions"
+            metadata_dir.mkdir(parents=True, exist_ok=True)
+            logs_dir.mkdir(parents=True, exist_ok=True)
+            id_json_path = metadata_dir / "id.json"
+            results_json_path = metadata_dir / "resultados.json"
+            id_json_path.write_text(
+                json.dumps(
+                    {
+                        "CaseID": case_id,
+                        "StudyInstanceUID": "1.2.3",
+                        "PatientName": "Alice Example",
+                        "AccessionNumber": "123",
+                        "StudyDate": "20260415",
+                        "Modality": "CT",
+                        "Pipeline": {"series_selection": {"SelectedPhase": "native"}},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            results_json_path.write_text("{}", encoding="utf-8")
+            pdf_path = artifacts_dir / "artifact_instructions.pdf"
+            dcm_path = artifacts_dir / "artifact_instructions.dcm"
+
+            def fake_build_pdf(_case_id: str) -> Path:
+                artifacts_dir.mkdir(parents=True, exist_ok=True)
+                pdf_path.write_bytes(b"%PDF-1.4\n%mock\n")
+                return pdf_path
+
+            def fake_build_dicom(*args, **kwargs):
+                artifacts_dir.mkdir(parents=True, exist_ok=True)
+                dcm_path.write_bytes(b"DICM")
+
+            with (
+                patch("heimdallr.metrics.worker.study_id_json", return_value=id_json_path),
+                patch("heimdallr.metrics.worker.study_results_json", return_value=results_json_path),
+                patch("heimdallr.metrics.worker.study_logs_dir", return_value=logs_dir),
+                patch("heimdallr.metrics.worker.study_dir", return_value=case_dir),
+                patch("heimdallr.metrics.worker.load_metrics_pipeline_profile", return_value=("test_profile", {"jobs": [{"name": "l3_muscle_area"}]})),
+                patch("heimdallr.metrics.worker._validate_case_against_profile"),
+                patch("heimdallr.metrics.worker._resolve_enabled_jobs", return_value=[{"name": "l3_muscle_area"}]),
+                patch("heimdallr.metrics.worker._validate_job_dependency_graph"),
+                patch("heimdallr.metrics.worker._resolve_max_parallel_jobs", return_value=1),
+                patch(
+                    "heimdallr.metrics.worker._execute_jobs",
+                    return_value=([{"name": "l3_muscle_area", "status": "done"}], []),
+                ),
+                patch("heimdallr.metrics.worker._enqueue_case_dicom_exports", return_value=0) as enqueue_mock,
+                patch("heimdallr.metrics.worker.build_artifact_instructions_pdf", side_effect=fake_build_pdf),
+                patch("heimdallr.metrics.worker.create_encapsulated_pdf_dicom", side_effect=fake_build_dicom),
+                patch("heimdallr.metrics.worker.db_connect") as mock_connect,
+                patch("heimdallr.metrics.worker.store.update_metrics_completion"),
+                patch("heimdallr.metrics.worker.store.update_calculation_results"),
+                patch("heimdallr.metrics.worker.store.update_id_json"),
+            ):
+                mock_connect.return_value = MagicMock()
+                ok = segment_case_metrics(case_dir)
+
+            self.assertTrue(ok)
+            self.assertTrue(pdf_path.exists())
+            self.assertTrue(dcm_path.exists())
+            enqueue_call = enqueue_mock.call_args
+            self.assertIsNotNone(enqueue_call)
+            enqueued_exports = enqueue_call.args[2]
+            self.assertIn(
+                {"path": "artifacts/metrics/instructions/artifact_instructions.dcm", "kind": "encapsulated_pdf"},
+                enqueued_exports,
+            )
+
+            results_payload = json.loads(results_json_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                results_payload["artifacts"]["artifact_instructions_pdf"],
+                {
+                    "path": "artifacts/metrics/instructions/artifact_instructions.pdf",
+                    "kind": "pdf",
+                    "locale": "pt_BR",
+                },
+            )
+            self.assertEqual(
+                results_payload["artifacts"]["artifact_instructions_dicom"],
+                {
+                    "path": "artifacts/metrics/instructions/artifact_instructions.dcm",
+                    "kind": "encapsulated_pdf",
+                    "source_pdf": "artifacts/metrics/instructions/artifact_instructions.pdf",
+                    "locale": "pt_BR",
+                },
+            )
+
+            metadata_payload = json.loads(id_json_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                metadata_payload["Pipeline"]["metrics_pipeline"]["instruction_pdf"],
+                {
+                    "path": "artifacts/metrics/instructions/artifact_instructions.pdf",
+                    "kind": "pdf",
+                    "locale": "pt_BR",
+                },
+            )
+            self.assertEqual(
+                metadata_payload["Pipeline"]["metrics_pipeline"]["instruction_dicom"],
+                {
+                    "path": "artifacts/metrics/instructions/artifact_instructions.dcm",
+                    "kind": "encapsulated_pdf",
+                    "source_pdf": "artifacts/metrics/instructions/artifact_instructions.pdf",
+                    "locale": "pt_BR",
+                },
+            )
 
 
 if __name__ == "__main__":

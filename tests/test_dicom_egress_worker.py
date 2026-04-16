@@ -4,9 +4,10 @@ import unittest
 from unittest.mock import patch
 
 from pydicom.dataset import Dataset, FileMetaDataset
-from pydicom.uid import ExplicitVRLittleEndian, JPEGLosslessSV1, SecondaryCaptureImageStorage
+from pydicom.uid import EncapsulatedPDFStorage, ExplicitVRLittleEndian, JPEGLosslessSV1, SecondaryCaptureImageStorage
 
 from heimdallr.dicom_egress import worker
+from heimdallr.metrics.jobs._dicom_encapsulated_pdf import create_encapsulated_pdf_dicom
 from heimdallr.shared import store
 
 
@@ -74,6 +75,40 @@ class TestDicomEgressWorker(unittest.TestCase):
 
         self.assertIs(prepared, transcoded)
         transcode.assert_called_once_with(worker.Path(source_path), JPEGLosslessSV1)
+
+
+class TestEncapsulatedPdfDicom(unittest.TestCase):
+    def test_create_encapsulated_pdf_dicom_sets_expected_tags(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = worker.Path(tmpdir)
+            pdf_path = tmp_path / "instructions.pdf"
+            output_path = tmp_path / "instructions.dcm"
+            pdf_path.write_bytes(b"%PDF-1.4\n%mock\n")
+
+            create_encapsulated_pdf_dicom(
+                pdf_path,
+                output_path,
+                {
+                    "StudyInstanceUID": "1.2.3",
+                    "PatientName": "Alice Example",
+                    "PatientID": "123",
+                    "AccessionNumber": "ACC-1",
+                    "StudyDate": "20260415",
+                    "PatientSex": "F",
+                },
+                series_description="Heimdallr Artifact Instructions PDF",
+                document_title="Heimdallr Artifact Instructions",
+                series_number=940,
+                instance_number=1,
+            )
+
+            ds = worker.pydicom.dcmread(str(output_path))
+            self.assertEqual(ds.SOPClassUID, EncapsulatedPDFStorage)
+            self.assertEqual(ds.Modality, "DOC")
+            self.assertEqual(ds.MIMETypeOfEncapsulatedDocument, "application/pdf")
+            self.assertEqual(ds.SeriesDescription, "Heimdallr Artifact Instructions PDF")
+            self.assertEqual(ds.DocumentTitle, "Heimdallr Artifact Instructions")
+            self.assertEqual(bytes(ds.EncapsulatedDocument).rstrip(b"\x00"), b"%PDF-1.4\n%mock\n")
 
 
 class TestStudyMetadataUpsert(unittest.TestCase):

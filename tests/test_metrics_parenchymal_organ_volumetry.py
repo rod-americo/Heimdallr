@@ -131,6 +131,57 @@ class TestParenchymalOrganVolumetryJob(unittest.TestCase):
             self.assertEqual(int(ds.InstanceNumber), 1)
             self.assertEqual(str(ds.Modality), "OT")
 
+    def test_job_suppresses_hu_outputs_for_contrast_series(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            case_id = "CaseParenchyma_Contrast_20260404_001"
+            case_dir = tmp_path / case_id
+            (case_dir / "metadata").mkdir(parents=True)
+            (case_dir / "derived").mkdir(parents=True)
+            (case_dir / "artifacts" / "total").mkdir(parents=True)
+
+            id_payload = {
+                "CaseID": case_id,
+                "Modality": "CT",
+                "StudyInstanceUID": "1.2.826.0.1.3680043.8.498.2",
+                "PatientName": "Test^Patient",
+                "PatientID": "P002",
+                "Pipeline": {"series_selection": {"SelectedPhase": "arterial"}},
+            }
+            (case_dir / "metadata" / "id.json").write_text(json.dumps(id_payload), encoding="utf-8")
+            (case_dir / "metadata" / "metadata.json").write_text(json.dumps(id_payload), encoding="utf-8")
+            (case_dir / "metadata" / "resultados.json").write_text("{}", encoding="utf-8")
+
+            shape = (12, 12, 8)
+            ct = np.zeros(shape, dtype=np.float32)
+            ct[2:8, 2:8, 2:6] = 60.0
+            write_nifti(case_dir / "derived" / f"{case_id}.nii.gz", ct, spacing=(1.0, 1.0, 1.0))
+
+            liver = np.zeros(shape, dtype=np.float32)
+            liver[2:8, 2:8, 2:6] = 1.0
+            write_nifti(case_dir / "artifacts" / "total" / "liver.nii.gz", liver)
+
+            with patch.object(settings, "STUDIES_DIR", tmp_path):
+                with patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "parenchymal_organ_volumetry",
+                        "--case-id",
+                        case_id,
+                        "--job-config-json",
+                        '{"generate_overlay": true, "emit_secondary_capture_dicom": false}',
+                    ],
+                ):
+                    self.assertEqual(parenchymal_organ_volumetry.main(), 0)
+
+            result_path = case_dir / "artifacts" / "metrics" / "parenchymal_organ_volumetry" / "result.json"
+            result = json.loads(result_path.read_text(encoding="utf-8"))
+
+            self.assertTrue(result["measurement"]["density_suppressed_due_to_contrast"])
+            self.assertIsNone(result["measurement"]["organs"]["liver"]["hu_mean"])
+            self.assertIsNone(result["measurement"]["organs"]["liver"]["hu_std"])
+
 
 if __name__ == "__main__":
     unittest.main()

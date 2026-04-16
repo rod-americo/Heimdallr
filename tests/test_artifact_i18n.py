@@ -30,6 +30,7 @@ class TestArtifactI18n(unittest.TestCase):
             slice_idx=87,
             probable_viewer_slice_index_one_based=164,
             muscle_area_cm2=42.15,
+            muscle_density_hu_mean=31.6,
             height_m=1.75,
             smi_cm2_m2=13.76,
             locale="pt_BR",
@@ -40,6 +41,7 @@ class TestArtifactI18n(unittest.TestCase):
             lines,
             [
                 "SMA (Área músculo-esquelética): 42,1 cm²",
+                "Densidade média muscular: 32 UH",
                 "Corte NIfTI: 87",
                 "Provável corte no visualizador: 164",
                 "Altura do paciente: 1,75 m",
@@ -52,6 +54,7 @@ class TestArtifactI18n(unittest.TestCase):
             slice_idx=12,
             probable_viewer_slice_index_one_based=42,
             muscle_area_cm2=38.04,
+            muscle_density_hu_mean=28.4,
             height_m=1.82,
             smi_cm2_m2=11.48,
             locale="en_US",
@@ -62,10 +65,33 @@ class TestArtifactI18n(unittest.TestCase):
             lines,
             [
                 "SMA (Skeletal muscle area): 38.0 cm²",
+                "Mean muscle density: 28 HU",
                 "NIfTI slice: 12",
                 "Probable viewer slice: 42",
                 "Patient height: 1.82 m",
                 "SMI (Skeletal Muscle Index): 11.5 cm²/m²",
+            ],
+        )
+
+    def test_l3_overlay_text_omits_density_when_unavailable(self):
+        _title, lines = build_overlay_text(
+            slice_idx=12,
+            probable_viewer_slice_index_one_based=42,
+            muscle_area_cm2=38.04,
+            muscle_density_hu_mean=None,
+            height_m=1.82,
+            smi_cm2_m2=11.48,
+            locale="pt_BR",
+        )
+
+        self.assertEqual(
+            lines,
+            [
+                "SMA (Área músculo-esquelética): 38,0 cm²",
+                "Corte NIfTI: 12",
+                "Provável corte no visualizador: 42",
+                "Altura do paciente: 1,82 m",
+                "SMI (Índice de Massa Muscular Esquelética): 11,5 cm²/m²",
             ],
         )
 
@@ -133,6 +159,22 @@ class TestArtifactI18n(unittest.TestCase):
         self.assertEqual(
             parenchymal_series_description("en_US"),
             "Heimdallr Parenchymal Organ Overlay 5 mm",
+        )
+
+    def test_parenchymal_overlay_text_supports_volume_only_lines(self):
+        lines = build_parenchymal_overlay_text(
+            organ_measurements={
+                "liver": {"analysis_status": "complete", "observed_volume_cm3": 1355.0, "hu_mean": None},
+            },
+            locale="pt_BR",
+        )
+
+        self.assertEqual(
+            lines,
+            [
+                "Órgãos parenquimatosos:",
+                "Fígado: 1.355 cm³",
+            ],
         )
 
 
