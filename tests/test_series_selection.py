@@ -120,6 +120,12 @@ class TestSeriesSelection(unittest.TestCase):
                                 "required": {"modality": "CT", "min_slices": 120},
                                 "hard_reject": {},
                                 "phase_priority": ["native", "portal_venous"],
+                                "follow_up_coverage": {
+                                    "enabled": True,
+                                    "when_previous_coverage": ["chest_only"],
+                                    "prefer_region": "abdomen",
+                                    "require_different_series": True,
+                                },
                                 "text_hints": {
                                     "description_avoid": [],
                                     "kernel_avoid": [],
@@ -178,6 +184,12 @@ class TestSeriesSelection(unittest.TestCase):
                                 "required": {"modality": "CT", "min_slices": 120},
                                 "hard_reject": {},
                                 "phase_priority": ["native", "portal_venous"],
+                                "follow_up_coverage": {
+                                    "enabled": True,
+                                    "when_previous_coverage": ["chest_only"],
+                                    "prefer_region": "abdomen",
+                                    "require_different_series": True,
+                                },
                                 "text_hints": {
                                     "description_avoid": [],
                                     "kernel_avoid": [],
@@ -240,6 +252,12 @@ class TestSeriesSelection(unittest.TestCase):
                                 "required": {"modality": "CT", "min_slices": 120},
                                 "hard_reject": {},
                                 "phase_priority": ["native", "portal_venous"],
+                                "follow_up_coverage": {
+                                    "enabled": True,
+                                    "when_previous_coverage": ["chest_only"],
+                                    "prefer_region": "abdomen",
+                                    "require_different_series": True,
+                                },
                                 "text_hints": {
                                     "description_avoid": [],
                                     "kernel_avoid": [],
@@ -318,6 +336,7 @@ class TestSeriesSelection(unittest.TestCase):
 
         self.assertEqual(selected_path.name, "abdomen.nii.gz")
         self.assertEqual(selection_info["SelectedSeriesInstanceUID"], "1.2.3.abdomen")
+        self.assertIn("follow_up_policy=abdomen", selection_info["SelectionReason"])
         self.assertIn("follow_up_after=chest_only", selection_info["SelectionReason"])
 
     def test_classifies_chest_and_abdomen_complete_coverage(self):
