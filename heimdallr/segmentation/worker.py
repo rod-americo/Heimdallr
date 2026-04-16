@@ -45,10 +45,7 @@ from heimdallr.shared.paths import (
     study_logs_dir,
     study_metadata_dir,
 )
-from heimdallr.shared.segmentation_coverage import (
-    SEGMENTATION_COVERAGE_CHEST_ONLY,
-    classify_segmentation_coverage,
-)
+from heimdallr.shared.segmentation_coverage import classify_segmentation_coverage
 from heimdallr.shared.sqlite import connect as db_connect
 
 settings.configure_service_stdio()
@@ -503,9 +500,11 @@ def _series_region_hint(series: dict) -> str:
     return "unknown"
 
 
-def _choose_follow_up_candidate_after_chest_only(
+def _choose_follow_up_candidate(
     selected: dict,
     candidates: list[dict],
+    *,
+    preferred_region: str,
     previous_series_uid: str | None,
 ) -> dict:
     selected_uid = str(selected["series"].get("SeriesInstanceUID") or "")
@@ -521,13 +520,13 @@ def _choose_follow_up_candidate_after_chest_only(
     if not alternative_candidates:
         return selected
 
-    abdominal_candidates = [
+    preferred_candidates = [
         candidate
         for candidate in alternative_candidates
-        if _series_region_hint(candidate["series"]) == "abdomen"
+        if _series_region_hint(candidate["series"]) == preferred_region
     ]
-    if abdominal_candidates:
-        return abdominal_candidates[0]
+    if preferred_candidates:
+        return preferred_candidates[0]
     return alternative_candidates[0]
 
 
@@ -545,6 +544,7 @@ def select_prepared_series(case_id, id_data):
     required = profile.get("required", {})
     hard_reject = profile.get("hard_reject", {})
     text_hints = profile.get("text_hints", {})
+    follow_up_coverage = profile.get("follow_up_coverage", {})
     phase_priority = [_normalize_phase(p) for p in profile.get("phase_priority", ["unknown"])]
     phase_rank = {phase: idx for idx, phase in enumerate(phase_priority)}
     contrast_fallback_rank = len(phase_priority)
@@ -660,13 +660,24 @@ def select_prepared_series(case_id, id_data):
         finally:
             conn.close()
         if (
-            recorded
-            and str(recorded["SegmentationCoverageClass"] or "") == SEGMENTATION_COVERAGE_CHEST_ONLY
+            bool(follow_up_coverage.get("enabled"))
+            and recorded
+            and str(recorded["SegmentationCoverageClass"] or "")
+            in {
+                str(item or "").strip()
+                for item in (follow_up_coverage.get("when_previous_coverage") or [])
+                if str(item or "").strip()
+            }
         ):
-            follow_up_selected = _choose_follow_up_candidate_after_chest_only(
+            follow_up_selected = _choose_follow_up_candidate(
                 selected,
                 candidates,
-                recorded["SegmentationSeriesInstanceUID"],
+                preferred_region=str(follow_up_coverage.get("prefer_region", "") or "abdomen").strip() or "abdomen",
+                previous_series_uid=(
+                    recorded["SegmentationSeriesInstanceUID"]
+                    if bool(follow_up_coverage.get("require_different_series", True))
+                    else None
+                ),
             )
             if follow_up_selected is not selected:
                 selected = follow_up_selected
@@ -690,10 +701,17 @@ def select_prepared_series(case_id, id_data):
                 else ""
             )
             + (
+                f", follow_up_policy={str(follow_up_coverage.get('prefer_region', '') or 'abdomen')}"
                 f", follow_up_after={recorded['SegmentationCoverageClass']}"
                 if study_uid
                 and recorded
-                and str(recorded["SegmentationCoverageClass"] or "") == SEGMENTATION_COVERAGE_CHEST_ONLY
+                and bool(follow_up_coverage.get("enabled"))
+                and str(recorded["SegmentationCoverageClass"] or "")
+                in {
+                    str(item or "").strip()
+                    for item in (follow_up_coverage.get("when_previous_coverage") or [])
+                    if str(item or "").strip()
+                }
                 and str(selected_series.get("SeriesInstanceUID") or "")
                 != str(recorded["SegmentationSeriesInstanceUID"] or "")
                 else ""
