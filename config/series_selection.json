@@ -27,6 +27,14 @@
         "native",
         "portal_venous"
       ],
+      "follow_up_coverage": {
+        "enabled": true,
+        "when_previous_coverage": [
+          "chest_only"
+        ],
+        "prefer_region": "abdomen",
+        "require_different_series": true
+      },
       "text_hints": {
         "description_avoid": [
           "mip",
