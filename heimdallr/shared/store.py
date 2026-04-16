@@ -36,6 +36,7 @@ _DICOM_METADATA_COLUMNS = {
     "SegmentationProfile": "TEXT",
     "SegmentationTasks": "TEXT",
     "SegmentationElapsedTime": "TEXT",
+    "SegmentationCoverageClass": "TEXT",
     "SegmentationCompletedAt": "TIMESTAMP",
     "MetricsProfile": "TEXT",
     "MetricsCompletedAt": "TIMESTAMP",
@@ -142,6 +143,8 @@ def ensure_schema(conn: sqlite3.Connection | None = None) -> None:
             SegmentationSliceCount INTEGER,
             SegmentationProfile TEXT,
             SegmentationTasks TEXT,
+            SegmentationElapsedTime TEXT,
+            SegmentationCoverageClass TEXT,
             SegmentationCompletedAt TIMESTAMP,
             ArtifactsPurged INTEGER DEFAULT 0,
             ArtifactsPurgedAt TIMESTAMP,
@@ -1344,6 +1347,7 @@ def get_recorded_segmentation_signature(conn: sqlite3.Connection, study_uid: str
             SegmentationProfile,
             SegmentationTasks,
             SegmentationElapsedTime,
+            SegmentationCoverageClass,
             SegmentationCompletedAt
         FROM dicom_metadata
         WHERE StudyInstanceUID = ?
@@ -1362,6 +1366,7 @@ def get_pipeline_completion_state(conn: sqlite3.Connection, study_uid: str) -> s
             SegmentationProfile,
             SegmentationTasks,
             SegmentationElapsedTime,
+            SegmentationCoverageClass,
             SegmentationCompletedAt,
             MetricsProfile,
             MetricsCompletedAt,
@@ -1382,6 +1387,7 @@ def update_segmentation_signature(
     profile_name: str,
     task_names: list[str],
     elapsed_time: str | None = None,
+    coverage_class: str | None = None,
 ) -> None:
     ensure_schema(conn)
     conn.execute(
@@ -1392,6 +1398,7 @@ def update_segmentation_signature(
             SegmentationProfile = ?,
             SegmentationTasks = ?,
             SegmentationElapsedTime = ?,
+            SegmentationCoverageClass = ?,
             SegmentationCompletedAt = ?
         WHERE StudyInstanceUID = ?
         """,
@@ -1401,6 +1408,7 @@ def update_segmentation_signature(
             profile_name,
             json.dumps(task_names),
             str(elapsed_time) if elapsed_time else None,
+            str(coverage_class) if coverage_class else None,
             _now_local_timestamp(),
             study_uid,
         ),
