@@ -9,6 +9,9 @@ msgstr "Corte no centro L3"
 msgid "l3.overlay.sma"
 msgstr "SMA (Área músculo-esquelética): {value} cm²"
 
+msgid "l3.overlay.density"
+msgstr "Densidade média muscular: {value} UH"
+
 msgid "l3.overlay.nifti_slice"
 msgstr "Corte NIfTI: {value}"
 
@@ -35,18 +38,28 @@ msgstr "UH"
 
 msgid "parenchymal.overlay.organ.liver"
 msgstr "Fígado: {volume} cm³ | {hu} {attenuation_unit}"
+msgid "parenchymal.overlay.organ.liver.volume_only"
+msgstr "Fígado: {volume} cm³"
 
 msgid "parenchymal.overlay.organ.spleen"
 msgstr "Baço: {volume} cm³ | {hu} {attenuation_unit}"
+msgid "parenchymal.overlay.organ.spleen.volume_only"
+msgstr "Baço: {volume} cm³"
 
 msgid "parenchymal.overlay.organ.pancreas"
 msgstr "Pâncreas: {volume} cm³ | {hu} {attenuation_unit}"
+msgid "parenchymal.overlay.organ.pancreas.volume_only"
+msgstr "Pâncreas: {volume} cm³"
 
 msgid "parenchymal.overlay.organ.kidney_right"
 msgstr "Rim direito: {volume} cm³ | {hu} {attenuation_unit}"
+msgid "parenchymal.overlay.organ.kidney_right.volume_only"
+msgstr "Rim direito: {volume} cm³"
 
 msgid "parenchymal.overlay.organ.kidney_left"
 msgstr "Rim esquerdo: {volume} cm³ | {hu} {attenuation_unit}"
+msgid "parenchymal.overlay.organ.kidney_left.volume_only"
+msgstr "Rim esquerdo: {volume} cm³"
 
 msgid "parenchymal.overlay.series_description"
 msgstr "Heimdallr Overlay de Órgãos Parenquimatosos 5 mm"

@@ -1,0 +1,340 @@
+msgid ""
+msgstr ""
+"Language: pt_BR\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "pdf.footer.page"
+msgstr "Heimdallr artifact guide  |  Página {page_number}"
+
+msgid "pdf.subtitle"
+msgstr "AN {accession_number} | {study_date}"
+
+msgid "pdf.patient_line"
+msgstr "Paciente: {patient_name}"
+
+msgid "pdf.cover.title"
+msgstr "Instruções dos Artefatos"
+
+msgid "pdf.cover.subtitle"
+msgstr "Documento de apoio à entrega dos artefatos"
+
+msgid "pdf.cover.body"
+msgstr "Este PDF resume o que foi entregue automaticamente pelo Heimdallr, como ler os artefatos e quais cautelas devem ser observadas antes da interpretação clínica."
+
+msgid "pdf.cover.case_summary"
+msgstr "Resumo do caso"
+
+msgid "pdf.cover.patient"
+msgstr "Paciente"
+
+msgid "pdf.cover.accession"
+msgstr "AN"
+
+msgid "pdf.cover.case_id"
+msgstr "Case ID"
+
+msgid "pdf.cover.modules"
+msgstr "Módulos incluídos"
+
+msgid "pdf.cover.required_reading"
+msgstr "Leitura obrigatória"
+
+msgid "pdf.cover.nature"
+msgstr "Natureza"
+
+msgid "pdf.cover.nature.value"
+msgstr "Todos os artefatos são derivados e servem como apoio visual e quantitativo."
+
+msgid "pdf.cover.orientation"
+msgstr "Orientação"
+
+msgid "pdf.cover.orientation.value"
+msgstr "Os overlays devem ser conferidos no contexto anatômico do estudo original."
+
+msgid "pdf.cover.limits"
+msgstr "Limites"
+
+msgid "pdf.cover.limits.value"
+msgstr "Ausência de cobertura anatômica completa, máscara truncada ou artefato técnico pode invalidar a interpretação quantitativa."
+
+msgid "pdf.card.instructions"
+msgstr "Instruções"
+
+msgid "pdf.row.measure"
+msgstr "Mede"
+
+msgid "pdf.row.delivery"
+msgstr "Entrega"
+
+msgid "pdf.row.reading"
+msgstr "Leitura"
+
+msgid "pdf.row.result"
+msgstr "Resultado"
+
+msgid "pdf.row.classification"
+msgstr "Classificação"
+
+msgid "pdf.row.practical_ranges"
+msgstr "Faixas práticas"
+
+msgid "pdf.row.cautions"
+msgstr "Cautelas"
+
+msgid "pdf.row.reference"
+msgstr "Referência"
+
+msgid "pdf.row.references_plural"
+msgstr "Referências"
+
+msgid "module.bone.title"
+msgstr "Bone Health L1 HU"
+
+msgid "module.l3.title"
+msgstr "L3 Muscle Area"
+
+msgid "module.parenchymal.title"
+msgstr "Parenchymal Organ Volumetry"
+
+msgid "bone.classification.normal"
+msgstr "normal"
+
+msgid "bone.classification.osteopenia"
+msgstr "osteopenia"
+
+msgid "bone.classification.osteoporosis"
+msgstr "osteoporose"
+
+msgid "bone.classification.indeterminate"
+msgstr "indeterminada"
+
+msgid "bone.row.measure"
+msgstr "Atenuação trabecular de L1 em HU em TC já adquirida."
+
+msgid "bone.row.delivery"
+msgstr "DICOM Secondary Capture com corte sagital de L1, ROI trabecular e valor médio."
+
+msgid "bone.row.reading"
+msgstr "Confirmar L1, ROI centrada em osso trabecular e ausência de truncamento importante."
+
+msgid "bone.row.result"
+msgstr "Valor médio: {hu_mean} | Classificação automatizada: {classification}"
+
+msgid "bone.row.report_suggestion"
+msgstr "Sugestão para laudo"
+
+msgid "bone.row.cautions"
+msgstr "Máscara incompleta, deformidade, metal ou técnica inadequada podem reduzir a confiança."
+
+msgid "bone.report.placeholder"
+msgstr "[Placeholder] Inserir texto de laudo."
+
+msgid "bone.report.normal"
+msgstr "– atenuação trabecular de L1 de {value}, dentro dos limites esperados para densidade mineral óssea preservada."
+
+msgid "bone.report.osteopenia"
+msgstr "– atenuação trabecular de L1 de {value}, evidenciando redução da densidade mineral óssea, sugestiva de osteopenia."
+
+msgid "bone.report.osteoporosis_suggestive"
+msgstr "– atenuação trabecular de L1 de {value}, achado sugestivo de osteoporose."
+
+msgid "bone.report.osteoporosis_marked"
+msgstr "– atenuação trabecular de L1 de {value}, compatível com acentuada redução da densidade mineral óssea, sugestiva de osteoporose."
+
+msgid "bone.report.osteoporosis_fragility"
+msgstr "– atenuação trabecular de L1 de {value}, compatível com acentuada redução da densidade mineral óssea, sugestiva de osteoporose, associada a maior risco de fratura por fragilidade."
+
+msgid "bone.references"
+msgstr "JANG, Samuel et al. Opportunistic osteoporosis screening at routine abdominal and thoracic CT: normative L1 trabecular attenuation values in more than 20 000 adults. <i>Radiology</i>, v. 291, p. 360-367, 2019. DOI: 10.1148/radiol.2019181648."
+
+msgid "l3.row.measure"
+msgstr "Área muscular esquelética no corte axial selecionado ao nível de L3."
+
+msgid "l3.row.delivery"
+msgstr "DICOM Secondary Capture com corte axial principal e referência sagital do nível medido."
+
+msgid "l3.row.reading"
+msgstr "Usar o axial como imagem principal. O sagital serve para confirmar o nível anatômico."
+
+msgid "l3.result.sma"
+msgstr "SMA: {value}"
+
+msgid "l3.result.density"
+msgstr " | Densidade média: {value}"
+
+msgid "l3.result.height"
+msgstr " | Altura: {value}"
+
+msgid "l3.result.weight"
+msgstr " | Peso: {value}"
+
+msgid "l3.result.smi"
+msgstr " | SMI: {value}"
+
+msgid "l3.result.bmi"
+msgstr " | IMC: {value}"
+
+msgid "l3.classification.smi"
+msgstr "SMI: {value}"
+
+msgid "l3.classification.density"
+msgstr " | Densidade: {value}"
+
+msgid "l3.classification.bmi_adjusted"
+msgstr " | Densidade ajustada por IMC: {value}"
+
+msgid "l3.class_value.normal"
+msgstr "normal"
+
+msgid "l3.class_value.sarcopenia"
+msgstr "sarcopenia"
+
+msgid "l3.class_value.indeterminate"
+msgstr "indeterminada"
+
+msgid "l3.density_value.normal"
+msgstr "normal"
+
+msgid "l3.density_value.mild"
+msgstr "reduzida (miosteatose leve)"
+
+msgid "l3.density_value.severe"
+msgstr "miosteatose importante"
+
+msgid "l3.density_value.indeterminate"
+msgstr "indeterminada"
+
+msgid "l3.bmi_density_value.normal"
+msgstr "normal"
+
+msgid "l3.bmi_density_value.abnormal"
+msgstr "anormal"
+
+msgid "l3.bmi_density_value.indeterminate"
+msgstr "indeterminada"
+
+msgid "l3.row.practical_ranges_smi"
+msgstr "SMI em L3 (cm²/m²): mulheres normal ≥ 39, sarcopenia < 39; homens normal ≥ 50, sarcopenia < 50."
+
+msgid "l3.row.practical_ranges_density"
+msgstr "Densidade muscular (UH): normal > 40, reduzida 30-40, miosteatose importante < 30."
+
+msgid "l3.row.bmi_adjustment.label"
+msgstr "Ajuste por IMC"
+
+msgid "l3.row.bmi_adjustment.value"
+msgstr "Quando disponível: IMC < 25, densidade anormal < 41 UH; IMC ≥ 25, densidade anormal < 33 UH."
+
+msgid "l3.row.bmi_adjustment.not_applicable"
+msgstr "Não aplicável quando a série selecionada é contrastada."
+
+msgid "l3.row.report_suggestions"
+msgstr "Sugestões para laudo"
+
+msgid "l3.row.cautions"
+msgstr "Ausência, corte ou segmentação inadequada de L3 pode inviabilizar a medida ou reduzir sua confiabilidade."
+
+msgid "l3.report.normal"
+msgstr "– musculatura esquelética em L3 com área e índice (SMI) dentro dos limites de normalidade para o sexo.\n– musculatura esquelética preservada ao nível de L3, sem critérios tomográficos para sarcopenia."
+
+msgid "l3.report.sarcopenia_only"
+msgstr "– redução do índice de massa muscular esquelética (SMI) ao nível de L3, compatível com sarcopenia.\n– musculatura esquelética em L3 com SMI abaixo do esperado para o sexo, achado compatível com sarcopenia.\n– SMI de {smi}, caracterizando sarcopenia."
+
+msgid "l3.report.sarcopenia_myosteatosis"
+msgstr "– redução do SMI associada à diminuição da atenuação muscular, achados compatíveis com sarcopenia e miosteatose.\n– musculatura esquelética em L3 com baixo SMI e densidade reduzida, compatível com sarcopenia associada à infiltração gordurosa.\n– SMI de {smi} e densidade muscular média de {density}, caracterizando sarcopenia associada à miosteatose.\n– sarcopenia associada à miosteatose."
+
+msgid "l3.report.myosteatosis_only"
+msgstr "– atenuação muscular reduzida ao nível de L3, compatível com miosteatose.\n– musculatura esquelética com densidade diminuída (em HU), sem redução significativa do SMI, sugerindo miosteatose isolada.\n– densidade muscular média de {density}, compatível com miosteatose.\n– miosteatose."
+
+msgid "l3.report.neutral"
+msgstr "– redução da massa muscular esquelética ao nível de L3.\n– redução da densidade muscular, sugerindo infiltração gordurosa."
+
+msgid "l3.references"
+msgstr "PRADO, C. M. et al. Prevalence and clinical implications of sarcopenic obesity in patients with solid tumours of the respiratory and gastrointestinal tracts: a population-based study. <i>The Lancet Oncology</i>, v. 9, n. 7, p. 629-635, 2008.\nMARTIN, L. et al. Cancer cachexia in the age of obesity: skeletal muscle depletion is a powerful prognostic factor. <i>Journal of Clinical Oncology</i>, v. 31, n. 12, p. 1539-1547, 2013.\nAUBREY, J. et al. Measurement of skeletal muscle radiation attenuation and basis of its biological variation. <i>Acta Physiologica</i>, v. 210, n. 3, p. 489-497, 2014."
+
+msgid "parenchymal.organ.liver"
+msgstr "fígado"
+
+msgid "parenchymal.organ.spleen"
+msgstr "baço"
+
+msgid "parenchymal.organ.pancreas"
+msgstr "pâncreas"
+
+msgid "parenchymal.organ.kidney_right"
+msgstr "rim direito"
+
+msgid "parenchymal.organ.kidney_left"
+msgstr "rim esquerdo"
+
+msgid "parenchymal.organs.incomplete"
+msgstr "– {label}: análise incompleta."
+
+msgid "parenchymal.organs.volume_only"
+msgstr "– {label}: {volume}."
+
+msgid "parenchymal.organs.volume_density"
+msgstr "– {label}: {volume} | atenuação média {attenuation}."
+
+msgid "parenchymal.organs.none"
+msgstr "– sem órgãos elegíveis para sumarização."
+
+msgid "parenchymal.steatosis.not_applicable"
+msgstr "Não aplicável quando a série selecionada é contrastada."
+
+msgid "parenchymal.steatosis.requires_unenhanced"
+msgstr "Aplicável preferencialmente à TC sem contraste, com HU médio hepático e esplênico disponíveis."
+
+msgid "parenchymal.steatosis.summary.moderate_severe"
+msgstr "achados compatíveis com esteatose moderada a acentuada."
+
+msgid "parenchymal.steatosis.summary.mild_borderline"
+msgstr "achado sugestivo ou limítrofe para esteatose leve."
+
+msgid "parenchymal.steatosis.summary.normal"
+msgstr "sem critério tomográfico robusto para esteatose hepática significativa."
+
+msgid "parenchymal.steatosis.summary.base"
+msgstr "Fígado: {liver} | Baço: {spleen} | L–S: {l_s} | PDFF estimada: {pdff} | {synthesis}"
+
+msgid "parenchymal.steatosis.summary.with_ratio"
+msgstr "{base} | L/S: {ratio}"
+
+msgid "parenchymal.practical_ranges.contrast"
+msgstr "– série contrastada: não interpretar HU hepático, L–S, L/S ou PDFF estimada.\n– volumetria permanece utilizável quando o órgão não estiver truncado."
+
+msgid "parenchymal.practical_ranges.unenhanced"
+msgstr "– fígado < 40 UH: esteatose moderada a acentuada | 40-50 UH: sugestiva de esteatose leve | > 50 UH: geralmente normal.\n– L–S ≤ -10 UH: critério clássico de esteatose | -10 a +5 UH: zona limítrofe | > +5 UH: geralmente normal.\n– L/S < 1,0: esteatose | < 0,8: esteatose mais significativa.\n– PDFF estimada: < 5% normal | 5-15% leve | 15-30% moderada | > 30% acentuada."
+
+msgid "parenchymal.row.measure"
+msgstr "Volumetria dos órgãos parenquimatosos segmentados e, em TC sem contraste, atenuação média volumétrica para fígado e baço."
+
+msgid "parenchymal.row.delivery"
+msgstr "Série DICOM derivada com {slice_count} cortes reconstruídos em 5 mm."
+
+msgid "parenchymal.row.delivery_fallback"
+msgstr "Série DICOM derivada com overlays dos órgãos analisados."
+
+msgid "parenchymal.row.reading"
+msgstr "Usar o volume absoluto como saída principal. Em fígado sem contraste, considerar HU hepático médio, L–S, L/S e PDFF estimada como apoio para esteatose."
+
+msgid "parenchymal.row.result"
+msgstr "Reconstrução alvo: {target_slice_thickness} | cortes exportados: {slice_count}"
+
+msgid "parenchymal.row.steatosis"
+msgstr "Esteatose hepática"
+
+msgid "parenchymal.row.organs"
+msgstr "Órgãos avaliados"
+
+msgid "parenchymal.row.expected_values"
+msgstr "Valores esperados"
+
+msgid "parenchymal.row.expected_values.value"
+msgstr "Fígado: 1200-1800 mL | baço: 100-300 mL | pâncreas: 60-100 mL | rins: 110-190 mL por rim."
+
+msgid "parenchymal.row.cautions"
+msgstr "– órgãos cortados na borda do exame podem ser segmentados visualmente, mas não devem ter volume interpretado como completo.\n– ferro hepático, edema e inflamação podem elevar HU e reduzir a acurácia para esteatose.\n– a estimativa de PDFF por regressão é aproximada e funciona melhor em TC sem contraste com média volumétrica."
+
+msgid "parenchymal.references"
+msgstr "PARK, S. H. et al. Macrovesicular hepatic steatosis in living liver donors: use of CT for quantitative and qualitative assessment. <i>Radiology</i>, v. 239, n. 1, p. 105-112, 2006.\nKODAMA, Y. et al. Liver attenuation measurement for quantitative assessment of hepatic steatosis. <i>American Journal of Roentgenology</i>, v. 188, p. 1307-1312, 2007.\nPICKHARDT, P. J. et al. Specificity of unenhanced CT for hepatic steatosis: implications for the incidental detection of fatty liver. <i>American Journal of Roentgenology</i>, v. 193, p. 124-130, 2009.\nPICKHARDT, P. J. et al. Accuracy of liver fat quantification at unenhanced CT using MRI-PDFF as reference standard. <i>Radiology</i>, 2018.\nLEE, S. S.; PARK, S. H. Radiologic evaluation of nonalcoholic fatty liver disease. <i>World Journal of Gastroenterology</i>, v. 20, n. 23, p. 7392-7402, 2014.\nVAUTHEY, J. N. et al. Standardized measurement of the future liver remnant prior to extended liver resection. <i>Annals of Surgery</i>, v. 231, n. 5, p. 767-776, 2000.\nPRASSOPOULOS, P. et al. Assessment of normal splenic size on computed tomography in adults. <i>Acta Radiologica</i>, v. 38, n. 6, p. 958-963, 1997.\nSAISHO, Y. et al. Pancreas volumes in humans from birth to age one hundred taking into account sex, obesity, and presence of type-2 diabetes. <i>Diabetes Care</i>, v. 30, n. 2, p. 271-276, 2007.\nCHEONG, B. et al. Normal values for renal length and volume as measured by magnetic resonance imaging. <i>Radiology</i>, v. 243, n. 3, p. 876-883, 2007."

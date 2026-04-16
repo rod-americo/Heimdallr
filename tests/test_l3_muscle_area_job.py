@@ -5,6 +5,7 @@ import numpy as np
 from heimdallr.metrics.jobs.l3_muscle_area import (
     MetricSkip,
     _overlay_display_directions,
+    calculate_mask_hu_statistics,
     build_skip_payload,
     centered_slab_bounds,
     compute_center_slice,
@@ -108,6 +109,28 @@ class TestL3MuscleAreaJob(unittest.TestCase):
             payload["artifacts"]["result_json"],
             "artifacts/metrics/l3_muscle_area/result.json",
         )
+
+    def test_calculate_mask_hu_statistics_uses_full_mask_area(self):
+        image = np.array(
+            [
+                [10.0, 20.0, 30.0],
+                [40.0, 50.0, 60.0],
+            ],
+            dtype=np.float32,
+        )
+        mask = np.array(
+            [
+                [False, True, True],
+                [False, True, False],
+            ],
+            dtype=bool,
+        )
+
+        stats = calculate_mask_hu_statistics(image, mask)
+
+        self.assertEqual(stats["voxel_count"], 3)
+        self.assertEqual(stats["mean_hu"], 33.33)
+        self.assertEqual(stats["std_hu"], 12.47)
 
     def test_render_overlay_rgb_returns_combined_axial_and_sagittal_image(self):
         image = np.linspace(-200.0, 250.0, num=24 * 20 * 16, dtype=np.float32).reshape((24, 20, 16))

@@ -32,6 +32,7 @@ from heimdallr.metrics.jobs._parenchymal_overlay_text import (
     resolve_artifact_locale,
     series_description,
 )
+from heimdallr.metrics.analysis.bone_health import extract_study_technique_context
 from heimdallr.shared.paths import study_metadata_json
 
 
@@ -77,12 +78,26 @@ def _load_case_metadata(case_id: str, case_dir: Path) -> dict[str, Any]:
     return merged
 
 
+def _selected_phase_from_metadata(case_metadata: dict[str, Any]) -> str:
+    return str(
+        (
+            case_metadata.get("Pipeline", {})
+            .get("series_selection", {})
+            .get("SelectedPhase")
+        )
+        or case_metadata.get("SelectedPhase")
+        or ""
+    ).strip()
+
+
 def _compute_mask_measurement(
     organ_key: str,
     organ_label: str,
     organ_mask: np.ndarray | None,
     ct_data: np.ndarray,
     spacing_xyz: tuple[float, float, float],
+    *,
+    suppress_density: bool = False,
 ) -> dict[str, Any]:
     if organ_mask is None:
         return {
@@ -112,9 +127,13 @@ def _compute_mask_measurement(
             "hu_std": None,
         }
 
-    hu_values = ct_data[mask_bool]
-    hu_mean = round(float(np.mean(hu_values)), 2) if hu_values.size else None
-    hu_std = round(float(np.std(hu_values)), 2) if hu_values.size else None
+    if suppress_density:
+        hu_mean = None
+        hu_std = None
+    else:
+        hu_values = ct_data[mask_bool]
+        hu_mean = round(float(np.mean(hu_values)), 2) if hu_values.size else None
+        hu_std = round(float(np.std(hu_values)), 2) if hu_values.size else None
     complete = mask_complete(mask_bool)
     voxel_volume_cm3 = float(spacing_xyz[0] * spacing_xyz[1] * spacing_xyz[2]) / 1000.0
     observed_volume_cm3 = round(voxel_count * voxel_volume_cm3, 3) if complete else None
@@ -317,6 +336,12 @@ def main() -> int:
             return 0
 
         case_metadata = _load_case_metadata(args.case_id, case_dir)
+        selected_phase = _selected_phase_from_metadata(case_metadata)
+        technique_context = extract_study_technique_context(
+            id_data=case_metadata,
+            results={"SelectedPhase": selected_phase},
+        )
+        suppress_density = technique_context.get("contrast") is True
         ct_img, ct_data = load_ct_volume(ct_path)
         spacing_xyz = tuple(float(value) for value in ct_img.header.get_zooms()[:3])
         axial_source_codes = plane_source_axis_codes(ct_img.affine, "z")
@@ -337,6 +362,7 @@ def main() -> int:
                 organ_mask,
                 ct_data,
                 spacing_xyz,
+                suppress_density=suppress_density,
             )
 
         available_masks = [mask for mask in organ_masks.values() if mask is not None and np.any(mask)]
@@ -434,6 +460,8 @@ def main() -> int:
                     "z": spacing_xyz[2],
                 },
                 "reconstruction_mode": "slab_average",
+                "selected_phase": selected_phase or None,
+                "density_suppressed_due_to_contrast": bool(suppress_density),
                 "source_slice_count": int(ct_data.shape[2]),
                 "exported_slice_count": len(dicom_exports),
                 "exported_slabs": export_slabs,
