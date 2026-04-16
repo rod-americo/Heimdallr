@@ -364,13 +364,30 @@ def build_l1_sagittal_roi(
     plane_spacing = sagittal_plane_spacing_mm(spacing_mm, plane_axis)
     min_spacing = max(min(plane_spacing), 1e-6)
     erosion_iters = max(1, int(round(float(erosion_mm) / min_spacing)))
+    ap_profile = plane_mask.sum(axis=1).astype(np.float64)
+    edge_width = max(1, int(round(ap_profile.size * 0.18)))
+    low_edge = float(np.median(ap_profile[:edge_width]))
+    high_edge = float(np.median(ap_profile[-edge_width:]))
+    anterior_is_low_index = high_edge > low_edge
+
     eroded_2d = binary_erosion(plane_mask, iterations=erosion_iters)
 
     labeled, num_features = ndlabel(eroded_2d)
     if num_features > 1:
-        component_sizes = [np.sum(labeled == i) for i in range(1, num_features + 1)]
-        largest = int(np.argmax(component_sizes)) + 1
-        eroded_2d = labeled == largest
+        selected_component = None
+        selected_score = None
+        for component_idx in range(1, num_features + 1):
+            component_mask = labeled == component_idx
+            coords = np.argwhere(component_mask)
+            if coords.size == 0:
+                continue
+            mean_row = float(np.mean(coords[:, 0]))
+            score = mean_row if anterior_is_low_index else -mean_row
+            if selected_score is None or score < selected_score:
+                selected_score = score
+                selected_component = component_idx
+        if selected_component is not None:
+            eroded_2d = labeled == selected_component
 
     if not np.any(eroded_2d):
         return None, {
@@ -379,12 +396,6 @@ def build_l1_sagittal_roi(
             "plane_axis": plane_axis,
             "plane_index": plane_index,
         }
-
-    ap_profile = plane_mask.sum(axis=1).astype(np.float64)
-    edge_width = max(1, int(round(ap_profile.size * 0.18)))
-    low_edge = float(np.median(ap_profile[:edge_width]))
-    high_edge = float(np.median(ap_profile[-edge_width:]))
-    anterior_is_low_index = high_edge > low_edge
 
     row_indices, col_indices = np.where(eroded_2d)
     row_min, row_max = int(row_indices.min()), int(row_indices.max())
