@@ -31,6 +31,7 @@ database/*.db-journal
 *.nii.gz
 *.dcm
 *.zip
+!docs/branding/fonts/*.zip
 *.log
 
 # Model Weights and Large Binaries
