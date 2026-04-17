@@ -816,6 +816,7 @@ def _load_metadata_rows(db_path: Path) -> list[dict[str, Any]]:
         SELECT StudyInstanceUID, PatientName, ClinicalName, AccessionNumber, StudyDate,
                Modality, IdJson, CalculationResults, ProcessedAt
         FROM dicom_metadata
+        WHERE COALESCE(ArtifactsPurged, 0) = 0
         ORDER BY ProcessedAt DESC
     """
     try:
