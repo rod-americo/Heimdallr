@@ -414,9 +414,16 @@ class TestMetricsWorker(unittest.TestCase):
             self.assertTrue(pdf_path.exists())
             self.assertTrue(dicom_path.exists())
             enqueued_exports = enqueue_mock.call_args.args[2]
+            self.assertEqual(enqueued_exports, [])
+
+            results_payload = json.loads(results_json_path.read_text(encoding="utf-8"))
             self.assertEqual(
-                enqueued_exports,
-                [{"path": "artifacts/metrics/instructions/artifact_instructions.dcm", "kind": "encapsulated_pdf"}],
+                results_payload["artifacts"]["artifact_instructions_dicom"],
+                {
+                    "path": "artifacts/metrics/instructions/artifact_instructions.dcm",
+                    "kind": "encapsulated_pdf",
+                    "locale": "pt_BR",
+                },
             )
 
 
