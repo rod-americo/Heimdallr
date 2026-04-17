@@ -871,11 +871,9 @@ def segment_case_metrics(case_input: Path) -> bool:
                         }
                     )
             else:
-                dicom_exports.append(
-                    {
-                        "path": str(instruction_dicom["path"]),
-                        "kind": str(instruction_dicom["kind"]),
-                    }
+                logger.log(
+                    "[Metrics] Instruction document generated locally but excluded from DICOM egress "
+                    f"(kind={instruction_dicom['kind']})"
                 )
 
         try:
