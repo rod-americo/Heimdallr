@@ -258,7 +258,7 @@ class HeimdallrDashboardApp(App[None]):
         assert self.snapshot is not None
         table = self.query_one("#cases", DataTable)
         table.clear(columns=False)
-        for case in self.snapshot.cases[:20]:
+        for case in self.snapshot.cases[:150]:
             updated = case.updated_at.strftime("%d/%m %H:%M") if case.updated_at else "-"
             table.add_row(
                 case.patient_name,
