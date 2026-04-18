@@ -49,6 +49,10 @@ _DICOM_EGRESS_QUEUE_COLUMNS = {
     "artifact_digest": "TEXT",
 }
 
+_RESOURCE_MONITOR_SAMPLE_COLUMNS = {
+    "subtree_pss_mb": "REAL",
+}
+
 _STUDY_HANDOFF_COLUMNS = {
     "case_id": "TEXT",
     "instance_count": "INTEGER",
@@ -297,6 +301,7 @@ def ensure_schema(conn: sqlite3.Connection | None = None) -> None:
             peak_rss_mb REAL,
             subtree_rss_mb REAL,
             subtree_peak_rss_mb REAL,
+            subtree_pss_mb REAL,
             major_faults INTEGER,
             cgroup_memory_current_mb REAL,
             cgroup_memory_peak_mb REAL,
@@ -320,8 +325,35 @@ def ensure_schema(conn: sqlite3.Connection | None = None) -> None:
         ON resource_monitor_samples(sampled_at)
         """
     )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS resource_monitor_case_peaks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            case_id TEXT NOT NULL,
+            stage TEXT NOT NULL,
+            first_sampled_at TIMESTAMP NOT NULL,
+            last_sampled_at TIMESTAMP NOT NULL,
+            sample_count INTEGER NOT NULL DEFAULT 0,
+            max_main_rss_mb REAL,
+            max_peak_rss_mb REAL,
+            max_subtree_pss_mb REAL,
+            max_cgroup_memory_current_mb REAL,
+            min_host_mem_available_mb REAL,
+            max_host_swap_used_mb REAL,
+            max_major_faults INTEGER,
+            UNIQUE(case_id, stage)
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_resource_monitor_case_peaks_case_stage
+        ON resource_monitor_case_peaks(case_id, stage)
+        """
+    )
     _ensure_columns(cursor, "dicom_metadata", _DICOM_METADATA_COLUMNS)
     _ensure_columns(cursor, "dicom_egress_queue", _DICOM_EGRESS_QUEUE_COLUMNS)
+    _ensure_columns(cursor, "resource_monitor_samples", _RESOURCE_MONITOR_SAMPLE_COLUMNS)
     _ensure_columns(cursor, "study_handoff_state", _STUDY_HANDOFF_COLUMNS)
     conn.commit()
     if owns_connection:
@@ -716,6 +748,7 @@ def insert_resource_monitor_samples(conn: sqlite3.Connection, samples: list[dict
             peak_rss_mb,
             subtree_rss_mb,
             subtree_peak_rss_mb,
+            subtree_pss_mb,
             major_faults,
             cgroup_memory_current_mb,
             cgroup_memory_peak_mb,
@@ -725,7 +758,7 @@ def insert_resource_monitor_samples(conn: sqlite3.Connection, samples: list[dict
             host_mem_used_percent,
             notes_json
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         [
             (
@@ -740,6 +773,7 @@ def insert_resource_monitor_samples(conn: sqlite3.Connection, samples: list[dict
                 sample.get("peak_rss_mb"),
                 sample.get("subtree_rss_mb"),
                 sample.get("subtree_peak_rss_mb"),
+                sample.get("subtree_pss_mb"),
                 sample.get("major_faults"),
                 sample.get("cgroup_memory_current_mb"),
                 sample.get("cgroup_memory_peak_mb"),
@@ -752,6 +786,67 @@ def insert_resource_monitor_samples(conn: sqlite3.Connection, samples: list[dict
             for sample in samples
         ],
     )
+    for sample in samples:
+        try:
+            active_case_ids = json.loads(str(sample.get("active_case_ids_json", "[]")))
+        except json.JSONDecodeError:
+            active_case_ids = []
+        if not isinstance(active_case_ids, list) or len(active_case_ids) != 1:
+            continue
+        case_id = str(active_case_ids[0] or "").strip()
+        stage = str(sample.get("stage", "") or "").strip()
+        sampled_at = str(sample.get("sampled_at", "") or "").strip()
+        if not case_id or not stage or not sampled_at:
+            continue
+        conn.execute(
+            """
+            INSERT INTO resource_monitor_case_peaks (
+                case_id,
+                stage,
+                first_sampled_at,
+                last_sampled_at,
+                sample_count,
+                max_main_rss_mb,
+                max_peak_rss_mb,
+                max_subtree_pss_mb,
+                max_cgroup_memory_current_mb,
+                min_host_mem_available_mb,
+                max_host_swap_used_mb,
+                max_major_faults
+            )
+            VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(case_id, stage) DO UPDATE SET
+                last_sampled_at = excluded.last_sampled_at,
+                sample_count = resource_monitor_case_peaks.sample_count + 1,
+                max_main_rss_mb = MAX(resource_monitor_case_peaks.max_main_rss_mb, excluded.max_main_rss_mb),
+                max_peak_rss_mb = MAX(resource_monitor_case_peaks.max_peak_rss_mb, excluded.max_peak_rss_mb),
+                max_subtree_pss_mb = MAX(resource_monitor_case_peaks.max_subtree_pss_mb, excluded.max_subtree_pss_mb),
+                max_cgroup_memory_current_mb = MAX(
+                    resource_monitor_case_peaks.max_cgroup_memory_current_mb,
+                    excluded.max_cgroup_memory_current_mb
+                ),
+                min_host_mem_available_mb = CASE
+                    WHEN resource_monitor_case_peaks.min_host_mem_available_mb IS NULL THEN excluded.min_host_mem_available_mb
+                    WHEN excluded.min_host_mem_available_mb IS NULL THEN resource_monitor_case_peaks.min_host_mem_available_mb
+                    ELSE MIN(resource_monitor_case_peaks.min_host_mem_available_mb, excluded.min_host_mem_available_mb)
+                END,
+                max_host_swap_used_mb = MAX(resource_monitor_case_peaks.max_host_swap_used_mb, excluded.max_host_swap_used_mb),
+                max_major_faults = MAX(resource_monitor_case_peaks.max_major_faults, excluded.max_major_faults)
+            """,
+            (
+                case_id,
+                stage,
+                sampled_at,
+                sampled_at,
+                sample.get("rss_mb"),
+                sample.get("peak_rss_mb"),
+                sample.get("subtree_pss_mb"),
+                sample.get("cgroup_memory_current_mb"),
+                sample.get("host_mem_available_mb"),
+                sample.get("host_swap_used_mb"),
+                sample.get("major_faults"),
+            ),
+        )
     conn.commit()
 
 

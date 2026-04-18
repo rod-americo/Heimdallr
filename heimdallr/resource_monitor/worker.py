@@ -31,6 +31,7 @@ class ProcessSnapshot:
     ppid: int
     rss_kb: int
     hwm_kb: int
+    pss_kb: int
     major_faults: int
 
 
@@ -75,6 +76,13 @@ def _parse_proc_stat_major_faults(raw_text: str) -> int:
         return 0
 
 
+def _parse_smaps_rollup_pss(path: Path) -> int:
+    raw_text = _read_text(path)
+    if not raw_text:
+        return 0
+    return _parse_status_value(raw_text, "Pss") or 0
+
+
 def _scan_process_table() -> dict[int, ProcessSnapshot]:
     snapshots: dict[int, ProcessSnapshot] = {}
     for proc_dir in Path("/proc").iterdir():
@@ -93,6 +101,7 @@ def _scan_process_table() -> dict[int, ProcessSnapshot]:
             ppid=ppid,
             rss_kb=rss_kb,
             hwm_kb=hwm_kb,
+            pss_kb=_parse_smaps_rollup_pss(proc_dir / "smaps_rollup"),
             major_faults=_parse_proc_stat_major_faults(stat_text),
         )
     return snapshots
@@ -234,6 +243,7 @@ def collect_resource_samples() -> list[dict[str, object]]:
             subtree = _subtree_pids(main_pid, processes)
             rss_kb = 0
             hwm_kb = 0
+            pss_kb = 0
             major_faults = 0
             for pid in subtree:
                 snapshot = processes.get(pid)
@@ -241,6 +251,7 @@ def collect_resource_samples() -> list[dict[str, object]]:
                     continue
                 rss_kb += snapshot.rss_kb
                 hwm_kb += snapshot.hwm_kb
+                pss_kb += snapshot.pss_kb
                 major_faults += snapshot.major_faults
             main_snapshot = processes.get(main_pid)
             cgroup_current_mb, cgroup_peak_mb = _cgroup_metrics(props.get("ControlGroup"))
@@ -258,6 +269,7 @@ def collect_resource_samples() -> list[dict[str, object]]:
                     "peak_rss_mb": _mb_from_kb(main_snapshot.hwm_kb if main_snapshot else 0),
                     "subtree_rss_mb": _mb_from_kb(rss_kb),
                     "subtree_peak_rss_mb": _mb_from_kb(hwm_kb),
+                    "subtree_pss_mb": _mb_from_kb(pss_kb),
                     "major_faults": major_faults,
                     "cgroup_memory_current_mb": cgroup_current_mb,
                     "cgroup_memory_peak_mb": cgroup_peak_mb,
@@ -291,7 +303,7 @@ def run_resource_monitor_once(*, persist: bool = True) -> list[dict[str, object]
             "[Resource Monitor] "
             f"{sample['service_slug']} pid={sample['main_pid'] or '-'} "
             f"rss={sample['rss_mb'] or 0:.2f}MB "
-            f"subtree={sample['subtree_rss_mb'] or 0:.2f}MB "
+            f"subtree_pss={sample['subtree_pss_mb'] or 0:.2f}MB "
             f"cgroup={sample['cgroup_memory_current_mb'] or 0:.2f}MB "
             f"swap={sample['host_swap_used_mb'] or 0:.2f}MB "
             f"cases={len(cases)} state={note.get('active_state', '')}"
