@@ -122,6 +122,11 @@ class TestParenchymalOrganVolumetryJob(unittest.TestCase):
             self.assertGreater(result["measurement"]["exported_slice_count"], 0)
             self.assertEqual(len(result["dicom_exports"]), result["measurement"]["exported_slice_count"])
             self.assertAlmostEqual(result["measurement"]["organs"]["liver"]["hu_mean"], 47.92, places=2)
+            self.assertAlmostEqual(
+                result["measurement"]["organs"]["liver"]["estimated_pdff_percent"],
+                10.41,
+                places=2,
+            )
             self.assertTrue(result["measurement"]["organs"]["pancreas"]["complete"])
 
             first_dicom = case_dir / result["dicom_exports"][0]["path"]
@@ -181,6 +186,7 @@ class TestParenchymalOrganVolumetryJob(unittest.TestCase):
             self.assertTrue(result["measurement"]["density_suppressed_due_to_contrast"])
             self.assertIsNone(result["measurement"]["organs"]["liver"]["hu_mean"])
             self.assertIsNone(result["measurement"]["organs"]["liver"]["hu_std"])
+            self.assertIsNone(result["measurement"]["organs"]["liver"]["estimated_pdff_percent"])
 
 
 if __name__ == "__main__":
