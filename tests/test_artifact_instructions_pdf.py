@@ -1,16 +1,33 @@
 import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 from heimdallr.metrics.artifact_instructions_pdf import (
+    _parenchymal_steatosis_summary,
     build_artifact_instructions_pdf,
     build_artifact_instructions_secondary_capture,
 )
 
 
 class TestArtifactInstructionsPdf(unittest.TestCase):
+    def test_parenchymal_steatosis_summary_uses_current_pdff_relation(self):
+        summary = _parenchymal_steatosis_summary(
+            {
+                "density_suppressed_due_to_contrast": False,
+                "organs": {
+                    "liver": {"hu_mean": 47.92},
+                    "spleen": {"hu_mean": 48.0},
+                },
+            },
+            locale="en_US",
+        )
+
+        self.assertIn("Estimated PDFF", summary)
+        self.assertRegex(summary, r"10[\\.,]4 ?%")
+
     def test_build_artifact_instructions_pdf_creates_pdf_for_completed_modules(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

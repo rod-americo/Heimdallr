@@ -12,6 +12,7 @@ from PIL import Image, ImageDraw, ImageFont
 from pydicom.uid import generate_uid
 from scipy.ndimage import binary_erosion
 
+from heimdallr.metrics.analysis.hepatic_steatosis import estimate_pdff_from_unenhanced_ct_hu
 from heimdallr.metrics.jobs._bone_job_common import (
     load_ct_volume,
     load_job_config,
@@ -134,6 +135,9 @@ def _compute_mask_measurement(
         hu_values = ct_data[mask_bool]
         hu_mean = round(float(np.mean(hu_values)), 2) if hu_values.size else None
         hu_std = round(float(np.std(hu_values)), 2) if hu_values.size else None
+    estimated_pdff_percent = None
+    if organ_key == "liver" and not suppress_density:
+        estimated_pdff_percent = estimate_pdff_from_unenhanced_ct_hu(hu_mean)
     complete = mask_complete(mask_bool)
     voxel_volume_cm3 = float(spacing_xyz[0] * spacing_xyz[1] * spacing_xyz[2]) / 1000.0
     observed_volume_cm3 = round(voxel_count * voxel_volume_cm3, 3) if complete else None
@@ -157,6 +161,7 @@ def _compute_mask_measurement(
         "volume_cm3": observed_volume_cm3,
         "hu_mean": hu_mean,
         "hu_std": hu_std,
+        "estimated_pdff_percent": estimated_pdff_percent,
     }
 
 
