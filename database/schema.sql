@@ -130,6 +130,33 @@ CREATE TABLE IF NOT EXISTS integration_dispatch_queue (
 );
 
 -- ============================================================
+-- Resource Monitor Samples: resident memory telemetry snapshots
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS resource_monitor_samples (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sampled_at TIMESTAMP NOT NULL,
+    service_slug TEXT NOT NULL,
+    service_unit TEXT NOT NULL,
+    stage TEXT,
+    main_pid INTEGER,
+    subtree_pids_json TEXT,
+    active_case_ids_json TEXT,
+    rss_mb REAL,
+    peak_rss_mb REAL,
+    subtree_rss_mb REAL,
+    subtree_peak_rss_mb REAL,
+    major_faults INTEGER,
+    cgroup_memory_current_mb REAL,
+    cgroup_memory_peak_mb REAL,
+    host_mem_total_mb REAL,
+    host_mem_available_mb REAL,
+    host_swap_used_mb REAL,
+    host_mem_used_percent REAL,
+    notes_json TEXT
+);
+
+-- ============================================================
 -- Indexes for Performance
 -- ============================================================
 
@@ -142,6 +169,8 @@ CREATE INDEX IF NOT EXISTS idx_segmentation_queue_status_created ON segmentation
 CREATE INDEX IF NOT EXISTS idx_metrics_queue_status_created ON metrics_queue(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_dicom_egress_queue_status_next_attempt ON dicom_egress_queue(status, next_attempt_at, created_at);
 CREATE INDEX IF NOT EXISTS idx_integration_dispatch_queue_status_next_attempt ON integration_dispatch_queue(status, next_attempt_at, created_at);
+CREATE INDEX IF NOT EXISTS idx_resource_monitor_samples_service_time ON resource_monitor_samples(service_slug, sampled_at);
+CREATE INDEX IF NOT EXISTS idx_resource_monitor_samples_time ON resource_monitor_samples(sampled_at);
 
 -- ============================================================
 -- Schema Notes

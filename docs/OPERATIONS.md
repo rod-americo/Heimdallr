@@ -14,7 +14,8 @@ Run as independent services:
 6. `python -m heimdallr.integration_dispatcher` (outbound webhook/event delivery)
 7. `python -m heimdallr.dicom_egress` (outbound DICOM artifact delivery)
 8. `python -m heimdallr.space_manager` (runtime/studies storage reclamation)
-9. `python -m heimdallr.tui` (optional operational dashboard)
+9. `python -m heimdallr.resource_monitor` (resident RAM telemetry sampling)
+10. `python -m heimdallr.tui` (optional operational dashboard)
 
 ## Repository File Map
 
@@ -85,6 +86,10 @@ python -m heimdallr.dicom_egress
 # Space manager
 source .venv/bin/activate
 python -m heimdallr.space_manager
+
+# Resource monitor
+source .venv/bin/activate
+python -m heimdallr.resource_monitor
 ```
 
 ## Environment and Config
@@ -103,6 +108,7 @@ export HEIMDALLR_PRESENTATION_CONFIG="config/presentation.json"
 export HEIMDALLR_SEGMENTATION_PIPELINE_CONFIG="config/segmentation_pipeline.json"
 export HEIMDALLR_METRICS_PIPELINE_CONFIG="config/metrics_pipeline.json"
 export HEIMDALLR_SPACE_MANAGER_CONFIG="config/space_manager.json"
+export HEIMDALLR_RESOURCE_MONITOR_CONFIG="config/resource_monitor.json"
 ```
 
 Before enabling segmentation, metrics, outbound DICOM delivery, or customizing presentation defaults on a host, create the local config files from the repository examples:
@@ -111,6 +117,7 @@ Before enabling segmentation, metrics, outbound DICOM delivery, or customizing p
 cp config/segmentation_pipeline.example.json config/segmentation_pipeline.json
 cp config/metrics_pipeline.example.json config/metrics_pipeline.json
 cp config/space_manager.example.json config/space_manager.json
+cp config/resource_monitor.example.json config/resource_monitor.json
 cp config/integration_dispatch.example.json config/integration_dispatch.json
 cp config/dicom_egress.example.json config/dicom_egress.json
 cp config/presentation.example.json config/presentation.json
@@ -121,6 +128,7 @@ These six JSON files are host-local operational config and are ignored by Git:
 - `config/segmentation_pipeline.json`
 - `config/metrics_pipeline.json`
 - `config/space_manager.json`
+- `config/resource_monitor.json`
 - `config/integration_dispatch.json`
 - `config/dicom_egress.json`
 - `config/presentation.json`
