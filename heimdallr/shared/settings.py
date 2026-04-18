@@ -217,6 +217,19 @@ SPACE_MANAGER_SCAN_INTERVAL = _config_int(
     ("scan_interval_seconds",),
     60,
 )
+RESOURCE_MONITOR_CONFIG_PATH = Path(
+    os.getenv(
+        "HEIMDALLR_RESOURCE_MONITOR_CONFIG",
+        str(CONFIG_DIR / "resource_monitor.json"),
+    )
+)
+RESOURCE_MONITOR_CONFIG = _load_json_config(RESOURCE_MONITOR_CONFIG_PATH)
+RESOURCE_MONITOR_SCAN_INTERVAL = _config_int(
+    "HEIMDALLR_RESOURCE_MONITOR_SCAN_INTERVAL",
+    RESOURCE_MONITOR_CONFIG,
+    ("scan_interval_seconds",),
+    10,
+)
 SPACE_MANAGER_USAGE_THRESHOLD_PERCENT = _config_float(
     "HEIMDALLR_SPACE_MANAGER_USAGE_THRESHOLD_PERCENT",
     SPACE_MANAGER_CONFIG,

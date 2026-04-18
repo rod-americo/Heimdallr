@@ -94,10 +94,15 @@ heimdallr.space_manager          ← runtime/studies retention / purge guard
    - monitors the filesystem that hosts `runtime/studies/`
    - purges oldest completed studies when a host-local disk usage threshold is exceeded
 
-8. **Control Plane**
+8. **Resource Monitor**
+   - resident RAM telemetry sampler (`heimdallr.resource_monitor`)
+   - amostra RSS do worker, RSS da árvore de subprocessos, memória do cgroup e swap do host
+   - persiste snapshots temporais em SQLite para análise posterior de capacidade
+
+9. **Control Plane**
    - FastAPI application serving dashboard, upload ingress, patient/results API, artifact download, and deterministic PDF export
 
-9. **Operations TUI**
+10. **Operations TUI**
    - Textual dashboard with live service radar, queue pressure, case spotlight, and upload-origin markers (`P` / `E`)
 
 ## Repository Layout
@@ -117,6 +122,7 @@ Heimdallr/
 │   ├── integration_dispatcher/     # Outbound webhook/event delivery worker
 │   ├── dicom_egress/               # Outbound DICOM C-STORE worker
 │   ├── space_manager/              # Disk-usage guard for runtime/studies
+│   ├── resource_monitor/           # Resident RAM telemetry sampler
 │   ├── shared/                     # Settings, SQLite store, paths, i18n, schemas
 │   ├── tui/                        # Textual operations dashboard
 │   ├── locales/                    # gettext catalogs (`artifacts`, `tui`)
@@ -223,7 +229,10 @@ Start the services in separate terminals or service units:
 # 8) Space Manager — runtime/studies storage reclamation
 .venv/bin/python -m heimdallr.space_manager
 
-# 9) Operations TUI — terminal dashboard
+# 9) Resource Monitor — resident RAM telemetry sampler
+.venv/bin/python -m heimdallr.resource_monitor
+
+# 10) Operations TUI — terminal dashboard
 .venv/bin/python -m heimdallr.tui
 ```
 
@@ -237,6 +246,7 @@ The minimum processing stack for a headless host is usually:
 Add these when needed:
 - `heimdallr.integration_dispatcher`
 - `heimdallr.space_manager`
+- `heimdallr.resource_monitor`
 - `heimdallr.control_plane`
 - `heimdallr.tui`
 
@@ -294,6 +304,7 @@ These files are expected to vary per host and are ignored by Git:
 - `config/metrics_pipeline.json`
 - `config/integration_dispatch.json`
 - `config/space_manager.json`
+- `config/resource_monitor.json`
 - `config/dicom_egress.json`
 - `config/presentation.json`
 
@@ -304,6 +315,7 @@ cp config/segmentation_pipeline.example.json config/segmentation_pipeline.json
 cp config/metrics_pipeline.example.json config/metrics_pipeline.json
 cp config/integration_dispatch.example.json config/integration_dispatch.json
 cp config/space_manager.example.json config/space_manager.json
+cp config/resource_monitor.example.json config/resource_monitor.json
 cp config/dicom_egress.example.json config/dicom_egress.json
 cp config/presentation.example.json config/presentation.json
 ```
@@ -322,6 +334,7 @@ cp config/presentation.example.json config/presentation.json
 | `HEIMDALLR_DICOM_EGRESS_CONFIG` | `config/dicom_egress.json` | Outbound DICOM destination config |
 | `HEIMDALLR_PRESENTATION_CONFIG` | `config/presentation.json` | Patient name and locale presentation config |
 | `HEIMDALLR_SPACE_MANAGER_CONFIG` | `config/space_manager.json` | Runtime storage reclamation policy |
+| `HEIMDALLR_RESOURCE_MONITOR_CONFIG` | `config/resource_monitor.json` | Resident RAM telemetry sampling policy |
 | `HEIMDALLR_AE_TITLE` | `HEIMDALLR` | DICOM Application Entity title |
 | `HEIMDALLR_TIMEZONE` | `America/Sao_Paulo` | Operational timezone |
 | `HEIMDALLR_MAX_PARALLEL_CASES` | `3` | Concurrent segmentation slots |

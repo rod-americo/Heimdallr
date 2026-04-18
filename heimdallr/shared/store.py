@@ -282,6 +282,44 @@ def ensure_schema(conn: sqlite3.Connection | None = None) -> None:
         ON study_handoff_state(status, last_seen_at, first_seen_at)
         """
     )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS resource_monitor_samples (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sampled_at TIMESTAMP NOT NULL,
+            service_slug TEXT NOT NULL,
+            service_unit TEXT NOT NULL,
+            stage TEXT,
+            main_pid INTEGER,
+            subtree_pids_json TEXT,
+            active_case_ids_json TEXT,
+            rss_mb REAL,
+            peak_rss_mb REAL,
+            subtree_rss_mb REAL,
+            subtree_peak_rss_mb REAL,
+            major_faults INTEGER,
+            cgroup_memory_current_mb REAL,
+            cgroup_memory_peak_mb REAL,
+            host_mem_total_mb REAL,
+            host_mem_available_mb REAL,
+            host_swap_used_mb REAL,
+            host_mem_used_percent REAL,
+            notes_json TEXT
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_resource_monitor_samples_service_time
+        ON resource_monitor_samples(service_slug, sampled_at)
+        """
+    )
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_resource_monitor_samples_time
+        ON resource_monitor_samples(sampled_at)
+        """
+    )
     _ensure_columns(cursor, "dicom_metadata", _DICOM_METADATA_COLUMNS)
     _ensure_columns(cursor, "dicom_egress_queue", _DICOM_EGRESS_QUEUE_COLUMNS)
     _ensure_columns(cursor, "study_handoff_state", _STUDY_HANDOFF_COLUMNS)
@@ -612,6 +650,107 @@ def enqueue_case_for_metrics(conn: sqlite3.Connection, case_id: str, input_path:
             error = NULL
         """,
         (str(case_id), str(input_path), created_at),
+    )
+    conn.commit()
+
+
+def list_resource_monitor_active_case_ids(conn: sqlite3.Connection, *, stage: str) -> list[str]:
+    ensure_schema(conn)
+    stage_name = str(stage or "").strip().lower()
+    if stage_name == "prepare":
+        rows = conn.execute(
+            """
+            SELECT COALESCE(NULLIF(case_id, ''), study_uid) AS active_id
+            FROM study_handoff_state
+            WHERE status = 'preparing'
+            ORDER BY last_seen_at, first_seen_at
+            """
+        ).fetchall()
+    elif stage_name == "segmentation":
+        rows = conn.execute(
+            """
+            SELECT case_id AS active_id
+            FROM segmentation_queue
+            WHERE status = 'claimed'
+            ORDER BY claimed_at, created_at
+            """
+        ).fetchall()
+    elif stage_name == "metrics":
+        rows = conn.execute(
+            """
+            SELECT case_id AS active_id
+            FROM metrics_queue
+            WHERE status = 'claimed'
+            ORDER BY claimed_at, created_at
+            """
+        ).fetchall()
+    elif stage_name == "egress":
+        rows = conn.execute(
+            """
+            SELECT DISTINCT case_id AS active_id
+            FROM dicom_egress_queue
+            WHERE status = 'claimed'
+            ORDER BY case_id
+            """
+        ).fetchall()
+    else:
+        return []
+    return [str(row["active_id"]) for row in rows if str(row["active_id"] or "").strip()]
+
+
+def insert_resource_monitor_samples(conn: sqlite3.Connection, samples: list[dict[str, Any]]) -> None:
+    ensure_schema(conn)
+    if not samples:
+        return
+    conn.executemany(
+        """
+        INSERT INTO resource_monitor_samples (
+            sampled_at,
+            service_slug,
+            service_unit,
+            stage,
+            main_pid,
+            subtree_pids_json,
+            active_case_ids_json,
+            rss_mb,
+            peak_rss_mb,
+            subtree_rss_mb,
+            subtree_peak_rss_mb,
+            major_faults,
+            cgroup_memory_current_mb,
+            cgroup_memory_peak_mb,
+            host_mem_total_mb,
+            host_mem_available_mb,
+            host_swap_used_mb,
+            host_mem_used_percent,
+            notes_json
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        [
+            (
+                sample.get("sampled_at"),
+                sample.get("service_slug"),
+                sample.get("service_unit"),
+                sample.get("stage"),
+                sample.get("main_pid"),
+                sample.get("subtree_pids_json"),
+                sample.get("active_case_ids_json"),
+                sample.get("rss_mb"),
+                sample.get("peak_rss_mb"),
+                sample.get("subtree_rss_mb"),
+                sample.get("subtree_peak_rss_mb"),
+                sample.get("major_faults"),
+                sample.get("cgroup_memory_current_mb"),
+                sample.get("cgroup_memory_peak_mb"),
+                sample.get("host_mem_total_mb"),
+                sample.get("host_mem_available_mb"),
+                sample.get("host_swap_used_mb"),
+                sample.get("host_mem_used_percent"),
+                sample.get("notes_json"),
+            )
+            for sample in samples
+        ],
     )
     conn.commit()
 
