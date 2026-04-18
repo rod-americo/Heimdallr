@@ -146,6 +146,7 @@ CREATE TABLE IF NOT EXISTS resource_monitor_samples (
     peak_rss_mb REAL,
     subtree_rss_mb REAL,
     subtree_peak_rss_mb REAL,
+    subtree_pss_mb REAL,
     major_faults INTEGER,
     cgroup_memory_current_mb REAL,
     cgroup_memory_peak_mb REAL,
@@ -154,6 +155,23 @@ CREATE TABLE IF NOT EXISTS resource_monitor_samples (
     host_swap_used_mb REAL,
     host_mem_used_percent REAL,
     notes_json TEXT
+);
+
+CREATE TABLE IF NOT EXISTS resource_monitor_case_peaks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id TEXT NOT NULL,
+    stage TEXT NOT NULL,
+    first_sampled_at TIMESTAMP NOT NULL,
+    last_sampled_at TIMESTAMP NOT NULL,
+    sample_count INTEGER NOT NULL DEFAULT 0,
+    max_main_rss_mb REAL,
+    max_peak_rss_mb REAL,
+    max_subtree_pss_mb REAL,
+    max_cgroup_memory_current_mb REAL,
+    min_host_mem_available_mb REAL,
+    max_host_swap_used_mb REAL,
+    max_major_faults INTEGER,
+    UNIQUE(case_id, stage)
 );
 
 -- ============================================================
@@ -171,6 +189,7 @@ CREATE INDEX IF NOT EXISTS idx_dicom_egress_queue_status_next_attempt ON dicom_e
 CREATE INDEX IF NOT EXISTS idx_integration_dispatch_queue_status_next_attempt ON integration_dispatch_queue(status, next_attempt_at, created_at);
 CREATE INDEX IF NOT EXISTS idx_resource_monitor_samples_service_time ON resource_monitor_samples(service_slug, sampled_at);
 CREATE INDEX IF NOT EXISTS idx_resource_monitor_samples_time ON resource_monitor_samples(sampled_at);
+CREATE INDEX IF NOT EXISTS idx_resource_monitor_case_peaks_case_stage ON resource_monitor_case_peaks(case_id, stage);
 
 -- ============================================================
 -- Schema Notes

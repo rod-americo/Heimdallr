@@ -3,6 +3,7 @@ import sqlite3
 import unittest
 
 from heimdallr.shared import store
+from heimdallr.resource_monitor import worker
 
 
 class ResourceMonitorStoreTests(unittest.TestCase):
@@ -70,6 +71,7 @@ class ResourceMonitorStoreTests(unittest.TestCase):
                         "peak_rss_mb": 130.0,
                         "subtree_rss_mb": 240.0,
                         "subtree_peak_rss_mb": 260.0,
+                        "subtree_pss_mb": 180.0,
                         "major_faults": 7,
                         "cgroup_memory_current_mb": 250.0,
                         "cgroup_memory_peak_mb": 275.0,
@@ -82,14 +84,73 @@ class ResourceMonitorStoreTests(unittest.TestCase):
                 ],
             )
             row = conn.execute(
-                "SELECT service_slug, main_pid, rss_mb, active_case_ids_json FROM resource_monitor_samples"
+                "SELECT service_slug, main_pid, rss_mb, subtree_pss_mb, active_case_ids_json FROM resource_monitor_samples"
             ).fetchone()
             self.assertEqual(row["service_slug"], "metrics")
             self.assertEqual(row["main_pid"], 123)
             self.assertEqual(row["rss_mb"], 120.5)
+            self.assertEqual(row["subtree_pss_mb"], 180.0)
             self.assertEqual(json.loads(row["active_case_ids_json"]), ["CaseA"])
+
+            peak_row = conn.execute(
+                """
+                SELECT case_id, stage, sample_count, max_main_rss_mb, max_subtree_pss_mb
+                FROM resource_monitor_case_peaks
+                """
+            ).fetchone()
+            self.assertEqual(peak_row["case_id"], "CaseA")
+            self.assertEqual(peak_row["stage"], "metrics")
+            self.assertEqual(peak_row["sample_count"], 1)
+            self.assertEqual(peak_row["max_main_rss_mb"], 120.5)
+            self.assertEqual(peak_row["max_subtree_pss_mb"], 180.0)
         finally:
             conn.close()
+
+    def test_insert_resource_monitor_samples_skips_shared_case_attribution(self):
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        try:
+            store.ensure_schema(conn)
+            store.insert_resource_monitor_samples(
+                conn,
+                [
+                    {
+                        "sampled_at": "2026-04-17 10:00:00",
+                        "service_slug": "segmentation",
+                        "service_unit": "heimdallr-segmentation.service",
+                        "stage": "segmentation",
+                        "main_pid": 456,
+                        "subtree_pids_json": json.dumps([456, 789]),
+                        "active_case_ids_json": json.dumps(["CaseA", "CaseB"]),
+                        "rss_mb": 80.0,
+                        "peak_rss_mb": 81.0,
+                        "subtree_rss_mb": 200.0,
+                        "subtree_peak_rss_mb": 220.0,
+                        "subtree_pss_mb": 150.0,
+                        "major_faults": 3,
+                        "cgroup_memory_current_mb": 500.0,
+                        "cgroup_memory_peak_mb": 700.0,
+                        "host_mem_total_mb": 32000.0,
+                        "host_mem_available_mb": 15000.0,
+                        "host_swap_used_mb": 0.0,
+                        "host_mem_used_percent": 53.0,
+                        "notes_json": json.dumps({"active_state": "active"}),
+                    }
+                ],
+            )
+            count = conn.execute("SELECT COUNT(*) FROM resource_monitor_case_peaks").fetchone()[0]
+            self.assertEqual(count, 0)
+        finally:
+            conn.close()
+
+
+class ResourceMonitorWorkerTests(unittest.TestCase):
+    def test_parse_smaps_rollup_pss_returns_zero_when_missing(self):
+        self.assertEqual(worker._parse_smaps_rollup_pss(worker.Path("/definitely/missing")), 0)
+
+    def test_parse_proc_stat_major_faults_reads_field(self):
+        raw = "123 (python) S 1 2 3 4 5 6 7 8 9 10 11 12"
+        self.assertEqual(worker._parse_proc_stat_major_faults(raw), 9)
 
 
 if __name__ == "__main__":
