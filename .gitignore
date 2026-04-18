@@ -57,5 +57,6 @@ config/dicom_egress.json
 config/integration_dispatch.json
 config/metrics_pipeline.json
 config/presentation.json
+config/resource_monitor.json
 config/segmentation_pipeline.json
 config/space_manager.json

@@ -1,0 +1,23 @@
+{
+  "scan_interval_seconds": 10,
+  "services": [
+    {
+      "slug": "prepare",
+      "unit": "heimdallr-prepare.service",
+      "stage": "prepare",
+      "enabled": true
+    },
+    {
+      "slug": "segmentation",
+      "unit": "heimdallr-segmentation.service",
+      "stage": "segmentation",
+      "enabled": true
+    },
+    {
+      "slug": "metrics",
+      "unit": "heimdallr-metrics.service",
+      "stage": "metrics",
+      "enabled": true
+    }
+  ]
+}
