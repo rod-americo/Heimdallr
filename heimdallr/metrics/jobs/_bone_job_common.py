@@ -253,6 +253,60 @@ def center_slice_index(mask: np.ndarray) -> int | None:
     return int(z_indices[len(z_indices) // 2])
 
 
+def _keep_largest_component_3d(mask: np.ndarray) -> np.ndarray:
+    from scipy.ndimage import label as ndlabel
+
+    mask_bool = np.asarray(mask, dtype=bool)
+    if not np.any(mask_bool):
+        return mask_bool
+
+    labeled, num_features = ndlabel(mask_bool, structure=np.ones((3, 3, 3), dtype=np.uint8))
+    if num_features <= 1:
+        return mask_bool
+
+    component_sizes = [int(np.sum(labeled == component_id)) for component_id in range(1, num_features + 1)]
+    best_label = int(np.argmax(component_sizes)) + 1
+    return labeled == best_label
+
+
+def vertebral_core_mask(
+    mask: np.ndarray,
+    *,
+    spacing_mm: tuple[float, float, float] | None = None,
+    erosion_mm: float = 5.0,
+) -> np.ndarray:
+    from scipy.ndimage import binary_erosion
+
+    mask_bool = np.asarray(mask, dtype=bool)
+    if mask_bool.ndim != 3 or not np.any(mask_bool):
+        return mask_bool
+
+    coords = np.argwhere(mask_bool)
+    mins = coords.min(axis=0)
+    maxs = coords.max(axis=0) + 1
+    cropped = mask_bool[mins[0]:maxs[0], mins[1]:maxs[1], mins[2]:maxs[2]]
+
+    if spacing_mm is None:
+        spacing = (1.0, 1.0, 1.0)
+    else:
+        spacing = tuple(float(v) for v in spacing_mm)
+    min_spacing = max(min(spacing), 1e-6)
+    erosion_iterations = max(1, int(round(float(erosion_mm) / min_spacing)))
+
+    eroded = binary_erosion(cropped, iterations=erosion_iterations)
+    if not np.any(eroded):
+        core_cropped = _keep_largest_component_3d(cropped)
+    else:
+        core_cropped = _keep_largest_component_3d(eroded)
+
+    if np.count_nonzero(core_cropped) == 0:
+        core_cropped = _keep_largest_component_3d(cropped)
+
+    core = np.zeros_like(mask_bool, dtype=bool)
+    core[mins[0]:maxs[0], mins[1]:maxs[1], mins[2]:maxs[2]] = core_cropped
+    return core
+
+
 def sagittal_plane_from_mask(mask: np.ndarray) -> tuple[np.ndarray | None, int | None, str | None]:
     mask_bool = np.asarray(mask, dtype=bool)
     coords = np.argwhere(mask_bool)
@@ -270,6 +324,48 @@ def sagittal_plane_from_mask(mask: np.ndarray) -> tuple[np.ndarray | None, int |
 
     plane_index = int(round((y_min + y_max) / 2.0))
     return np.asarray(mask_bool[:, plane_index, :], dtype=bool), plane_index, "y"
+
+
+def sagittal_plane_from_mask_with_affine(
+    mask: np.ndarray,
+    affine: np.ndarray | None,
+    *,
+    spacing_mm: tuple[float, float, float] | None = None,
+    core_erosion_mm: float = 5.0,
+) -> tuple[np.ndarray | None, int | None, str | None]:
+    mask_bool = np.asarray(mask, dtype=bool)
+    coords = np.argwhere(mask_bool)
+    if coords.size == 0:
+        return None, None, None
+
+    if affine is not None:
+        try:
+            axis_codes = affine_axis_codes(np.asarray(affine, dtype=np.float64))
+            lateral_axes = [idx for idx, code in enumerate(axis_codes) if code in {"L", "R"}]
+            if lateral_axes:
+                axis = int(lateral_axes[0])
+                axis_name = ("x", "y", "z")[axis]
+                core_mask = vertebral_core_mask(
+                    mask_bool,
+                    spacing_mm=spacing_mm,
+                    erosion_mm=core_erosion_mm,
+                )
+                core_coords = np.argwhere(core_mask)
+                if core_coords.size > 0:
+                    axis_min = int(core_coords[:, axis].min())
+                    axis_max = int(core_coords[:, axis].max())
+                else:
+                    axis_min = int(coords[:, axis].min())
+                    axis_max = int(coords[:, axis].max())
+                plane_index = int(round((axis_min + axis_max) / 2.0))
+                if axis_name == "x":
+                    return np.asarray(mask_bool[plane_index, :, :], dtype=bool), plane_index, "x"
+                if axis_name == "y":
+                    return np.asarray(mask_bool[:, plane_index, :], dtype=bool), plane_index, "y"
+        except Exception:
+            pass
+
+    return sagittal_plane_from_mask(mask_bool)
 
 
 def extract_plane(data: np.ndarray, plane_axis: str, plane_index: int) -> np.ndarray:
@@ -358,7 +454,12 @@ def build_l1_sagittal_roi(
 ) -> tuple[np.ndarray | None, dict[str, Any]]:
     from scipy.ndimage import binary_erosion, distance_transform_edt, label as ndlabel
 
-    plane_mask, plane_index, plane_axis = sagittal_plane_from_mask(mask_l1)
+    plane_mask, plane_index, plane_axis = sagittal_plane_from_mask_with_affine(
+        mask_l1,
+        affine,
+        spacing_mm=spacing_mm,
+        core_erosion_mm=erosion_mm,
+    )
     if plane_mask is None or plane_index is None or plane_axis is None:
         return None, {"status": "empty_mask"}
 
