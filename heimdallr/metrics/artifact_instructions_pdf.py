@@ -16,6 +16,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from pydicom.uid import generate_uid
 
+from heimdallr.metrics.analysis.hepatic_steatosis import estimate_pdff_from_unenhanced_ct_hu
 from heimdallr.metrics.jobs._dicom_secondary_capture import create_secondary_capture_from_rgb
 from heimdallr.shared import settings
 from heimdallr.shared.i18n import format_decimal, normalize_locale, translate
@@ -662,7 +663,7 @@ def _parenchymal_steatosis_summary(measurement: dict[str, Any], *, locale: str |
 
     l_s = liver_hu_value - spleen_hu_value
     l_s_ratio = liver_hu_value / spleen_hu_value if spleen_hu_value else None
-    pdff = max(0.0, 51.0 - (0.65 * liver_hu_value))
+    pdff = estimate_pdff_from_unenhanced_ct_hu(liver_hu_value)
 
     if liver_hu_value < 40.0 or l_s <= -10.0:
         synthesis = _t("parenchymal.steatosis.summary.moderate_severe", locale=locale)

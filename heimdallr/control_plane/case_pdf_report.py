@@ -7,6 +7,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+from heimdallr.metrics.analysis.hepatic_steatosis import estimate_pdff_from_unenhanced_ct_hu
 from heimdallr.shared import settings
 from heimdallr.shared.patient_names import normalize_patient_name_display
 
@@ -351,10 +352,14 @@ def build_case_report(case_folder: Path, output_path: Path | None = None) -> Pat
         ("L1 BMD class", str(results.get("L1_bmd_classification", "-"))),
     ], left_x, left_y, col_width)
     left_y += 16
+    liver_pdff_percent = results.get("liver_pdff_percent")
+    if liver_pdff_percent in (None, ""):
+        liver_pdff_percent = estimate_pdff_from_unenhanced_ct_hu(results.get("liver_hu_mean"))
+
     left_y = _draw_card(draw, "Liver and Organs", [
         ("Liver volume", _fmt_number(results.get("liver_vol_cm3"), "cm3")),
         ("Liver mean HU", _fmt_number(results.get("liver_hu_mean"), "HU")),
-        ("Estimated PDFF", _fmt_number(results.get("liver_pdff_percent"), "%")),
+        ("Estimated PDFF", _fmt_number(liver_pdff_percent, "%")),
         ("Spleen volume", _fmt_number(results.get("spleen_vol_cm3"), "cm3")),
         ("Right kidney volume", _fmt_number(results.get("kidney_right_vol_cm3"), "cm3")),
         ("Left kidney volume", _fmt_number(results.get("kidney_left_vol_cm3"), "cm3")),
