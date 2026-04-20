@@ -862,19 +862,10 @@ def segment_case_metrics(case_input: Path) -> bool:
             delivery_kind=instruction_dicom_kind,
         )
         if instruction_dicom:
-            if instruction_dicom["kind"] == "secondary_capture":
-                for path in instruction_dicom.get("paths", []):
-                    dicom_exports.append(
-                        {
-                            "path": str(path),
-                            "kind": "secondary_capture",
-                        }
-                    )
-            else:
-                logger.log(
-                    "[Metrics] Instruction document generated locally but excluded from DICOM egress "
-                    f"(kind={instruction_dicom['kind']})"
-                )
+            logger.log(
+                "[Metrics] Instruction document generated locally but excluded from DICOM egress "
+                f"(kind={instruction_dicom['kind']})"
+            )
 
         try:
             enqueued_dicom_exports = _enqueue_case_dicom_exports(

@@ -291,13 +291,7 @@ class TestMetricsWorker(unittest.TestCase):
             enqueue_call = enqueue_mock.call_args
             self.assertIsNotNone(enqueue_call)
             enqueued_exports = enqueue_call.args[2]
-            self.assertEqual(
-                enqueued_exports,
-                [
-                    {"path": "artifacts/metrics/instructions/dicom_sc/page_01.dcm", "kind": "secondary_capture"},
-                    {"path": "artifacts/metrics/instructions/dicom_sc/page_02.dcm", "kind": "secondary_capture"},
-                ],
-            )
+            self.assertEqual(enqueued_exports, [])
 
             results_payload = json.loads(results_json_path.read_text(encoding="utf-8"))
             self.assertEqual(
