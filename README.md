@@ -337,7 +337,7 @@ cp config/presentation.example.json config/presentation.json
 | `HEIMDALLR_RESOURCE_MONITOR_CONFIG` | `config/resource_monitor.json` | Resident RAM telemetry sampling policy |
 | `HEIMDALLR_AE_TITLE` | `HEIMDALLR` | DICOM Application Entity title |
 | `HEIMDALLR_TIMEZONE` | `America/Sao_Paulo` | Operational timezone |
-| `HEIMDALLR_MAX_PARALLEL_CASES` | `3` | Concurrent segmentation slots |
+| `HEIMDALLR_MAX_PARALLEL_CASES` | `1` | Concurrent segmentation case slots |
 | `HEIMDALLR_DICOM_HANDOFF_MODE` | `local_prepare` | `local_prepare` or `http_upload` |
 | `HEIMDALLR_DCM2NIIX_BIN` | auto | Override bundled/system `dcm2niix` |
 | `HEIMDALLR_DCMCJPEG_BIN` | auto | Override bundled/system `dcmcjpeg` |
