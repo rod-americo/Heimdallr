@@ -1378,9 +1378,10 @@ def segment_case(case_input):
 def main():
     """
     Main daemon loop.
-    
-    Monitors input/ directory for new NIfTI files and processes them in parallel.
-    Supports up to 3 simultaneous cases for optimal resource utilization.
+
+    Monitors input/ directory for new NIfTI files and processes them with
+    configurable case concurrency. The default operational policy is one case
+    at a time.
     """
     print("Starting input/ directory monitoring...")
     _install_signal_handlers()

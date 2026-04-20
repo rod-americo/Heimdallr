@@ -1,5 +1,8 @@
 {
   "default_profile": "ct_native_segmentation_only",
+  "execution": {
+    "max_parallel_cases": 1
+  },
   "profiles": {
     "ct_native_segmentation_only": {
       "required": {
