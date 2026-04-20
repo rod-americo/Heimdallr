@@ -103,6 +103,7 @@ class CaseOverview:
     discarded_series: int
     path: Path | None
     error: str
+    segmentation_status: str
     sort_timestamp: float
 
 
@@ -184,6 +185,7 @@ def build_snapshot(
                 "metrics_elapsed": study.get("metrics_elapsed") or case["metrics_elapsed"],
                 "total_elapsed": study.get("total_elapsed") or case["total_elapsed"],
                 "segmentation_reused": study.get("segmentation_reused", case["segmentation_reused"]),
+                "segmentation_status": study.get("segmentation_status") or case["segmentation_status"],
                 "segmentation_reuse_reason": study.get(
                     "segmentation_reuse_reason",
                     case["segmentation_reuse_reason"],
@@ -677,6 +679,7 @@ def _finalize_case(case: dict[str, Any]) -> CaseOverview:
         discarded_series=case["discarded_series"],
         path=case["path"],
         error=case["error"] or "",
+        segmentation_status=case.get("segmentation_status", "") or "",
         sort_timestamp=sort_timestamp,
     )
 
