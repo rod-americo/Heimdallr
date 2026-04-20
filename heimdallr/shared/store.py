@@ -49,6 +49,10 @@ _DICOM_EGRESS_QUEUE_COLUMNS = {
     "artifact_digest": "TEXT",
 }
 
+_SEGMENTATION_QUEUE_COLUMNS = {
+    "attempts": "INTEGER NOT NULL DEFAULT 0",
+}
+
 _RESOURCE_MONITOR_SAMPLE_COLUMNS = {
     "subtree_pss_mb": "REAL",
 }
@@ -352,6 +356,7 @@ def ensure_schema(conn: sqlite3.Connection | None = None) -> None:
         """
     )
     _ensure_columns(cursor, "dicom_metadata", _DICOM_METADATA_COLUMNS)
+    _ensure_columns(cursor, "segmentation_queue", _SEGMENTATION_QUEUE_COLUMNS)
     _ensure_columns(cursor, "dicom_egress_queue", _DICOM_EGRESS_QUEUE_COLUMNS)
     _ensure_columns(cursor, "resource_monitor_samples", _RESOURCE_MONITOR_SAMPLE_COLUMNS)
     _ensure_columns(cursor, "study_handoff_state", _STUDY_HANDOFF_COLUMNS)
@@ -486,15 +491,16 @@ def enqueue_segmentation_case(conn: sqlite3.Connection, case_id: str, input_path
     )
     conn.execute(
         """
-        INSERT INTO segmentation_queue (case_id, input_path, status, created_at)
-        VALUES (?, ?, 'pending', ?)
+        INSERT INTO segmentation_queue (case_id, input_path, status, created_at, attempts)
+        VALUES (?, ?, 'pending', ?, 0)
         ON CONFLICT(case_id) DO UPDATE SET
             input_path = excluded.input_path,
             status = 'pending',
             created_at = excluded.created_at,
             claimed_at = NULL,
             finished_at = NULL,
-            error = NULL
+            error = NULL,
+            attempts = 0
         """,
         (str(case_id), str(input_path), created_at),
     )
@@ -1193,7 +1199,8 @@ def claim_next_pending_segmentation_queue_item(conn: sqlite3.Connection) -> tupl
         UPDATE segmentation_queue
         SET status = 'claimed',
             claimed_at = ?,
-            error = NULL
+            error = NULL,
+            attempts = COALESCE(attempts, 0) + 1
         WHERE id = ? AND status = 'pending'
         """,
         (claimed_at, queue_id),
@@ -1435,6 +1442,38 @@ def mark_segmentation_queue_item_error(conn: sqlite3.Connection, queue_id: int, 
         (finished_at, str(error_message)[:2000], queue_id),
     )
     conn.commit()
+
+
+def retry_segmentation_queue_item(
+    conn: sqlite3.Connection,
+    queue_id: int,
+    error_message: Any,
+    *,
+    max_attempts: int,
+) -> bool:
+    ensure_schema(conn)
+    row = conn.execute(
+        "SELECT attempts FROM segmentation_queue WHERE id = ?",
+        (int(queue_id),),
+    ).fetchone()
+    if row is None:
+        return False
+    attempts = int(row["attempts"] or 0)
+    if attempts >= int(max_attempts):
+        return False
+    conn.execute(
+        """
+        UPDATE segmentation_queue
+        SET status = 'pending',
+            claimed_at = NULL,
+            finished_at = NULL,
+            error = ?
+        WHERE id = ?
+        """,
+        (str(error_message)[:2000], int(queue_id)),
+    )
+    conn.commit()
+    return True
 
 
 def mark_metrics_queue_item_error(conn: sqlite3.Connection, queue_id: int, error_message: Any) -> None:

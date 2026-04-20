@@ -694,6 +694,8 @@ def _derive_stage_key(case: dict[str, Any]) -> str:
         return "segmentation"
     if segmentation_queue_status == "pending" or case["pending_file"]:
         return "queued"
+    if case.get("segmentation_status") == "ineligible":
+        return "ineligible"
     if segmentation_queue_status == "error" or metrics_queue_status == "error" or case["failed_file"] or case["has_error_log"]:
         return "failed"
     if case["path"] is not None:
@@ -702,6 +704,8 @@ def _derive_stage_key(case: dict[str, Any]) -> str:
 
 
 def _derive_case_signal(case: dict[str, Any], stage_key: str) -> str:
+    if stage_key == "ineligible":
+        return tui("snapshot.case.signal.ineligible")
     if case["error"]:
         return _truncate(case["error"], 52)
     if case["segmentation_reused"]:
@@ -731,6 +735,8 @@ def _derive_case_signal(case: dict[str, Any], stage_key: str) -> str:
 
 
 def _display_queue_status_key(case: dict[str, Any], stage_key: str) -> str:
+    if stage_key == "ineligible":
+        return ""
     if stage_key in {"metrics", "processed"} and case["metrics_queue_status"]:
         return case["metrics_queue_status"]
     if case["segmentation_queue_status"]:
@@ -755,6 +761,7 @@ def _empty_case(case_id: str) -> dict[str, Any]:
         "total_elapsed": "",
         "metrics_started": False,
         "metrics_finished": False,
+        "segmentation_status": "",
         "segmentation_reused": False,
         "segmentation_reuse_reason": "",
         "segmentation_original_elapsed": "",
@@ -887,6 +894,7 @@ def _load_studies(studies_dir: Path, now: datetime) -> dict[str, dict[str, Any]]
             ),
             "metrics_started": bool(pipeline.get("metrics_start_time")),
             "metrics_finished": bool(pipeline.get("metrics_end_time")),
+            "segmentation_status": str(pipeline.get("segmentation_status", "") or ""),
             "segmentation_reused": segmentation_reused,
             "segmentation_reuse_reason": segmentation_reuse_reason,
             "segmentation_original_elapsed": str(
