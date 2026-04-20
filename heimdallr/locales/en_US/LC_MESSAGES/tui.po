@@ -255,6 +255,9 @@ msgstr "Segmentation"
 msgid "case.stage.metrics"
 msgstr "Metrics"
 
+msgid "case.stage.ineligible"
+msgstr "Ineligible"
+
 msgid "case.stage.failed"
 msgstr "Failed"
 
@@ -413,6 +416,9 @@ msgstr "metrics running after reused segmentation"
 
 msgid "snapshot.case.signal.metrics_running_prepare_duplicate"
 msgstr "metrics running after prepare-level duplicate skip"
+
+msgid "snapshot.case.signal.ineligible"
+msgstr "series ineligible for the profile"
 
 msgid "snapshot.case.signal.waiting_slot"
 msgstr "waiting for segmentation slot"

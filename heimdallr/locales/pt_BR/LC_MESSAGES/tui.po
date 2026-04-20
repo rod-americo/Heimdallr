@@ -255,6 +255,9 @@ msgstr "Segmentação"
 msgid "case.stage.metrics"
 msgstr "Métricas"
 
+msgid "case.stage.ineligible"
+msgstr "Inelegível"
+
 msgid "case.stage.failed"
 msgstr "Falha"
 
@@ -413,6 +416,9 @@ msgstr "métricas após segmentação reaproveitada"
 
 msgid "snapshot.case.signal.metrics_running_prepare_duplicate"
 msgstr "métricas após duplicata ignorada no preparo"
+
+msgid "snapshot.case.signal.ineligible"
+msgstr "série inelegível para o perfil"
 
 msgid "snapshot.case.signal.waiting_slot"
 msgstr "aguardando slot de segmentação"

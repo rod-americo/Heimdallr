@@ -255,12 +255,56 @@ class TestStoreQueueRecovery(unittest.TestCase):
             self.assertIsNotNone(claimed)
             self.assertEqual(claimed[1], "CaseSeg")
             row = conn.execute(
-                "SELECT status, claimed_at, error FROM segmentation_queue WHERE case_id = ?",
+                "SELECT status, claimed_at, error, attempts FROM segmentation_queue WHERE case_id = ?",
                 ("CaseSeg",),
             ).fetchone()
             self.assertEqual(row["status"], "claimed")
             self.assertIsNotNone(row["claimed_at"])
             self.assertIsNone(row["error"])
+            self.assertEqual(row["attempts"], 1)
+            conn.close()
+
+    def test_retry_segmentation_queue_item_requeues_once_before_error(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "dicom.db"
+            conn = _connect_row_db(db_path)
+            store.ensure_schema(conn)
+            conn.execute(
+                """
+                INSERT INTO segmentation_queue (case_id, input_path, status, created_at, attempts)
+                VALUES (?, ?, 'claimed', '2026-04-12 10:00:00', 1)
+                """,
+                ("CaseRetry", "/tmp/retry"),
+            )
+
+            requeued = store.retry_segmentation_queue_item(
+                conn,
+                1,
+                "worker shutdown",
+                max_attempts=2,
+            )
+            self.assertTrue(requeued)
+            row = conn.execute(
+                "SELECT status, claimed_at, finished_at, error, attempts FROM segmentation_queue WHERE case_id = ?",
+                ("CaseRetry",),
+            ).fetchone()
+            self.assertEqual(row["status"], "pending")
+            self.assertIsNone(row["claimed_at"])
+            self.assertIsNone(row["finished_at"])
+            self.assertEqual(row["error"], "worker shutdown")
+            self.assertEqual(row["attempts"], 1)
+
+            conn.execute(
+                "UPDATE segmentation_queue SET status = 'claimed', attempts = 2 WHERE case_id = ?",
+                ("CaseRetry",),
+            )
+            requeued = store.retry_segmentation_queue_item(
+                conn,
+                1,
+                "worker shutdown",
+                max_attempts=2,
+            )
+            self.assertFalse(requeued)
             conn.close()
 
     def test_claim_next_pending_metrics_queue_item_reclaims_stale_claim(self):

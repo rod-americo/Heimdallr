@@ -41,6 +41,25 @@ class TestTuiSnapshot(unittest.TestCase):
 
         self.assertEqual(stage, "segmentation")
 
+    def test_derive_stage_key_marks_ineligible_before_failed(self):
+        stage = _derive_stage_key(
+            {
+                "segmentation_queue_status": "error",
+                "metrics_queue_status": "",
+                "metrics_started": False,
+                "metrics_finished": False,
+                "has_results": False,
+                "failed_file": False,
+                "has_error_log": True,
+                "active_file": False,
+                "pending_file": False,
+                "path": object(),
+                "segmentation_status": "ineligible",
+            }
+        )
+
+        self.assertEqual(stage, "ineligible")
+
     def test_build_snapshot_marks_reused_segmentation_in_signal_and_elapsed(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)

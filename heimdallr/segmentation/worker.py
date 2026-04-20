@@ -103,6 +103,14 @@ class PipelineLogger:
             self.log_file = None
 
 
+class WorkerShutdownRequestedError(RuntimeError):
+    """Raised when the worker is stopping while a task is still running."""
+
+
+def _is_ineligible_selection_error(exc: Exception) -> bool:
+    return "No eligible series found for profile" in str(exc or "")
+
+
 def _record_segmentation_pipeline_state(
     case_id: str,
     *,
@@ -248,6 +256,19 @@ def mark_segmentation_queue_item_error(queue_id, error_message):
     conn = db_connect()
     store.mark_segmentation_queue_item_error(conn, queue_id, error_message)
     conn.close()
+
+
+def retry_segmentation_queue_item(queue_id, error_message) -> bool:
+    conn = db_connect()
+    try:
+        return store.retry_segmentation_queue_item(
+            conn,
+            queue_id,
+            error_message,
+            max_attempts=settings.SEGMENTATION_SHUTDOWN_RETRIES + 1,
+        )
+    finally:
+        conn.close()
 
 
 def _latest_output_activity_timestamp(output_folder: Path) -> float:
@@ -969,6 +990,8 @@ def run_task(task_name, input_file, output_folder, extra_args=None, max_retries=
                     _unregister_child_process(process)
 
                 if timed_out_message is not None:
+                    if "Worker shutdown requested while task was still running" in timed_out_message:
+                        raise WorkerShutdownRequestedError(timed_out_message)
                     raise TimeoutError(timed_out_message)
 
                 if process.returncode != 0:
@@ -1101,6 +1124,14 @@ def segment_case(case_input):
             nifti_path, selection_info = select_prepared_series(case_id, id_data)
         except Exception as e:
             logger.print(f"Failed to select series for case {case_id}: {e}")
+            if _is_ineligible_selection_error(e):
+                _record_segmentation_pipeline_state(
+                    case_id,
+                    status="ineligible",
+                    end_dt=datetime.datetime.now(LOCAL_TZ),
+                )
+                logger.close()
+                return "ineligible"
             logger.close()
             return False
     else:
@@ -1417,12 +1448,24 @@ def main():
             active_futures.discard(fut)
         try:
             ok = fut.result()  # Raise exception if case failed
+            if ok == "ineligible":
+                print(f"[Segmentation] Ineligible: {f_path.name}")
+                if queue_id is not None:
+                    mark_segmentation_queue_item_done(queue_id)
+                return
             print(f"[Segmentation] {'Done' if ok else 'Failed'}: {f_path.name}")
             if queue_id is not None:
                 if ok:
                     mark_segmentation_queue_item_done(queue_id)
                 else:
                     mark_segmentation_queue_item_error(queue_id, "Case finished with failure return status")
+        except WorkerShutdownRequestedError as e:
+            if queue_id is not None and retry_segmentation_queue_item(queue_id, e):
+                print(f"[Segmentation] Requeued after worker shutdown: {f_path.name}")
+                return
+            if queue_id is not None:
+                mark_segmentation_queue_item_error(queue_id, e)
+            print(f"Error in case segmentation thread {f_path.name}: {e}")
         except Exception as e:
             if queue_id is not None:
                 mark_segmentation_queue_item_error(queue_id, e)
