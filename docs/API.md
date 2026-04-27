@@ -23,10 +23,22 @@ This document summarizes high-value API contracts used in Heimdallr workflows.
 
 ### Upload and Tooling
 
+- `POST /jobs`
 - `POST /upload`
 - `GET /api/tools/uploader`
 
 `POST /upload` accepts a `.zip` payload and hands it off asynchronously to the `heimdallr.prepare` flow.
+
+`POST /jobs` accepts `multipart/form-data` with:
+- `study_file`
+- `client_case_id`
+- `callback_url`
+- optional `source_system`
+- optional `requested_outputs` JSON
+
+It returns an immediate acceptance payload with `job_id` and `status=queued`.
+When processing finishes, `heimdallr.integration_delivery` performs an outbound
+multipart callback containing `manifest.json` plus `package.zip`.
 
 ### Patients and Results
 
@@ -54,3 +66,4 @@ When integrating clients:
 1. API outputs are assistive and must not be used as autonomous diagnosis.
 2. Validation, timeout, and retry behavior should be enforced by calling clients.
 3. Upload handling is asynchronous; a successful `/upload` response means preparation started, not that final metrics are already available.
+4. `/jobs` is also asynchronous; the final result is delivered by server-to-server callback rather than client polling.

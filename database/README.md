@@ -32,13 +32,14 @@ Stores DICOM metadata and calculation results for all processed studies.
 
 ### Queue Tables
 
-Operational dispatch is tracked in four queue tables:
+Operational dispatch is tracked in five queue tables:
 
 | Table | Purpose |
 |-------|---------|
 | `segmentation_queue` | Prepared studies waiting for segmentation |
 | `metrics_queue` | Processed studies waiting for post-segmentation metrics |
 | `integration_dispatch_queue` | Prepared-study events waiting for outbound HTTP delivery |
+| `integration_delivery_queue` | Completed externally submitted studies waiting for final package callback delivery |
 | `dicom_egress_queue` | Generated DICOM artifacts waiting for outbound C-STORE delivery |
 
 ### Indexes
@@ -82,6 +83,10 @@ heimdallr.prepare
   ↓
   Enqueues: integration_dispatch_queue entries for patient-identified events
 
+heimdallr.metrics
+  ↓
+  Enqueues: integration_delivery_queue entries for external final package delivery
+
 heimdallr.dicom_egress
   ↓
   Claims: pending outbound artifacts and performs DICOM C-STORE delivery
@@ -89,6 +94,10 @@ heimdallr.dicom_egress
 heimdallr.integration_dispatcher
   ↓
   Claims: pending outbound events and performs HTTP POST delivery
+
+heimdallr.integration_delivery
+  ↓
+  Claims: pending completed cases and performs multipart HTTP callback delivery
 ```
 
 ## Querying Examples

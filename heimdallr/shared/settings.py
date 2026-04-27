@@ -206,6 +206,19 @@ INTEGRATION_DISPATCH_SCAN_INTERVAL = _config_int(
     ("scan_interval_seconds",),
     5,
 )
+INTEGRATION_DELIVERY_CONFIG_PATH = Path(
+    os.getenv(
+        "HEIMDALLR_INTEGRATION_DELIVERY_CONFIG",
+        str(CONFIG_DIR / "integration_delivery.json"),
+    )
+)
+INTEGRATION_DELIVERY_CONFIG = _load_json_config(INTEGRATION_DELIVERY_CONFIG_PATH)
+INTEGRATION_DELIVERY_SCAN_INTERVAL = _config_int(
+    "HEIMDALLR_INTEGRATION_DELIVERY_SCAN_INTERVAL",
+    INTEGRATION_DELIVERY_CONFIG,
+    ("scan_interval_seconds",),
+    5,
+)
 SPACE_MANAGER_CONFIG_PATH = Path(
     os.getenv(
         "HEIMDALLR_SPACE_MANAGER_CONFIG",

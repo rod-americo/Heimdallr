@@ -29,6 +29,8 @@ heimdallr.prepare                ← ZIP unpack, metadata extraction,
       │                             DICOM → NIfTI, phase detection
       ├──────────────► heimdallr.integration_dispatcher
       │               patient-identified outbound webhooks
+      ├──────────────► heimdallr.integration_delivery
+      │               final package push to external submitter
       │
       ▼
 runtime/queue/pending/
@@ -89,20 +91,25 @@ heimdallr.space_manager          ← runtime/studies retention / purge guard
    - async delivery after `prepare`
    - retry/backoff and multi-destination support
 
-7. **Space Manager**
+7. **External Submit + Final Delivery**
+   - `POST /jobs` upload ingress for external systems
+   - per-job callback URL persisted with the submitted study
+   - queue-driven final `manifest.json` + `package.zip` callback after `metrics`
+
+8. **Space Manager**
    - resident storage guard (`heimdallr.space_manager`)
    - monitors the filesystem that hosts `runtime/studies/`
    - purges oldest completed studies when a host-local disk usage threshold is exceeded
 
-8. **Resource Monitor**
+9. **Resource Monitor**
    - resident RAM telemetry sampler (`heimdallr.resource_monitor`)
    - amostra RSS do worker, RSS da árvore de subprocessos, memória do cgroup e swap do host
    - persiste snapshots temporais em SQLite para análise posterior de capacidade
 
-9. **Control Plane**
+10. **Control Plane**
    - FastAPI application serving dashboard, upload ingress, patient/results API, artifact download, and deterministic PDF export
 
-10. **Operations TUI**
+11. **Operations TUI**
    - Textual dashboard with live service radar, queue pressure, case spotlight, and upload-origin markers (`P` / `E`)
 
 ## Repository Layout
@@ -120,6 +127,7 @@ Heimdallr/
 │   │   ├── analysis/               #   Shared analysis helpers
 │   │   └── jobs/                   #   Production jobs + experimental jobs/tests
 │   ├── integration_dispatcher/     # Outbound webhook/event delivery worker
+│   ├── integration_delivery/       # Outbound final package callback worker
 │   ├── dicom_egress/               # Outbound DICOM C-STORE worker
 │   ├── space_manager/              # Disk-usage guard for runtime/studies
 │   ├── resource_monitor/           # Resident RAM telemetry sampler
@@ -226,13 +234,16 @@ Start the services in separate terminals or service units:
 # 7) Integration Dispatcher — outbound patient/event webhooks
 .venv/bin/python -m heimdallr.integration_dispatcher
 
-# 8) Space Manager — runtime/studies storage reclamation
+# 8) Final Delivery Worker — push final package to external submitter
+.venv/bin/python -m heimdallr.integration_delivery
+
+# 9) Space Manager — runtime/studies storage reclamation
 .venv/bin/python -m heimdallr.space_manager
 
-# 9) Resource Monitor — resident RAM telemetry sampler
+# 10) Resource Monitor — resident RAM telemetry sampler
 .venv/bin/python -m heimdallr.resource_monitor
 
-# 10) Operations TUI — terminal dashboard
+# 11) Operations TUI — terminal dashboard
 .venv/bin/python -m heimdallr.tui
 ```
 
@@ -245,6 +256,7 @@ The minimum processing stack for a headless host is usually:
 
 Add these when needed:
 - `heimdallr.integration_dispatcher`
+- `heimdallr.integration_delivery`
 - `heimdallr.space_manager`
 - `heimdallr.resource_monitor`
 - `heimdallr.control_plane`
@@ -265,9 +277,21 @@ Add these when needed:
 
 | Method | Path | Description |
 |---|---|---|
+| `POST` | `/jobs` | Accept an externally submitted `.zip` plus callback metadata |
 | `POST` | `/upload` | Accept a `.zip` study payload into the external spool |
 | `GET` | `/` | Dashboard shell |
 | `GET` | `/api/tools/uploader` | Download the CLI uploader script |
+
+`POST /jobs` expects `multipart/form-data` with:
+- `study_file`: ZIP payload
+- `client_case_id`: caller-owned identifier echoed back on delivery
+- `callback_url`: final package callback target
+- `source_system`: optional caller label
+- `requested_outputs`: optional JSON object
+
+Accepted jobs are persisted into the external spool plus a sidecar submission
+manifest. After `metrics` completes, `heimdallr.integration_delivery` pushes
+`manifest.json` + `package.zip` back to the caller's `callback_url`.
 
 ### Patients and Results
 
@@ -303,6 +327,7 @@ These files are expected to vary per host and are ignored by Git:
 - `config/segmentation_pipeline.json`
 - `config/metrics_pipeline.json`
 - `config/integration_dispatch.json`
+- `config/integration_delivery.json`
 - `config/space_manager.json`
 - `config/resource_monitor.json`
 - `config/dicom_egress.json`
@@ -314,6 +339,7 @@ Create them from the example templates:
 cp config/segmentation_pipeline.example.json config/segmentation_pipeline.json
 cp config/metrics_pipeline.example.json config/metrics_pipeline.json
 cp config/integration_dispatch.example.json config/integration_dispatch.json
+cp config/integration_delivery.example.json config/integration_delivery.json
 cp config/space_manager.example.json config/space_manager.json
 cp config/resource_monitor.example.json config/resource_monitor.json
 cp config/dicom_egress.example.json config/dicom_egress.json
@@ -331,6 +357,7 @@ cp config/presentation.example.json config/presentation.json
 | `HEIMDALLR_SERIES_SELECTION_CONFIG` | `config/series_selection.json` | Series selection rules |
 | `HEIMDALLR_METRICS_PIPELINE_CONFIG` | `config/metrics_pipeline.json` | Metrics profile config |
 | `HEIMDALLR_INTEGRATION_DISPATCH_CONFIG` | `config/integration_dispatch.json` | Outbound webhook/event config |
+| `HEIMDALLR_INTEGRATION_DELIVERY_CONFIG` | `config/integration_delivery.json` | Final package callback worker config |
 | `HEIMDALLR_DICOM_EGRESS_CONFIG` | `config/dicom_egress.json` | Outbound DICOM destination config |
 | `HEIMDALLR_PRESENTATION_CONFIG` | `config/presentation.json` | Patient name and locale presentation config |
 | `HEIMDALLR_SPACE_MANAGER_CONFIG` | `config/space_manager.json` | Runtime storage reclamation policy |

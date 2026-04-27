@@ -1,0 +1,8 @@
+{
+  "enabled": false,
+  "_comment": "Host-local outbound final package delivery for externally submitted jobs. The callback URL is per submission; this file only controls worker behavior.",
+  "scan_interval_seconds": 5,
+  "retry_attempts": 5,
+  "retry_backoff_seconds": 30,
+  "timeout_seconds": 120
+}
