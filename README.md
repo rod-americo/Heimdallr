@@ -288,10 +288,15 @@ Add these when needed:
 - `callback_url`: final package callback target
 - `source_system`: optional caller label
 - `requested_outputs`: optional JSON object
+- `requested_metrics_modules`: optional JSON array or CSV string
 
 Accepted jobs are persisted into the external spool plus a sidecar submission
 manifest. After `metrics` completes, `heimdallr.integration_delivery` pushes
 `manifest.json` + `package.zip` back to the caller's `callback_url`.
+
+When `requested_metrics_modules` is present, the `metrics` worker filters the
+case to that subset and automatically expands any declared job dependencies
+from the active metrics profile.
 
 ### Patients and Results
 

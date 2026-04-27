@@ -38,6 +38,31 @@ def normalize_requested_outputs(raw: dict[str, Any] | None) -> dict[str, bool]:
     return normalized
 
 
+def normalize_requested_metrics_modules(raw: Any) -> list[str]:
+    if raw in (None, ""):
+        return []
+
+    items: list[str]
+    if isinstance(raw, list):
+        items = [str(item or "").strip() for item in raw]
+    elif isinstance(raw, str):
+        text = raw.strip()
+        if not text:
+            return []
+        items = [part.strip() for part in text.split(",")]
+    else:
+        raise ValueError("requested_metrics_modules must be a list or CSV string")
+
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for item in items:
+        if not item or item in seen:
+            continue
+        normalized.append(item)
+        seen.add(item)
+    return normalized
+
+
 def new_external_job_id() -> str:
     return str(uuid.uuid4())
 
@@ -87,6 +112,7 @@ def build_external_submission_payload(
     callback_url: str,
     source_system: str | None,
     requested_outputs: dict[str, Any] | None,
+    requested_metrics_modules: Any = None,
 ) -> dict[str, Any]:
     return {
         "job_id": str(job_id),
@@ -94,5 +120,6 @@ def build_external_submission_payload(
         "callback_url": str(callback_url),
         "source_system": str(source_system or "").strip() or None,
         "requested_outputs": normalize_requested_outputs(requested_outputs),
+        "requested_metrics_modules": normalize_requested_metrics_modules(requested_metrics_modules),
         "received_at": settings.local_now().isoformat(),
     }

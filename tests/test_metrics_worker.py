@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 from heimdallr.metrics.worker import (
     MetricsLogger,
     _record_metrics_pipeline_state,
+    _requested_metrics_modules_from_metadata,
     _execute_jobs,
     _validate_case_against_profile,
     _resolve_enabled_jobs,
@@ -112,6 +113,44 @@ class TestMetricsWorker(unittest.TestCase):
 
         with self.assertRaisesRegex(RuntimeError, "cycle detected"):
             _validate_job_dependency_graph(jobs)
+
+    def test_resolve_enabled_jobs_filters_to_requested_jobs_and_dependencies(self):
+        jobs = _resolve_enabled_jobs(
+            {
+                "jobs": [
+                    {"name": "l3_muscle_area"},
+                    {"name": "parenchymal_organ_volumetry"},
+                    {
+                        "name": "opportunistic_osteoporosis_composite",
+                        "needs": ["l3_muscle_area", "parenchymal_organ_volumetry"],
+                    },
+                ]
+            },
+            requested_job_names=["opportunistic_osteoporosis_composite"],
+        )
+
+        self.assertEqual(
+            [job["name"] for job in jobs],
+            ["l3_muscle_area", "parenchymal_organ_volumetry", "opportunistic_osteoporosis_composite"],
+        )
+
+    def test_resolve_enabled_jobs_rejects_unknown_requested_job(self):
+        with self.assertRaisesRegex(RuntimeError, "Requested metrics job"):
+            _resolve_enabled_jobs(
+                {"jobs": [{"name": "l3_muscle_area"}]},
+                requested_job_names=["does_not_exist"],
+            )
+
+    def test_requested_metrics_modules_from_metadata_reads_external_delivery(self):
+        names = _requested_metrics_modules_from_metadata(
+            {
+                "ExternalDelivery": {
+                    "requested_metrics_modules": ["l3_muscle_area", "bone_health_l1_hu", "l3_muscle_area"]
+                }
+            }
+        )
+
+        self.assertEqual(names, ["l3_muscle_area", "bone_health_l1_hu"])
 
     def test_resolve_max_parallel_jobs_uses_profile_execution(self):
         self.assertEqual(_resolve_max_parallel_jobs({"execution": {"max_parallel_jobs": 3}}), 3)
