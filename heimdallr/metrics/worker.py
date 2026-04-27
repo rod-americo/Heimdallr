@@ -21,6 +21,7 @@ from heimdallr.metrics.artifact_instructions_pdf import (
     build_artifact_instructions_pdf,
     build_artifact_instructions_secondary_capture,
 )
+from heimdallr.integration_delivery import enqueue_case_delivery
 from heimdallr.metrics.jobs._dicom_encapsulated_pdf import create_encapsulated_pdf_dicom
 from heimdallr.dicom_egress.config import build_egress_queue_items
 from heimdallr.shared import settings, store
@@ -906,6 +907,17 @@ def segment_case_metrics(case_input: Path) -> bool:
                 )
             finally:
                 conn.close()
+        external_delivery = metadata.get("ExternalDelivery", {})
+        if isinstance(external_delivery, dict):
+            try:
+                if enqueue_case_delivery(
+                    case_id=case_id,
+                    study_uid=study_uid or None,
+                    external_delivery=external_delivery,
+                ):
+                    logger.log("[Metrics] Enqueued final package delivery")
+            except Exception as exc:
+                logger.log(f"[Metrics] Warning: failed to enqueue final package delivery: {exc}")
         logger.log(f"[Metrics] ✓ Complete ({pipeline['metrics_elapsed_time']})")
         logger.close()
         return True

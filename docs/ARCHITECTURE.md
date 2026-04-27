@@ -31,7 +31,15 @@ Heimdallr is an imaging operations pipeline designed to convert incoming radiolo
 - Consumes `metrics_queue` for post-segmentation derived jobs
 - Runs modular jobs such as bone-health screening and vertebral fracture heuristics
 
-7. `heimdallr/dicom_egress/`
+7. `heimdallr/integration_dispatcher/`
+- Consumes `integration_dispatch_queue` for lightweight outbound event delivery
+- Performs HTTP webhook delivery after `prepare`
+
+8. `heimdallr/integration_delivery/`
+- Consumes `integration_delivery_queue` for final package callbacks
+- Builds `manifest.json` + `package.zip` and pushes them to the submitter callback URL
+
+9. `heimdallr/dicom_egress/`
 - Consumes `dicom_egress_queue` for outbound artifact delivery
 - Acts as DICOM SCU and performs C-STORE to configured remote SCP destinations
 
@@ -46,11 +54,13 @@ Heimdallr is an imaging operations pipeline designed to convert incoming radiolo
 ## Request/Data Flow
 
 ```text
-PACS/Modality (DICOM) --> heimdallr/intake --> /upload (heimdallr/control_plane)
+PACS/Modality (DICOM) --> heimdallr/intake --> /upload or /jobs (heimdallr/control_plane)
                                                          |
                                                          v
                                                    heimdallr/prepare
                                               (select + convert + persist)
+                                                         |
+                                                         +--> integration_dispatch_queue --> heimdallr.integration_dispatcher
                                                          |
                                                          v
                                                 segmentation_queue
@@ -65,6 +75,8 @@ PACS/Modality (DICOM) --> heimdallr/intake --> /upload (heimdallr/control_plane)
                                                          v
                                                 heimdallr/metrics
                                          (derived jobs + job artifacts)
+                                                         |
+                                                         +--> integration_delivery_queue --> heimdallr.integration_delivery
                                                          |
                                                          v
                                                dicom_egress_queue
@@ -90,7 +102,7 @@ PACS/Modality (DICOM) --> heimdallr/intake --> /upload (heimdallr/control_plane)
 ## Operational Boundaries
 
 - Assistive outputs are operational results and require clinical validation before use.
-- Production operation expects independent process supervision for the control plane, prepare worker, segmentation worker, metrics worker, intake gateway, and DICOM egress runtimes.
+- Production operation expects independent process supervision for the control plane, prepare worker, segmentation worker, metrics worker, intake gateway, integration dispatch, integration delivery, and DICOM egress runtimes.
 
 ## Cross-References
 

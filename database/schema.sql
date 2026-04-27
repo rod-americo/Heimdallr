@@ -130,6 +130,34 @@ CREATE TABLE IF NOT EXISTS integration_dispatch_queue (
 );
 
 -- ============================================================
+-- Integration Delivery Queue: outbound final package delivery
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS integration_delivery_queue (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    event_version INTEGER NOT NULL DEFAULT 1,
+    case_id TEXT NOT NULL,
+    study_uid TEXT,
+    client_case_id TEXT,
+    source_system TEXT,
+    callback_url TEXT NOT NULL,
+    http_method TEXT NOT NULL DEFAULT 'POST',
+    timeout_seconds INTEGER NOT NULL DEFAULT 120,
+    requested_outputs_json TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    attempts INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP,
+    claimed_at TIMESTAMP,
+    finished_at TIMESTAMP,
+    next_attempt_at TIMESTAMP,
+    response_status INTEGER,
+    error TEXT,
+    UNIQUE(job_id, callback_url)
+);
+
+-- ============================================================
 -- Resource Monitor Samples: resident memory telemetry snapshots
 -- ============================================================
 
@@ -187,6 +215,7 @@ CREATE INDEX IF NOT EXISTS idx_segmentation_queue_status_created ON segmentation
 CREATE INDEX IF NOT EXISTS idx_metrics_queue_status_created ON metrics_queue(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_dicom_egress_queue_status_next_attempt ON dicom_egress_queue(status, next_attempt_at, created_at);
 CREATE INDEX IF NOT EXISTS idx_integration_dispatch_queue_status_next_attempt ON integration_dispatch_queue(status, next_attempt_at, created_at);
+CREATE INDEX IF NOT EXISTS idx_integration_delivery_queue_status_next_attempt ON integration_delivery_queue(status, next_attempt_at, created_at);
 CREATE INDEX IF NOT EXISTS idx_resource_monitor_samples_service_time ON resource_monitor_samples(service_slug, sampled_at);
 CREATE INDEX IF NOT EXISTS idx_resource_monitor_samples_time ON resource_monitor_samples(sampled_at);
 CREATE INDEX IF NOT EXISTS idx_resource_monitor_case_peaks_case_stage ON resource_monitor_case_peaks(case_id, stage);
