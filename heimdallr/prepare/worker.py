@@ -42,6 +42,11 @@ from heimdallr.shared import settings
 from heimdallr.shared import store
 from heimdallr.integration_dispatcher.events import build_patient_identified_event
 from heimdallr.integration_dispatcher import enqueue_dispatches
+from heimdallr.shared.external_delivery import (
+    delete_external_submission_sidecar,
+    load_external_submission_sidecar,
+    move_external_submission_sidecar,
+)
 from heimdallr.shared.patient_names import normalize_patient_name_display
 from heimdallr.shared.paths import (
     study_artifacts_dir,
@@ -258,11 +263,11 @@ def _read_study_json_if_matching(path: Path, study_uid: str) -> dict:
 
 
 def _delete_spooled_zip(zip_path: Path) -> None:
-    if not zip_path.exists():
-        return
     try:
-        zip_path.unlink()
-        print(f"  Deleted input ZIP: {zip_path}")
+        if zip_path.exists():
+            zip_path.unlink()
+            print(f"  Deleted input ZIP: {zip_path}")
+        delete_external_submission_sidecar(zip_path)
     except Exception as exc:
         print(f"  Warning: Could not delete input ZIP: {exc}")
 
@@ -521,6 +526,7 @@ def move_failed_upload(zip_path: Path) -> Path:
     if destination.exists():
         destination = settings.UPLOAD_FAILED_DIR / f"{destination.stem}_{int(time.time())}{destination.suffix}"
     zip_path.replace(destination)
+    move_external_submission_sidecar(zip_path, destination)
     return destination
 
 def extract_full_dicom_metadata(ds):
@@ -857,6 +863,7 @@ def process_zip(zip_path):
         stage_timings["extract_zip_seconds"] = round(time.perf_counter() - extract_started, 3)
         intake_manifest = {}
         intake_manifest_path = extract_dir / INTAKE_MANIFEST_NAME
+        external_submission = load_external_submission_sidecar(zip_path)
         if intake_manifest_path.exists():
             try:
                 with open(intake_manifest_path, "r", encoding="utf-8") as manifest_file:
@@ -1239,6 +1246,10 @@ def process_zip(zip_path):
                 "prepare_stats": prepare_stats,
                 "prepare_input_origin": upload_origin,
             }
+            if external_submission:
+                prepare_pipeline_updates["external_job_id"] = external_submission.get("job_id")
+                prepare_pipeline_updates["external_client_case_id"] = external_submission.get("client_case_id")
+                prepare_pipeline_updates["external_submission_received_at"] = external_submission.get("received_at")
             if intake_manifest:
                 prepare_pipeline_updates["intake_first_instance_time"] = intake_manifest.get("first_instance_time")
                 prepare_pipeline_updates["intake_last_instance_time"] = intake_manifest.get("last_instance_time")
@@ -1270,6 +1281,17 @@ def process_zip(zip_path):
                 duplicate_skip_context=duplicate_skip_context,
                 reference_dicom_context=reference_dicom_context,
             )
+            if external_submission:
+                external_delivery_payload = {
+                    "job_id": str(external_submission.get("job_id", "") or "").strip() or None,
+                    "client_case_id": str(external_submission.get("client_case_id", "") or "").strip() or None,
+                    "callback_url": str(external_submission.get("callback_url", "") or "").strip() or None,
+                    "source_system": str(external_submission.get("source_system", "") or "").strip() or None,
+                    "requested_outputs": external_submission.get("requested_outputs", {}),
+                    "received_at": external_submission.get("received_at"),
+                }
+                output_meta["ExternalDelivery"] = external_delivery_payload
+                output_metadata["ExternalDelivery"] = external_delivery_payload
             
             # Save updated id.json
             with open(study_id_json(case_id), "w") as f:
