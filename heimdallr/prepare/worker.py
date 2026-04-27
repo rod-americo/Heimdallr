@@ -1288,6 +1288,7 @@ def process_zip(zip_path):
                     "callback_url": str(external_submission.get("callback_url", "") or "").strip() or None,
                     "source_system": str(external_submission.get("source_system", "") or "").strip() or None,
                     "requested_outputs": external_submission.get("requested_outputs", {}),
+                    "requested_metrics_modules": external_submission.get("requested_metrics_modules", []),
                     "received_at": external_submission.get("received_at"),
                 }
                 output_meta["ExternalDelivery"] = external_delivery_payload

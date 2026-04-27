@@ -32,6 +32,7 @@ class TestJobSubmissionRoute(unittest.TestCase):
                         "callback_url": "http://receiver.local/callback",
                         "source_system": "partner_a",
                         "requested_outputs": json.dumps({"include_report_pdf": False}),
+                        "requested_metrics_modules": json.dumps(["l3_muscle_area", "bone_health_l1_hu"]),
                     },
                 )
             self.assertEqual(response.status_code, 200)
@@ -45,6 +46,14 @@ class TestJobSubmissionRoute(unittest.TestCase):
             self.assertEqual(sidecar["callback_url"], "http://receiver.local/callback")
             self.assertEqual(sidecar["source_system"], "partner_a")
             self.assertFalse(sidecar["requested_outputs"]["include_report_pdf"])
+            self.assertEqual(
+                sidecar["requested_metrics_modules"],
+                ["l3_muscle_area", "bone_health_l1_hu"],
+            )
+            self.assertEqual(
+                body["requested_metrics_modules"],
+                ["l3_muscle_area", "bone_health_l1_hu"],
+            )
 
 
 class TestIntegrationDeliveryStore(unittest.TestCase):

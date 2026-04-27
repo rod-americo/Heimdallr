@@ -163,6 +163,10 @@ JSON file.
 9. **Storage Reclamation**: `space_manager` periodically checks filesystem usage and, above threshold, deletes the oldest non-active case directories under `runtime/studies/` while marking them as purged in SQLite.
 10. **Delivery**: Dashboard and APIs serve the final structured data and images.
 
+External submitters may also pass `requested_metrics_modules` in `POST /jobs`.
+When present, the `metrics` worker filters the active profile to that subset
+and expands any explicit job dependencies automatically.
+
 ## Data Contracts
 
 ### `metadata/id.json`

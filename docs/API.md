@@ -35,10 +35,15 @@ This document summarizes high-value API contracts used in Heimdallr workflows.
 - `callback_url`
 - optional `source_system`
 - optional `requested_outputs` JSON
+- optional `requested_metrics_modules` (JSON array or CSV string)
 
 It returns an immediate acceptance payload with `job_id` and `status=queued`.
 When processing finishes, `heimdallr.integration_delivery` performs an outbound
 multipart callback containing `manifest.json` plus `package.zip`.
+
+If `requested_metrics_modules` is provided, Heimdallr constrains the case to
+that subset of metrics jobs and automatically includes declared dependencies
+from the active metrics profile.
 
 ### Patients and Results
 

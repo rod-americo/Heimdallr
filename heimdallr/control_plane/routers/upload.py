@@ -10,6 +10,7 @@ from ...shared import settings
 from ...shared.external_delivery import (
     build_external_submission_payload,
     new_external_job_id,
+    normalize_requested_metrics_modules,
     write_external_submission_sidecar,
 )
 from ...shared.spool import atomic_copy_stream
@@ -48,6 +49,7 @@ async def submit_job(
     callback_url: str = Form(...),
     source_system: str | None = Form(None),
     requested_outputs: str | None = Form(None),
+    requested_metrics_modules: str | None = Form(None),
 ):
     if not study_file.filename.lower().endswith(".zip"):
         raise HTTPException(status_code=400, detail="Only .zip files are allowed.")
@@ -68,6 +70,20 @@ async def submit_job(
         if not isinstance(parsed_requested_outputs, dict):
             raise HTTPException(status_code=400, detail="requested_outputs must be a JSON object.")
 
+    parsed_requested_metrics_modules: list[str] | None = None
+    if requested_metrics_modules:
+        try:
+            candidate = json.loads(requested_metrics_modules)
+        except json.JSONDecodeError:
+            candidate = requested_metrics_modules
+        try:
+            parsed_requested_metrics_modules = normalize_requested_metrics_modules(candidate)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail="requested_metrics_modules must be a JSON array or CSV string.",
+            ) from exc
+
     upload_name = f"study_{settings.local_timestamp('%Y%m%d%H%M%S')}.zip"
     file_path = settings.UPLOAD_EXTERNAL_DIR / upload_name
     if file_path.exists():
@@ -81,6 +97,7 @@ async def submit_job(
         callback_url=normalized_callback_url,
         source_system=source_system,
         requested_outputs=parsed_requested_outputs,
+        requested_metrics_modules=parsed_requested_metrics_modules,
     )
 
     try:
@@ -98,4 +115,5 @@ async def submit_job(
         "status": "queued",
         "received_at": submission_payload["received_at"],
         "stored_file": upload_name,
+        "requested_metrics_modules": submission_payload["requested_metrics_modules"],
     }

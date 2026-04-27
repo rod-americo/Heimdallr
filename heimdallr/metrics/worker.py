@@ -223,6 +223,24 @@ def load_metrics_pipeline_profile() -> tuple[str, dict]:
     return profile_name, profile
 
 
+def _requested_metrics_modules_from_metadata(metadata: dict) -> list[str]:
+    external_delivery = metadata.get("ExternalDelivery", {})
+    if not isinstance(external_delivery, dict):
+        return []
+    raw = external_delivery.get("requested_metrics_modules", [])
+    if not isinstance(raw, list):
+        return []
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        name = str(item or "").strip()
+        if not name or name in seen:
+            continue
+        normalized.append(name)
+        seen.add(name)
+    return normalized
+
+
 def _load_case_metadata(case_id: str) -> dict:
     metadata_path = study_id_json(case_id)
     with open(metadata_path, "r", encoding="utf-8") as handle:
@@ -630,7 +648,7 @@ def _normalize_job_needs(job: dict) -> list[str]:
     return normalized
 
 
-def _resolve_enabled_jobs(profile: dict) -> list[dict]:
+def _resolve_enabled_jobs(profile: dict, requested_job_names: list[str] | None = None) -> list[dict]:
     jobs = [dict(job) for job in profile.get("jobs", []) if job.get("enabled", True)]
     seen_names: set[str] = set()
     for job in jobs:
@@ -642,7 +660,29 @@ def _resolve_enabled_jobs(profile: dict) -> list[dict]:
         seen_names.add(name)
         job["name"] = name
         job["needs"] = _normalize_job_needs(job)
-    return jobs
+    if not requested_job_names:
+        return jobs
+
+    jobs_by_name = {job["name"]: job for job in jobs}
+    unknown = [name for name in requested_job_names if name not in jobs_by_name]
+    if unknown:
+        raise RuntimeError(f"Requested metrics job(s) not found in profile: {', '.join(unknown)}")
+
+    resolved_names: list[str] = []
+    seen_resolved: set[str] = set()
+
+    def include_job(name: str) -> None:
+        if name in seen_resolved:
+            return
+        for need in jobs_by_name[name]["needs"]:
+            include_job(need)
+        resolved_names.append(name)
+        seen_resolved.add(name)
+
+    for name in requested_job_names:
+        include_job(name)
+
+    return [jobs_by_name[name] for name in resolved_names]
 
 
 def _validate_job_dependency_graph(jobs: list[dict]) -> None:
@@ -822,7 +862,8 @@ def segment_case_metrics(case_input: Path) -> bool:
         metadata = _load_case_metadata(case_id)
         profile_name, profile = load_metrics_pipeline_profile()
         _validate_case_against_profile(case_id, metadata, profile_name, profile)
-        jobs = _resolve_enabled_jobs(profile)
+        requested_job_names = _requested_metrics_modules_from_metadata(metadata)
+        jobs = _resolve_enabled_jobs(profile, requested_job_names=requested_job_names)
         if not jobs:
             logger.log(f"[Metrics] No enabled jobs for profile {profile_name}")
             logger.close()
@@ -834,6 +875,8 @@ def segment_case_metrics(case_input: Path) -> bool:
         start_dt = datetime.datetime.now(LOCAL_TZ)
         logger.log(f"=== Metrics Case: {case_id} ===")
         logger.log(f"[Metrics] Profile: {profile_name}")
+        if requested_job_names:
+            logger.log(f"[Metrics] Requested jobs: {', '.join(requested_job_names)}")
         logger.log(f"[Metrics] Jobs: {', '.join(job['name'] for job in jobs)}")
         logger.log(f"[Metrics] Max parallel jobs: {max_parallel_jobs}")
         logger.log(f"[Metrics] Instruction DICOM kind: {instruction_dicom_kind}")
@@ -887,6 +930,7 @@ def segment_case_metrics(case_input: Path) -> bool:
         pipeline.pop("metrics_error", None)
         pipeline["metrics_pipeline"] = {
             "profile": profile_name,
+            "requested_jobs": requested_job_names,
             "max_parallel_jobs": max_parallel_jobs,
             "instruction_dicom_kind": instruction_dicom_kind,
             "jobs": completed_jobs,
