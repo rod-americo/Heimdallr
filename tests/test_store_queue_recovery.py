@@ -97,8 +97,8 @@ class TestStoreQueueRecovery(unittest.TestCase):
             store.ensure_schema(conn)
             conn.execute(
                 """
-                INSERT INTO segmentation_queue (case_id, input_path, status, created_at, claimed_at)
-                VALUES (?, ?, 'claimed', '2026-04-12 10:00:00', '2099-04-12 10:00:05')
+                INSERT INTO segmentation_queue (case_id, input_path, status, created_at, claimed_at, claim_heartbeat_at)
+                VALUES (?, ?, 'claimed', '2026-04-12 10:00:00', '2026-04-12 10:00:05', '2099-04-12 10:10:05')
                 """,
                 ("CaseFresh", "/tmp/original"),
             )
@@ -107,12 +107,13 @@ class TestStoreQueueRecovery(unittest.TestCase):
                 store.enqueue_segmentation_case(conn, "CaseFresh", "/tmp/new-path")
 
             row = conn.execute(
-                "SELECT status, input_path, claimed_at FROM segmentation_queue WHERE case_id = ?",
+                "SELECT status, input_path, claimed_at, claim_heartbeat_at FROM segmentation_queue WHERE case_id = ?",
                 ("CaseFresh",),
             ).fetchone()
             self.assertEqual(row["status"], "claimed")
             self.assertEqual(row["input_path"], "/tmp/new-path")
-            self.assertEqual(row["claimed_at"], "2099-04-12 10:00:05")
+            self.assertEqual(row["claimed_at"], "2026-04-12 10:00:05")
+            self.assertEqual(row["claim_heartbeat_at"], "2099-04-12 10:10:05")
             conn.close()
 
     def test_enqueue_case_for_metrics_preserves_fresh_claimed_row(self):
@@ -122,8 +123,8 @@ class TestStoreQueueRecovery(unittest.TestCase):
             store.ensure_schema(conn)
             conn.execute(
                 """
-                INSERT INTO metrics_queue (case_id, input_path, status, created_at, claimed_at)
-                VALUES (?, ?, 'claimed', '2026-04-12 10:00:00', '2099-04-12 10:00:05')
+                INSERT INTO metrics_queue (case_id, input_path, status, created_at, claimed_at, claim_heartbeat_at)
+                VALUES (?, ?, 'claimed', '2026-04-12 10:00:00', '2026-04-12 10:00:05', '2099-04-12 10:10:05')
                 """,
                 ("CaseFreshMetrics", "/tmp/original"),
             )
@@ -132,12 +133,13 @@ class TestStoreQueueRecovery(unittest.TestCase):
                 store.enqueue_case_for_metrics(conn, "CaseFreshMetrics", "/tmp/new-path")
 
             row = conn.execute(
-                "SELECT status, input_path, claimed_at FROM metrics_queue WHERE case_id = ?",
+                "SELECT status, input_path, claimed_at, claim_heartbeat_at FROM metrics_queue WHERE case_id = ?",
                 ("CaseFreshMetrics",),
             ).fetchone()
             self.assertEqual(row["status"], "claimed")
             self.assertEqual(row["input_path"], "/tmp/new-path")
-            self.assertEqual(row["claimed_at"], "2099-04-12 10:00:05")
+            self.assertEqual(row["claimed_at"], "2026-04-12 10:00:05")
+            self.assertEqual(row["claim_heartbeat_at"], "2099-04-12 10:10:05")
             conn.close()
 
     def test_enqueue_segmentation_case_clears_downstream_non_done_state(self):
@@ -202,15 +204,15 @@ class TestStoreQueueRecovery(unittest.TestCase):
             store.ensure_schema(conn)
             conn.execute(
                 """
-                INSERT INTO segmentation_queue (case_id, input_path, status, created_at, claimed_at)
-                VALUES (?, ?, 'claimed', '2026-04-12 10:00:00', '2026-04-12 10:00:05')
+                INSERT INTO segmentation_queue (case_id, input_path, status, created_at, claimed_at, claim_heartbeat_at)
+                VALUES (?, ?, 'claimed', '2026-04-12 10:00:00', '2026-04-12 10:00:05', '2026-04-12 10:00:06')
                 """,
                 ("CaseSeg", "/tmp/seg"),
             )
             conn.execute(
                 """
-                INSERT INTO metrics_queue (case_id, input_path, status, created_at, claimed_at)
-                VALUES (?, ?, 'claimed', '2026-04-12 10:00:00', '2026-04-12 10:00:05')
+                INSERT INTO metrics_queue (case_id, input_path, status, created_at, claimed_at, claim_heartbeat_at)
+                VALUES (?, ?, 'claimed', '2026-04-12 10:00:00', '2026-04-12 10:00:05', '2026-04-12 10:00:06')
                 """,
                 ("CaseMet", "/tmp/met"),
             )
@@ -219,19 +221,21 @@ class TestStoreQueueRecovery(unittest.TestCase):
             self.assertEqual(store.reset_claimed_metrics_queue_items(conn), 1)
 
             seg_row = conn.execute(
-                "SELECT status, claimed_at, finished_at, error FROM segmentation_queue WHERE case_id = ?",
+                "SELECT status, claimed_at, claim_heartbeat_at, finished_at, error FROM segmentation_queue WHERE case_id = ?",
                 ("CaseSeg",),
             ).fetchone()
             met_row = conn.execute(
-                "SELECT status, claimed_at, finished_at, error FROM metrics_queue WHERE case_id = ?",
+                "SELECT status, claimed_at, claim_heartbeat_at, finished_at, error FROM metrics_queue WHERE case_id = ?",
                 ("CaseMet",),
             ).fetchone()
             self.assertEqual(seg_row["status"], "pending")
             self.assertIsNone(seg_row["claimed_at"])
+            self.assertIsNone(seg_row["claim_heartbeat_at"])
             self.assertIsNone(seg_row["finished_at"])
             self.assertIsNone(seg_row["error"])
             self.assertEqual(met_row["status"], "pending")
             self.assertIsNone(met_row["claimed_at"])
+            self.assertIsNone(met_row["claim_heartbeat_at"])
             self.assertIsNone(met_row["finished_at"])
             self.assertIsNone(met_row["error"])
             conn.close()
@@ -243,8 +247,8 @@ class TestStoreQueueRecovery(unittest.TestCase):
             store.ensure_schema(conn)
             conn.execute(
                 """
-                INSERT INTO segmentation_queue (case_id, input_path, status, created_at, claimed_at)
-                VALUES (?, ?, 'claimed', '2026-04-12 10:00:00', '2026-04-12 10:00:05')
+                INSERT INTO segmentation_queue (case_id, input_path, status, created_at, claimed_at, claim_heartbeat_at)
+                VALUES (?, ?, 'claimed', '2026-04-12 10:00:00', '2099-04-12 10:00:00', '2026-04-12 10:00:05')
                 """,
                 ("CaseSeg", "/tmp/seg"),
             )
@@ -255,13 +259,39 @@ class TestStoreQueueRecovery(unittest.TestCase):
             self.assertIsNotNone(claimed)
             self.assertEqual(claimed[1], "CaseSeg")
             row = conn.execute(
-                "SELECT status, claimed_at, error, attempts FROM segmentation_queue WHERE case_id = ?",
+                "SELECT status, claimed_at, claim_heartbeat_at, error, attempts FROM segmentation_queue WHERE case_id = ?",
                 ("CaseSeg",),
             ).fetchone()
             self.assertEqual(row["status"], "claimed")
             self.assertIsNotNone(row["claimed_at"])
+            self.assertEqual(row["claimed_at"], row["claim_heartbeat_at"])
             self.assertIsNone(row["error"])
             self.assertEqual(row["attempts"], 1)
+            conn.close()
+
+    def test_touch_segmentation_queue_item_claim_updates_heartbeat_only(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "dicom.db"
+            conn = _connect_row_db(db_path)
+            store.ensure_schema(conn)
+            conn.execute(
+                """
+                INSERT INTO segmentation_queue (case_id, input_path, status, created_at, claimed_at, claim_heartbeat_at)
+                VALUES (?, ?, 'claimed', '2026-04-12 10:00:00', '2026-04-12 10:00:05', '2026-04-12 10:00:05')
+                """,
+                ("CaseHeartbeat", "/tmp/seg"),
+            )
+
+            with patch("heimdallr.shared.store._now_local_timestamp", return_value="2026-04-12 10:03:00"):
+                touched = store.touch_segmentation_queue_item_claim(conn, 1)
+
+            self.assertTrue(touched)
+            row = conn.execute(
+                "SELECT claimed_at, claim_heartbeat_at FROM segmentation_queue WHERE case_id = ?",
+                ("CaseHeartbeat",),
+            ).fetchone()
+            self.assertEqual(row["claimed_at"], "2026-04-12 10:00:05")
+            self.assertEqual(row["claim_heartbeat_at"], "2026-04-12 10:03:00")
             conn.close()
 
     def test_retry_segmentation_queue_item_requeues_once_before_error(self):

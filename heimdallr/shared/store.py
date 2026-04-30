@@ -51,6 +51,11 @@ _DICOM_EGRESS_QUEUE_COLUMNS = {
 
 _SEGMENTATION_QUEUE_COLUMNS = {
     "attempts": "INTEGER NOT NULL DEFAULT 0",
+    "claim_heartbeat_at": "TIMESTAMP",
+}
+
+_METRICS_QUEUE_COLUMNS = {
+    "claim_heartbeat_at": "TIMESTAMP",
 }
 
 _RESOURCE_MONITOR_SAMPLE_COLUMNS = {
@@ -101,11 +106,24 @@ def _parse_local_timestamp(value: Any) -> datetime | None:
     return None
 
 
-def _is_stale_claimed_at(value: Any, *, ttl_seconds: int) -> bool:
-    claimed_at = _parse_local_timestamp(value)
-    if claimed_at is None:
+def _effective_claim_activity_timestamp(
+    claimed_at: Any,
+    heartbeat_at: Any = None,
+) -> datetime | None:
+    heartbeat_dt = _parse_local_timestamp(heartbeat_at)
+    if heartbeat_dt is not None:
+        return heartbeat_dt
+    claimed_dt = _parse_local_timestamp(claimed_at)
+    if claimed_dt is not None:
+        return claimed_dt
+    return None
+
+
+def _is_stale_claimed_at(claimed_at: Any, *, ttl_seconds: int, heartbeat_at: Any = None) -> bool:
+    activity_at = _effective_claim_activity_timestamp(claimed_at, heartbeat_at)
+    if activity_at is None:
         return True
-    return (datetime.now(LOCAL_TZ) - claimed_at).total_seconds() >= max(int(ttl_seconds), 1)
+    return (datetime.now(LOCAL_TZ) - activity_at).total_seconds() >= max(int(ttl_seconds), 1)
 
 
 def ensure_schema(conn: sqlite3.Connection | None = None) -> None:
@@ -169,6 +187,7 @@ def ensure_schema(conn: sqlite3.Connection | None = None) -> None:
             status TEXT NOT NULL DEFAULT 'pending',
             created_at TIMESTAMP,
             claimed_at TIMESTAMP,
+            claim_heartbeat_at TIMESTAMP,
             finished_at TIMESTAMP,
             error TEXT
         )
@@ -189,6 +208,7 @@ def ensure_schema(conn: sqlite3.Connection | None = None) -> None:
             status TEXT NOT NULL DEFAULT 'pending',
             created_at TIMESTAMP,
             claimed_at TIMESTAMP,
+            claim_heartbeat_at TIMESTAMP,
             finished_at TIMESTAMP,
             error TEXT
         )
@@ -390,6 +410,7 @@ def ensure_schema(conn: sqlite3.Connection | None = None) -> None:
     )
     _ensure_columns(cursor, "dicom_metadata", _DICOM_METADATA_COLUMNS)
     _ensure_columns(cursor, "segmentation_queue", _SEGMENTATION_QUEUE_COLUMNS)
+    _ensure_columns(cursor, "metrics_queue", _METRICS_QUEUE_COLUMNS)
     _ensure_columns(cursor, "dicom_egress_queue", _DICOM_EGRESS_QUEUE_COLUMNS)
     _ensure_columns(cursor, "resource_monitor_samples", _RESOURCE_MONITOR_SAMPLE_COLUMNS)
     _ensure_columns(cursor, "study_handoff_state", _STUDY_HANDOFF_COLUMNS)
@@ -492,7 +513,7 @@ def enqueue_segmentation_case(conn: sqlite3.Connection, case_id: str, input_path
     created_at = _now_local_timestamp()
     existing = conn.execute(
         """
-        SELECT status, claimed_at
+        SELECT status, claimed_at, claim_heartbeat_at
         FROM segmentation_queue
         WHERE case_id = ?
         """,
@@ -501,6 +522,7 @@ def enqueue_segmentation_case(conn: sqlite3.Connection, case_id: str, input_path
     if existing and existing["status"] == "claimed" and not _is_stale_claimed_at(
         existing["claimed_at"],
         ttl_seconds=settings.SEGMENTATION_CLAIM_TTL_SECONDS,
+        heartbeat_at=existing["claim_heartbeat_at"],
     ):
         conn.execute(
             """
@@ -531,6 +553,7 @@ def enqueue_segmentation_case(conn: sqlite3.Connection, case_id: str, input_path
             status = 'pending',
             created_at = excluded.created_at,
             claimed_at = NULL,
+            claim_heartbeat_at = NULL,
             finished_at = NULL,
             error = NULL,
             attempts = 0
@@ -687,7 +710,7 @@ def enqueue_case_for_metrics(conn: sqlite3.Connection, case_id: str, input_path:
     created_at = _now_local_timestamp()
     existing = conn.execute(
         """
-        SELECT status, claimed_at
+        SELECT status, claimed_at, claim_heartbeat_at
         FROM metrics_queue
         WHERE case_id = ?
         """,
@@ -696,6 +719,7 @@ def enqueue_case_for_metrics(conn: sqlite3.Connection, case_id: str, input_path:
     if existing and existing["status"] == "claimed" and not _is_stale_claimed_at(
         existing["claimed_at"],
         ttl_seconds=settings.METRICS_CLAIM_TTL_SECONDS,
+        heartbeat_at=existing["claim_heartbeat_at"],
     ):
         conn.execute(
             """
@@ -717,6 +741,7 @@ def enqueue_case_for_metrics(conn: sqlite3.Connection, case_id: str, input_path:
             status = 'pending',
             created_at = excluded.created_at,
             claimed_at = NULL,
+            claim_heartbeat_at = NULL,
             finished_at = NULL,
             error = NULL
         """,
@@ -1165,6 +1190,7 @@ def reset_claimed_segmentation_queue_items(conn: sqlite3.Connection) -> int:
         UPDATE segmentation_queue
         SET status = 'pending',
             claimed_at = NULL,
+            claim_heartbeat_at = NULL,
             finished_at = NULL,
             error = NULL
         WHERE status = 'claimed'
@@ -1181,6 +1207,7 @@ def reset_claimed_metrics_queue_items(conn: sqlite3.Connection) -> int:
         UPDATE metrics_queue
         SET status = 'pending',
             claimed_at = NULL,
+            claim_heartbeat_at = NULL,
             finished_at = NULL,
             error = NULL
         WHERE status = 'claimed'
@@ -1194,7 +1221,7 @@ def requeue_stale_claimed_segmentation_items(conn: sqlite3.Connection, *, ttl_se
     ensure_schema(conn)
     rows = conn.execute(
         """
-        SELECT id, claimed_at
+        SELECT id, claimed_at, claim_heartbeat_at
         FROM segmentation_queue
         WHERE status = 'claimed'
         """
@@ -1202,7 +1229,11 @@ def requeue_stale_claimed_segmentation_items(conn: sqlite3.Connection, *, ttl_se
     stale_ids = [
         int(row["id"])
         for row in rows
-        if _is_stale_claimed_at(row["claimed_at"], ttl_seconds=ttl_seconds)
+        if _is_stale_claimed_at(
+            row["claimed_at"],
+            ttl_seconds=ttl_seconds,
+            heartbeat_at=row["claim_heartbeat_at"],
+        )
     ]
     if not stale_ids:
         return 0
@@ -1211,6 +1242,7 @@ def requeue_stale_claimed_segmentation_items(conn: sqlite3.Connection, *, ttl_se
         UPDATE segmentation_queue
         SET status = 'pending',
             claimed_at = NULL,
+            claim_heartbeat_at = NULL,
             finished_at = NULL,
             error = NULL
         WHERE id = ?
@@ -1225,7 +1257,7 @@ def requeue_stale_claimed_metrics_items(conn: sqlite3.Connection, *, ttl_seconds
     ensure_schema(conn)
     rows = conn.execute(
         """
-        SELECT id, claimed_at
+        SELECT id, claimed_at, claim_heartbeat_at
         FROM metrics_queue
         WHERE status = 'claimed'
         """
@@ -1233,7 +1265,11 @@ def requeue_stale_claimed_metrics_items(conn: sqlite3.Connection, *, ttl_seconds
     stale_ids = [
         int(row["id"])
         for row in rows
-        if _is_stale_claimed_at(row["claimed_at"], ttl_seconds=ttl_seconds)
+        if _is_stale_claimed_at(
+            row["claimed_at"],
+            ttl_seconds=ttl_seconds,
+            heartbeat_at=row["claim_heartbeat_at"],
+        )
     ]
     if not stale_ids:
         return 0
@@ -1242,6 +1278,7 @@ def requeue_stale_claimed_metrics_items(conn: sqlite3.Connection, *, ttl_seconds
         UPDATE metrics_queue
         SET status = 'pending',
             claimed_at = NULL,
+            claim_heartbeat_at = NULL,
             finished_at = NULL,
             error = NULL
         WHERE id = ?
@@ -1257,7 +1294,7 @@ def touch_segmentation_queue_item_claim(conn: sqlite3.Connection, queue_id: int)
     cursor = conn.execute(
         """
         UPDATE segmentation_queue
-        SET claimed_at = ?
+        SET claim_heartbeat_at = ?
         WHERE id = ?
           AND status = 'claimed'
         """,
@@ -1272,7 +1309,7 @@ def touch_metrics_queue_item_claim(conn: sqlite3.Connection, queue_id: int) -> b
     cursor = conn.execute(
         """
         UPDATE metrics_queue
-        SET claimed_at = ?
+        SET claim_heartbeat_at = ?
         WHERE id = ?
           AND status = 'claimed'
         """,
@@ -1311,11 +1348,12 @@ def claim_next_pending_segmentation_queue_item(conn: sqlite3.Connection) -> tupl
         UPDATE segmentation_queue
         SET status = 'claimed',
             claimed_at = ?,
+            claim_heartbeat_at = ?,
             error = NULL,
             attempts = COALESCE(attempts, 0) + 1
         WHERE id = ? AND status = 'pending'
         """,
-        (claimed_at, queue_id),
+        (claimed_at, claimed_at, queue_id),
     )
     if cursor.rowcount != 1:
         conn.rollback()
@@ -1353,10 +1391,11 @@ def claim_next_pending_metrics_queue_item(conn: sqlite3.Connection) -> tuple[int
         UPDATE metrics_queue
         SET status = 'claimed',
             claimed_at = ?,
+            claim_heartbeat_at = ?,
             error = NULL
         WHERE id = ? AND status = 'pending'
         """,
-        (claimed_at, queue_id),
+        (claimed_at, claimed_at, queue_id),
     )
     if cursor.rowcount != 1:
         conn.rollback()
@@ -1536,6 +1575,7 @@ def mark_segmentation_queue_item_done(conn: sqlite3.Connection, queue_id: int) -
         UPDATE segmentation_queue
         SET status = 'done',
             finished_at = ?,
+            claim_heartbeat_at = NULL,
             error = NULL
         WHERE id = ?
         """,
@@ -1551,6 +1591,7 @@ def mark_metrics_queue_item_done(conn: sqlite3.Connection, queue_id: int) -> Non
         UPDATE metrics_queue
         SET status = 'done',
             finished_at = ?,
+            claim_heartbeat_at = NULL,
             error = NULL
         WHERE id = ?
         """,
@@ -1626,6 +1667,7 @@ def mark_segmentation_queue_item_error(conn: sqlite3.Connection, queue_id: int, 
         UPDATE segmentation_queue
         SET status = 'error',
             finished_at = ?,
+            claim_heartbeat_at = NULL,
             error = ?
         WHERE id = ?
         """,
@@ -1656,6 +1698,7 @@ def retry_segmentation_queue_item(
         UPDATE segmentation_queue
         SET status = 'pending',
             claimed_at = NULL,
+            claim_heartbeat_at = NULL,
             finished_at = NULL,
             error = ?
         WHERE id = ?
@@ -1673,6 +1716,7 @@ def mark_metrics_queue_item_error(conn: sqlite3.Connection, queue_id: int, error
         UPDATE metrics_queue
         SET status = 'error',
             finished_at = ?,
+            claim_heartbeat_at = NULL,
             error = ?
         WHERE id = ?
         """,
