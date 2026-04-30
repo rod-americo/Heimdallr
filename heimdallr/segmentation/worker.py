@@ -1023,6 +1023,8 @@ def run_task(task_name, input_file, output_folder, extra_args=None, max_retries=
                 return
             except subprocess.CalledProcessError:
                 raise
+            except WorkerShutdownRequestedError:
+                raise
             except TimeoutError:
                 raise
             except Exception as exc:
@@ -1379,6 +1381,25 @@ def segment_case(case_input):
 
         logger.close()
         return True
+
+    except WorkerShutdownRequestedError as e:
+        try:
+            _record_segmentation_pipeline_state(
+                case_id,
+                status="error",
+                end_dt=datetime.datetime.now(LOCAL_TZ),
+                error=str(e),
+            )
+        except Exception:
+            pass
+        logger.print(f"Unhandled segmentation error for {case_id}: {e}")
+        try:
+            with open(error_log_path, "w") as f:
+                f.write(str(e))
+        except Exception:
+            pass
+        logger.close()
+        raise
 
     except Exception as e:
         try:
