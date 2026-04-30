@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS segmentation_queue (
     status TEXT NOT NULL DEFAULT 'pending',
     created_at TIMESTAMP,
     claimed_at TIMESTAMP,
+    claim_heartbeat_at TIMESTAMP,
     finished_at TIMESTAMP,
     error TEXT
 );
@@ -71,6 +72,7 @@ CREATE TABLE IF NOT EXISTS metrics_queue (
     status TEXT NOT NULL DEFAULT 'pending',
     created_at TIMESTAMP,
     claimed_at TIMESTAMP,
+    claim_heartbeat_at TIMESTAMP,
     finished_at TIMESTAMP,
     error TEXT
 );
