@@ -9,13 +9,99 @@ from unittest.mock import MagicMock, patch
 
 from heimdallr.segmentation.worker import (
     _record_segmentation_pipeline_state,
+    WorkerShutdownRequestedError,
     resolve_segmentation_plan,
+    segment_case,
     should_reuse_existing_segmentation,
 )
 from heimdallr.shared import store
 
 
 class TestSegmentationReuse(unittest.TestCase):
+    def test_segment_case_propagates_worker_shutdown_for_queue_retry(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base = Path(tmpdir)
+            case_id = "ShutdownCase_20260420_1"
+            case_dir = base / case_id
+            metadata_dir = case_dir / "metadata"
+            logs_dir = case_dir / "logs"
+            artifacts_dir = case_dir / "artifacts"
+            derived_dir = case_dir / "derived"
+            metadata_dir.mkdir(parents=True, exist_ok=True)
+            logs_dir.mkdir(parents=True, exist_ok=True)
+            artifacts_dir.mkdir(parents=True, exist_ok=True)
+            derived_dir.mkdir(parents=True, exist_ok=True)
+
+            id_json_path = metadata_dir / "id.json"
+            id_json_path.write_text(
+                json.dumps(
+                    {
+                        "CaseID": case_id,
+                        "StudyInstanceUID": "1.2.3",
+                        "PatientName": "Alice Example",
+                        "AccessionNumber": "1",
+                        "StudyDate": "20260420",
+                        "Modality": "CT",
+                        "Pipeline": {},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            selected_nifti = base / "selected.nii.gz"
+            selected_nifti.write_bytes(gzip.compress(b"1"))
+            shutdown_error = WorkerShutdownRequestedError(
+                "[total] Worker shutdown requested while task was still running"
+            )
+
+            with (
+                patch("heimdallr.segmentation.worker.study_dir", return_value=case_dir),
+                patch("heimdallr.segmentation.worker.study_artifacts_dir", return_value=artifacts_dir),
+                patch("heimdallr.segmentation.worker.study_derived_dir", return_value=derived_dir),
+                patch("heimdallr.segmentation.worker.study_logs_dir", return_value=logs_dir),
+                patch("heimdallr.segmentation.worker.study_metadata_dir", return_value=metadata_dir),
+                patch("heimdallr.segmentation.worker.study_id_json", return_value=id_json_path),
+                patch(
+                    "heimdallr.segmentation.worker.select_prepared_series",
+                    return_value=(
+                        selected_nifti,
+                        {
+                            "SelectedSeriesNumber": "2",
+                            "SelectedPhase": "native",
+                            "SliceCount": 100,
+                            "SelectedSeriesInstanceUID": "1.2.3.4.5",
+                        },
+                    ),
+                ),
+                patch(
+                    "heimdallr.segmentation.worker.resolve_segmentation_plan",
+                    return_value=("ct_native_segmentation_only", [{"name": "total"}]),
+                ),
+                patch(
+                    "heimdallr.segmentation.worker.should_reuse_existing_segmentation",
+                    return_value=(False, None),
+                ),
+                patch(
+                    "heimdallr.segmentation.worker.run_segmentation_pipeline",
+                    side_effect=shutdown_error,
+                ),
+                patch("heimdallr.segmentation.worker.db_connect", return_value=MagicMock()),
+                patch("heimdallr.segmentation.worker.store.update_id_json"),
+            ):
+                with self.assertRaises(WorkerShutdownRequestedError):
+                    segment_case(case_dir)
+
+            payload = json.loads(id_json_path.read_text(encoding="utf-8"))
+            pipeline = payload["Pipeline"]
+            self.assertEqual(pipeline["segmentation_status"], "error")
+            self.assertEqual(
+                pipeline["segmentation_error"],
+                "[total] Worker shutdown requested while task was still running",
+            )
+            self.assertEqual(
+                (logs_dir / "error.log").read_text(encoding="utf-8"),
+                "[total] Worker shutdown requested while task was still running",
+            )
+
     def test_resolve_segmentation_plan_accepts_portal_venous_fallback(self):
         with patch(
             "heimdallr.segmentation.worker.load_segmentation_pipeline_profile",
