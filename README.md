@@ -270,6 +270,7 @@ compute capacity. Do not treat unit tests as proof of clinical readiness.
 | Architecture | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
 | Contracts | [`docs/CONTRACTS.md`](docs/CONTRACTS.md) |
 | Operations | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) |
+| Runtime requirements | [`docs/RUNTIME_REQUIREMENTS.md`](docs/RUNTIME_REQUIREMENTS.md) |
 | Decisions | [`docs/DECISIONS.md`](docs/DECISIONS.md) |
 | API contracts | [`docs/API.md`](docs/API.md) |
 | Database schema notes | [`database/README.md`](database/README.md) |

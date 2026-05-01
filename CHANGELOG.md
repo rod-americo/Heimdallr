@@ -10,6 +10,8 @@ changes.
 - Added project gate, structural doctor policy, and adapted starter-kit
   governance baseline for the existing Heimdallr repository.
 - Added explicit contracts, decisions, and recovery checklist documentation.
+- Added POC host requirements audit documentation and runtime requirements
+  comparison script.
 
 ### Changed
 
@@ -17,6 +19,8 @@ changes.
   paths, queue contracts, domain boundaries, and known hotspots.
 - Marked stale prototype-fat test modules as skipped when the removed prototype
   scripts are not present, instead of reconstructing deleted scripts.
+- Updated agent instructions to require Git parity between local worktrees and
+  the `thor` POC host before host-side test comparisons.
 
 ### Operational Notes
 

@@ -134,7 +134,32 @@ Before concluding any change:
 If the change affects resident services, document restart impact in
 `docs/OPERATIONS.md`.
 
-## 7. Known Hotspots
+## 7. Thor POC Host Protocol
+
+Use `thor` as the POC code-test host when the task requires host-level
+validation. The current known working venv is:
+
+```text
+/home/rodrigo/venvs/totalsegmentator
+```
+
+Before comparing test results, local and `thor` must have the same Git branch,
+upstream, commit, and expected worktree cleanliness:
+
+```bash
+git status --short --branch
+git rev-parse --short HEAD
+ssh thor 'cd ~/Heimdallr && git status --short --branch && git rev-parse --short HEAD'
+```
+
+If code should be tested on `thor`, push locally first and update `thor` with
+`git pull --ff-only`. Do not edit code, host-local config, runtime state, or the
+POC venv on `thor` unless the user explicitly asks for host-side changes.
+
+Use `docs/RUNTIME_REQUIREMENTS.md` and `scripts/check_runtime_requirements.py`
+when auditing or rebuilding Python environments.
+
+## 8. Known Hotspots
 
 - `heimdallr/prepare/worker.py`: large orchestration surface for ZIP claiming,
   DICOM scan, metadata extraction, conversion, queue enqueue, and duplicate
@@ -153,7 +178,7 @@ If the change affects resident services, document restart impact in
   consistent with API and SQLite behavior.
 - LLM-adjacent dependencies/settings: existing residue only; do not expand.
 
-## 8. Change Guardrails
+## 9. Change Guardrails
 
 - Preserve current service boundaries unless an explicit decision is recorded.
 - Do not refactor directories just to match a starter-kit shape.
@@ -167,7 +192,7 @@ If the change affects resident services, document restart impact in
 - Do not overwrite local runtime state, database files, or ignored host config.
 - Do not revert user changes in the worktree.
 
-## 9. Git Workflow
+## 10. Git Workflow
 
 Use the branch that is already checked out for the current task. Do not create
 or switch branches unless the user explicitly asks for that branch workflow.
@@ -184,7 +209,7 @@ Allowed common types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`,
 Keep subjects at 72 characters or less and never include PHI/PII, dumps, local
 secrets, or patient identifiers.
 
-## 10. Local Gate and Doctor
+## 11. Local Gate and Doctor
 
 Use:
 
