@@ -161,6 +161,13 @@ POC venv on `thor` unless the user explicitly asks for host-side changes.
 Use `docs/RUNTIME_REQUIREMENTS.md` and `scripts/check_runtime_requirements.py`
 when auditing or rebuilding Python environments.
 
+Thor has an NVIDIA RTX 3090. Do not use
+`config/segmentation_pipeline.example.json` for large Thor segmentation smoke;
+that template is CPU-first. Use ignored host-local
+`config/segmentation_pipeline.json` created from
+`config/segmentation_pipeline.gpu.example.json`, then restart the segmentation
+worker before timing or validating segmentation behavior.
+
 ## 8. Known Hotspots
 
 - `heimdallr/prepare/worker.py`: large orchestration surface for ZIP claiming,

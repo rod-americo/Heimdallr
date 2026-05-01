@@ -43,6 +43,8 @@ python: 3.12.3
 pip: 24.0
 pip check: No broken requirements found.
 requirements audit: matches requirements.txt
+gpu: NVIDIA GeForce RTX 3090
+torch cuda: available in ~/Heimdallr/.venv
 ```
 
 Historical drift observed in the older external POC venv
@@ -56,6 +58,17 @@ Historical drift observed in the older external POC venv
 
 Use `~/Heimdallr/.venv` for new code tests unless the user explicitly asks to
 compare against the older external venv.
+
+Thor segmentation smoke must use the GPU host-local profile:
+
+```bash
+cp config/segmentation_pipeline.gpu.example.json config/segmentation_pipeline.json
+```
+
+`config/segmentation_pipeline.json` is ignored because it is operational host
+state. Restart the segmentation worker after changing it. The CPU-first
+`config/segmentation_pipeline.example.json` remains a conservative portable
+example and should not be used for large Thor smoke runs.
 
 ## 3. Git Parity Rule: Local and Thor
 
