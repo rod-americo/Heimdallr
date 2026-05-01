@@ -34,8 +34,10 @@ This document summarizes high-value API contracts used in Heimdallr workflows.
 - `client_case_id`
 - `callback_url`
 - optional `source_system`
-- optional `requested_outputs` JSON
-- optional `requested_metrics_modules` (JSON array or CSV string)
+- optional `requested_outputs` JSON, which selects returned files such as
+  metrics JSON, overlays, report PDF, and report Encapsulated PDF DICOM
+- optional `requested_metrics_modules` (JSON array or CSV string), which
+  selects enabled metrics jobs to run from the active profile
 
 It returns an immediate acceptance payload with `job_id` and `status=queued`.
 When processing finishes, `heimdallr.integration.delivery` performs an outbound
@@ -45,7 +47,9 @@ The consumer-facing callback contract is documented in
 
 If `requested_metrics_modules` is provided, Heimdallr constrains the case to
 that subset of metrics jobs and automatically includes declared dependencies
-from the active metrics profile.
+from the active metrics profile. When metrics jobs declare
+`requires_segmentation_tasks`, segmentation is also constrained to the required
+TotalSegmentator tasks.
 
 ### Patients and Results
 

@@ -259,9 +259,11 @@ Common failure signals:
 | `heimdallr/dicom_egress/` | restart DICOM egress worker. |
 | `heimdallr/integration/dispatch/` | restart integration dispatch worker. |
 | `heimdallr/integration/delivery/` | restart integration delivery worker. |
+| `heimdallr/integration/delivery/package.py` | restart integration delivery worker before validating callback package contents. |
 | `heimdallr/integration/submissions.py` | restart control plane and prepare worker. |
 | `heimdallr/control_plane/` or `static/` | restart control plane; browser refresh may be needed. |
 | `config/series_selection.json` | restart prepare/segmentation services that load selection behavior. |
+| `config/metrics_pipeline.json` | restart metrics worker; restart segmentation worker too because external requested metrics can narrow segmentation tasks from this profile. |
 | host-local pipeline config | restart the affected worker unless the code explicitly reloads it per cycle. |
 | docs-only or governance-script changes | no resident service restart. |
 

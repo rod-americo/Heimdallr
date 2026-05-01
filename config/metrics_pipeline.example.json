@@ -3,6 +3,7 @@
     "job_resolution": "When jobs[].module is omitted, Heimdallr resolves jobs[].name to heimdallr.metrics.jobs.<name>.",
     "job_addition": "To add a new job, create the module under heimdallr/metrics/jobs/ and declare it in jobs[]. Use jobs[].module only for non-conventional names inside heimdallr.metrics.jobs.",
     "parallel_execution": "Profiles may set execution.max_parallel_jobs. Jobs may declare needs to wait for prerequisite job names while still allowing independent jobs to run in parallel.",
+    "segmentation_requirements": "Jobs should declare requires_segmentation_tasks so external requested_metrics_modules can avoid unnecessary TotalSegmentator tasks.",
     "experimental_jobs": "Experimental metrics modules should live under heimdallr.metrics.jobs.tests or heimdallr.metrics.analysis and be enabled only via explicit jobs[].module overrides in host-local config."
   },
   "default_profile": "ct_native_basic_metrics",
@@ -22,18 +23,28 @@
         {
           "name": "l3_muscle_area",
           "enabled": true,
+          "requires_segmentation_tasks": [
+            "total",
+            "tissue_types"
+          ],
           "generate_overlay": true,
           "emit_secondary_capture_dicom": true
         },
         {
           "name": "parenchymal_organ_volumetry",
           "enabled": true,
+          "requires_segmentation_tasks": [
+            "total"
+          ],
           "generate_overlay": true,
           "emit_secondary_capture_dicom": true
         },
         {
           "name": "bone_health_l1_hu",
           "enabled": true,
+          "requires_segmentation_tasks": [
+            "total"
+          ],
           "generate_overlay": true,
           "strict_qc": false
         }
