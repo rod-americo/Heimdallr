@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
+import sys
 import time
 
 import requests
@@ -20,6 +21,27 @@ from heimdallr.shared import settings, store
 from heimdallr.shared.sqlite import connect as db_connect
 
 settings.configure_service_stdio()
+
+SERVICE_NAME = "integration_delivery"
+MODULE_NAME = "integration_delivery.worker"
+
+
+def _log_event(
+    level: str,
+    event: str,
+    message: str,
+    **fields: object,
+) -> None:
+    payload = {
+        "lvl": level,
+        "svc": SERVICE_NAME,
+        "mod": MODULE_NAME,
+        "evt": event,
+        "msg": message,
+    }
+    payload.update({key: value for key, value in fields.items() if value is not None})
+    sys.stdout.write(json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n")
+    sys.stdout.flush()
 
 
 def ensure_integration_delivery_queue_table() -> None:
@@ -136,9 +158,16 @@ def run_delivery_cycle() -> int:
             attempts_before_claim,
         ) = queue_item
 
-        print(
-            f"[Integration Delivery] Claimed {event_type} "
-            f"({job_id}) -> {callback_url} for {case_id}"
+        _log_event(
+            "INFO",
+            "delivery_claimed",
+            "integration delivery item claimed",
+            queue_id=queue_id,
+            job_id=job_id,
+            event_type=event_type,
+            case_id=case_id,
+            study_uid=study_uid,
+            callback_url=callback_url,
         )
         temp_dir = None
         try:
@@ -159,9 +188,17 @@ def run_delivery_cycle() -> int:
             )
             mark_integration_delivery_queue_item_done(queue_id, response_status=int(response.status_code))
             processed += 1
-            print(
-                f"[Integration Delivery] ✓ {event_type} "
-                f"({job_id}) -> {callback_url} [{response.status_code}]"
+            _log_event(
+                "OK",
+                "delivery_done",
+                "integration delivery item delivered",
+                queue_id=queue_id,
+                job_id=job_id,
+                event_type=event_type,
+                case_id=case_id,
+                study_uid=study_uid,
+                callback_url=callback_url,
+                response_status=int(response.status_code),
             )
         except Exception as exc:
             config = load_integration_delivery_config()
@@ -174,15 +211,36 @@ def run_delivery_cycle() -> int:
                     str(exc),
                     backoff_seconds=retry_backoff_seconds,
                 )
-                print(
-                    f"[Integration Delivery] Retry {claimed_attempt}/{retry_attempts} "
-                    f"for {event_type} ({job_id}) -> {callback_url}: {exc}"
+                _log_event(
+                    "WARN",
+                    "delivery_retry",
+                    "integration delivery item scheduled for retry",
+                    queue_id=queue_id,
+                    job_id=job_id,
+                    event_type=event_type,
+                    case_id=case_id,
+                    study_uid=study_uid,
+                    callback_url=callback_url,
+                    retry=claimed_attempt,
+                    max_retries=retry_attempts,
+                    backoff_seconds=retry_backoff_seconds,
+                    err=str(exc),
                 )
             else:
                 mark_integration_delivery_queue_item_error(queue_id, str(exc))
-                print(
-                    f"[Integration Delivery] Error for {event_type} "
-                    f"({job_id}) -> {callback_url}: {exc}"
+                _log_event(
+                    "ERR",
+                    "delivery_fail",
+                    "integration delivery item failed",
+                    queue_id=queue_id,
+                    job_id=job_id,
+                    event_type=event_type,
+                    case_id=case_id,
+                    study_uid=study_uid,
+                    callback_url=callback_url,
+                    retry=claimed_attempt,
+                    max_retries=retry_attempts,
+                    err=str(exc),
                 )
         finally:
             if temp_dir is not None:
@@ -198,16 +256,26 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    print("Starting integration delivery monitoring...")
-    print(f"  Config: {settings.INTEGRATION_DELIVERY_CONFIG_PATH}")
-    print(f"  Scan interval: {settings.INTEGRATION_DELIVERY_SCAN_INTERVAL}s")
+    _log_event(
+        "INFO",
+        "worker_start",
+        "starting integration delivery monitoring",
+        config_path=str(settings.INTEGRATION_DELIVERY_CONFIG_PATH),
+        scan_interval_seconds=settings.INTEGRATION_DELIVERY_SCAN_INTERVAL,
+        run_once=args.run_once,
+    )
     ensure_integration_delivery_queue_table()
 
     if args.run_once:
         try:
             run_delivery_cycle()
         except Exception as exc:
-            print(f"Error in integration delivery run-once: {exc}")
+            _log_event(
+                "ERR",
+                "run_once_fail",
+                "integration delivery run-once failed",
+                err=str(exc),
+            )
             return 1
         return 0
 
@@ -218,8 +286,17 @@ def main(argv: list[str] | None = None) -> int:
                 if processed == 0:
                     time.sleep(settings.INTEGRATION_DELIVERY_SCAN_INTERVAL)
             except Exception as exc:
-                print(f"Error in integration delivery main loop: {exc}")
+                _log_event(
+                    "ERR",
+                    "main_loop_fail",
+                    "integration delivery main loop failed",
+                    err=str(exc),
+                )
                 time.sleep(settings.INTEGRATION_DELIVERY_SCAN_INTERVAL)
     except KeyboardInterrupt:
-        print("\nStopping integration delivery monitoring...")
+        _log_event(
+            "INFO",
+            "worker_stop",
+            "stopping integration delivery monitoring",
+        )
         return 0
