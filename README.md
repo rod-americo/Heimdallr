@@ -328,7 +328,8 @@ These files are part of the repository contract:
 
 ### Host-Local Operational Configuration
 
-These files are expected to vary per host and are ignored by Git:
+Only the templates are tracked in Git. The concrete host-local files below are
+expected to vary per host and are ignored by Git:
 - `config/segmentation_pipeline.json`
 - `config/metrics_pipeline.json`
 - `config/integration_dispatch.json`

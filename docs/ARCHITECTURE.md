@@ -94,7 +94,7 @@ PACS/Modality (DICOM) --> heimdallr/intake --> /upload or /jobs (heimdallr/contr
 
 ## External Dependencies
 
-- Python 3.10+
+- Python 3.12
 - `dcm2niix`
 - TotalSegmentator runtime in `.venv`
 - Optional OCR: `pytesseract` + `tesseract` system binary
