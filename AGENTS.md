@@ -70,9 +70,7 @@ Use the existing module boundaries:
   artifacts.
 - `heimdallr/dicom_egress/`: outbound DICOM C-STORE queue worker.
 - `heimdallr/integration/`: external job submission helpers, outbound event
-  dispatch, and final package callback delivery. The legacy
-  `heimdallr/integration_dispatcher/` and `heimdallr/integration_delivery/`
-  packages are compatibility shims only.
+  dispatch, and final package callback delivery.
 - `heimdallr/space_manager/`: disk usage guard for `runtime/studies/`.
 - `heimdallr/resource_monitor/`: memory telemetry sampler.
 - `heimdallr/shared/`: settings, paths, SQLite store, schemas, i18n, spool

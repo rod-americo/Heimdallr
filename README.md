@@ -138,10 +138,6 @@ External integration code is canonical under `heimdallr/integration/`:
 - `integration/submissions.py`: `/jobs` submission sidecar contract.
 - `integration/docs/`: consumer-facing contracts for external applications.
 
-The older `heimdallr.integration_dispatcher` and
-`heimdallr.integration_delivery` module paths are compatibility shims for
-existing supervisors.
-
 ## Quick Start
 
 ### 1. Clone
