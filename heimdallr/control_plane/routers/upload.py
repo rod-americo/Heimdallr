@@ -7,7 +7,7 @@ import json
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from ...shared import settings
-from ...shared.external_delivery import (
+from ...integration.submissions import (
     build_external_submission_payload,
     new_external_job_id,
     normalize_requested_metrics_modules,

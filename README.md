@@ -44,8 +44,8 @@ runtime artifacts under `runtime/` (ignored by Git).
   - `python -m heimdallr.segmentation`
   - `python -m heimdallr.metrics`
   - `python -m heimdallr.dicom_egress`
-  - `python -m heimdallr.integration_dispatcher`
-  - `python -m heimdallr.integration_delivery`
+  - `python -m heimdallr.integration.dispatch`
+  - `python -m heimdallr.integration.delivery`
   - `python -m heimdallr.space_manager`
   - `python -m heimdallr.resource_monitor`
   - `python -m heimdallr.tui`
@@ -104,8 +104,8 @@ FastAPI dashboard/API + optional Textual TUI
 | `heimdallr.segmentation` | operational, dependency-heavy hotspot | Runs TotalSegmentator tasks from host-local profile; depends on binary/license/GPU or CPU capacity. |
 | `heimdallr.metrics` | operational, mixed production/experimental surface | Production-facing jobs are enabled through `config/metrics_pipeline.example.json`; experimental jobs must stay opt-in. |
 | `heimdallr.dicom_egress` | operational | Queue-driven C-STORE SCU with retry and compression fallback. |
-| `heimdallr.integration_dispatcher` | operational if configured | Delivers patient-identified events to configured HTTP destinations. |
-| `heimdallr.integration_delivery` | operational if configured | Sends final `manifest.json` and `package.zip` callbacks for external submissions. |
+| `heimdallr.integration.dispatch` | operational if configured | Delivers patient-identified events to configured HTTP destinations. |
+| `heimdallr.integration.delivery` | operational if configured | Sends final `manifest.json` and `package.zip` callbacks for external submissions. |
 | `heimdallr.control_plane` | operational | FastAPI dashboard, upload ingress, patient/results API, PDF export. Built-in auth is not present. |
 | `heimdallr.tui` | operational support tool | Reads SQLite/process state for live operations. |
 | `heimdallr.space_manager` | operational guardrail | Purges completed study artifacts when configured disk thresholds are exceeded. |
@@ -130,6 +130,17 @@ Heimdallr/
 ├── CHANGELOG.md                # Human-readable project change history
 └── AGENTS.md                   # Collaboration protocol for agents and maintainers
 ```
+
+External integration code is canonical under `heimdallr/integration/`:
+
+- `integration/dispatch/`: outbound JSON event dispatch.
+- `integration/delivery/`: final callback package delivery.
+- `integration/submissions.py`: `/jobs` submission sidecar contract.
+- `integration/docs/`: consumer-facing contracts for external applications.
+
+The older `heimdallr.integration_dispatcher` and
+`heimdallr.integration_delivery` module paths are compatibility shims for
+existing supervisors.
 
 ## Quick Start
 
@@ -186,8 +197,8 @@ or inject `TOTALSEGMENTATOR_LICENSE` through host supervision.
 .venv/bin/python -m heimdallr.metrics
 .venv/bin/python -m heimdallr.intake
 .venv/bin/python -m heimdallr.dicom_egress
-.venv/bin/python -m heimdallr.integration_dispatcher
-.venv/bin/python -m heimdallr.integration_delivery
+.venv/bin/python -m heimdallr.integration.dispatch
+.venv/bin/python -m heimdallr.integration.delivery
 .venv/bin/python -m heimdallr.space_manager
 .venv/bin/python -m heimdallr.resource_monitor
 ```

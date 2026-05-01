@@ -69,10 +69,10 @@ Use the existing module boundaries:
 - `heimdallr/metrics/`: deterministic post-segmentation jobs and generated
   artifacts.
 - `heimdallr/dicom_egress/`: outbound DICOM C-STORE queue worker.
-- `heimdallr/integration_dispatcher/`: patient-identified outbound event
-  delivery.
-- `heimdallr/integration_delivery/`: final external submission package
-  callback delivery.
+- `heimdallr/integration/`: external job submission helpers, outbound event
+  dispatch, and final package callback delivery. The legacy
+  `heimdallr/integration_dispatcher/` and `heimdallr/integration_delivery/`
+  packages are compatibility shims only.
 - `heimdallr/space_manager/`: disk usage guard for `runtime/studies/`.
 - `heimdallr/resource_monitor/`: memory telemetry sampler.
 - `heimdallr/shared/`: settings, paths, SQLite store, schemas, i18n, spool
@@ -117,6 +117,10 @@ same change.
   supplement.
 - Keep API details in `docs/API.md` and database details in `database/README.md`;
   link them from structural docs instead of copying them wholesale.
+- Keep external integration consumer contracts in `heimdallr/integration/docs/`.
+  Update them in the same change when `/jobs`, callback delivery, outbound
+  events, payload fields, retry semantics, or integration security assumptions
+  change.
 
 ## 6. Minimum Validation
 

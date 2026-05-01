@@ -62,8 +62,8 @@ do not claim clinical readiness.
 | `prepare` | claimable ZIP payload | study directory, metadata, queue rows | bad ZIP, no valid DICOM series, conversion failure, insufficient series images |
 | `segmentation` | prepared case queue item | segmentation artifacts and metrics queue item | TotalSegmentator failure, missing license, resource exhaustion, stale claim |
 | `metrics` | metrics queue item | results JSON, overlays, PDFs, DICOM artifacts, delivery queues | missing masks, unsupported profile, job dependency errors, artifact generation failure |
-| `integration_dispatcher` | dispatch queue item | HTTP event delivery state | unreachable endpoint, non-2xx response, config error |
-| `integration_delivery` | delivery queue item | final callback delivery state | missing case outputs, callback failure, package build failure |
+| `integration.dispatch` | dispatch queue item | HTTP event delivery state | unreachable endpoint, non-2xx response, config error |
+| `integration.delivery` | delivery queue item | final callback delivery state | missing case outputs, callback failure, package build failure |
 | `dicom_egress` | DICOM egress queue item | remote C-STORE delivery state | peer rejects association, transfer syntax mismatch, compression fallback unavailable |
 | `space_manager` | completed study artifacts | reclaimed disk and purge flags | permission failure, active case protection, insufficient purge candidates |
 | `resource_monitor` | process/case state | SQLite telemetry samples | process disappeared, unsupported procfs/cgroup details |
@@ -87,6 +87,9 @@ Optional fields:
 - `requested_outputs` as JSON object
 - `requested_metrics_modules` as JSON array or CSV string
 
+The external consumer contract is maintained in
+`heimdallr/integration/docs/JOB_SUBMISSION.md`.
+
 ### Final Delivery
 
 For `/jobs` submissions, the final callback is multipart and includes:
@@ -96,6 +99,9 @@ For `/jobs` submissions, the final callback is multipart and includes:
 
 Delivery occurs only after metrics execution reaches the package delivery
 enqueue path.
+
+Outbound event dispatch consumers are documented in
+`heimdallr/integration/docs/EVENT_DISPATCH.md`.
 
 ### DICOM
 

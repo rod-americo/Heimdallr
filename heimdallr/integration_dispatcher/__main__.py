@@ -1,6 +1,6 @@
-"""Module entrypoint for the integration dispatcher worker."""
+"""Compatibility entrypoint for the integration dispatch worker."""
 
-from .worker import main
+from heimdallr.integration.dispatch.worker import main
 
 
 if __name__ == "__main__":
