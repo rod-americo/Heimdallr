@@ -1,0 +1,25 @@
+# Changelog
+
+This file records notable behavior, architecture, documentation, and operation
+changes.
+
+## [Unreleased]
+
+### Added
+
+- Added project gate, structural doctor policy, and adapted starter-kit
+  governance baseline for the existing Heimdallr repository.
+- Added explicit contracts, decisions, and recovery checklist documentation.
+
+### Changed
+
+- Reworked repository documentation around real Heimdallr services, runtime
+  paths, queue contracts, domain boundaries, and known hotspots.
+- Marked stale prototype-fat test modules as skipped when the removed prototype
+  scripts are not present, instead of reconstructing deleted scripts.
+
+### Operational Notes
+
+- This documentation/governance recovery does not change resident service
+  runtime behavior and does not require a service restart.
+- Local hook support is provided but not automatically installed.
