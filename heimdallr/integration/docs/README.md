@@ -6,9 +6,10 @@ consume without reading Heimdallr internals.
 These contracts describe the current implementation under
 `heimdallr.integration`. They are intentionally narrower than a general partner
 API specification: Heimdallr currently provides asynchronous job submission,
-final package callbacks, and configured outbound event dispatch. It does not
-provide built-in authentication, signed webhooks, partner-specific adapters, or
-a synchronous result API for externally submitted jobs.
+caller-selected metrics processing, caller-selected final package outputs, and
+configured outbound event dispatch. It does not provide built-in
+authentication, signed webhooks, partner-specific adapters, or a synchronous
+result API for externally submitted jobs.
 
 ## Current Surfaces
 
@@ -17,6 +18,9 @@ a synchronous result API for externally submitted jobs.
 | External job submission | external app to Heimdallr | `POST /jobs` multipart upload | implemented |
 | Final package delivery | Heimdallr to external app | multipart HTTP `POST` callback | implemented when configured |
 | Event dispatch | Heimdallr to configured destinations | JSON HTTP `POST` | implemented when configured |
+
+`requested_metrics_modules` controls what Heimdallr runs. `requested_outputs`
+controls what Heimdallr returns.
 
 ## Contract Files
 

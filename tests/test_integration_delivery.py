@@ -37,7 +37,7 @@ class TestJobSubmissionRoute(unittest.TestCase):
                         "client_case_id": "external-123",
                         "callback_url": "http://receiver.local/callback",
                         "source_system": "partner_a",
-                        "requested_outputs": json.dumps({"include_report_pdf": False}),
+                        "requested_outputs": json.dumps({"report_pdf": False}),
                         "requested_metrics_modules": json.dumps(["l3_muscle_area", "bone_health_l1_hu"]),
                     },
                 )
@@ -51,7 +51,7 @@ class TestJobSubmissionRoute(unittest.TestCase):
             self.assertEqual(sidecar["client_case_id"], "external-123")
             self.assertEqual(sidecar["callback_url"], "http://receiver.local/callback")
             self.assertEqual(sidecar["source_system"], "partner_a")
-            self.assertFalse(sidecar["requested_outputs"]["include_report_pdf"])
+            self.assertFalse(sidecar["requested_outputs"]["report_pdf"])
             self.assertEqual(
                 sidecar["requested_metrics_modules"],
                 ["l3_muscle_area", "bone_health_l1_hu"],
@@ -80,7 +80,7 @@ class TestIntegrationDeliveryStore(unittest.TestCase):
                 callback_url="http://receiver.local/callback",
                 http_method="POST",
                 timeout_seconds=120,
-                requested_outputs={"include_report_pdf": True},
+                requested_outputs={"report_pdf": True},
             )
 
             claimed = store.claim_next_pending_integration_delivery_queue_item(conn)
@@ -122,11 +122,19 @@ class TestIntegrationDeliveryPackageAndWorker(unittest.TestCase):
                 encoding="utf-8",
             )
             (case_root / "artifacts" / "metrics" / "l3_muscle_area" / "overlay_sc.dcm").write_bytes(b"dicom")
+            (case_root / "artifacts" / "metrics" / "l3_muscle_area" / "overlay.png").write_bytes(b"png")
+            (case_root / "artifacts" / "metrics" / "instructions").mkdir(parents=True, exist_ok=True)
+            (case_root / "artifacts" / "metrics" / "instructions" / "artifact_instructions.pdf").write_bytes(b"%PDF")
+            (case_root / "artifacts" / "metrics" / "instructions" / "artifact_instructions.dcm").write_bytes(b"DICM")
 
             report_path = case_root / "metadata" / "report.pdf"
+            report_dicom_path = case_root / "metadata" / "report.dcm"
             def _fake_report(_case_root):
                 report_path.write_bytes(b"%PDF")
                 return report_path
+
+            def _fake_report_dicom(*, output_path, **_kwargs):
+                output_path.write_bytes(b"DICM")
 
             with (
                 patch("heimdallr.integration.delivery.package.study_dir", return_value=case_root),
@@ -135,29 +143,109 @@ class TestIntegrationDeliveryPackageAndWorker(unittest.TestCase):
                 patch("heimdallr.integration.delivery.package.study_results_json", return_value=case_root / "metadata" / "resultados.json"),
                 patch("heimdallr.integration.delivery.package.study_artifacts_dir", return_value=case_root / "artifacts"),
                 patch("heimdallr.integration.delivery.package.build_case_report", side_effect=_fake_report),
+                patch("heimdallr.integration.delivery.package.create_encapsulated_pdf_dicom", side_effect=_fake_report_dicom),
             ):
                 manifest, package_path = delivery_package.build_delivery_package(
                     case_id="Case123",
                     job_id="job-1",
                     client_case_id="external-123",
                     source_system="partner_a",
-                    requested_outputs={"include_report_pdf": True},
+                    requested_outputs={
+                        "metrics_json": True,
+                        "overlays_png": True,
+                        "overlays_dicom": True,
+                        "report_pdf": True,
+                        "report_pdf_dicom": True,
+                        "artifact_instructions_pdf": True,
+                        "artifact_instructions_dicom": True,
+                        "artifacts_tree": False,
+                    },
                 )
 
             self.assertEqual(manifest["event_type"], "case.completed")
             self.assertEqual(manifest["job_id"], "job-1")
             self.assertTrue(package_path.exists())
+            self.assertTrue(report_dicom_path.exists())
 
             import zipfile
 
             with zipfile.ZipFile(package_path, "r") as zip_handle:
                 names = set(zip_handle.namelist())
+                package_manifest = json.loads(zip_handle.read("manifest.json").decode("utf-8"))
             self.assertIn("manifest.json", names)
             self.assertIn("metadata/id.json", names)
             self.assertIn("metadata/resultados.json", names)
             self.assertIn("metadata/report.pdf", names)
+            self.assertIn("metadata/report.dcm", names)
             self.assertIn("artifacts/metrics/l3_muscle_area/result.json", names)
+            self.assertIn("artifacts/metrics/l3_muscle_area/overlay.png", names)
             self.assertIn("artifacts/metrics/l3_muscle_area/overlay_sc.dcm", names)
+            self.assertIn("artifacts/metrics/instructions/artifact_instructions.pdf", names)
+            self.assertIn("artifacts/metrics/instructions/artifact_instructions.dcm", names)
+            self.assertEqual(manifest["missing_outputs"], [])
+            self.assertIn("report_pdf_dicom", manifest["delivered_outputs"])
+            self.assertEqual(package_manifest["requested_outputs"]["report_pdf_dicom"], True)
+
+    def test_build_delivery_package_honors_output_selection(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            case_root = Path(tmpdir) / "runtime" / "studies" / "CaseSelected"
+            (case_root / "metadata").mkdir(parents=True, exist_ok=True)
+            (case_root / "artifacts" / "metrics" / "l3_muscle_area").mkdir(parents=True, exist_ok=True)
+            (case_root / "metadata" / "id.json").write_text(
+                json.dumps({"StudyInstanceUID": "1.2.3", "ExternalDelivery": {}}),
+                encoding="utf-8",
+            )
+            (case_root / "metadata" / "resultados.json").write_text('{"metrics":{}}', encoding="utf-8")
+            (case_root / "artifacts" / "metrics" / "l3_muscle_area" / "result.json").write_text(
+                "{}",
+                encoding="utf-8",
+            )
+            (case_root / "artifacts" / "metrics" / "l3_muscle_area" / "overlay.png").write_bytes(b"png")
+            (case_root / "artifacts" / "metrics" / "l3_muscle_area" / "overlay_sc.dcm").write_bytes(b"dicom")
+
+            with (
+                patch("heimdallr.integration.delivery.package.study_dir", return_value=case_root),
+                patch("heimdallr.integration.delivery.package.study_id_json", return_value=case_root / "metadata" / "id.json"),
+                patch("heimdallr.integration.delivery.package.study_metadata_json", return_value=case_root / "metadata" / "metadata.json"),
+                patch("heimdallr.integration.delivery.package.study_results_json", return_value=case_root / "metadata" / "resultados.json"),
+                patch("heimdallr.integration.delivery.package.study_artifacts_dir", return_value=case_root / "artifacts"),
+            ):
+                manifest, package_path = delivery_package.build_delivery_package(
+                    case_id="CaseSelected",
+                    job_id="job-2",
+                    client_case_id="external-456",
+                    source_system=None,
+                    requested_outputs={
+                        "id_json": False,
+                        "metadata_json": False,
+                        "metrics_json": True,
+                        "overlays_png": False,
+                        "overlays_dicom": False,
+                        "report_pdf": False,
+                        "report_pdf_dicom": False,
+                        "artifact_instructions_pdf": False,
+                        "artifact_instructions_dicom": False,
+                        "artifacts_tree": False,
+                    },
+                )
+
+            import zipfile
+
+            with zipfile.ZipFile(package_path, "r") as zip_handle:
+                names = set(zip_handle.namelist())
+            self.assertEqual(
+                names,
+                {
+                    "manifest.json",
+                    "metadata/resultados.json",
+                    "artifacts/metrics/l3_muscle_area/result.json",
+                },
+            )
+            self.assertEqual(manifest["delivered_outputs"]["metrics_json"], ["metadata/resultados.json"])
+            self.assertEqual(
+                manifest["delivered_outputs"]["metric_result_json"],
+                ["artifacts/metrics/l3_muscle_area/result.json"],
+            )
 
     def test_deliver_case_package_posts_multipart(self):
         response = Mock(status_code=202, text="")

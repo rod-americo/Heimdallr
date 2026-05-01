@@ -26,6 +26,11 @@ Optional fields:
 | `requested_outputs` | JSON object string | Controls optional files in the final package. |
 | `requested_metrics_modules` | JSON array string or CSV string | Limits metrics jobs to requested modules plus dependencies from the active metrics profile. Not fully validated at admission time. |
 
+`requested_metrics_modules` and `requested_outputs` are intentionally separate:
+
+- `requested_metrics_modules` orders which metrics processing should run.
+- `requested_outputs` chooses which generated files should be returned.
+
 Example request:
 
 ```bash
@@ -34,7 +39,7 @@ curl -X POST "http://localhost:8001/jobs" \
   -F "client_case_id=external-123" \
   -F "source_system=partner_a" \
   -F "callback_url=http://receiver.local/heimdallr/callback" \
-  -F 'requested_outputs={"include_report_pdf":true,"include_artifacts_tree":true}' \
+  -F 'requested_outputs={"metrics_json":true,"overlays_dicom":true,"report_pdf":true,"report_pdf_dicom":true,"artifacts_tree":false}' \
   -F 'requested_metrics_modules=["l3_muscle_area","bone_health_l1_hu"]'
 ```
 
@@ -71,14 +76,44 @@ Supported `requested_outputs` keys:
 
 | Key | Default | Current behavior |
 | --- | --- | --- |
-| `include_id_json` | `true` | `metadata/id.json` is currently always included as minimum package metadata. |
-| `include_metadata_json` | `true` | Includes `metadata/metadata.json` when present. |
-| `include_resultados_json` | `true` | Includes `metadata/resultados.json` when present. |
-| `include_report_pdf` | `true` | Builds and includes `metadata/report.pdf` when possible. |
-| `include_artifacts_tree` | `true` | Includes files under `artifacts/metrics/` when present. |
+| `id_json` | `true` | Includes `metadata/id.json`. Heimdallr still requires this file internally to build the package. |
+| `metadata_json` | `true` | Includes `metadata/metadata.json` when present. |
+| `metrics_json` | `true` | Includes `metadata/resultados.json` and per-metric `artifacts/metrics/<metric_key>/result.json` files when present. |
+| `overlays_png` | `true` | Includes generated PNG files under `artifacts/metrics/` when present. |
+| `overlays_dicom` | `true` | Includes generated overlay DICOM files under `artifacts/metrics/`, excluding instruction-document DICOM files. |
+| `report_pdf` | `true` | Builds and includes `metadata/report.pdf` when possible. |
+| `report_pdf_dicom` | `false` | Builds and includes `metadata/report.dcm` as Encapsulated PDF DICOM from the case report PDF. |
+| `artifact_instructions_pdf` | `true` | Includes `artifacts/metrics/instructions/artifact_instructions.pdf` when present. |
+| `artifact_instructions_dicom` | `true` | Includes instruction-document DICOM files under `artifacts/metrics/instructions/` when present. |
+| `artifacts_tree` | `true` | Includes every file under `artifacts/metrics/`. Set this to `false` for strictly selected output packages. |
 
 Boolean-like strings such as `"true"`, `"yes"`, `"on"`, and `"1"` are treated
 as true when the sidecar is normalized.
+
+## Requested Metrics
+
+`requested_metrics_modules` accepts a JSON array string or a CSV string. Values
+must match enabled job names from the active metrics profile. Heimdallr includes
+declared job dependencies automatically.
+
+When the active metrics profile declares `requires_segmentation_tasks` for the
+requested jobs, the segmentation worker limits TotalSegmentator tasks to the
+union of those requirements. For example, a request that only includes
+`bone_health_l1_hu` can run `total` without `tissue_types`, while
+`l3_muscle_area` still requires both `total` and `tissue_types`.
+
+Example:
+
+```json
+[
+  "l3_muscle_area",
+  "bone_health_l1_hu"
+]
+```
+
+If the field is omitted or empty, Heimdallr runs the enabled jobs and
+segmentation tasks from the active profiles. Unknown job names fail during
+segmentation or metrics execution rather than at `/jobs` admission time.
 
 ## Final Callback
 
@@ -114,6 +149,36 @@ Example callback manifest:
   "client_case_id": "external-123",
   "source_system": "partner_a",
   "status": "done",
+  "requested_outputs": {
+    "id_json": true,
+    "metadata_json": true,
+    "metrics_json": true,
+    "overlays_png": true,
+    "overlays_dicom": true,
+    "report_pdf": true,
+    "report_pdf_dicom": true,
+    "artifact_instructions_pdf": true,
+    "artifact_instructions_dicom": true,
+    "artifacts_tree": false
+  },
+  "delivered_outputs": {
+    "metrics_json": [
+      "metadata/resultados.json"
+    ],
+    "metric_result_json": [
+      "artifacts/metrics/l3_muscle_area/result.json"
+    ],
+    "overlays_dicom": [
+      "artifacts/metrics/l3_muscle_area/overlay_sc.dcm"
+    ],
+    "report_pdf": [
+      "metadata/report.pdf"
+    ],
+    "report_pdf_dicom": [
+      "metadata/report.dcm"
+    ]
+  },
+  "missing_outputs": [],
   "received_at": "2026-05-01T14:30:00-03:00",
   "completed_at": "2026-05-01T14:42:10-03:00",
   "package_name": "heimdallr_external-123.zip",
@@ -137,6 +202,7 @@ metadata/id.json
 metadata/metadata.json
 metadata/resultados.json
 metadata/report.pdf
+metadata/report.dcm
 artifacts/metrics/<metric_key>/...
 ```
 

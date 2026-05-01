@@ -184,7 +184,9 @@ worker before timing or validating segmentation behavior.
   enqueue.
 - `heimdallr/shared/store.py`: SQLite schema creation, migration, queue
   lifecycle, retry semantics, and resource monitor state.
-- `config/metrics_pipeline.example.json`: production metrics profile contract.
+- `config/metrics_pipeline.example.json`: production metrics profile contract;
+  `requires_segmentation_tasks` also affects external requested-metrics
+  segmentation planning.
 - `config/series_selection.json`: selected-series behavior; changes can alter
   clinical measurement inputs.
 - `docs/API.md`, `docs/CONTRACTS.md`, and `database/README.md`: must stay

@@ -15,13 +15,17 @@ from heimdallr.shared.spool import atomic_write_bytes
 EXTERNAL_SUBMISSION_SIDECAR_SUFFIX = ".submission.json"
 
 DEFAULT_REQUESTED_OUTPUTS = {
-    "include_id_json": True,
-    "include_metadata_json": True,
-    "include_resultados_json": True,
-    "include_report_pdf": True,
-    "include_artifacts_tree": True,
+    "id_json": True,
+    "metadata_json": True,
+    "metrics_json": True,
+    "overlays_png": True,
+    "overlays_dicom": True,
+    "report_pdf": True,
+    "report_pdf_dicom": False,
+    "artifact_instructions_pdf": True,
+    "artifact_instructions_dicom": True,
+    "artifacts_tree": True,
 }
-
 
 def normalize_requested_outputs(raw: dict[str, Any] | None) -> dict[str, bool]:
     normalized = dict(DEFAULT_REQUESTED_OUTPUTS)

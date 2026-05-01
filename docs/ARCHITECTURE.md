@@ -141,13 +141,16 @@ Future extraction should be behavior-driven and tested, not directory-first.
    candidate series, converts DICOM to NIfTI, writes study metadata, and
    enqueues segmentation.
 4. `segmentation` claims the case, resolves the active segmentation profile,
-   selects the target series, runs or reuses TotalSegmentator outputs, writes
-   pipeline state, and enqueues metrics.
+   selects the target series, narrows TotalSegmentator tasks when an external
+   submission requested metrics with declared segmentation requirements, runs
+   or reuses outputs, writes pipeline state, and enqueues metrics.
 5. `metrics` claims the case, resolves the active metrics profile, executes
    enabled jobs and dependencies, writes `metadata/resultados.json`, creates
    artifacts, and enqueues outbound delivery where configured.
 6. `dicom_egress`, `integration.dispatch`, and `integration.delivery` drain
-   their queues independently.
+   their queues independently. External `/jobs` submissions can request a
+   subset of enabled metrics jobs through `requested_metrics_modules` and a
+   subset of returned files through `requested_outputs`.
 7. `control_plane` and `tui` read SQLite and runtime files to expose current
    state to operators.
 8. `space_manager` and `resource_monitor` provide operational guardrails around

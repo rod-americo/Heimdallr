@@ -19,6 +19,11 @@ changes.
   shims for previous integration worker module paths.
 - Added consumer-facing integration contracts under
   `heimdallr/integration/docs/`.
+- Added caller-selectable integration package outputs, including metrics JSON,
+  overlays, report PDF, and report Encapsulated PDF DICOM.
+- Added metrics-to-segmentation task requirements so external requested metrics
+  can avoid unnecessary TotalSegmentator tasks when the active profile declares
+  those requirements.
 
 ### Changed
 
