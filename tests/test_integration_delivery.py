@@ -16,12 +16,6 @@ from heimdallr.integration.submissions import load_external_submission_sidecar
 
 
 class TestJobSubmissionRoute(unittest.TestCase):
-    def test_legacy_delivery_package_reexports_canonical_outbox(self):
-        from heimdallr.integration_delivery import enqueue_case_delivery as legacy_enqueue
-        from heimdallr.integration.delivery import enqueue_case_delivery as canonical_enqueue
-
-        self.assertIs(legacy_enqueue, canonical_enqueue)
-
     def test_submit_job_stores_zip_and_submission_sidecar(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             upload_dir = Path(tmpdir) / "uploads" / "external"

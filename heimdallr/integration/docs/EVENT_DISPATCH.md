@@ -13,9 +13,6 @@ destinations from `config/integration_dispatch.json`.
 .venv/bin/python -m heimdallr.integration.dispatch
 ```
 
-Legacy supervisors may still call `heimdallr.integration_dispatcher`; that path
-is a compatibility shim only.
-
 ## Destination Configuration
 
 Host-local file:

@@ -15,8 +15,7 @@ changes.
 - Added a local DICOM ZIP metadata anonymization helper for host-only smoke
   datasets.
 - Added a GPU segmentation pipeline example for Thor smoke/runtime use.
-- Added canonical `heimdallr.integration` package structure with compatibility
-  shims for previous integration worker module paths.
+- Added canonical `heimdallr.integration` package structure.
 - Added consumer-facing integration contracts under
   `heimdallr/integration/docs/`.
 - Added caller-selectable integration package outputs, including metrics JSON,
@@ -40,6 +39,11 @@ changes.
   not the CPU-first portable example.
 - Consolidated integration documentation around `integration.dispatch`,
   `integration.delivery`, and `integration.submissions`.
+
+### Removed
+
+- Removed legacy `heimdallr.integration_dispatcher` and
+  `heimdallr.integration_delivery` compatibility module paths.
 
 ### Operational Notes
 

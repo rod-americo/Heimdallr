@@ -12,12 +12,6 @@ from heimdallr.shared import settings, store
 
 
 class TestIntegrationDispatchConfig(unittest.TestCase):
-    def test_legacy_dispatcher_package_reexports_canonical_outbox(self):
-        from heimdallr.integration_dispatcher import enqueue_dispatches as legacy_enqueue
-        from heimdallr.integration.dispatch import enqueue_dispatches as canonical_enqueue
-
-        self.assertIs(legacy_enqueue, canonical_enqueue)
-
     def test_build_dispatch_queue_items_filters_destinations_and_merges_env_headers(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             config_path = Path(tmpdir) / "integration_dispatch.json"

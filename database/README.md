@@ -91,11 +91,11 @@ heimdallr.dicom_egress
   ↓
   Claims: pending outbound artifacts and performs DICOM C-STORE delivery
 
-heimdallr.integration_dispatcher
+heimdallr.integration.dispatch
   ↓
   Claims: pending outbound events and performs HTTP POST delivery
 
-heimdallr.integration_delivery
+heimdallr.integration.delivery
   ↓
   Claims: pending completed cases and performs multipart HTTP callback delivery
 ```
