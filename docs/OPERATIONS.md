@@ -14,7 +14,7 @@ configuration. Operators should supervise each resident service separately.
 | Environment | Purpose | Runtime | Notes |
 | --- | --- | --- | --- |
 | `local` | development and focused tests | Python 3.12 `.venv` | May run only one service or tests at a time. |
-| `thor` | POC code-test host | `/home/rodrigo/venvs/totalsegmentator` | Keep Git state equal to local before comparing tests. |
+| `thor` | POC code-test host | `~/Heimdallr/.venv` | Keep Git state equal to local before comparing tests. |
 | `validation` | controlled non-PHI or approved clinical validation | supervised Python `.venv` | Requires DICOM peer config, TotalSegmentator readiness, and documented run notes. |
 | `production-like` | operational host under maintainer control | supervised Python `.venv` | Requires backup, restart policy, network controls, and smoke evidence. |
 
@@ -117,6 +117,12 @@ Ignored host-local config:
 - `config/space_manager.json`
 - `config/resource_monitor.json`
 
+Project presentation default:
+
+- `en_US` is the default artifact and TUI locale.
+- `pt_BR` remains a supported locale for explicit host-local overrides and i18n
+  tests.
+
 ## 5. Minimum Validation
 
 ```bash
@@ -152,9 +158,9 @@ worktree changes on either side.
 Use the current POC venv for code tests:
 
 ```bash
-ssh thor 'cd ~/Heimdallr && /home/rodrigo/venvs/totalsegmentator/bin/python --version'
-ssh thor 'cd ~/Heimdallr && /home/rodrigo/venvs/totalsegmentator/bin/python -m pip check'
-ssh thor 'cd ~/Heimdallr && /home/rodrigo/venvs/totalsegmentator/bin/python scripts/check_runtime_requirements.py'
+ssh thor 'cd ~/Heimdallr && .venv/bin/python --version'
+ssh thor 'cd ~/Heimdallr && .venv/bin/python -m pip check'
+ssh thor 'cd ~/Heimdallr && .venv/bin/python scripts/check_runtime_requirements.py'
 ```
 
 Do not mutate `thor` host config, runtime state, or the POC venv unless the
