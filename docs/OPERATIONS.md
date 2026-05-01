@@ -192,6 +192,20 @@ ssh thor 'cd ~/Heimdallr && .venv/bin/python -m pip check'
 ssh thor 'cd ~/Heimdallr && .venv/bin/python scripts/check_runtime_requirements.py'
 ```
 
+Thor has an NVIDIA RTX 3090 and the in-repository `.venv` has CUDA-capable
+PyTorch. Do not run large smoke segmentation with
+`config/segmentation_pipeline.example.json`, because that example is CPU-first.
+For Thor smoke and resident segmentation, create the ignored host-local config
+from the GPU template:
+
+```bash
+cp config/segmentation_pipeline.gpu.example.json config/segmentation_pipeline.json
+```
+
+Then restart the segmentation worker so it reloads
+`config/segmentation_pipeline.json`. The concrete `config/segmentation_pipeline.json`
+file is host-local and must not be committed.
+
 Do not mutate `thor` host config, runtime state, or the POC venv unless the
 task explicitly calls for host-side changes.
 
