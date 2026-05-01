@@ -116,8 +116,6 @@ assets when present.
 - `heimdallr/shared/spool.py`: atomic spool file operations.
 - `heimdallr/shared/study_manifest.py`: intake manifest fingerprinting.
 - `heimdallr/integration/submissions.py`: `/jobs` payload and sidecar helpers.
-- `heimdallr/integration_dispatcher/` and `heimdallr/integration_delivery/`:
-  legacy compatibility shims for previous module entrypoints.
 
 ### 4.4 Deterministic Domain Logic
 
