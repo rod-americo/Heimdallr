@@ -117,6 +117,11 @@ Ignored host-local config:
 - `config/space_manager.json`
 - `config/resource_monitor.json`
 
+When `resource_monitor` samples services installed as user-scoped systemd
+units, prefix the unit name with `user:` in `config/resource_monitor.json`, for
+example `user:heimdallr-segmentation.service`. Unprefixed names are read from
+the system systemd manager.
+
 Project presentation default:
 
 - `en_US` is the default artifact and TUI locale.
