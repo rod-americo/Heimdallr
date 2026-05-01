@@ -51,8 +51,8 @@ cp config/resource_monitor.example.json config/resource_monitor.json
 .venv/bin/python -m heimdallr.metrics
 .venv/bin/python -m heimdallr.intake
 .venv/bin/python -m heimdallr.dicom_egress
-.venv/bin/python -m heimdallr.integration_dispatcher
-.venv/bin/python -m heimdallr.integration_delivery
+.venv/bin/python -m heimdallr.integration.dispatch
+.venv/bin/python -m heimdallr.integration.delivery
 .venv/bin/python -m heimdallr.space_manager
 .venv/bin/python -m heimdallr.resource_monitor
 ```
@@ -257,8 +257,9 @@ Common failure signals:
 | `heimdallr/segmentation/` | restart segmentation worker. |
 | `heimdallr/metrics/` | restart metrics worker. |
 | `heimdallr/dicom_egress/` | restart DICOM egress worker. |
-| `heimdallr/integration_dispatcher/` | restart integration dispatcher. |
-| `heimdallr/integration_delivery/` | restart integration delivery worker. |
+| `heimdallr/integration/dispatch/` | restart integration dispatch worker. |
+| `heimdallr/integration/delivery/` | restart integration delivery worker. |
+| `heimdallr/integration/submissions.py` | restart control plane and prepare worker. |
 | `heimdallr/control_plane/` or `static/` | restart control plane; browser refresh may be needed. |
 | `config/series_selection.json` | restart prepare/segmentation services that load selection behavior. |
 | host-local pipeline config | restart the affected worker unless the code explicitly reloads it per cycle. |

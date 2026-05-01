@@ -21,7 +21,7 @@ from heimdallr.metrics.artifact_instructions_pdf import (
     build_artifact_instructions_pdf,
     build_artifact_instructions_secondary_capture,
 )
-from heimdallr.integration_delivery import enqueue_case_delivery
+from heimdallr.integration.delivery import enqueue_case_delivery
 from heimdallr.metrics.jobs._dicom_encapsulated_pdf import create_encapsulated_pdf_dicom
 from heimdallr.dicom_egress.config import build_egress_queue_items
 from heimdallr.shared import settings, store

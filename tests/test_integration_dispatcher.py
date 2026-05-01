@@ -6,12 +6,18 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from heimdallr.integration_dispatcher import config as dispatch_config
-from heimdallr.integration_dispatcher import events, worker
+from heimdallr.integration.dispatch import config as dispatch_config
+from heimdallr.integration.dispatch import events, worker
 from heimdallr.shared import settings, store
 
 
 class TestIntegrationDispatchConfig(unittest.TestCase):
+    def test_legacy_dispatcher_package_reexports_canonical_outbox(self):
+        from heimdallr.integration_dispatcher import enqueue_dispatches as legacy_enqueue
+        from heimdallr.integration.dispatch import enqueue_dispatches as canonical_enqueue
+
+        self.assertIs(legacy_enqueue, canonical_enqueue)
+
     def test_build_dispatch_queue_items_filters_destinations_and_merges_env_headers(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             config_path = Path(tmpdir) / "integration_dispatch.json"
@@ -132,7 +138,7 @@ class TestIntegrationDispatchStoreAndWorker(unittest.TestCase):
     def test_dispatch_integration_event_posts_json_and_accepts_202(self):
         response = Mock(status_code=202, text="")
 
-        with patch("heimdallr.integration_dispatcher.worker.requests.request", return_value=response) as request:
+        with patch("heimdallr.integration.dispatch.worker.requests.request", return_value=response) as request:
             returned = worker.dispatch_integration_event(
                 destination_url="http://asha.local/webhooks/patient-identified",
                 http_method="POST",
@@ -153,7 +159,7 @@ class TestIntegrationDispatchStoreAndWorker(unittest.TestCase):
     def test_dispatch_integration_event_raises_on_non_2xx(self):
         response = Mock(status_code=503, text="service unavailable")
 
-        with patch("heimdallr.integration_dispatcher.worker.requests.request", return_value=response):
+        with patch("heimdallr.integration.dispatch.worker.requests.request", return_value=response):
             with self.assertRaises(RuntimeError) as ctx:
                 worker.dispatch_integration_event(
                     destination_url="http://asha.local/webhooks/patient-identified",

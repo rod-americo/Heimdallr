@@ -40,9 +40,9 @@ from zoneinfo import ZoneInfo
 
 from heimdallr.shared import settings
 from heimdallr.shared import store
-from heimdallr.integration_dispatcher.events import build_patient_identified_event
-from heimdallr.integration_dispatcher import enqueue_dispatches
-from heimdallr.shared.external_delivery import (
+from heimdallr.integration.dispatch.events import build_patient_identified_event
+from heimdallr.integration.dispatch import enqueue_dispatches
+from heimdallr.integration.submissions import (
     delete_external_submission_sidecar,
     load_external_submission_sidecar,
     move_external_submission_sidecar,
