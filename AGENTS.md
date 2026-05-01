@@ -101,6 +101,8 @@ same change.
 - `config/metrics_pipeline.json` is host-local. When adding a production
   metrics module, update `config/metrics_pipeline.example.json` in the same
   change.
+- Default presentation locale for this project is `en_US`. Keep `pt_BR` as a
+  supported locale, not as the default.
 - Mutable data belongs in `runtime/` or `database/*.db`, both ignored by Git.
 
 ## 5. Documentation Rules
@@ -137,10 +139,10 @@ If the change affects resident services, document restart impact in
 ## 7. Thor POC Host Protocol
 
 Use `thor` as the POC code-test host when the task requires host-level
-validation. The current known working venv is:
+validation. The current project venv is:
 
 ```text
-/home/rodrigo/venvs/totalsegmentator
+/home/rodrigo/Heimdallr/.venv
 ```
 
 Before comparing test results, local and `thor` must have the same Git branch,

@@ -1,11 +1,11 @@
 {
   "artifacts": {
     "_comment": "Default locale for presentation artifacts such as overlays, burned-in DICOM, and PDFs.",
-    "locale": "pt_BR"
+    "locale": "en_US"
   },
   "tui": {
     "_comment": "Default locale for the operational Textual dashboard.",
-    "locale": "pt_BR"
+    "locale": "en_US"
   },
   "patient_name": {
     "_comment": "Display-only normalization profile. Use 'dicom_caret' when PatientName arrives as 'SURNAME^GIVEN NAMES' and the UI should render it as 'GIVEN NAMES SURNAME'.",
