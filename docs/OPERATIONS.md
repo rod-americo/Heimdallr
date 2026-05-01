@@ -142,6 +142,35 @@ End-to-end smoke is only meaningful when a known non-PHI study, DICOM peer
 configuration, conversion binaries, TotalSegmentator readiness, and compute
 capacity are available.
 
+### Local Smoke Datasets
+
+Large DICOM smoke datasets must stay outside Git. Use ignored runtime storage
+for host-local fixtures:
+
+```bash
+runtime/test_datasets/
+```
+
+On `thor`, the current local smoke fixture is:
+
+```text
+runtime/test_datasets/prometheus_smoke/heimdallr_smoke_001_anonymized.zip
+runtime/test_datasets/prometheus_smoke/heimdallr_smoke_001_manifest.json
+```
+
+It was generated from a local Prometheus ZIP using:
+
+```bash
+.venv/bin/python scripts/anonymize_dicom_zip.py SOURCE.zip \
+  runtime/test_datasets/prometheus_smoke/heimdallr_smoke_001_anonymized.zip \
+  --manifest runtime/test_datasets/prometheus_smoke/heimdallr_smoke_001_manifest.json
+```
+
+The helper performs metadata anonymization, rewrites DICOM UIDs, replaces direct
+patient identifiers with `HEIMDALLR-SMOKE-001` / `Heimdallr^Smoke`, and writes
+safe archive member names. It does not OCR-scrub burned-in pixel text; do not
+publish the output or commit it to the repository.
+
 ### Thor POC Validation
 
 Before using `thor`, ensure local and host Git states match:
