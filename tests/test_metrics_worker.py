@@ -338,7 +338,7 @@ class TestMetricsWorker(unittest.TestCase):
                 {
                     "path": "artifacts/metrics/instructions/artifact_instructions.pdf",
                     "kind": "pdf",
-                    "locale": "pt_BR",
+                    "locale": "en_US",
                 },
             )
             self.assertEqual(
@@ -350,7 +350,7 @@ class TestMetricsWorker(unittest.TestCase):
                     ],
                     "kind": "secondary_capture",
                     "series_instance_uid": "1.2.3.4",
-                    "locale": "pt_BR",
+                    "locale": "en_US",
                 },
             )
 
@@ -360,7 +360,7 @@ class TestMetricsWorker(unittest.TestCase):
                 {
                     "path": "artifacts/metrics/instructions/artifact_instructions.pdf",
                     "kind": "pdf",
-                    "locale": "pt_BR",
+                    "locale": "en_US",
                 },
             )
             self.assertEqual(
@@ -372,7 +372,7 @@ class TestMetricsWorker(unittest.TestCase):
                     ],
                     "kind": "secondary_capture",
                     "series_instance_uid": "1.2.3.4",
-                    "locale": "pt_BR",
+                    "locale": "en_US",
                 },
             )
 
@@ -455,7 +455,7 @@ class TestMetricsWorker(unittest.TestCase):
                 {
                     "path": "artifacts/metrics/instructions/artifact_instructions.dcm",
                     "kind": "encapsulated_pdf",
-                    "locale": "pt_BR",
+                    "locale": "en_US",
                 },
             )
 

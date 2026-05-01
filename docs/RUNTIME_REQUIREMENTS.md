@@ -30,21 +30,23 @@ The current POC test host is:
 thor
 ```
 
-The currently working venv observed on `thor` is:
+The current in-repository POC venv on `thor` is:
 
 ```text
-/home/rodrigo/venvs/totalsegmentator
+/home/rodrigo/Heimdallr/.venv
 ```
 
-Observed read-only baseline:
+Observed baseline:
 
 ```text
 python: 3.12.3
 pip: 24.0
 pip check: No broken requirements found.
+requirements audit: matches requirements.txt
 ```
 
-Important drift from `requirements.txt` observed on the existing POC venv:
+Historical drift observed in the older external POC venv
+`/home/rodrigo/venvs/totalsegmentator`:
 
 | Item | Observed state | Operational interpretation |
 | --- | --- | --- |
@@ -52,8 +54,8 @@ Important drift from `requirements.txt` observed on the existing POC venv:
 | `xgboost==2.1.4` | `3.1.3` installed | The POC venv is newer than the pinned requirement; do not copy this drift into `requirements.txt` without testing affected metrics. |
 | `python-dotenv==1.0.1` | installed as extra | Do not add this to `requirements.txt`; `.env` loading remains outside Heimdallr architecture. |
 
-The existing POC venv can be used for code tests, but it is not byte-for-byte
-equivalent to `requirements.txt`.
+Use `~/Heimdallr/.venv` for new code tests unless the user explicitly asks to
+compare against the older external venv.
 
 ## 3. Git Parity Rule: Local and Thor
 
@@ -106,7 +108,7 @@ Local:
 Thor POC venv:
 
 ```bash
-ssh thor 'cd ~/Heimdallr && /home/rodrigo/venvs/totalsegmentator/bin/python scripts/check_runtime_requirements.py'
+ssh thor 'cd ~/Heimdallr && .venv/bin/python scripts/check_runtime_requirements.py'
 ```
 
 The command exits non-zero when required packages are missing or pinned versions
@@ -116,8 +118,10 @@ important or when `--show-extras` is passed.
 ## 5. Rebuild Procedure
 
 Do not alter the POC host venv unless the user explicitly asks for a rebuild.
-When a new environment is needed, prefer creating a new venv path rather than
-overwriting the known working one.
+The current project venv path on `thor` is `~/Heimdallr/.venv`.
+
+When a separate experimental environment is needed, prefer creating a new venv
+path rather than overwriting the known working one.
 
 Example new environment:
 
@@ -145,5 +149,6 @@ Only promote the new venv after:
 - Do not update pins from a working host venv without confirming code impact.
 - CUDA-related packages are Linux x86_64 specific and are guarded by environment
   markers in `requirements.txt`.
-- If TUI support is required on the POC host, `textual==8.1.1` must be present
-  in the selected venv.
+- TUI support requires `textual==8.1.1` in the selected venv.
+- Default presentation locale is `en_US`; use `pt_BR` only through an explicit
+  host-local override or targeted i18n tests.

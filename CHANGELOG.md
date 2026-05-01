@@ -21,6 +21,7 @@ changes.
   scripts are not present, instead of reconstructing deleted scripts.
 - Updated agent instructions to require Git parity between local worktrees and
   the `thor` POC host before host-side test comparisons.
+- Set `en_US` as the default presentation locale for artifacts and TUI output.
 
 ### Operational Notes
 
