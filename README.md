@@ -265,6 +265,12 @@ Use `scripts/anonymize_dicom_zip.py` to create a metadata-anonymized DICOM ZIP
 for local tests. The helper does not OCR-scrub burned-in pixel text, so generated
 fixtures must not be published or committed.
 
+For Thor GPU smoke, use ignored host-local
+`config/segmentation_pipeline.json` generated from
+`config/segmentation_pipeline.gpu.example.json`. The default
+`config/segmentation_pipeline.example.json` is CPU-first and is not appropriate
+for timing large Thor segmentation runs.
+
 ## Governance
 
 | Resource | Location |

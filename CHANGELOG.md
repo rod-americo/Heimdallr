@@ -14,6 +14,7 @@ changes.
   comparison script.
 - Added a local DICOM ZIP metadata anonymization helper for host-only smoke
   datasets.
+- Added a GPU segmentation pipeline example for Thor smoke/runtime use.
 
 ### Changed
 
@@ -26,6 +27,8 @@ changes.
 - Set `en_US` as the default presentation locale for artifacts and TUI output.
 - Documented ignored `runtime/test_datasets/` usage for large local smoke
   fixtures.
+- Documented that Thor segmentation smoke should use the GPU host-local profile,
+  not the CPU-first portable example.
 
 ### Operational Notes
 
