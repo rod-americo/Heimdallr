@@ -163,9 +163,31 @@ def _host_memory_snapshot() -> dict[str, float | None]:
 
 
 def _systemd_properties(unit: str) -> dict[str, str]:
+    scope = "system"
+    systemd_unit = unit
+    if unit.startswith("user:"):
+        scope = "user"
+        systemd_unit = unit.removeprefix("user:").strip()
+    if not systemd_unit:
+        return {}
+    command = ["systemctl"]
+    if scope == "user":
+        command.append("--user")
+    command.extend(
+        [
+            "show",
+            systemd_unit,
+            "-p",
+            "ActiveState",
+            "-p",
+            "ExecMainPID",
+            "-p",
+            "ControlGroup",
+        ]
+    )
     try:
         output = subprocess.check_output(
-            ["systemctl", "show", unit, "-p", "ActiveState", "-p", "ExecMainPID", "-p", "ControlGroup"],
+            command,
             text=True,
             stderr=subprocess.DEVNULL,
             timeout=5,
