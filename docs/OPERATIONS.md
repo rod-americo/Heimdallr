@@ -1,310 +1,272 @@
-# Operations Runbook
+# Operations
 
-This document provides a baseline for operating Heimdallr in production-like environments.
+This runbook describes the real Heimdallr boot, configuration, runtime state,
+validation, restart, and troubleshooting model.
 
-## Service Topology
+## 1. Purpose
 
-Run as independent services:
+Heimdallr is operated as multiple independent Python services that share a
+single package, SQLite database, runtime filesystem, and host-local
+configuration. Operators should supervise each resident service separately.
 
-1. `python -m heimdallr.control_plane` (API, dashboard, upload endpoints)
-2. `python -m heimdallr.prepare` (study preparation watchdog)
-3. `python -m heimdallr.segmentation` (segmentation worker)
-4. `python -m heimdallr.metrics` (post-segmentation derived metrics worker)
-5. `python -m heimdallr.intake` (DICOM C-STORE intake)
-6. `python -m heimdallr.integration_dispatcher` (outbound webhook/event delivery)
-7. `python -m heimdallr.integration_delivery` (outbound final package delivery)
-8. `python -m heimdallr.dicom_egress` (outbound DICOM artifact delivery)
-9. `python -m heimdallr.space_manager` (runtime/studies storage reclamation)
-10. `python -m heimdallr.resource_monitor` (resident RAM telemetry sampling)
-11. `python -m heimdallr.tui` (optional operational dashboard)
+## 2. Environments
 
-## Repository File Map
+| Environment | Purpose | Runtime | Notes |
+| --- | --- | --- | --- |
+| `local` | development and focused tests | Python 3.12 `.venv` | May run only one service or tests at a time. |
+| `validation` | controlled non-PHI or approved clinical validation | supervised Python `.venv` | Requires DICOM peer config, TotalSegmentator readiness, and documented run notes. |
+| `production-like` | operational host under maintainer control | supervised Python `.venv` | Requires backup, restart policy, network controls, and smoke evidence. |
 
-### Core Package (`heimdallr/`)
-- `control_plane/`: FastAPI application, routers, and static serving.
-- `intake/gateway.py`: DICOM reception and study spooling.
-- `prepare/worker.py`: Series discovery and DICOM-to-NIfTI conversion.
-- `segmentation/worker.py`: Core segmentation worker logic.
-- `metrics/worker.py`: Post-segmentation derived metrics execution.
-- `integration_dispatcher/worker.py`: Queue-driven outbound webhook dispatcher.
-- `integration_delivery/worker.py`: Queue-driven final package callback worker.
-- `dicom_egress/worker.py`: Queue-driven outbound C-STORE dispatcher.
-- `shared/settings.py`: Centralized runtime settings and binary paths.
+## 3. How to Run
 
-### Configuration and Data
-- `config/`: Pipeline JSON profiles and series selection rules.
-- `database/schema.sql`: SQLite schema for state management.
-- `static/`: Frontend dashboard assets.
-
-
-## Baseline Startup
-
-Single-venv host installation:
+### Local Boot
 
 ```bash
 python3.12 -m venv .venv
 source .venv/bin/activate
+python -m pip install --upgrade pip
 pip install -r requirements.txt
-.venv/bin/totalseg_set_license -l YOUR_LICENSE_KEY
 ```
 
-The unified runtime targets Python 3.12. `dicom2nifti` runs from the Python
-package itself; native GDCM libraries are expected to come from the
-`python-gdcm` wheel inside `.venv`, not from a separate binary under `bin/`.
-
-All supervised services should point to the same interpreter:
-`.venv/bin/python`.
-
-For DICOM peers that only accept JPEG Lossless `Secondary Capture`, keep
-`dcmcjpeg` bundled in `bin/linux-amd64/dcmcjpeg` (or `bin/dcmcjpeg`). Heimdallr
-resolves this binary before falling back to the system `PATH`, and the matching
-upstream notice should live under `bin/licenses/`.
-
-```bash
-# API + Dashboard
-source .venv/bin/activate
-python -m heimdallr.control_plane
-
-# Prepare worker
-source .venv/bin/activate
-python -m heimdallr.prepare
-
-# Segmentation worker
-source .venv/bin/activate
-python -m heimdallr.segmentation
-
-# Metrics worker
-source .venv/bin/activate
-python -m heimdallr.metrics
-
-# DICOM listener
-source .venv/bin/activate
-python -m heimdallr.intake
-
-# Integration dispatch worker
-source .venv/bin/activate
-python -m heimdallr.integration_dispatcher
-
-# Final package delivery worker
-source .venv/bin/activate
-python -m heimdallr.integration_delivery
-
-# DICOM egress worker
-source .venv/bin/activate
-python -m heimdallr.dicom_egress
-
-# Space manager
-source .venv/bin/activate
-python -m heimdallr.space_manager
-
-# Resource monitor
-source .venv/bin/activate
-python -m heimdallr.resource_monitor
-```
-
-## Environment and Config
-
-Configuration is centralized in `heimdallr/shared/settings.py` plus the pipeline JSON profiles under `config/`, and can be overridden via `HEIMDALLR_*` environment variables.
-
-Common examples:
-
-```bash
-export HEIMDALLR_AE_TITLE="HEIMDALLR"
-export HEIMDALLR_DICOM_PORT="11114"
-export HEIMDALLR_IDLE_SECONDS="30"
-export HEIMDALLR_INTEGRATION_DISPATCH_CONFIG="config/integration_dispatch.json"
-export HEIMDALLR_INTEGRATION_DELIVERY_CONFIG="config/integration_delivery.json"
-export HEIMDALLR_DICOM_EGRESS_CONFIG="config/dicom_egress.json"
-export HEIMDALLR_PRESENTATION_CONFIG="config/presentation.json"
-export HEIMDALLR_SEGMENTATION_PIPELINE_CONFIG="config/segmentation_pipeline.json"
-export HEIMDALLR_METRICS_PIPELINE_CONFIG="config/metrics_pipeline.json"
-export HEIMDALLR_SPACE_MANAGER_CONFIG="config/space_manager.json"
-export HEIMDALLR_RESOURCE_MONITOR_CONFIG="config/resource_monitor.json"
-```
-
-Before enabling segmentation, metrics, outbound DICOM delivery, or customizing presentation defaults on a host, create the local config files from the repository examples:
+Create host-local config files from examples when the related service is used:
 
 ```bash
 cp config/segmentation_pipeline.example.json config/segmentation_pipeline.json
 cp config/metrics_pipeline.example.json config/metrics_pipeline.json
-cp config/space_manager.example.json config/space_manager.json
-cp config/resource_monitor.example.json config/resource_monitor.json
 cp config/integration_dispatch.example.json config/integration_dispatch.json
 cp config/integration_delivery.example.json config/integration_delivery.json
 cp config/dicom_egress.example.json config/dicom_egress.json
 cp config/presentation.example.json config/presentation.json
+cp config/space_manager.example.json config/space_manager.json
+cp config/resource_monitor.example.json config/resource_monitor.json
 ```
 
-Only the example templates are tracked in Git. The concrete host-local files
-below are operational config and are ignored by Git:
+### Primary Boot
+
+```bash
+.venv/bin/python -m heimdallr.control_plane
+.venv/bin/python -m heimdallr.prepare
+.venv/bin/python -m heimdallr.segmentation
+.venv/bin/python -m heimdallr.metrics
+.venv/bin/python -m heimdallr.intake
+.venv/bin/python -m heimdallr.dicom_egress
+.venv/bin/python -m heimdallr.integration_dispatcher
+.venv/bin/python -m heimdallr.integration_delivery
+.venv/bin/python -m heimdallr.space_manager
+.venv/bin/python -m heimdallr.resource_monitor
+```
+
+Run each command in its own process supervisor unit, terminal, or container.
+The optional dashboard TUI is:
+
+```bash
+.venv/bin/python -m heimdallr.tui
+```
+
+## 4. Operational Configuration
+
+Configuration is centralized in `heimdallr/shared/settings.py` and JSON files
+under `config/`.
+
+Critical environment variables:
+
+- `HEIMDALLR_SERVER_HOST`
+- `HEIMDALLR_SERVER_PORT`
+- `HEIMDALLR_AE_TITLE`
+- `HEIMDALLR_DICOM_PORT`
+- `HEIMDALLR_DICOM_HANDOFF_MODE`
+- `HEIMDALLR_INTAKE_PIPELINE_CONFIG`
+- `HEIMDALLR_SERIES_SELECTION_CONFIG`
+- `HEIMDALLR_SEGMENTATION_PIPELINE_CONFIG`
+- `HEIMDALLR_METRICS_PIPELINE_CONFIG`
+- `HEIMDALLR_DICOM_EGRESS_CONFIG`
+- `HEIMDALLR_INTEGRATION_DISPATCH_CONFIG`
+- `HEIMDALLR_INTEGRATION_DELIVERY_CONFIG`
+- `HEIMDALLR_PRESENTATION_CONFIG`
+- `HEIMDALLR_SPACE_MANAGER_CONFIG`
+- `HEIMDALLR_RESOURCE_MONITOR_CONFIG`
+- `HEIMDALLR_DCM2NIIX_BIN`
+- `HEIMDALLR_DCMCJPEG_BIN`
+- `TOTALSEGMENTATOR_LICENSE`
+
+Runtime state:
+
+- upload spool: `runtime/intake/uploads/`
+- DICOM intake staging: `runtime/intake/dicom/`
+- queue filesystem state: `runtime/queue/`
+- study outputs: `runtime/studies/<case_id>/`
+- SQLite database: `database/dicom.db`
+- static dashboard assets: `static/`
+
+Tracked config:
+
+- `config/intake_pipeline.json`
+- `config/series_selection.json`
+- `config/*.example.json`
+- `config/doctor.json`
+
+Ignored host-local config:
 
 - `config/segmentation_pipeline.json`
 - `config/metrics_pipeline.json`
-- `config/space_manager.json`
-- `config/resource_monitor.json`
+- `config/dicom_egress.json`
 - `config/integration_dispatch.json`
 - `config/integration_delivery.json`
-- `config/dicom_egress.json`
 - `config/presentation.json`
+- `config/space_manager.json`
+- `config/resource_monitor.json`
 
-For outbound webhook authentication, prefer `headers_from_env` in
-`config/integration_dispatch.json` over hardcoding secrets directly in the
-JSON file.
-
-## End-to-End Pipeline Flow
-
-1. **Intake**: Study arrives via DICOM C-STORE (`intake`), manual `POST /upload`, or external submit `POST /jobs`.
-2. **Spooling**: Files are stored in `runtime/intake/uploads/`.
-3. **Preparation**: `prepare` worker extracts ZIP, enumerates candidate series, converts them to NIfTI via `dcm2niix`, records phase metadata, and creates `metadata/id.json`.
-4. **Segmentation**: `segmentation` worker claims the case, selects the series using `config/series_selection.json`, runs segmentation (e.g., TotalSegmentator), and archives results in `runtime/studies/<CaseID>/derived/`.
-5. **Metrics**: `metrics` worker executes derived calculations (volumetry, density) and updates `metadata/resultados.json`.
-6. **Integration Dispatch**: `prepare` enqueues patient-identified events into `integration_dispatch_queue`, and `integration_dispatcher` delivers them to configured HTTP endpoints.
-7. **Final Package Delivery**: `metrics` enqueues externally submitted cases into `integration_delivery_queue`, and `integration_delivery` pushes `manifest.json` + `package.zip` to the per-job callback URL.
-8. **DICOM Egress**: `metrics` enqueues generated DICOM artifacts into `dicom_egress_queue`, and `dicom_egress` delivers them to configured remote SCP destinations.
-9. **Storage Reclamation**: `space_manager` periodically checks filesystem usage and, above threshold, deletes the oldest non-active case directories under `runtime/studies/` while marking them as purged in SQLite.
-10. **Delivery**: Dashboard and APIs serve the final structured data and images.
-
-External submitters may also pass `requested_metrics_modules` in `POST /jobs`.
-When present, the `metrics` worker filters the active profile to that subset
-and expands any explicit job dependencies automatically.
-
-## Data Contracts
-
-### `metadata/id.json`
-Contains study-level metadata, CaseID, and series selection audit trail.
-
-### `metadata/resultados.json`
-The primary output for clinical consumption. Includes:
-- `modality` and `body_regions`.
-- Organ volumetry and quantification.
-- Derived metrics (attenuation, indices).
-- Metadata for post-segmentation jobs.
-
-### SQLite (`database/dicom.db`)
-Central state for all studies, tracking pipeline stage, patient demographics, and calculated summaries.
-
-Queue tables include:
-- `segmentation_queue`
-- `metrics_queue`
-- `integration_dispatch_queue`
-- `integration_delivery_queue`
-- `dicom_egress_queue`
-
-
-## OCR De-identification Dependency
-
-For OCR-driven de-identification review before external model calls:
-
-1. Install Python package: `pip install pytesseract`
-2. Install system binary: `tesseract` (`brew install tesseract` or `apt-get install tesseract-ocr`)
-3. Default behavior: `DEID_OCR_ACTION=block` (external call is blocked when text is detected)
-
-If OCR dependencies are not installed, the gateway reports `ocr_available=false` in `deid` telemetry.
-
-## PACS Connectivity Checks
-
-Expected defaults:
-
-- AE Title: `HEIMDALLR`
-- Port: `11114`
-- Protocol: DICOM C-STORE
-
-Quick smoke test using DCMTK:
+## 5. Minimum Validation
 
 ```bash
-dcmsend localhost 11114 -aec HEIMDALLR test.dcm
+python3 scripts/check_project_gate.py && python3 scripts/project_doctor.py && python3 scripts/project_doctor.py --audit-config
 ```
 
-## Health and Monitoring Checks
+Additional checks by change type:
 
-1. `http://localhost:8001/docs` responds.
-2. Listener accepts inbound C-STORE on port `11114`.
-3. Queue path `upload -> prepare -> segmentation -> metrics` completes for a known study.
-4. If outbound delivery is enabled, `dicom_egress_queue` drains and the remote SCP accepts C-STORE.
-5. GPU capacity is available for segmentation workloads.
+- Python syntax: `.venv/bin/python -m compileall heimdallr scripts tests`
+- Unit tests: `.venv/bin/python -m unittest discover -s tests`
+- Control plane smoke: `curl -fsS http://localhost:8001/docs >/dev/null`
+- DICOM listener smoke: send a known non-PHI DICOM sample with a DCMTK tool such
+  as `dcmsend localhost 11114 -aec HEIMDALLR sample.dcm`
+- SQLite integrity: `sqlite3 database/dicom.db "PRAGMA integrity_check;"`
 
-## Backup and Restore (SQLite)
+End-to-end smoke is only meaningful when a known non-PHI study, DICOM peer
+configuration, conversion binaries, TotalSegmentator readiness, and compute
+capacity are available.
+
+## 6. Logs and Diagnosis
+
+Current logging:
+
+- resident worker stdout/stderr, line-buffered by
+  `settings.configure_service_stdio()`
+- per-case logs under `runtime/studies/<case_id>/logs/` where the worker writes
+  them
+- SQLite queue and status fields
+- resource monitor samples in SQLite
+- supervisor logs from `systemd`, `launchd`, `skuld`, containers, or terminals
+
+Common diagnostic commands:
+
+```bash
+git status --short --branch
+python3 scripts/project_doctor.py
+sqlite3 database/dicom.db ".tables"
+sqlite3 database/dicom.db "SELECT status, count(*) FROM segmentation_queue GROUP BY status;"
+sqlite3 database/dicom.db "SELECT status, count(*) FROM metrics_queue GROUP BY status;"
+sqlite3 database/dicom.db "SELECT status, count(*) FROM dicom_egress_queue GROUP BY status;"
+find runtime/intake/uploads -maxdepth 2 -type f | sort | tail
+find runtime/studies -maxdepth 2 -type d | sort | tail
+```
+
+Common failure signals:
+
+- ZIP remains in upload spool and `prepare` is not running or cannot claim it.
+- queue rows stay `claimed` until claim TTL recovery on restart.
+- `segmentation` fails because TotalSegmentator binary, license, or compute is
+  unavailable.
+- `metrics` skips jobs because masks or required profile inputs are missing.
+- `dicom_egress` retries because the remote SCP rejects association, syntax, or
+  generated artifact type.
+- `integration_delivery` retries because callback URL is unreachable or
+  returns non-2xx.
+
+## 7. Restart Policy
+
+| Change | Restart impact |
+| --- | --- |
+| `heimdallr/shared/settings.py` | restart all resident services that read settings at import. |
+| `heimdallr/shared/store.py` | restart all workers and control plane after schema/queue changes. |
+| `heimdallr/intake/` | restart intake listener. |
+| `heimdallr/prepare/` | restart prepare worker. |
+| `heimdallr/segmentation/` | restart segmentation worker. |
+| `heimdallr/metrics/` | restart metrics worker. |
+| `heimdallr/dicom_egress/` | restart DICOM egress worker. |
+| `heimdallr/integration_dispatcher/` | restart integration dispatcher. |
+| `heimdallr/integration_delivery/` | restart integration delivery worker. |
+| `heimdallr/control_plane/` or `static/` | restart control plane; browser refresh may be needed. |
+| `config/series_selection.json` | restart prepare/segmentation services that load selection behavior. |
+| host-local pipeline config | restart the affected worker unless the code explicitly reloads it per cycle. |
+| docs-only or governance-script changes | no resident service restart. |
+
+Recommended restart order for a full stack restart:
+
+1. stop intake first to prevent new handoffs
+2. stop prepare, segmentation, metrics, delivery, egress, monitors
+3. restart control plane if changed
+4. start prepare, segmentation, metrics, delivery, egress, monitors
+5. start intake last
+
+## 8. Persistence, Backup, and Cleanup
+
+Primary state:
+
+- `database/dicom.db`
+- `runtime/studies/<case_id>/`
+- host-local config files under `config/`
 
 Backup example:
 
 ```bash
-cp database/dicom.db database/dicom_backup_$(date +%Y%m%d_%H%M%S).db
+sqlite3 database/dicom.db ".backup 'database/dicom_backup_$(date +%Y%m%d_%H%M%S).db'"
 ```
 
 Restore example:
 
 ```bash
 cp database/dicom_backup_<timestamp>.db database/dicom.db
-```
-
-Integrity check:
-
-```bash
 sqlite3 database/dicom.db "PRAGMA integrity_check;"
 ```
 
-## Retroactive Recalculation
+Safe cleanup candidates:
 
-Use the batch recalculation script when derived metrics need to be regenerated from existing case outputs:
+- old failed upload ZIPs after investigation
+- generated runtime artifacts only when `space_manager` policy or an operator
+  decision says they are no longer needed
+- local caches outside tracked source
 
-```bash
-source .venv/bin/activate
-.venv/bin/python scripts/retroactive_recalculate_metrics.py --limit 10
-```
+Never remove without explicit intent:
 
-Common variants:
+- `database/dicom.db`
+- host-local config JSON
+- active queue files or active study directories
+- evidence packages for validation runs
 
-- Skip PNG regeneration: `.venv/bin/python scripts/retroactive_recalculate_metrics.py --skip-overlays`
-- Process a specific case: `.venv/bin/python scripts/retroactive_recalculate_metrics.py --case <case_id>`
-- Parallelize cautiously: `.venv/bin/python scripts/retroactive_recalculate_metrics.py --workers 2`
+## 9. Troubleshooting Checklist
 
-Legacy compatibility wrapper:
+1. Confirm which service owns the failing stage.
+2. Confirm the service process is running under the expected `.venv`.
+3. Confirm host-local config exists and is valid JSON.
+4. Check queue status counts in SQLite.
+5. Inspect the relevant case directory under `runtime/studies/<case_id>/`.
+6. Check worker output and per-case logs.
+7. Confirm external dependency reachability: DICOM peer, callback URL,
+   TotalSegmentator binary/license, conversion binaries.
+8. Confirm filesystem permissions for `runtime/` and `database/`.
+9. Run structural validation if docs/contracts were changed.
+10. Capture exact error text before cleaning failed runtime state.
 
-```bash
-.venv/bin/python scripts/retroactive_emphysema.py
-```
+## 10. Operational Scripts
 
-## Incident Triage Shortlist
+| Script | Purpose |
+| --- | --- |
+| `scripts/check_project_gate.py` | Validate repository gate completeness. |
+| `scripts/project_doctor.py` | Validate structural documentation coherence. |
+| `scripts/install_git_hooks.sh` | Opt-in local pre-commit hook installation. |
+| `scripts/retroactive_recalculate_metrics.py` | Regenerate metrics for existing cases. |
+| `scripts/consolidate_metrics_csv.py` | Export metrics database to CSV. |
+| `scripts/extract_prometheus_bmd.py` | Extract BMD values for Prometheus ingestion. |
+| `scripts/update_kvp_retroactive.py` | Backfill kVp values from DICOM metadata. |
+| `scripts/bmd_roi_comparison_preview.py` | Visual preview of BMD ROI placement. |
+| `scripts/retroactive_emphysema.py` | Legacy compatibility wrapper for emphysema recalculation. |
+| `scripts/watch_heimdallr.py` | Filesystem watcher for upload from a drop folder. |
 
-1. Validate service process state and restart order (`control_plane -> prepare -> segmentation -> metrics -> integration_delivery -> dicom_egress -> intake`).
-2. Check PACS destination configuration and network reachability.
-3. Inspect `runtime/intake/` and `runtime/studies/` for stuck or failed studies.
-4. Confirm data storage permissions for the `runtime/` directory.
+## 11. Related Documents
 
-## Maintenance Playbook
-
-- **Adjusting endpoints**: Edit the relevant router under `heimdallr/control_plane/routers/`.
-- **Changing series selection**: Update `config/series_selection.json`.
-- **Adding a clinical metric**: Add a production job under `heimdallr/metrics/jobs/` and enable it in the host-local `config/metrics_pipeline.json`.
-- **Keeping an experimental metric out of the default profile**: Place it under `heimdallr/metrics/jobs/tests/` or `heimdallr/metrics/analysis/` and use an explicit `jobs[].module` override only in host-local config.
-- **Changing segmentation tasks or CPU/GPU/threading policy**: Update the host-local `config/segmentation_pipeline.json` created from `config/segmentation_pipeline.example.json`.
-- **Changing enabled metrics or job parallelism**: Update the host-local `config/metrics_pipeline.json` created from `config/metrics_pipeline.example.json`.
-- **Changing outbound patient/event webhooks**: Update the host-local `config/integration_dispatch.json` created from `config/integration_dispatch.example.json`.
-- **Changing final package callback retries/timeouts**: Update the host-local `config/integration_delivery.json` created from `config/integration_delivery.example.json`.
-- **Changing storage reclamation policy**: Update the host-local `config/space_manager.json` created from `config/space_manager.example.json`.
-- **Improving intake logic**: Edit `heimdallr/intake/gateway.py`.
-- **Changing outbound DICOM destinations**: Update the host-local `config/dicom_egress.json` created from `config/dicom_egress.example.json`.
-- **Changing locale or patient-name presentation defaults**: Update the host-local `config/presentation.json` created from `config/presentation.example.json`.
-
-## Checklist Before Changes
-- Confirm impact on `id.json` and `resultados.json` consistency.
-- Verify that `runtime/` path permissions are preserved.
-- Test the full automated chain: `intake -> prepare -> segmentation -> metrics -> dicom_egress`.
-
-
-## Incident Severity Model (Suggested)
-
-- `SEV-1`: complete intake/segmentation outage or confirmed data exposure risk
-- `SEV-2`: degraded throughput, repeated failed studies, or unstable report-assist path
-- `SEV-3`: isolated case failure without systemic impact
-
-Suggested response:
-
-1. Open incident log with timestamp, owner, and current impact.
-2. Stabilize service (stop bleed / rollback / isolate dependency).
-3. Capture root cause evidence before cleanup.
-4. Document corrective and preventive actions.
-
-## Safety Reminder
-
-Heimdallr is clinical decision support infrastructure. Automated outputs must be reviewed by qualified professionals before clinical action.
+- Architecture: `docs/ARCHITECTURE.md`
+- Contracts: `docs/CONTRACTS.md`
+- API: `docs/API.md`
+- Database: `database/README.md`
+- Validation stages: `docs/validation-stage-manual.md`
+- Decisions: `docs/DECISIONS.md`
