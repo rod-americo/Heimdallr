@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import requests
+import sys
 import time
 
 from heimdallr.integration_dispatcher.config import (
@@ -17,6 +18,27 @@ from heimdallr.shared import settings, store
 from heimdallr.shared.sqlite import connect as db_connect
 
 settings.configure_service_stdio()
+
+SERVICE_NAME = "integration_dispatcher"
+MODULE_NAME = "integration_dispatcher.worker"
+
+
+def _log_event(
+    level: str,
+    event: str,
+    message: str,
+    **fields: object,
+) -> None:
+    payload = {
+        "lvl": level,
+        "svc": SERVICE_NAME,
+        "mod": MODULE_NAME,
+        "evt": event,
+        "msg": message,
+    }
+    payload.update({key: value for key, value in fields.items() if value is not None})
+    sys.stdout.write(json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n")
+    sys.stdout.flush()
 
 
 def ensure_integration_dispatch_queue_table() -> None:
@@ -133,9 +155,15 @@ def run_dispatch_cycle() -> int:
             attempts_before_claim,
         ) = queue_item
 
-        print(
-            f"[Integration Dispatch] Claimed {event_type} "
-            f"({event_key}) -> {destination_name} for {case_id or 'n/a'}"
+        _log_event(
+            "INFO",
+            "dispatch_claimed",
+            "integration dispatch item claimed",
+            queue_id=queue_id,
+            event_type=event_type,
+            event_key=event_key,
+            case_id=case_id,
+            destination=destination_name,
         )
         try:
             response = dispatch_integration_event(
@@ -150,9 +178,16 @@ def run_dispatch_cycle() -> int:
                 response_status=int(response.status_code),
             )
             processed += 1
-            print(
-                f"[Integration Dispatch] ✓ {event_type} "
-                f"({event_key}) -> {destination_name} [{response.status_code}]"
+            _log_event(
+                "OK",
+                "dispatch_done",
+                "integration dispatch item delivered",
+                queue_id=queue_id,
+                event_type=event_type,
+                event_key=event_key,
+                case_id=case_id,
+                destination=destination_name,
+                response_status=int(response.status_code),
             )
         except Exception as exc:
             config = load_integration_dispatch_config()
@@ -165,15 +200,34 @@ def run_dispatch_cycle() -> int:
                     str(exc),
                     backoff_seconds=retry_backoff_seconds,
                 )
-                print(
-                    f"[Integration Dispatch] Retry {claimed_attempt}/{retry_attempts} "
-                    f"for {event_type} ({event_key}) -> {destination_name}: {exc}"
+                _log_event(
+                    "WARN",
+                    "dispatch_retry",
+                    "integration dispatch item scheduled for retry",
+                    queue_id=queue_id,
+                    event_type=event_type,
+                    event_key=event_key,
+                    case_id=case_id,
+                    destination=destination_name,
+                    retry=claimed_attempt,
+                    max_retries=retry_attempts,
+                    backoff_seconds=retry_backoff_seconds,
+                    err=str(exc),
                 )
             else:
                 mark_integration_dispatch_queue_item_error(queue_id, str(exc))
-                print(
-                    f"[Integration Dispatch] Error for {event_type} "
-                    f"({event_key}) -> {destination_name}: {exc}"
+                _log_event(
+                    "ERR",
+                    "dispatch_fail",
+                    "integration dispatch item failed",
+                    queue_id=queue_id,
+                    event_type=event_type,
+                    event_key=event_key,
+                    case_id=case_id,
+                    destination=destination_name,
+                    retry=claimed_attempt,
+                    max_retries=retry_attempts,
+                    err=str(exc),
                 )
 
 
@@ -186,16 +240,26 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    print("Starting integration dispatch monitoring...")
-    print(f"  Config: {settings.INTEGRATION_DISPATCH_CONFIG_PATH}")
-    print(f"  Scan interval: {settings.INTEGRATION_DISPATCH_SCAN_INTERVAL}s")
+    _log_event(
+        "INFO",
+        "worker_start",
+        "starting integration dispatch monitoring",
+        config_path=str(settings.INTEGRATION_DISPATCH_CONFIG_PATH),
+        scan_interval_seconds=settings.INTEGRATION_DISPATCH_SCAN_INTERVAL,
+        run_once=args.run_once,
+    )
     ensure_integration_dispatch_queue_table()
 
     if args.run_once:
         try:
             run_dispatch_cycle()
         except Exception as exc:
-            print(f"Error in integration dispatch run-once: {exc}")
+            _log_event(
+                "ERR",
+                "run_once_fail",
+                "integration dispatch run-once failed",
+                err=str(exc),
+            )
             return 1
         return 0
 
@@ -206,8 +270,17 @@ def main(argv: list[str] | None = None) -> int:
                 if processed == 0:
                     time.sleep(settings.INTEGRATION_DISPATCH_SCAN_INTERVAL)
             except Exception as exc:
-                print(f"Error in integration dispatch main loop: {exc}")
+                _log_event(
+                    "ERR",
+                    "main_loop_fail",
+                    "integration dispatch main loop failed",
+                    err=str(exc),
+                )
                 time.sleep(settings.INTEGRATION_DISPATCH_SCAN_INTERVAL)
     except KeyboardInterrupt:
-        print("\nStopping integration dispatch monitoring...")
+        _log_event(
+            "INFO",
+            "worker_stop",
+            "stopping integration dispatch monitoring",
+        )
         return 0
