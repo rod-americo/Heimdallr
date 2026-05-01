@@ -14,6 +14,7 @@ configuration. Operators should supervise each resident service separately.
 | Environment | Purpose | Runtime | Notes |
 | --- | --- | --- | --- |
 | `local` | development and focused tests | Python 3.12 `.venv` | May run only one service or tests at a time. |
+| `thor` | POC code-test host | `/home/rodrigo/venvs/totalsegmentator` | Keep Git state equal to local before comparing tests. |
 | `validation` | controlled non-PHI or approved clinical validation | supervised Python `.venv` | Requires DICOM peer config, TotalSegmentator readiness, and documented run notes. |
 | `production-like` | operational host under maintainer control | supervised Python `.venv` | Requires backup, restart policy, network controls, and smoke evidence. |
 
@@ -135,6 +136,30 @@ End-to-end smoke is only meaningful when a known non-PHI study, DICOM peer
 configuration, conversion binaries, TotalSegmentator readiness, and compute
 capacity are available.
 
+### Thor POC Validation
+
+Before using `thor`, ensure local and host Git states match:
+
+```bash
+git status --short --branch
+git rev-parse --short HEAD
+ssh thor 'cd ~/Heimdallr && git status --short --branch && git rev-parse --short HEAD'
+```
+
+Expected: same branch, same upstream target, same commit hash, and no unexpected
+worktree changes on either side.
+
+Use the current POC venv for code tests:
+
+```bash
+ssh thor 'cd ~/Heimdallr && /home/rodrigo/venvs/totalsegmentator/bin/python --version'
+ssh thor 'cd ~/Heimdallr && /home/rodrigo/venvs/totalsegmentator/bin/python -m pip check'
+ssh thor 'cd ~/Heimdallr && /home/rodrigo/venvs/totalsegmentator/bin/python scripts/check_runtime_requirements.py'
+```
+
+Do not mutate `thor` host config, runtime state, or the POC venv unless the
+task explicitly calls for host-side changes.
+
 ## 6. Logs and Diagnosis
 
 Current logging:
@@ -253,6 +278,7 @@ Never remove without explicit intent:
 | --- | --- |
 | `scripts/check_project_gate.py` | Validate repository gate completeness. |
 | `scripts/project_doctor.py` | Validate structural documentation coherence. |
+| `scripts/check_runtime_requirements.py` | Compare active Python environment against `requirements.txt`. |
 | `scripts/install_git_hooks.sh` | Opt-in local pre-commit hook installation. |
 | `scripts/retroactive_recalculate_metrics.py` | Regenerate metrics for existing cases. |
 | `scripts/consolidate_metrics_csv.py` | Export metrics database to CSV. |
@@ -266,6 +292,7 @@ Never remove without explicit intent:
 
 - Architecture: `docs/ARCHITECTURE.md`
 - Contracts: `docs/CONTRACTS.md`
+- Runtime requirements: `docs/RUNTIME_REQUIREMENTS.md`
 - API: `docs/API.md`
 - Database: `database/README.md`
 - Validation stages: `docs/validation-stage-manual.md`
