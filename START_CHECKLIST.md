@@ -56,8 +56,10 @@ what was observed or added during recovery.
   distinct identifiers.
 - [x] Experimental metrics boundaries are documented.
 - [x] LLM/reporting boundaries are documented as out of scope.
-- [ ] End-to-end smoke evidence for a non-PHI sample study is not stored in the
-  repository.
+- [x] End-to-end smoke sample data is kept out of Git under ignored
+  `runtime/test_datasets/`.
+- [ ] End-to-end smoke has not yet been executed against the local anonymized
+  sample on `thor`.
 
 ## 5. Validation
 

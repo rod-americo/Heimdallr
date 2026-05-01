@@ -260,6 +260,11 @@ Full end-to-end smoke requires a known non-PHI study payload, DICOM peer
 configuration, conversion binaries, TotalSegmentator readiness, and enough
 compute capacity. Do not treat unit tests as proof of clinical readiness.
 
+Large smoke datasets are host-local and ignored under `runtime/test_datasets/`.
+Use `scripts/anonymize_dicom_zip.py` to create a metadata-anonymized DICOM ZIP
+for local tests. The helper does not OCR-scrub burned-in pixel text, so generated
+fixtures must not be published or committed.
+
 ## Governance
 
 | Resource | Location |
