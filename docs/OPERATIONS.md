@@ -46,11 +46,11 @@ python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 .venv/bin/totalseg_set_license -l YOUR_LICENSE_KEY
+```
 
 The unified runtime targets Python 3.12. `dicom2nifti` runs from the Python
 package itself; native GDCM libraries are expected to come from the
 `python-gdcm` wheel inside `.venv`, not from a separate binary under `bin/`.
-```
 
 All supervised services should point to the same interpreter:
 `.venv/bin/python`.
@@ -135,7 +135,8 @@ cp config/dicom_egress.example.json config/dicom_egress.json
 cp config/presentation.example.json config/presentation.json
 ```
 
-These six JSON files are host-local operational config and are ignored by Git:
+Only the example templates are tracked in Git. The concrete host-local files
+below are operational config and are ignored by Git:
 
 - `config/segmentation_pipeline.json`
 - `config/metrics_pipeline.json`
