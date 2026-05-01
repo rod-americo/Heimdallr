@@ -73,8 +73,8 @@ Each resident service has its own module entrypoint:
 - `heimdallr/segmentation/__main__.py`
 - `heimdallr/metrics/__main__.py`
 - `heimdallr/dicom_egress/__main__.py`
-- `heimdallr/integration_dispatcher/__main__.py`
-- `heimdallr/integration_delivery/__main__.py`
+- `heimdallr/integration/dispatch/__main__.py`
+- `heimdallr/integration/delivery/__main__.py`
 - `heimdallr/space_manager/__main__.py`
 - `heimdallr/resource_monitor/__main__.py`
 - `heimdallr/tui/__main__.py`
@@ -96,9 +96,9 @@ assets when present.
   deterministic job execution, artifacts, DICOM egress enqueue, final delivery
   enqueue.
 - `heimdallr/dicom_egress/worker.py`: outbound C-STORE retry worker.
-- `heimdallr/integration_dispatcher/worker.py`: outbound JSON event retry
+- `heimdallr/integration/dispatch/worker.py`: outbound JSON event retry
   worker.
-- `heimdallr/integration_delivery/worker.py`: final package callback retry
+- `heimdallr/integration/delivery/worker.py`: final package callback retry
   worker.
 - `heimdallr/space_manager/worker.py`: disk threshold monitor and completed
   study purge.
@@ -115,7 +115,9 @@ assets when present.
 - `heimdallr/shared/sqlite.py`: SQLite connection helper.
 - `heimdallr/shared/spool.py`: atomic spool file operations.
 - `heimdallr/shared/study_manifest.py`: intake manifest fingerprinting.
-- `heimdallr/shared/external_delivery.py`: `/jobs` payload and sidecar helpers.
+- `heimdallr/integration/submissions.py`: `/jobs` payload and sidecar helpers.
+- `heimdallr/integration_dispatcher/` and `heimdallr/integration_delivery/`:
+  legacy compatibility shims for previous module entrypoints.
 
 ### 4.4 Deterministic Domain Logic
 
@@ -144,7 +146,7 @@ Future extraction should be behavior-driven and tested, not directory-first.
 5. `metrics` claims the case, resolves the active metrics profile, executes
    enabled jobs and dependencies, writes `metadata/resultados.json`, creates
    artifacts, and enqueues outbound delivery where configured.
-6. `dicom_egress`, `integration_dispatcher`, and `integration_delivery` drain
+6. `dicom_egress`, `integration.dispatch`, and `integration.delivery` drain
    their queues independently.
 7. `control_plane` and `tui` read SQLite and runtime files to expose current
    state to operators.

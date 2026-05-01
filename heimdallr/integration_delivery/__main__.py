@@ -1,5 +1,7 @@
-"""Module entrypoint for the integration delivery worker."""
+"""Compatibility entrypoint for the integration delivery worker."""
 
-from .worker import main
+from heimdallr.integration.delivery.worker import main
 
-raise SystemExit(main())
+
+if __name__ == "__main__":
+    raise SystemExit(main())

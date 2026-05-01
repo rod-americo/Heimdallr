@@ -9,13 +9,19 @@ from unittest.mock import Mock, patch
 from fastapi.testclient import TestClient
 
 from heimdallr.control_plane.app import create_app
-from heimdallr.integration_delivery import package as delivery_package
-from heimdallr.integration_delivery import worker
+from heimdallr.integration.delivery import package as delivery_package
+from heimdallr.integration.delivery import worker
 from heimdallr.shared import settings, store
-from heimdallr.shared.external_delivery import load_external_submission_sidecar
+from heimdallr.integration.submissions import load_external_submission_sidecar
 
 
 class TestJobSubmissionRoute(unittest.TestCase):
+    def test_legacy_delivery_package_reexports_canonical_outbox(self):
+        from heimdallr.integration_delivery import enqueue_case_delivery as legacy_enqueue
+        from heimdallr.integration.delivery import enqueue_case_delivery as canonical_enqueue
+
+        self.assertIs(legacy_enqueue, canonical_enqueue)
+
     def test_submit_job_stores_zip_and_submission_sidecar(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             upload_dir = Path(tmpdir) / "uploads" / "external"
@@ -123,12 +129,12 @@ class TestIntegrationDeliveryPackageAndWorker(unittest.TestCase):
                 return report_path
 
             with (
-                patch("heimdallr.integration_delivery.package.study_dir", return_value=case_root),
-                patch("heimdallr.integration_delivery.package.study_id_json", return_value=case_root / "metadata" / "id.json"),
-                patch("heimdallr.integration_delivery.package.study_metadata_json", return_value=case_root / "metadata" / "metadata.json"),
-                patch("heimdallr.integration_delivery.package.study_results_json", return_value=case_root / "metadata" / "resultados.json"),
-                patch("heimdallr.integration_delivery.package.study_artifacts_dir", return_value=case_root / "artifacts"),
-                patch("heimdallr.integration_delivery.package.build_case_report", side_effect=_fake_report),
+                patch("heimdallr.integration.delivery.package.study_dir", return_value=case_root),
+                patch("heimdallr.integration.delivery.package.study_id_json", return_value=case_root / "metadata" / "id.json"),
+                patch("heimdallr.integration.delivery.package.study_metadata_json", return_value=case_root / "metadata" / "metadata.json"),
+                patch("heimdallr.integration.delivery.package.study_results_json", return_value=case_root / "metadata" / "resultados.json"),
+                patch("heimdallr.integration.delivery.package.study_artifacts_dir", return_value=case_root / "artifacts"),
+                patch("heimdallr.integration.delivery.package.build_case_report", side_effect=_fake_report),
             ):
                 manifest, package_path = delivery_package.build_delivery_package(
                     case_id="Case123",
@@ -160,7 +166,7 @@ class TestIntegrationDeliveryPackageAndWorker(unittest.TestCase):
             package_path.write_bytes(b"zip")
             manifest = {"package_name": "package.zip"}
 
-            with patch("heimdallr.integration_delivery.worker.requests.request", return_value=response) as request:
+            with patch("heimdallr.integration.delivery.worker.requests.request", return_value=response) as request:
                 returned = worker.deliver_case_package(
                     callback_url="http://receiver.local/callback",
                     http_method="POST",
