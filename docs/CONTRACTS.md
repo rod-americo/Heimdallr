@@ -39,7 +39,8 @@ do not claim clinical readiness.
 | SQLite state | `database/dicom.db` | SQLite | Stores study metadata, queues, delivery state, and resource monitor samples. |
 | DICOM egress items | remote SCP | DICOM C-STORE | Queue worker attempts configured artifact delivery. |
 | Integration dispatch events | external HTTP endpoint | JSON HTTP POST | Delivered when configured destinations accept the event. |
-| Final delivery callback | external submitter | multipart HTTP POST | Sends `manifest.json` and `package.zip` for accepted `/jobs` submissions. |
+| Job status lookup | `GET /jobs/{job_id}` | JSON | Best-effort state for accepted external jobs. |
+| Terminal delivery callback | external submitter | multipart HTTP POST | Sends `case.completed` with `manifest.json` and `package.zip`, or `case.failed` with manifest only. |
 
 ## 4. Identifiers and Keys
 
@@ -95,13 +96,14 @@ The external consumer contract is maintained in
 
 ### Final Delivery
 
-For `/jobs` submissions, the final callback is multipart and includes:
+For `/jobs` submissions, successful final callbacks are multipart and include:
 
 - `manifest.json`
 - `package.zip`
 
-Delivery occurs only after metrics execution reaches the package delivery
-enqueue path.
+Terminal failed callbacks use `event_type=case.failed` and include a multipart
+`manifest.json` without `package.zip`. `GET /jobs/{job_id}` exposes best-effort
+status for accepted jobs while processing and delivery are still in progress.
 
 Outbound event dispatch consumers are documented in
 `heimdallr/integration/docs/EVENT_DISPATCH.md`.

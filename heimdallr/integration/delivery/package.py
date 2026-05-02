@@ -250,3 +250,39 @@ def build_delivery_package(
         "missing_outputs": manifest_in_zip["missing_outputs"],
     }
     return callback_manifest, package_path
+
+
+def build_failed_delivery_manifest(
+    *,
+    job_id: str,
+    case_id: str | None,
+    study_uid: str | None,
+    client_case_id: str | None,
+    source_system: str | None,
+    payload: dict[str, Any] | None,
+) -> dict[str, Any]:
+    failure = payload if isinstance(payload, dict) else {}
+    failure_stage = str(failure.get("failure_stage", "unknown") or "unknown")
+    error = str(failure.get("error", "") or "")[:2000]
+    return {
+        "event_type": "case.failed",
+        "event_version": 1,
+        "event_id": f"case.failed:{job_id}",
+        "job_id": job_id,
+        "case_id": str(case_id or "").strip() or None,
+        "study_instance_uid": study_uid,
+        "client_case_id": client_case_id,
+        "source_system": source_system,
+        "status": "failed",
+        "failure_stage": failure_stage,
+        "error": error,
+        "received_at": failure.get("received_at"),
+        "completed_at": failure.get("failed_at"),
+        "package_name": None,
+        "package_sha256": None,
+        "package_size_bytes": 0,
+        "contents": {},
+        "requested_outputs": {},
+        "delivered_outputs": {},
+        "missing_outputs": [],
+    }

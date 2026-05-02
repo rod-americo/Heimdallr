@@ -39,7 +39,7 @@ Operational dispatch is tracked in five queue tables:
 | `segmentation_queue` | Prepared studies waiting for segmentation |
 | `metrics_queue` | Processed studies waiting for post-segmentation metrics |
 | `integration_dispatch_queue` | Prepared-study events waiting for outbound HTTP delivery |
-| `integration_delivery_queue` | Completed externally submitted studies waiting for final package callback delivery |
+| `integration_delivery_queue` | Terminal externally submitted job callbacks waiting for outbound HTTP delivery |
 | `dicom_egress_queue` | Generated DICOM artifacts waiting for outbound C-STORE delivery |
 
 ### Indexes
@@ -85,7 +85,7 @@ heimdallr.prepare
 
 heimdallr.metrics
   ↓
-  Enqueues: integration_delivery_queue entries for external final package delivery
+  Enqueues: integration_delivery_queue entries for external case.completed delivery
 
 heimdallr.dicom_egress
   ↓
@@ -97,7 +97,7 @@ heimdallr.integration.dispatch
 
 heimdallr.integration.delivery
   ↓
-  Claims: pending completed cases and performs multipart HTTP callback delivery
+  Claims: pending terminal callbacks and performs multipart HTTP delivery
 ```
 
 ## Querying Examples

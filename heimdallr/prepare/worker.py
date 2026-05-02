@@ -42,10 +42,12 @@ from heimdallr.shared import settings
 from heimdallr.shared import store
 from heimdallr.integration.dispatch.events import build_patient_identified_event
 from heimdallr.integration.dispatch import enqueue_dispatches
+from heimdallr.integration.delivery import enqueue_case_failed_delivery
 from heimdallr.integration.submissions import (
     delete_external_submission_sidecar,
     load_external_submission_sidecar,
     move_external_submission_sidecar,
+    update_external_submission_sidecar,
 )
 from heimdallr.shared.patient_names import normalize_patient_name_display
 from heimdallr.shared.paths import (
@@ -1368,11 +1370,35 @@ def process_spooled_zip(zip_path: Path) -> bool:
     """Process a claimed spool ZIP and keep the watchdog alive on failures."""
     intake_manifest = _load_intake_manifest_from_zip(zip_path)
     manifest_study_uid, manifest_digest = _extract_manifest_fingerprint(intake_manifest)
+    external_submission = load_external_submission_sidecar(zip_path)
     try:
         print(f"[Prepare] Claimed upload: {unclaim_path(zip_path).name}")
         process_zip(zip_path)
         return True
     except Exception as exc:
+        if external_submission:
+            failure = {
+                "failure": {
+                    "stage": "prepare",
+                    "error": str(exc)[:2000],
+                    "failed_at": datetime.datetime.now(LOCAL_TZ).isoformat(),
+                }
+            }
+            try:
+                update_external_submission_sidecar(zip_path, failure)
+                external_submission.update(failure)
+            except Exception:
+                pass
+            try:
+                enqueue_case_failed_delivery(
+                    case_id=None,
+                    study_uid=manifest_study_uid or None,
+                    external_delivery=external_submission,
+                    failure_stage="prepare",
+                    error_message=str(exc),
+                )
+            except Exception as delivery_exc:
+                print(f"  [Warning] Failed to enqueue case.failed callback: {delivery_exc}")
         if manifest_study_uid and manifest_digest:
             conn = db_connect()
             try:

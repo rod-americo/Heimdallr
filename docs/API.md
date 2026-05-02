@@ -24,6 +24,7 @@ This document summarizes high-value API contracts used in Heimdallr workflows.
 ### Upload and Tooling
 
 - `POST /jobs`
+- `GET /jobs/{job_id}`
 - `POST /upload`
 - `GET /api/tools/uploader`
 
@@ -40,8 +41,11 @@ This document summarizes high-value API contracts used in Heimdallr workflows.
   selects enabled metrics jobs to run from the active profile
 
 It returns an immediate acceptance payload with `job_id` and `status=queued`.
-When processing finishes, `heimdallr.integration.delivery` performs an outbound
-multipart callback containing `manifest.json` plus `package.zip`.
+`GET /jobs/{job_id}` returns the best available asynchronous status for that
+external job. When processing finishes, `heimdallr.integration.delivery`
+performs an outbound multipart callback. Successful jobs emit `case.completed`
+with `manifest.json` plus `package.zip`; terminal failed jobs emit
+`case.failed` with `manifest.json` and no package.
 The consumer-facing callback contract is documented in
 `heimdallr/integration/docs/JOB_SUBMISSION.md`.
 
@@ -77,4 +81,5 @@ When integrating clients:
 1. API outputs are assistive and must not be used as autonomous diagnosis.
 2. Validation, timeout, and retry behavior should be enforced by calling clients.
 3. Upload handling is asynchronous; a successful `/upload` response means preparation started, not that final metrics are already available.
-4. `/jobs` is also asynchronous; the final result is delivered by server-to-server callback rather than client polling.
+4. `/jobs` is also asynchronous; consumers should treat `GET /jobs/{job_id}` as
+   operational status and the callback as the terminal handoff contract.

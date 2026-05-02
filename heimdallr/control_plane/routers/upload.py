@@ -7,6 +7,7 @@ import json
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from ...shared import settings
+from ...integration.status import external_job_status
 from ...integration.submissions import (
     build_external_submission_payload,
     new_external_job_id,
@@ -117,3 +118,14 @@ async def submit_job(
         "stored_file": upload_name,
         "requested_metrics_modules": submission_payload["requested_metrics_modules"],
     }
+
+
+@router.get("/jobs/{job_id}")
+async def get_job_status(job_id: str):
+    normalized_job_id = str(job_id or "").strip()
+    if not normalized_job_id:
+        raise HTTPException(status_code=400, detail="job_id is required.")
+    status = external_job_status(normalized_job_id)
+    if status is None:
+        raise HTTPException(status_code=404, detail="job_id not found.")
+    return status

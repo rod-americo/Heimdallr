@@ -156,6 +156,7 @@ CREATE TABLE IF NOT EXISTS integration_delivery_queue (
     next_attempt_at TIMESTAMP,
     response_status INTEGER,
     error TEXT,
+    payload_json TEXT,
     UNIQUE(job_id, callback_url)
 );
 
