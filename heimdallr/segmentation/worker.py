@@ -37,6 +37,7 @@ from zoneinfo import ZoneInfo
 
 from heimdallr.shared import settings
 from heimdallr.shared import store
+from heimdallr.integration.delivery import enqueue_case_failed_delivery
 from heimdallr.shared.paths import (
     study_artifacts_dir,
     study_derived_dir,
@@ -58,6 +59,28 @@ _ACTIVE_CHILDREN_LOCK = threading.Lock()
 _SHUTDOWN_EVENT = threading.Event()
 
 # ============================================================
+
+
+def _enqueue_external_failure_if_present(case_id: str, *, failure_stage: str, error_message: str) -> None:
+    try:
+        id_json_path = study_id_json(case_id)
+        if not id_json_path.exists():
+            return
+        with open(id_json_path, "r", encoding="utf-8") as handle:
+            metadata = json.load(handle)
+        external_delivery = metadata.get("ExternalDelivery")
+        if not isinstance(external_delivery, dict):
+            return
+        if enqueue_case_failed_delivery(
+            case_id=case_id,
+            study_uid=str(metadata.get("StudyInstanceUID", "") or "").strip() or None,
+            external_delivery=external_delivery,
+            failure_stage=failure_stage,
+            error_message=error_message,
+        ):
+            print(f"[Integration] Enqueued case.failed callback for {case_id}")
+    except Exception as exc:
+        print(f"[Integration] Warning: failed to enqueue case.failed callback for {case_id}: {exc}")
 # CONFIGURATION
 # ============================================================
 
@@ -411,7 +434,132 @@ def load_segmentation_pipeline_profile() -> tuple[str, dict]:
     return profile_name, profile
 
 
-def resolve_segmentation_plan(modality, selected_phase) -> tuple[str, list[dict]]:
+def load_metrics_pipeline_profile_for_segmentation() -> tuple[str, dict]:
+    """Load metrics profile metadata needed to filter segmentation tasks."""
+    config_path = Path(settings.METRICS_PIPELINE_CONFIG_PATH)
+    with open(config_path, "r", encoding="utf-8") as f:
+        config = json.load(f)
+
+    profiles = config.get("profiles", {})
+    profile_name = settings.METRICS_PIPELINE_PROFILE or config.get("default_profile")
+    if not profile_name:
+        raise RuntimeError(f"Metrics pipeline config has no default_profile: {config_path}")
+    profile = profiles.get(profile_name)
+    if not profile:
+        raise RuntimeError(f"Metrics pipeline profile '{profile_name}' not found in {config_path}")
+    return profile_name, profile
+
+
+def _normalize_job_needs(job: dict) -> list[str]:
+    raw_needs = job.get("needs", [])
+    if raw_needs in (None, ""):
+        return []
+    if not isinstance(raw_needs, list):
+        raise RuntimeError(f"Metrics job '{job.get('name', '<unknown>')}' needs must be a list")
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for item in raw_needs:
+        need = str(item or "").strip()
+        if not need or need in seen:
+            continue
+        normalized.append(need)
+        seen.add(need)
+    return normalized
+
+
+def _normalize_required_segmentation_tasks(job: dict) -> list[str] | None:
+    raw_tasks = job.get("requires_segmentation_tasks")
+    if raw_tasks is None:
+        raw_tasks = job.get("segmentation_tasks")
+    if raw_tasks is None:
+        return None
+    if not isinstance(raw_tasks, list):
+        raise RuntimeError(
+            f"Metrics job '{job.get('name', '<unknown>')}' requires_segmentation_tasks must be a list"
+        )
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for item in raw_tasks:
+        task_name = str(item or "").strip()
+        if not task_name or task_name in seen:
+            continue
+        normalized.append(task_name)
+        seen.add(task_name)
+    return normalized
+
+
+def _requested_segmentation_task_names(requested_job_names: list[str] | None) -> set[str] | None:
+    if not requested_job_names:
+        return None
+
+    _metrics_profile_name, metrics_profile = load_metrics_pipeline_profile_for_segmentation()
+    jobs: list[dict] = []
+    seen_names: set[str] = set()
+    for raw_job in metrics_profile.get("jobs", []):
+        if not raw_job.get("enabled", True):
+            continue
+        job = dict(raw_job)
+        name = str(job.get("name", "") or "").strip()
+        if not name:
+            raise RuntimeError("Metrics job is missing a name")
+        if name in seen_names:
+            raise RuntimeError(f"Metrics profile contains duplicate job '{name}'")
+        seen_names.add(name)
+        job["name"] = name
+        job["needs"] = _normalize_job_needs(job)
+        jobs.append(job)
+
+    jobs_by_name = {job["name"]: job for job in jobs}
+    unknown = [name for name in requested_job_names if name not in jobs_by_name]
+    if unknown:
+        raise RuntimeError(f"Requested metrics job(s) not found in profile: {', '.join(unknown)}")
+
+    resolved_job_names: list[str] = []
+    seen_resolved: set[str] = set()
+
+    def include_job(name: str) -> None:
+        if name in seen_resolved:
+            return
+        for need in jobs_by_name[name]["needs"]:
+            include_job(need)
+        resolved_job_names.append(name)
+        seen_resolved.add(name)
+
+    for name in requested_job_names:
+        include_job(name)
+
+    required_tasks: set[str] = set()
+    for name in resolved_job_names:
+        required = _normalize_required_segmentation_tasks(jobs_by_name[name])
+        if required is None:
+            return None
+        required_tasks.update(required)
+    return required_tasks
+
+
+def _requested_metrics_modules_from_metadata(metadata: dict) -> list[str]:
+    external_delivery = metadata.get("ExternalDelivery", {})
+    if not isinstance(external_delivery, dict):
+        return []
+    raw = external_delivery.get("requested_metrics_modules", [])
+    if not isinstance(raw, list):
+        return []
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        name = str(item or "").strip()
+        if not name or name in seen:
+            continue
+        normalized.append(name)
+        seen.add(name)
+    return normalized
+
+
+def resolve_segmentation_plan(
+    modality,
+    selected_phase,
+    requested_metrics_modules: list[str] | None = None,
+) -> tuple[str, list[dict]]:
     """Resolve the active segmentation profile and enabled tasks for a case."""
     profile_name, profile = load_segmentation_pipeline_profile()
     required = profile.get("required", {})
@@ -429,6 +577,13 @@ def resolve_segmentation_plan(modality, selected_phase) -> tuple[str, list[dict]
         )
 
     tasks = [task for task in profile.get("tasks", []) if task.get("enabled", True)]
+    required_task_names = _requested_segmentation_task_names(requested_metrics_modules)
+    if required_task_names is not None:
+        tasks = [
+            task
+            for task in tasks
+            if str(task.get("name", "") or "").strip() in required_task_names
+        ]
     if not tasks:
         raise RuntimeError(f"Segmentation profile '{profile_name}' has no enabled tasks")
     return profile_name, tasks
@@ -761,12 +916,28 @@ def materialize_canonical_nifti(source_path, final_path):
     return final_path
 
 
-def run_segmentation_pipeline(case_id, modality, selected_phase, nifti_path, case_output, artifacts_dir, log_dir, logger):
+def run_segmentation_pipeline(
+    case_id,
+    modality,
+    selected_phase,
+    nifti_path,
+    case_output,
+    artifacts_dir,
+    log_dir,
+    logger,
+    requested_metrics_modules: list[str] | None = None,
+):
     """Execute the configured segmentation task list for the selected series."""
-    profile_name, tasks = resolve_segmentation_plan(modality, selected_phase)
+    profile_name, tasks = resolve_segmentation_plan(
+        modality,
+        selected_phase,
+        requested_metrics_modules=requested_metrics_modules,
+    )
 
     logger.print(f"[Segmentation] Profile: {profile_name}")
     logger.print(f"[Segmentation] Selected phase: {_normalize_phase(selected_phase)}")
+    if requested_metrics_modules:
+        logger.print(f"[Segmentation] Requested metrics: {', '.join(requested_metrics_modules)}")
     logger.print(f"[Segmentation] Tasks: {', '.join(task['name'] for task in tasks)}")
 
     for task in tasks:
@@ -788,6 +959,7 @@ def run_segmentation_pipeline(case_id, modality, selected_phase, nifti_path, cas
 
     return {
         "profile": profile_name,
+        "requested_metrics_modules": list(requested_metrics_modules or []),
         "tasks": [
             {
                 "name": task["name"],
@@ -1164,6 +1336,7 @@ def segment_case(case_input):
         modality = "CT"
         selected_phase = "unknown"
         study_uid = None
+        requested_metrics_modules: list[str] = []
         id_json_path = study_id_json(case_id)
         if id_json_path.exists():
             try:
@@ -1171,6 +1344,7 @@ def segment_case(case_input):
                     meta = json.load(f)
                 modality = meta.get("Modality", "CT")
                 study_uid = meta.get("StudyInstanceUID")
+                requested_metrics_modules = _requested_metrics_modules_from_metadata(meta)
                 if selection_info is not None:
                     selected_phase = selection_info.get("SelectedPhase", "unknown")
 
@@ -1191,7 +1365,11 @@ def segment_case(case_input):
                 f"Selected series {selection_info['SelectedSeriesNumber']} "
                 f"({selection_info['SelectedPhase']}, {selection_info['SliceCount']} slices)"
             )
-        profile_name, planned_tasks = resolve_segmentation_plan(modality, selected_phase)
+        profile_name, planned_tasks = resolve_segmentation_plan(
+            modality,
+            selected_phase,
+            requested_metrics_modules=requested_metrics_modules,
+        )
         seg_start_time = time.time()
         should_reuse, recorded_elapsed_time = should_reuse_existing_segmentation(
             study_uid,
@@ -1203,6 +1381,7 @@ def segment_case(case_input):
         if should_reuse:
             segmentation_info = {
                 "profile": profile_name,
+                "requested_metrics_modules": list(requested_metrics_modules),
                 "tasks": [
                     {
                         "name": task["name"],
@@ -1230,6 +1409,7 @@ def segment_case(case_input):
                 artifacts_dir=artifacts_dir,
                 log_dir=log_dir,
                 logger=logger,
+                requested_metrics_modules=requested_metrics_modules,
             )
             seg_elapsed = time.time() - seg_start_time
             logger.print(f"[Segmentation] ✓ Complete ({seg_elapsed:.1f}s)")
@@ -1479,17 +1659,33 @@ def main():
                 if ok:
                     mark_segmentation_queue_item_done(queue_id)
                 else:
-                    mark_segmentation_queue_item_error(queue_id, "Case finished with failure return status")
+                    error_message = "Case finished with failure return status"
+                    mark_segmentation_queue_item_error(queue_id, error_message)
+                    _enqueue_external_failure_if_present(
+                        f_path.name,
+                        failure_stage="segmentation",
+                        error_message=error_message,
+                    )
         except WorkerShutdownRequestedError as e:
             if queue_id is not None and retry_segmentation_queue_item(queue_id, e):
                 print(f"[Segmentation] Requeued after worker shutdown: {f_path.name}")
                 return
             if queue_id is not None:
                 mark_segmentation_queue_item_error(queue_id, e)
+                _enqueue_external_failure_if_present(
+                    f_path.name,
+                    failure_stage="segmentation",
+                    error_message=str(e),
+                )
             print(f"Error in case segmentation thread {f_path.name}: {e}")
         except Exception as e:
             if queue_id is not None:
                 mark_segmentation_queue_item_error(queue_id, e)
+                _enqueue_external_failure_if_present(
+                    f_path.name,
+                    failure_stage="segmentation",
+                    error_message=str(e),
+                )
             print(f"Error in case segmentation thread {f_path.name}: {e}")
 
     try:

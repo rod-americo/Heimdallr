@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from heimdallr.integration_dispatcher.config import build_dispatch_queue_items
+from heimdallr.integration.dispatch.config import build_dispatch_queue_items
 from heimdallr.shared import store
 from heimdallr.shared.sqlite import connect as db_connect
 

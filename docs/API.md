@@ -24,6 +24,7 @@ This document summarizes high-value API contracts used in Heimdallr workflows.
 ### Upload and Tooling
 
 - `POST /jobs`
+- `GET /jobs/{job_id}`
 - `POST /upload`
 - `GET /api/tools/uploader`
 
@@ -34,16 +35,25 @@ This document summarizes high-value API contracts used in Heimdallr workflows.
 - `client_case_id`
 - `callback_url`
 - optional `source_system`
-- optional `requested_outputs` JSON
-- optional `requested_metrics_modules` (JSON array or CSV string)
+- optional `requested_outputs` JSON, which selects returned files such as
+  metrics JSON, overlays, report PDF, and report Encapsulated PDF DICOM
+- optional `requested_metrics_modules` (JSON array or CSV string), which
+  selects enabled metrics jobs to run from the active profile
 
 It returns an immediate acceptance payload with `job_id` and `status=queued`.
-When processing finishes, `heimdallr.integration_delivery` performs an outbound
-multipart callback containing `manifest.json` plus `package.zip`.
+`GET /jobs/{job_id}` returns the best available asynchronous status for that
+external job. When processing finishes, `heimdallr.integration.delivery`
+performs an outbound multipart callback. Successful jobs emit `case.completed`
+with `manifest.json` plus `package.zip`; terminal failed jobs emit
+`case.failed` with `manifest.json` and no package.
+The consumer-facing callback contract is documented in
+`heimdallr/integration/docs/JOB_SUBMISSION.md`.
 
 If `requested_metrics_modules` is provided, Heimdallr constrains the case to
 that subset of metrics jobs and automatically includes declared dependencies
-from the active metrics profile.
+from the active metrics profile. When metrics jobs declare
+`requires_segmentation_tasks`, segmentation is also constrained to the required
+TotalSegmentator tasks.
 
 ### Patients and Results
 
@@ -71,4 +81,5 @@ When integrating clients:
 1. API outputs are assistive and must not be used as autonomous diagnosis.
 2. Validation, timeout, and retry behavior should be enforced by calling clients.
 3. Upload handling is asynchronous; a successful `/upload` response means preparation started, not that final metrics are already available.
-4. `/jobs` is also asynchronous; the final result is delivered by server-to-server callback rather than client polling.
+4. `/jobs` is also asynchronous; consumers should treat `GET /jobs/{job_id}` as
+   operational status and the callback as the terminal handoff contract.

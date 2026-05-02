@@ -1,6 +1,7 @@
 import json
 import sqlite3
 import unittest
+from unittest.mock import patch
 
 from heimdallr.shared import store
 from heimdallr.resource_monitor import worker
@@ -151,6 +152,53 @@ class ResourceMonitorWorkerTests(unittest.TestCase):
     def test_parse_proc_stat_major_faults_reads_field(self):
         raw = "123 (python) S 1 2 3 4 5 6 7 8 9 10 11 12"
         self.assertEqual(worker._parse_proc_stat_major_faults(raw), 9)
+
+    def test_systemd_properties_reads_system_unit_by_default(self):
+        with patch.object(worker.subprocess, "check_output", return_value="ActiveState=active\nExecMainPID=123\n") as mocked:
+            props = worker._systemd_properties("heimdallr-prepare.service")
+
+        self.assertEqual(props["ActiveState"], "active")
+        self.assertEqual(props["ExecMainPID"], "123")
+        mocked.assert_called_once_with(
+            [
+                "systemctl",
+                "show",
+                "heimdallr-prepare.service",
+                "-p",
+                "ActiveState",
+                "-p",
+                "ExecMainPID",
+                "-p",
+                "ControlGroup",
+            ],
+            text=True,
+            stderr=worker.subprocess.DEVNULL,
+            timeout=5,
+        )
+
+    def test_systemd_properties_reads_user_unit_when_prefixed(self):
+        with patch.object(worker.subprocess, "check_output", return_value="ActiveState=active\nExecMainPID=456\n") as mocked:
+            props = worker._systemd_properties("user:heimdallr-prepare.service")
+
+        self.assertEqual(props["ActiveState"], "active")
+        self.assertEqual(props["ExecMainPID"], "456")
+        mocked.assert_called_once_with(
+            [
+                "systemctl",
+                "--user",
+                "show",
+                "heimdallr-prepare.service",
+                "-p",
+                "ActiveState",
+                "-p",
+                "ExecMainPID",
+                "-p",
+                "ControlGroup",
+            ],
+            text=True,
+            stderr=worker.subprocess.DEVNULL,
+            timeout=5,
+        )
 
 
 if __name__ == "__main__":
