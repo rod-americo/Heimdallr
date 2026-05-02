@@ -110,7 +110,7 @@ FastAPI dashboard/API + optional Textual TUI
 | `heimdallr.tui` | operational support tool | Reads SQLite/process state for live operations. |
 | `heimdallr.space_manager` | operational guardrail | Purges completed study artifacts when configured disk thresholds are exceeded. |
 | `heimdallr.resource_monitor` | operational telemetry | Samples service and case memory state into SQLite. |
-| `heimdallr.deid_gateway` and LLM-related settings/deps | boundary hotspot | Existing compatibility residue around external model calls; do not expand here. Move future intelligence work to Asha. |
+| LLM-related settings/deps | boundary hotspot | Existing compatibility residue around external model calls; do not expand here. Keep future intelligence work in Asha. |
 
 ## Repository Layout
 

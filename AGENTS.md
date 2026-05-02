@@ -49,8 +49,8 @@ Do not add or revive:
 - advanced assisted report conversion routines for external model APIs
 
 Those responsibilities belong to Asha. Existing compatibility residue around
-external model settings or de-identification must not be expanded in this
-repository without an explicit architectural decision.
+external model settings must not be expanded in this repository without an
+explicit architectural decision.
 
 ## 3. Layer and Module Rules
 
