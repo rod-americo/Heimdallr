@@ -55,6 +55,14 @@ class TestJobSubmissionRoute(unittest.TestCase):
                 ["l3_muscle_area", "bone_health_l1_hu"],
             )
 
+            with patch.object(settings, "UPLOAD_EXTERNAL_DIR", upload_dir):
+                status_response = client.get(f"/jobs/{body['job_id']}")
+            self.assertEqual(status_response.status_code, 200)
+            status_body = status_response.json()
+            self.assertEqual(status_body["job_id"], body["job_id"])
+            self.assertEqual(status_body["status"], "queued")
+            self.assertEqual(status_body["client_case_id"], "external-123")
+
 
 class TestIntegrationDeliveryStore(unittest.TestCase):
     def test_enqueue_claim_and_complete_delivery_queue_item(self):
@@ -89,6 +97,35 @@ class TestIntegrationDeliveryStore(unittest.TestCase):
             ).fetchone()
             self.assertEqual(row["status"], "done")
             self.assertEqual(row["response_status"], 202)
+        finally:
+            conn.close()
+
+    def test_enqueue_claim_failed_delivery_queue_item_keeps_payload(self):
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        try:
+            store.ensure_schema(conn)
+            store.enqueue_integration_delivery(
+                conn,
+                job_id="job-failed",
+                event_type="case.failed",
+                event_version=1,
+                case_id="CaseFailed",
+                study_uid="1.2.3",
+                client_case_id="external-123",
+                source_system="partner_a",
+                callback_url="http://receiver.local/callback",
+                http_method="POST",
+                timeout_seconds=120,
+                requested_outputs={},
+                payload={"failure_stage": "metrics", "error": "boom"},
+            )
+
+            claimed = store.claim_next_pending_integration_delivery_queue_item(conn)
+            self.assertIsNotNone(claimed)
+            self.assertEqual(claimed[1], "job-failed")
+            self.assertEqual(claimed[2], "case.failed")
+            self.assertEqual(json.loads(claimed[12])["failure_stage"], "metrics")
         finally:
             conn.close()
 
@@ -263,6 +300,28 @@ class TestIntegrationDeliveryPackageAndWorker(unittest.TestCase):
         self.assertEqual(kwargs["timeout"], 60)
         self.assertIn("manifest", kwargs["files"])
         self.assertIn("package", kwargs["files"])
+
+    def test_deliver_failed_callback_posts_manifest_without_package(self):
+        response = Mock(status_code=202, text="")
+        manifest = {
+            "event_type": "case.failed",
+            "package_name": None,
+            "job_id": "job-failed",
+        }
+
+        with patch("heimdallr.integration.delivery.worker.requests.request", return_value=response) as request:
+            returned = worker.deliver_callback(
+                callback_url="http://receiver.local/callback",
+                http_method="POST",
+                timeout_seconds=60,
+                manifest=manifest,
+            )
+
+        self.assertIs(returned, response)
+        args, kwargs = request.call_args
+        self.assertEqual(args[:2], ("POST", "http://receiver.local/callback"))
+        self.assertIn("manifest", kwargs["files"])
+        self.assertNotIn("package", kwargs["files"])
 
 
 if __name__ == "__main__":

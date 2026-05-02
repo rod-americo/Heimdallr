@@ -21,7 +21,7 @@ from heimdallr.metrics.artifact_instructions_pdf import (
     build_artifact_instructions_pdf,
     build_artifact_instructions_secondary_capture,
 )
-from heimdallr.integration.delivery import enqueue_case_delivery
+from heimdallr.integration.delivery import enqueue_case_delivery, enqueue_case_failed_delivery
 from heimdallr.metrics.jobs._dicom_encapsulated_pdf import create_encapsulated_pdf_dicom
 from heimdallr.dicom_egress.config import build_egress_queue_items
 from heimdallr.shared import settings, store
@@ -41,6 +41,28 @@ JOB_ALLOWED_MODULE_PREFIXES = (
     "heimdallr.metrics.jobs.",
     "heimdallr.metrics.analysis.",
 )
+
+
+def _enqueue_external_failure_if_present(case_id: str, *, failure_stage: str, error_message: str) -> None:
+    try:
+        id_json_path = study_id_json(case_id)
+        if not id_json_path.exists():
+            return
+        with open(id_json_path, "r", encoding="utf-8") as handle:
+            metadata = json.load(handle)
+        external_delivery = metadata.get("ExternalDelivery")
+        if not isinstance(external_delivery, dict):
+            return
+        if enqueue_case_failed_delivery(
+            case_id=case_id,
+            study_uid=str(metadata.get("StudyInstanceUID", "") or "").strip() or None,
+            external_delivery=external_delivery,
+            failure_stage=failure_stage,
+            error_message=error_message,
+        ):
+            print(f"[Integration] Enqueued case.failed callback for {case_id}")
+    except Exception as exc:
+        print(f"[Integration] Warning: failed to enqueue case.failed callback for {case_id}: {exc}")
 
 # Metrics job resolution is intentionally convention-based so operational
 # changes live in config/metrics_pipeline.json instead of this worker:
@@ -1013,10 +1035,21 @@ def main() -> int:
                 if ok:
                     mark_metrics_queue_item_done(queue_id)
                 else:
-                    mark_metrics_queue_item_error(queue_id, "Metrics finished with failure return status")
+                    error_message = "Metrics finished with failure return status"
+                    mark_metrics_queue_item_error(queue_id, error_message)
+                    _enqueue_external_failure_if_present(
+                        case_path.name,
+                        failure_stage="metrics",
+                        error_message=error_message,
+                    )
         except Exception as exc:
             if queue_id is not None:
                 mark_metrics_queue_item_error(queue_id, exc)
+                _enqueue_external_failure_if_present(
+                    case_path.name,
+                    failure_stage="metrics",
+                    error_message=str(exc),
+                )
             print(f"Error in metrics thread {case_path.name}: {exc}")
 
     try:
@@ -1028,7 +1061,13 @@ def main() -> int:
                         queue_id, _, input_path_str = queue_item
                         case_path = Path(input_path_str)
                         if not case_path.exists():
-                            mark_metrics_queue_item_error(queue_id, f"Input path not found: {case_path}")
+                            error_message = f"Input path not found: {case_path}"
+                            mark_metrics_queue_item_error(queue_id, error_message)
+                            _enqueue_external_failure_if_present(
+                                case_path.name,
+                                failure_stage="metrics",
+                                error_message=error_message,
+                            )
                         else:
                             print(f"[Metrics] Claimed queue item: {case_path.name}")
                             _submit_case(case_path, queue_id=queue_id)

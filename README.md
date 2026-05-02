@@ -105,7 +105,7 @@ FastAPI dashboard/API + optional Textual TUI
 | `heimdallr.metrics` | operational, mixed production/experimental surface | Production-facing jobs are enabled through `config/metrics_pipeline.example.json`; experimental jobs must stay opt-in. |
 | `heimdallr.dicom_egress` | operational | Queue-driven C-STORE SCU with retry and compression fallback. |
 | `heimdallr.integration.dispatch` | operational if configured | Delivers patient-identified events to configured HTTP destinations. |
-| `heimdallr.integration.delivery` | operational if configured | Sends final `manifest.json` and `package.zip` callbacks for external submissions. |
+| `heimdallr.integration.delivery` | operational if configured | Sends terminal `case.completed` or `case.failed` callbacks for external submissions. |
 | `heimdallr.control_plane` | operational | FastAPI dashboard, upload ingress, patient/results API, PDF export. Built-in auth is not present. |
 | `heimdallr.tui` | operational support tool | Reads SQLite/process state for live operations. |
 | `heimdallr.space_manager` | operational guardrail | Purges completed study artifacts when configured disk thresholds are exceeded. |

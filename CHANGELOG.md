@@ -23,6 +23,9 @@ changes.
 - Added metrics-to-segmentation task requirements so external requested metrics
   can avoid unnecessary TotalSegmentator tasks when the active profile declares
   those requirements.
+- Added external job status lookup through `GET /jobs/{job_id}`.
+- Added terminal `case.failed` callbacks for externally submitted jobs that
+  fail in prepare, segmentation, or metrics.
 
 ### Changed
 

@@ -16,7 +16,7 @@ from heimdallr.integration.delivery.config import (
     integration_delivery_retry_backoff_seconds,
     load_integration_delivery_config,
 )
-from heimdallr.integration.delivery.package import build_delivery_package
+from heimdallr.integration.delivery.package import build_delivery_package, build_failed_delivery_manifest
 from heimdallr.shared import settings, store
 from heimdallr.shared.sqlite import connect as db_connect
 
@@ -135,6 +135,40 @@ def deliver_case_package(
     )
 
 
+def deliver_callback(
+    *,
+    callback_url: str,
+    http_method: str,
+    timeout_seconds: int,
+    manifest: dict,
+    package_path: str | None = None,
+) -> requests.Response:
+    if package_path:
+        return deliver_case_package(
+            callback_url=callback_url,
+            http_method=http_method,
+            timeout_seconds=timeout_seconds,
+            manifest=manifest,
+            package_path=package_path,
+        )
+    if str(http_method).upper() != "POST":
+        raise RuntimeError(f"Unsupported delivery method: {http_method}")
+    response = requests.request(
+        "POST",
+        callback_url,
+        files={
+            "manifest": ("manifest.json", json.dumps(manifest, ensure_ascii=False), "application/json"),
+        },
+        timeout=max(int(timeout_seconds), 1),
+    )
+    if 200 <= int(response.status_code) < 300:
+        return response
+    body_preview = (response.text or "").strip()[:500]
+    raise RuntimeError(
+        f"HTTP {response.status_code} from {callback_url}: {body_preview or 'empty response body'}"
+    )
+
+
 def run_delivery_cycle() -> int:
     processed = 0
     while True:
@@ -155,6 +189,7 @@ def run_delivery_cycle() -> int:
             http_method,
             timeout_seconds,
             requested_outputs_json,
+            payload_json,
             attempts_before_claim,
         ) = queue_item
 
@@ -171,20 +206,31 @@ def run_delivery_cycle() -> int:
         )
         temp_dir = None
         try:
-            manifest, package_path = build_delivery_package(
-                case_id=case_id,
-                job_id=job_id,
-                client_case_id=client_case_id,
-                source_system=source_system,
-                requested_outputs=json.loads(requested_outputs_json or "{}"),
-            )
-            temp_dir = package_path.parent
-            response = deliver_case_package(
+            if event_type == "case.failed":
+                manifest = build_failed_delivery_manifest(
+                    job_id=job_id,
+                    case_id=case_id,
+                    study_uid=study_uid,
+                    client_case_id=client_case_id,
+                    source_system=source_system,
+                    payload=json.loads(payload_json or "{}"),
+                )
+                package_path = None
+            else:
+                manifest, package_path = build_delivery_package(
+                    case_id=case_id,
+                    job_id=job_id,
+                    client_case_id=client_case_id,
+                    source_system=source_system,
+                    requested_outputs=json.loads(requested_outputs_json or "{}"),
+                )
+                temp_dir = package_path.parent
+            response = deliver_callback(
                 callback_url=callback_url,
                 http_method=http_method,
                 timeout_seconds=int(timeout_seconds),
                 manifest=manifest,
-                package_path=str(package_path),
+                package_path=str(package_path) if package_path else None,
             )
             mark_integration_delivery_queue_item_done(queue_id, response_status=int(response.status_code))
             processed += 1
