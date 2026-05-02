@@ -127,7 +127,6 @@ are concentrated in:
 - metrics jobs under `heimdallr/metrics/jobs/`.
 - analysis helpers under `heimdallr/metrics/analysis/`.
 - patient-name presentation helpers under `heimdallr/shared/patient_names.py`.
-- de-identification helper behavior under `heimdallr/deid_gateway.py`.
 
 Future extraction should be behavior-driven and tested, not directory-first.
 

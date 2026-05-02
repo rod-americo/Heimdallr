@@ -44,6 +44,7 @@ changes.
 
 - Removed legacy `heimdallr.integration_dispatcher` and
   `heimdallr.integration_delivery` compatibility module paths.
+- Moved the external-model de-identification gateway residue to Asha.
 
 ### Operational Notes
 
