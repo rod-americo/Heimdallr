@@ -1,3 +1,4 @@
+import json
 import sqlite3
 import tempfile
 import unittest
@@ -335,6 +336,99 @@ class TestStoreQueueRecovery(unittest.TestCase):
                 max_attempts=2,
             )
             self.assertFalse(requeued)
+            conn.close()
+
+    def test_update_calculation_results_materializes_bone_health_fields(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "dicom.db"
+            conn = _connect_row_db(db_path)
+            store.ensure_schema(conn)
+            conn.execute(
+                """
+                INSERT INTO dicom_metadata (StudyInstanceUID, PatientName, AccessionNumber, StudyDate, Modality)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                ("1.2.3", "Alice Example", "123", "20260502", "CT"),
+            )
+
+            store.update_calculation_results(
+                conn,
+                "1.2.3",
+                {
+                    "metrics": {
+                        "bone_health_l1_hu": {
+                            "status": "done",
+                            "measurement": {
+                                "l1_trabecular_hu_mean": 142.5,
+                                "classification": "osteopenia",
+                                "qc": {"bone_health_qc_pass": True},
+                            },
+                        }
+                    }
+                },
+            )
+
+            row = conn.execute(
+                """
+                SELECT BoneHealthL1TrabecularHuMean, BoneHealthL1Classification, BoneHealthL1QcPass
+                FROM dicom_metadata
+                WHERE StudyInstanceUID = ?
+                """,
+                ("1.2.3",),
+            ).fetchone()
+            self.assertEqual(row["BoneHealthL1TrabecularHuMean"], 142.5)
+            self.assertEqual(row["BoneHealthL1Classification"], "osteopenia")
+            self.assertEqual(row["BoneHealthL1QcPass"], 1)
+            conn.close()
+
+    def test_backfill_materialized_calculation_results_populates_legacy_rows(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "dicom.db"
+            conn = _connect_row_db(db_path)
+            store.ensure_schema(conn)
+            conn.execute(
+                """
+                INSERT INTO dicom_metadata (
+                    StudyInstanceUID, PatientName, AccessionNumber, StudyDate, Modality, CalculationResults
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "1.2.4",
+                    "Bob Example",
+                    "124",
+                    "20260502",
+                    "CT",
+                    json.dumps(
+                        {
+                            "metrics": {
+                                "bone_health_l1_hu": {
+                                    "status": "done",
+                                    "measurement": {
+                                        "l1_trabecular_hu_mean": 88.0,
+                                        "classification": "osteoporosis",
+                                        "qc": {"bone_health_qc_pass": False},
+                                    },
+                                }
+                            }
+                        }
+                    ),
+                ),
+            )
+
+            updated = store.backfill_materialized_calculation_results(conn)
+            self.assertEqual(updated, 1)
+            row = conn.execute(
+                """
+                SELECT BoneHealthL1TrabecularHuMean, BoneHealthL1Classification, BoneHealthL1QcPass
+                FROM dicom_metadata
+                WHERE StudyInstanceUID = ?
+                """,
+                ("1.2.4",),
+            ).fetchone()
+            self.assertEqual(row["BoneHealthL1TrabecularHuMean"], 88.0)
+            self.assertEqual(row["BoneHealthL1Classification"], "osteoporosis")
+            self.assertEqual(row["BoneHealthL1QcPass"], 0)
             conn.close()
 
     def test_claim_next_pending_metrics_queue_item_reclaims_stale_claim(self):

@@ -35,6 +35,9 @@ CREATE TABLE IF NOT EXISTS dicom_metadata (
     Weight REAL,
     Height REAL,
     SMI REAL,
+    BoneHealthL1TrabecularHuMean REAL,
+    BoneHealthL1Classification TEXT,
+    BoneHealthL1QcPass INTEGER,
     SegmentationSeriesInstanceUID TEXT,
     SegmentationSliceCount INTEGER,
     SegmentationProfile TEXT,
@@ -44,6 +47,12 @@ CREATE TABLE IF NOT EXISTS dicom_metadata (
     -- Timestamps
     ProcessedAt TIMESTAMP
 );
+
+CREATE INDEX IF NOT EXISTS idx_dicom_metadata_l1_hu_mean
+ON dicom_metadata(BoneHealthL1TrabecularHuMean);
+
+CREATE INDEX IF NOT EXISTS idx_dicom_metadata_l1_qc_hu
+ON dicom_metadata(BoneHealthL1QcPass, BoneHealthL1TrabecularHuMean);
 
 -- ============================================================
 -- Segmentation Queue: Immediate Dispatch Signaling

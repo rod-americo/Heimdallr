@@ -40,6 +40,9 @@ _DICOM_METADATA_COLUMNS = {
     "SegmentationCompletedAt": "TIMESTAMP",
     "MetricsProfile": "TEXT",
     "MetricsCompletedAt": "TIMESTAMP",
+    "BoneHealthL1TrabecularHuMean": "REAL",
+    "BoneHealthL1Classification": "TEXT",
+    "BoneHealthL1QcPass": "INTEGER",
     "ArtifactsPurged": "INTEGER DEFAULT 0",
     "ArtifactsPurgedAt": "TIMESTAMP",
     "ProcessedAt": "TIMESTAMP",
@@ -420,6 +423,18 @@ def ensure_schema(conn: sqlite3.Connection | None = None) -> None:
     _ensure_columns(cursor, "dicom_egress_queue", _DICOM_EGRESS_QUEUE_COLUMNS)
     _ensure_columns(cursor, "resource_monitor_samples", _RESOURCE_MONITOR_SAMPLE_COLUMNS)
     _ensure_columns(cursor, "study_handoff_state", _STUDY_HANDOFF_COLUMNS)
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_dicom_metadata_l1_hu_mean
+        ON dicom_metadata(BoneHealthL1TrabecularHuMean)
+        """
+    )
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_dicom_metadata_l1_qc_hu
+        ON dicom_metadata(BoneHealthL1QcPass, BoneHealthL1TrabecularHuMean)
+        """
+    )
     conn.commit()
     if owns_connection:
         conn.close()
@@ -434,6 +449,77 @@ def _ensure_columns(cursor: sqlite3.Cursor, table_name: str, columns: dict[str, 
         if name in existing:
             continue
         cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {name} {definition}")
+
+
+def _to_optional_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _to_optional_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _to_optional_int_bool(value: Any) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return int(value)
+    text = str(value).strip().lower()
+    if text in {"1", "true", "yes"}:
+        return 1
+    if text in {"0", "false", "no"}:
+        return 0
+    return None
+
+
+def _extract_bone_health_materialized_fields(results: dict[str, Any] | None) -> dict[str, Any]:
+    metrics = results.get("metrics") if isinstance(results, dict) else None
+    if not isinstance(metrics, dict):
+        return {
+            "BoneHealthL1TrabecularHuMean": None,
+            "BoneHealthL1Classification": None,
+            "BoneHealthL1QcPass": None,
+        }
+
+    bone_health = metrics.get("bone_health_l1_hu")
+    if not isinstance(bone_health, dict) or bone_health.get("status") != "done":
+        return {
+            "BoneHealthL1TrabecularHuMean": None,
+            "BoneHealthL1Classification": None,
+            "BoneHealthL1QcPass": None,
+        }
+
+    measurement = bone_health.get("measurement")
+    if not isinstance(measurement, dict):
+        return {
+            "BoneHealthL1TrabecularHuMean": None,
+            "BoneHealthL1Classification": None,
+            "BoneHealthL1QcPass": None,
+        }
+
+    qc = measurement.get("qc")
+    if not isinstance(qc, dict):
+        qc = {}
+
+    return {
+        "BoneHealthL1TrabecularHuMean": _to_optional_float(
+            measurement.get("l1_trabecular_hu_mean")
+        ),
+        "BoneHealthL1Classification": _to_optional_text(
+            measurement.get("classification")
+        ),
+        "BoneHealthL1QcPass": _to_optional_int_bool(
+            qc.get("bone_health_qc_pass")
+        ),
+    }
 
 
 def upsert_study_metadata(conn: sqlite3.Connection, metadata: dict[str, Any]) -> None:
@@ -2064,11 +2150,64 @@ def update_study_biometrics(
 
 
 def update_calculation_results(conn: sqlite3.Connection, study_uid: str, results: dict[str, Any]) -> None:
+    ensure_schema(conn)
+    materialized = _extract_bone_health_materialized_fields(results)
     conn.execute(
-        "UPDATE dicom_metadata SET CalculationResults = ? WHERE StudyInstanceUID = ?",
-        (json.dumps(results), study_uid),
+        """
+        UPDATE dicom_metadata
+        SET CalculationResults = ?,
+            BoneHealthL1TrabecularHuMean = ?,
+            BoneHealthL1Classification = ?,
+            BoneHealthL1QcPass = ?
+        WHERE StudyInstanceUID = ?
+        """,
+        (
+            json.dumps(results),
+            materialized["BoneHealthL1TrabecularHuMean"],
+            materialized["BoneHealthL1Classification"],
+            materialized["BoneHealthL1QcPass"],
+            study_uid,
+        ),
     )
     conn.commit()
+
+
+def backfill_materialized_calculation_results(conn: sqlite3.Connection) -> int:
+    ensure_schema(conn)
+    rows = conn.execute(
+        """
+        SELECT StudyInstanceUID, CalculationResults
+        FROM dicom_metadata
+        WHERE CalculationResults IS NOT NULL
+          AND TRIM(CalculationResults) != ''
+        """
+    ).fetchall()
+
+    updated = 0
+    for row in rows:
+        try:
+            results = json.loads(row["CalculationResults"])
+        except Exception:
+            continue
+        materialized = _extract_bone_health_materialized_fields(results)
+        conn.execute(
+            """
+            UPDATE dicom_metadata
+            SET BoneHealthL1TrabecularHuMean = ?,
+                BoneHealthL1Classification = ?,
+                BoneHealthL1QcPass = ?
+            WHERE StudyInstanceUID = ?
+            """,
+            (
+                materialized["BoneHealthL1TrabecularHuMean"],
+                materialized["BoneHealthL1Classification"],
+                materialized["BoneHealthL1QcPass"],
+                row["StudyInstanceUID"],
+            ),
+        )
+        updated += 1
+    conn.commit()
+    return updated
 
 
 def list_patient_rows(conn: sqlite3.Connection) -> list[sqlite3.Row]:
