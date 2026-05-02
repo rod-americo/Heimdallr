@@ -11,6 +11,7 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 import numpy as np
+from PIL import Image
 
 from heimdallr.metrics.jobs._bone_job_common import (
     build_l1_sagittal_roi,
@@ -158,6 +159,7 @@ def main() -> int:
         artifacts_dir = study_artifacts_dir(args.case_id)
         ct_path = resolve_canonical_nifti(args.case_id)
         l1_path = artifacts_dir / "total" / "vertebrae_L1.nii.gz"
+        overlay_png_path = metric_dir / "overlay.png"
         overlay_sc_path = metric_dir / "overlay_sc.dcm"
 
         payload["inputs"] = {
@@ -245,8 +247,9 @@ def main() -> int:
 
         artifacts = {"result_json": str(result_path.relative_to(case_dir))}
         dicom_exports: list[dict[str, str]] = []
-        emit_dicom = bool(job_config.get("emit_secondary_capture_dicom", job_config.get("generate_overlay", True)))
-        if emit_dicom:
+        generate_overlay = bool(job_config.get("generate_overlay", True))
+        emit_dicom = bool(job_config.get("emit_secondary_capture_dicom", generate_overlay))
+        if generate_overlay or emit_dicom:
             artifact_locale = resolve_artifact_locale(job_config)
             title, summary_lines = build_overlay_text(
                 hu_mean=slice_stats["mean_hu"],
@@ -262,6 +265,11 @@ def main() -> int:
                 plane_spacing_mm=plane_spacing,
                 source_axis_codes=plane_source_codes,
             )
+            if generate_overlay:
+                Image.fromarray(overlay_rgb).save(overlay_png_path)
+                artifacts["overlay_png"] = str(overlay_png_path.relative_to(case_dir))
+
+        if emit_dicom:
             create_secondary_capture_from_rgb(
                 overlay_rgb,
                 overlay_sc_path,

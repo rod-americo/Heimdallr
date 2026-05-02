@@ -1,5 +1,11 @@
+import json
+import sys
+import tempfile
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
+import nibabel as nib
 import numpy as np
 
 from heimdallr.metrics.analysis.bone_health import (
@@ -15,8 +21,16 @@ from heimdallr.metrics.jobs._bone_job_common import (
     build_l1_sagittal_roi,
     display_aspect_from_spacing_mm,
 )
+from heimdallr.metrics.jobs import bone_health_l1_hu as l1_hu_job
 from heimdallr.metrics.jobs.bone_health_l1_hu import render_sagittal_overlay_rgb
 from heimdallr.metrics.jobs._bone_health_overlay_text import build_overlay_text, hu_mean_color
+from heimdallr.shared import settings
+
+
+def write_nifti(path: Path, data: np.ndarray, spacing=(1.0, 1.0, 1.0)) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    affine = np.diag([spacing[0], spacing[1], spacing[2], 1.0])
+    nib.save(nib.Nifti1Image(data.astype(np.float32), affine), str(path))
 
 
 class TestBoneHealthHelpers(unittest.TestCase):
@@ -202,6 +216,58 @@ class TestBoneHealthHelpers(unittest.TestCase):
         self.assertEqual(len(summary_lines), 1)
         self.assertEqual(summary_lines[0]["text"], "Média: 125 UH")
         self.assertEqual(summary_lines[0]["color"], "#ffd166")
+
+    def test_l1_hu_job_writes_png_overlay_artifact(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            case_id = "CaseBone_20260502_001"
+            case_dir = tmp_path / case_id
+            (case_dir / "metadata").mkdir(parents=True)
+            (case_dir / "derived").mkdir(parents=True)
+            (case_dir / "artifacts" / "total").mkdir(parents=True)
+            (case_dir / "metadata" / "id.json").write_text(
+                json.dumps(
+                    {
+                        "CaseID": case_id,
+                        "Modality": "CT",
+                        "StudyInstanceUID": "1.2.826.0.1.3680043.10.543.1",
+                        "Pipeline": {"series_selection": {"SelectedPhase": "native"}},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (case_dir / "metadata" / "metadata.json").write_text("{}", encoding="utf-8")
+            (case_dir / "metadata" / "resultados.json").write_text("{}", encoding="utf-8")
+
+            ct = np.full((18, 18, 18), 90.0, dtype=np.float32)
+            l1_mask = np.zeros_like(ct, dtype=np.float32)
+            l1_mask[5:13, 4:15, 4:15] = 1.0
+            ct[l1_mask > 0] = 145.0
+
+            write_nifti(case_dir / "derived" / f"{case_id}.nii.gz", ct)
+            write_nifti(case_dir / "artifacts" / "total" / "vertebrae_L1.nii.gz", l1_mask)
+
+            job_config = json.dumps({"generate_overlay": True, "erosion_mm": 1.0, "roi_radius_mm": 2.0})
+            with patch.object(settings, "STUDIES_DIR", tmp_path):
+                with (
+                    patch.object(
+                        sys,
+                        "argv",
+                        ["bone_health_l1_hu", "--case-id", case_id, "--job-config-json", job_config],
+                    ),
+                    patch("builtins.print"),
+                ):
+                    self.assertEqual(l1_hu_job.main(), 0)
+
+            result_path = case_dir / "artifacts" / "metrics" / "bone_health_l1_hu" / "result.json"
+            payload = json.loads(result_path.read_text(encoding="utf-8"))
+            overlay_path = case_dir / payload["artifacts"]["overlay_png"]
+
+            self.assertEqual(payload["status"], "done")
+            self.assertIn("overlay_png", payload["artifacts"])
+            self.assertIn("overlay_sc_dcm", payload["artifacts"])
+            self.assertTrue(overlay_path.exists())
+            self.assertGreater(overlay_path.stat().st_size, 0)
 
 
 if __name__ == "__main__":

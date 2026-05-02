@@ -114,6 +114,10 @@ Supported `requested_outputs` keys:
 | `artifact_instructions_dicom` | `true` | Includes instruction-document DICOM files under `artifacts/metrics/instructions/` when present. |
 | `artifacts_tree` | `true` | Includes every file under `artifacts/metrics/`. Set this to `false` for strictly selected output packages. |
 
+`overlays_png` and `overlays_dicom` are packaging selections. Metric jobs still
+determine which overlay artifacts exist. `bone_health_l1_hu` currently writes
+both `overlay.png` and `overlay_sc.dcm` when overlay generation is enabled.
+
 Boolean-like strings such as `"true"`, `"yes"`, `"on"`, and `"1"` are treated
 as true when the sidecar is normalized.
 

@@ -42,6 +42,8 @@ changes.
   not the CPU-first portable example.
 - Consolidated integration documentation around `integration.dispatch`,
   `integration.delivery`, and `integration.submissions`.
+- Changed `bone_health_l1_hu` overlay generation to write `overlay.png` in
+  addition to `overlay_sc.dcm` when overlays are enabled.
 
 ### Removed
 
