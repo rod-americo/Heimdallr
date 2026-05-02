@@ -44,6 +44,8 @@ changes.
   `integration.delivery`, and `integration.submissions`.
 - Changed `bone_health_l1_hu` overlay generation to write `overlay.png` in
   addition to `overlay_sc.dcm` when overlays are enabled.
+- Clarified that integration consumers must use the delivery manifest, not
+  per-metric result artifacts, as the authoritative ZIP inventory.
 
 ### Removed
 

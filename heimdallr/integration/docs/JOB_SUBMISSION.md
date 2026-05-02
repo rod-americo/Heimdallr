@@ -118,6 +118,14 @@ Supported `requested_outputs` keys:
 determine which overlay artifacts exist. `bone_health_l1_hu` currently writes
 both `overlay.png` and `overlay_sc.dcm` when overlay generation is enabled.
 
+Do not infer delivery contents from `metadata/resultados.json` or per-metric
+`artifacts/metrics/<metric_key>/result.json` files. Those files describe what
+the metric jobs generated for the case. The authoritative delivery inventory is
+the package `manifest.json`, especially `requested_outputs`,
+`delivered_outputs`, and `missing_outputs`. For example, a metric result may
+still list `overlay_sc_dcm` while the delivery ZIP omits it because
+`requested_outputs.overlays_dicom=false`.
+
 Boolean-like strings such as `"true"`, `"yes"`, `"on"`, and `"1"` are treated
 as true when the sidecar is normalized.
 
