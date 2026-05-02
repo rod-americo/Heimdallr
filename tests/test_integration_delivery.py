@@ -149,7 +149,14 @@ class TestIntegrationDeliveryPackageAndWorker(unittest.TestCase):
             (case_root / "metadata" / "metadata.json").write_text("{}", encoding="utf-8")
             (case_root / "metadata" / "resultados.json").write_text('{"metrics":{}}', encoding="utf-8")
             (case_root / "artifacts" / "metrics" / "l3_muscle_area" / "result.json").write_text(
-                "{}",
+                json.dumps(
+                    {
+                        "artifacts": {
+                            "overlay_png": "artifacts/metrics/l3_muscle_area/overlay.png",
+                            "overlay_sc_dcm": "artifacts/metrics/l3_muscle_area/overlay_sc.dcm",
+                        }
+                    }
+                ),
                 encoding="utf-8",
             )
             (case_root / "artifacts" / "metrics" / "l3_muscle_area" / "overlay_sc.dcm").write_bytes(b"dicom")
@@ -264,6 +271,7 @@ class TestIntegrationDeliveryPackageAndWorker(unittest.TestCase):
 
             with zipfile.ZipFile(package_path, "r") as zip_handle:
                 names = set(zip_handle.namelist())
+                package_manifest = json.loads(zip_handle.read("manifest.json").decode("utf-8"))
             self.assertEqual(
                 names,
                 {
@@ -272,6 +280,12 @@ class TestIntegrationDeliveryPackageAndWorker(unittest.TestCase):
                     "artifacts/metrics/l3_muscle_area/result.json",
                 },
             )
+            self.assertNotIn("overlays_png", manifest["delivered_outputs"])
+            self.assertNotIn("overlays_dicom", manifest["delivered_outputs"])
+            self.assertFalse(package_manifest["requested_outputs"]["overlays_png"])
+            self.assertFalse(package_manifest["requested_outputs"]["overlays_dicom"])
+            self.assertNotIn("overlays_png", package_manifest["delivered_outputs"])
+            self.assertNotIn("overlays_dicom", package_manifest["delivered_outputs"])
             self.assertEqual(manifest["delivered_outputs"]["metrics_json"], ["metadata/resultados.json"])
             self.assertEqual(
                 manifest["delivered_outputs"]["metric_result_json"],
