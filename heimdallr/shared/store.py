@@ -58,6 +58,10 @@ _METRICS_QUEUE_COLUMNS = {
     "claim_heartbeat_at": "TIMESTAMP",
 }
 
+_INTEGRATION_DELIVERY_QUEUE_COLUMNS = {
+    "payload_json": "TEXT",
+}
+
 _RESOURCE_MONITOR_SAMPLE_COLUMNS = {
     "subtree_pss_mb": "REAL",
 }
@@ -308,6 +312,7 @@ def ensure_schema(conn: sqlite3.Connection | None = None) -> None:
             next_attempt_at TIMESTAMP,
             response_status INTEGER,
             error TEXT,
+            payload_json TEXT,
             UNIQUE(job_id, callback_url)
         )
         """
@@ -411,6 +416,7 @@ def ensure_schema(conn: sqlite3.Connection | None = None) -> None:
     _ensure_columns(cursor, "dicom_metadata", _DICOM_METADATA_COLUMNS)
     _ensure_columns(cursor, "segmentation_queue", _SEGMENTATION_QUEUE_COLUMNS)
     _ensure_columns(cursor, "metrics_queue", _METRICS_QUEUE_COLUMNS)
+    _ensure_columns(cursor, "integration_delivery_queue", _INTEGRATION_DELIVERY_QUEUE_COLUMNS)
     _ensure_columns(cursor, "dicom_egress_queue", _DICOM_EGRESS_QUEUE_COLUMNS)
     _ensure_columns(cursor, "resource_monitor_samples", _RESOURCE_MONITOR_SAMPLE_COLUMNS)
     _ensure_columns(cursor, "study_handoff_state", _STUDY_HANDOFF_COLUMNS)
@@ -1118,6 +1124,7 @@ def enqueue_integration_delivery(
     http_method: str,
     timeout_seconds: int,
     requested_outputs: dict[str, Any] | None,
+    payload: dict[str, Any] | None = None,
 ) -> None:
     ensure_schema(conn)
     created_at = _now_local_timestamp()
@@ -1142,9 +1149,10 @@ def enqueue_integration_delivery(
             finished_at,
             next_attempt_at,
             response_status,
-            error
+            error,
+            payload_json
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, NULL, NULL, ?, NULL, NULL)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, NULL, NULL, ?, NULL, NULL, ?)
         ON CONFLICT(job_id, callback_url) DO UPDATE SET
             event_type = excluded.event_type,
             event_version = excluded.event_version,
@@ -1162,7 +1170,8 @@ def enqueue_integration_delivery(
             finished_at = NULL,
             next_attempt_at = excluded.next_attempt_at,
             response_status = NULL,
-            error = NULL
+            error = NULL,
+            payload_json = excluded.payload_json
         """,
         (
             str(job_id),
@@ -1178,9 +1187,45 @@ def enqueue_integration_delivery(
             json.dumps(requested_outputs or {}),
             created_at,
             created_at,
+            json.dumps(payload or {}),
         ),
     )
     conn.commit()
+
+
+def get_integration_delivery_rows_for_job(conn: sqlite3.Connection, job_id: str) -> list[sqlite3.Row]:
+    ensure_schema(conn)
+    cursor = conn.execute(
+        """
+        SELECT
+            id,
+            job_id,
+            event_type,
+            event_version,
+            case_id,
+            study_uid,
+            client_case_id,
+            source_system,
+            callback_url,
+            http_method,
+            timeout_seconds,
+            requested_outputs_json,
+            status,
+            attempts,
+            created_at,
+            claimed_at,
+            finished_at,
+            next_attempt_at,
+            response_status,
+            error,
+            payload_json
+        FROM integration_delivery_queue
+        WHERE job_id = ?
+        ORDER BY created_at DESC, id DESC
+        """,
+        (str(job_id),),
+    )
+    return list(cursor.fetchall())
 
 
 def reset_claimed_segmentation_queue_items(conn: sqlite3.Connection) -> int:
@@ -1514,7 +1559,7 @@ def claim_next_pending_integration_dispatch_queue_item(
 
 def claim_next_pending_integration_delivery_queue_item(
     conn: sqlite3.Connection,
-) -> tuple[int, str, str, int, str, str | None, str | None, str | None, str, str, int, str, int] | None:
+) -> tuple[int, str, str, int, str, str | None, str | None, str | None, str, str, int, str, str, int] | None:
     ensure_schema(conn)
     claimed_at = _now_local_timestamp()
     cursor = conn.cursor()
@@ -1534,6 +1579,7 @@ def claim_next_pending_integration_delivery_queue_item(
             http_method,
             timeout_seconds,
             requested_outputs_json,
+            payload_json,
             attempts
         FROM integration_delivery_queue
         WHERE status = 'pending'

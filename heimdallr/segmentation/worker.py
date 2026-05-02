@@ -37,6 +37,7 @@ from zoneinfo import ZoneInfo
 
 from heimdallr.shared import settings
 from heimdallr.shared import store
+from heimdallr.integration.delivery import enqueue_case_failed_delivery
 from heimdallr.shared.paths import (
     study_artifacts_dir,
     study_derived_dir,
@@ -58,6 +59,28 @@ _ACTIVE_CHILDREN_LOCK = threading.Lock()
 _SHUTDOWN_EVENT = threading.Event()
 
 # ============================================================
+
+
+def _enqueue_external_failure_if_present(case_id: str, *, failure_stage: str, error_message: str) -> None:
+    try:
+        id_json_path = study_id_json(case_id)
+        if not id_json_path.exists():
+            return
+        with open(id_json_path, "r", encoding="utf-8") as handle:
+            metadata = json.load(handle)
+        external_delivery = metadata.get("ExternalDelivery")
+        if not isinstance(external_delivery, dict):
+            return
+        if enqueue_case_failed_delivery(
+            case_id=case_id,
+            study_uid=str(metadata.get("StudyInstanceUID", "") or "").strip() or None,
+            external_delivery=external_delivery,
+            failure_stage=failure_stage,
+            error_message=error_message,
+        ):
+            print(f"[Integration] Enqueued case.failed callback for {case_id}")
+    except Exception as exc:
+        print(f"[Integration] Warning: failed to enqueue case.failed callback for {case_id}: {exc}")
 # CONFIGURATION
 # ============================================================
 
@@ -1636,17 +1659,33 @@ def main():
                 if ok:
                     mark_segmentation_queue_item_done(queue_id)
                 else:
-                    mark_segmentation_queue_item_error(queue_id, "Case finished with failure return status")
+                    error_message = "Case finished with failure return status"
+                    mark_segmentation_queue_item_error(queue_id, error_message)
+                    _enqueue_external_failure_if_present(
+                        f_path.name,
+                        failure_stage="segmentation",
+                        error_message=error_message,
+                    )
         except WorkerShutdownRequestedError as e:
             if queue_id is not None and retry_segmentation_queue_item(queue_id, e):
                 print(f"[Segmentation] Requeued after worker shutdown: {f_path.name}")
                 return
             if queue_id is not None:
                 mark_segmentation_queue_item_error(queue_id, e)
+                _enqueue_external_failure_if_present(
+                    f_path.name,
+                    failure_stage="segmentation",
+                    error_message=str(e),
+                )
             print(f"Error in case segmentation thread {f_path.name}: {e}")
         except Exception as e:
             if queue_id is not None:
                 mark_segmentation_queue_item_error(queue_id, e)
+                _enqueue_external_failure_if_present(
+                    f_path.name,
+                    failure_stage="segmentation",
+                    error_message=str(e),
+                )
             print(f"Error in case segmentation thread {f_path.name}: {e}")
 
     try:

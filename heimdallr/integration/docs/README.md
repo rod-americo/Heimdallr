@@ -8,24 +8,26 @@ These contracts describe the current implementation under
 API specification: Heimdallr currently provides asynchronous job submission,
 caller-selected metrics processing, caller-selected final package outputs, and
 configured outbound event dispatch. It does not provide built-in
-authentication, signed webhooks, partner-specific adapters, or a synchronous
-result API for externally submitted jobs.
+authentication, signed webhooks, partner-specific adapters, or synchronous
+result payloads for externally submitted jobs.
 
 ## Current Surfaces
 
 | Surface | Direction | Transport | Current status |
 | --- | --- | --- | --- |
 | External job submission | external app to Heimdallr | `POST /jobs` multipart upload | implemented |
-| Final package delivery | Heimdallr to external app | multipart HTTP `POST` callback | implemented when configured |
+| External job status | external app to Heimdallr | `GET /jobs/{job_id}` JSON | implemented |
+| Terminal job delivery | Heimdallr to external app | multipart HTTP `POST` callback | implemented when configured |
 | Event dispatch | Heimdallr to configured destinations | JSON HTTP `POST` | implemented when configured |
 
 `requested_metrics_modules` controls what Heimdallr runs. `requested_outputs`
-controls what Heimdallr returns.
+controls what Heimdallr returns for `case.completed`. Failed jobs emit
+`case.failed` with a manifest and no package.
 
 ## Contract Files
 
-- `JOB_SUBMISSION.md`: how an external application submits a study and receives
-  the final package callback.
+- `JOB_SUBMISSION.md`: how an external application submits a study, checks job
+  status, and receives terminal callbacks.
 - `EVENT_DISPATCH.md`: how configured consumers receive outbound event payloads
   such as `patient_identified`.
 

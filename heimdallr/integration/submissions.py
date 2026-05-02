@@ -94,6 +94,14 @@ def load_external_submission_sidecar(zip_path: Path) -> dict[str, Any]:
     return raw if isinstance(raw, dict) else {}
 
 
+def update_external_submission_sidecar(zip_path: Path, updates: dict[str, Any]) -> None:
+    payload = load_external_submission_sidecar(zip_path)
+    if not payload:
+        return
+    payload.update(updates)
+    write_external_submission_sidecar(zip_path, payload)
+
+
 def delete_external_submission_sidecar(zip_path: Path) -> None:
     sidecar_path = external_submission_sidecar_path(zip_path)
     if sidecar_path.exists():
