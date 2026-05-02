@@ -9,7 +9,7 @@ import requests
 import sys
 import time
 
-from heimdallr.integration_dispatcher.config import (
+from heimdallr.integration.dispatch.config import (
     integration_dispatch_retry_attempts,
     integration_dispatch_retry_backoff_seconds,
     load_integration_dispatch_config,
@@ -19,8 +19,8 @@ from heimdallr.shared.sqlite import connect as db_connect
 
 settings.configure_service_stdio()
 
-SERVICE_NAME = "integration_dispatcher"
-MODULE_NAME = "integration_dispatcher.worker"
+SERVICE_NAME = "integration_dispatch"
+MODULE_NAME = "integration.dispatch.worker"
 
 
 def _log_event(

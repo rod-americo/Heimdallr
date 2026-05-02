@@ -121,8 +121,8 @@ class TestTuiSnapshot(unittest.TestCase):
 
             case = next(item for item in snapshot.cases if item.case_id == "ReuseCase_20260413_1")
             self.assertEqual(case.stage_key, "processed")
-            self.assertEqual(case.segmentation_elapsed, "reuso (0:03:21)")
-            self.assertEqual(case.signal, "results.json pronto com segmentação reaproveitada")
+            self.assertEqual(case.segmentation_elapsed, "reused (0:03:21)")
+            self.assertEqual(case.signal, "results ready from reused segmentation")
 
     def test_build_snapshot_marks_prepare_duplicate_skip_separately(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -180,8 +180,8 @@ class TestTuiSnapshot(unittest.TestCase):
             )
 
             case = next(item for item in snapshot.cases if item.case_id == "DupCase_20260413_1")
-            self.assertEqual(case.segmentation_elapsed, "duplicata (0:04:12)")
-            self.assertEqual(case.signal, "results.json pronto com duplicata ignorada no preparo")
+            self.assertEqual(case.segmentation_elapsed, "duplicate (0:04:12)")
+            self.assertEqual(case.signal, "results ready from prepare-level duplicate skip")
 
     def test_build_snapshot_marks_ineligible_case_from_pipeline_state(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -237,7 +237,7 @@ class TestTuiSnapshot(unittest.TestCase):
             case = next(item for item in snapshot.cases if item.case_id == "IneligibleCase_20260420_1")
             self.assertEqual(case.stage_key, "ineligible")
             self.assertEqual(case.segmentation_status, "ineligible")
-            self.assertEqual(case.signal, "série inelegível para o perfil")
+            self.assertEqual(case.signal, "series ineligible for the profile")
 
     def test_build_snapshot_classifies_pipeline_state(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -651,7 +651,7 @@ class TestTuiSnapshot(unittest.TestCase):
 
             self.assertEqual(intake_stage.state, "flow")
             self.assertEqual(intake_stage.failed, 0)
-            self.assertIn("2 falhas de intake retidas", intake_stage.notes)
+            self.assertIn("2 intake failures retained", intake_stage.notes)
             self.assertEqual(prepare_stage.state, "flow")
             self.assertEqual(prepare_stage.failed, 0)
             self.assertEqual(len(snapshot.alerts), 1)
@@ -707,18 +707,18 @@ class TestTuiSnapshot(unittest.TestCase):
             intake_stage = next(stage for stage in snapshot.stages if stage.slug == "intake")
             intake_service = next(service for service in snapshot.services if service.slug == "intake")
             space_service = next(service for service in snapshot.services if service.slug == "space_manager")
-            self.assertIn("handoff após 10m sem novas imagens", intake_stage.notes)
+            self.assertIn("handoff after 10m without new images", intake_stage.notes)
             self.assertTrue(
                 any(
-                    note.startswith("janela de silêncio restante estimada:")
+                    note.startswith("estimated quiet-window remaining:")
                     for note in intake_stage.notes
                 )
             )
-            self.assertTrue(intake_service.details[0].startswith("PID 111 • ativo há 1:23 • última imagem há 2m"))
-            self.assertRegex(intake_service.details[0], r"handoff em [78]m$")
+            self.assertTrue(intake_service.details[0].startswith("PID 111 • up 1:23 • last image 2m ago"))
+            self.assertRegex(intake_service.details[0], r"handoff in [78]m$")
             self.assertEqual(
                 space_service.details[0],
-                "PID 222 • ativo há 2:34 • livre 64.0GB",
+                "PID 222 • up 2:34 • free 64.0GB",
             )
 
 

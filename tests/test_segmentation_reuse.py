@@ -134,6 +134,81 @@ class TestSegmentationReuse(unittest.TestCase):
         self.assertEqual(profile_name, "ct_native_segmentation_only")
         self.assertEqual(tasks, [{"name": "total", "enabled": True}])
 
+    def test_resolve_segmentation_plan_filters_tasks_for_requested_metrics(self):
+        segmentation_profile = {
+            "required": {"modality": "CT", "selected_phase": ["native"]},
+            "tasks": [
+                {"name": "total", "enabled": True, "output_dir": "artifacts/total"},
+                {"name": "tissue_types", "enabled": True, "output_dir": "artifacts/tissue_types"},
+            ],
+        }
+        metrics_profile = {
+            "jobs": [
+                {
+                    "name": "bone_health_l1_hu",
+                    "enabled": True,
+                    "requires_segmentation_tasks": ["total"],
+                },
+                {
+                    "name": "l3_muscle_area",
+                    "enabled": True,
+                    "requires_segmentation_tasks": ["total", "tissue_types"],
+                },
+            ],
+        }
+        with (
+            patch(
+                "heimdallr.segmentation.worker.load_segmentation_pipeline_profile",
+                return_value=("ct_native_segmentation_only", segmentation_profile),
+            ),
+            patch(
+                "heimdallr.segmentation.worker.load_metrics_pipeline_profile_for_segmentation",
+                return_value=("ct_native_basic_metrics", metrics_profile),
+            ),
+        ):
+            _profile_name, tasks = resolve_segmentation_plan(
+                "CT",
+                "native",
+                requested_metrics_modules=["bone_health_l1_hu"],
+            )
+
+        self.assertEqual([task["name"] for task in tasks], ["total"])
+
+    def test_resolve_segmentation_plan_keeps_tissue_types_when_requested_metric_needs_it(self):
+        segmentation_profile = {
+            "required": {"modality": "CT", "selected_phase": ["native"]},
+            "tasks": [
+                {"name": "total", "enabled": True, "output_dir": "artifacts/total"},
+                {"name": "tissue_types", "enabled": True, "output_dir": "artifacts/tissue_types"},
+            ],
+        }
+        metrics_profile = {
+            "jobs": [
+                {
+                    "name": "l3_muscle_area",
+                    "enabled": True,
+                    "requires_segmentation_tasks": ["total", "tissue_types"],
+                },
+            ],
+        }
+        with (
+            patch(
+                "heimdallr.segmentation.worker.load_segmentation_pipeline_profile",
+                return_value=("ct_native_segmentation_only", segmentation_profile),
+            ),
+            patch(
+                "heimdallr.segmentation.worker.load_metrics_pipeline_profile_for_segmentation",
+                return_value=("ct_native_basic_metrics", metrics_profile),
+            ),
+        ):
+            _profile_name, tasks = resolve_segmentation_plan(
+                "CT",
+                "native",
+                requested_metrics_modules=["l3_muscle_area"],
+            )
+
+        self.assertEqual([task["name"] for task in tasks], ["total", "tissue_types"])
+
     def test_record_segmentation_pipeline_state_closes_failed_stage(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             id_json_path = Path(tmpdir) / "id.json"

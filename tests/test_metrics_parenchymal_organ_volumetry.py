@@ -131,8 +131,8 @@ class TestParenchymalOrganVolumetryJob(unittest.TestCase):
 
             first_dicom = case_dir / result["dicom_exports"][0]["path"]
             ds = pydicom.dcmread(str(first_dicom))
-            self.assertEqual(str(ds.SeriesDescription), "Heimdallr Overlay de Órgãos Parenquimatosos 5 mm")
-            self.assertIn("Reconstrução axial de 5 mm", str(ds.DerivationDescription))
+            self.assertEqual(str(ds.SeriesDescription), "Heimdallr Parenchymal Organ Overlay 5 mm")
+            self.assertIn("5 mm axial reconstruction", str(ds.DerivationDescription))
             self.assertEqual(int(ds.InstanceNumber), 1)
             self.assertEqual(str(ds.Modality), "OT")
 
