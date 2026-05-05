@@ -28,7 +28,10 @@ DEFAULT_REQUESTED_OUTPUTS = {
 }
 
 def normalize_requested_outputs(raw: dict[str, Any] | None) -> dict[str, bool]:
-    normalized = dict(DEFAULT_REQUESTED_OUTPUTS)
+    if raw is None:
+        return dict(DEFAULT_REQUESTED_OUTPUTS)
+
+    normalized = {key: False for key in DEFAULT_REQUESTED_OUTPUTS}
     if not isinstance(raw, dict):
         return normalized
     for key in tuple(DEFAULT_REQUESTED_OUTPUTS):

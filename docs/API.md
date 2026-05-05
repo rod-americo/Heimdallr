@@ -49,6 +49,10 @@ with `manifest.json` plus `package.zip`; terminal failed jobs emit
 The consumer-facing callback contract is documented in
 `heimdallr/integration/docs/JOB_SUBMISSION.md`.
 
+When `requested_outputs` is provided, omitted output keys are treated as
+`false`. Consumers should request every file type they expect in the final
+package.
+
 If `requested_metrics_modules` is provided, Heimdallr constrains the case to
 that subset of metrics jobs and automatically includes declared dependencies
 from the active metrics profile. When metrics jobs declare

@@ -91,6 +91,10 @@ Optional fields:
   declared `requires_segmentation_tasks` values can narrow the segmentation
   task set before metrics run.
 
+If `requested_outputs` is present, omitted output keys are `false`. If the
+field is omitted entirely, Heimdallr keeps the legacy default completion
+package.
+
 The external consumer contract is maintained in
 `heimdallr/integration/docs/JOB_SUBMISSION.md`.
 
