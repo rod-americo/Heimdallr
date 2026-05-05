@@ -1,0 +1,99 @@
+name: heimdallr-api
+
+x-heimdallr-common: &heimdallr-common
+  image: heimdallr-api:local
+  build:
+    context: .
+    dockerfile: Dockerfile.api
+    args:
+      HEIMDALLR_BAKE_TOTALSEG_WEIGHTS: ${HEIMDALLR_BAKE_TOTALSEG_WEIGHTS:-true}
+      HEIMDALLR_TOTALSEG_WEIGHTS_TASKS: ${HEIMDALLR_TOTALSEG_WEIGHTS_TASKS:-total_fast}
+      HEIMDALLR_TOTALSEG_BIG_SHAPE_SLICES: ${HEIMDALLR_TOTALSEG_BIG_SHAPE_SLICES:-3000}
+  restart: unless-stopped
+  working_dir: /app
+  environment: &heimdallr-env
+    HEIMDALLR_SERVER_HOST: 0.0.0.0
+    HEIMDALLR_SERVER_PORT: 8001
+    HEIMDALLR_DCM2NIIX_BIN: /app/bin/linux-amd64/dcm2niix
+    HEIMDALLR_DCMCJPEG_BIN: /app/bin/linux-amd64/dcmcjpeg
+    HEIMDALLR_TOTALSEG_BIN_DIR: /usr/local/bin
+    HEIMDALLR_TOTALSEGMENTATOR_BIN: /usr/local/bin/TotalSegmentator
+    HEIMDALLR_TOTALSEG_GET_PHASE_BIN: /usr/local/bin/totalseg_get_phase
+    TOTALSEG_HOME_DIR: /opt/totalsegmentator/config
+    TOTALSEG_WEIGHTS_PATH: /opt/totalsegmentator/weights
+    TOTALSEGMENTATOR_LICENSE: ${TOTALSEGMENTATOR_LICENSE:-}
+  volumes:
+    - ./runtime:/app/runtime
+    - ./database:/app/database
+    - ./config:/app/config:ro
+    - heimdallr-totalseg-config:/opt/totalsegmentator/config
+
+services:
+  control-plane:
+    <<: *heimdallr-common
+    container_name: heimdallr-control-plane
+    command: ["python", "-m", "heimdallr.control_plane"]
+    ports:
+      - "${HEIMDALLR_API_PORT:-8001}:8001"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8001/docs >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  prepare:
+    <<: *heimdallr-common
+    container_name: heimdallr-prepare
+    command: ["python", "-m", "heimdallr.prepare"]
+    depends_on:
+      - control-plane
+
+  segmentation:
+    <<: *heimdallr-common
+    container_name: heimdallr-segmentation
+    command: ["python", "-m", "heimdallr.segmentation"]
+    devices:
+      - /dev/nvidia0:/dev/nvidia0
+      - /dev/nvidiactl:/dev/nvidiactl
+      - /dev/nvidia-uvm:/dev/nvidia-uvm
+    volumes:
+      - ./runtime:/app/runtime
+      - ./database:/app/database
+      - ./config:/app/config:ro
+      - heimdallr-totalseg-config:/opt/totalsegmentator/config
+      - /usr/lib/x86_64-linux-gnu/libcuda.so.1:/usr/lib/x86_64-linux-gnu/libcuda.so.1:ro
+      - /usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1:/usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1:ro
+    shm_size: 8gb
+    depends_on:
+      - prepare
+
+  metrics:
+    <<: *heimdallr-common
+    container_name: heimdallr-metrics
+    command: ["python", "-m", "heimdallr.metrics"]
+    depends_on:
+      - segmentation
+
+  integration-delivery:
+    <<: *heimdallr-common
+    container_name: heimdallr-integration-delivery
+    command: ["python", "-m", "heimdallr.integration.delivery"]
+    depends_on:
+      - metrics
+
+  space-manager:
+    <<: *heimdallr-common
+    container_name: heimdallr-space-manager
+    command: ["python", "-m", "heimdallr.space_manager"]
+    profiles:
+      - maintenance
+
+  resource-monitor:
+    <<: *heimdallr-common
+    container_name: heimdallr-resource-monitor
+    command: ["python", "-m", "heimdallr.resource_monitor"]
+    profiles:
+      - monitoring
+
+volumes:
+  heimdallr-totalseg-config:
