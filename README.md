@@ -226,6 +226,19 @@ under `config/`.
 See [`docs/OPERATIONS.md`](docs/OPERATIONS.md) for the full runtime and restart
 model.
 
+## API Container Scope
+
+The experimental API container stack is documented in
+[`docs/CONTAINER_API.md`](docs/CONTAINER_API.md). It includes the control plane,
+prepare, segmentation, metrics, and integration delivery services. It
+intentionally excludes DICOM C-STORE intake, DICOM egress, and integration
+dispatch.
+
+Build and GPU validation should be done on `thor`, where Docker and the POC GPU
+environment are available. The image is Python 3.12-based and can bake
+TotalSegmentator weights for the requested task set; by default it bakes
+`total_fast`, matching the current Thor POC `total --fast` profile.
+
 ## Contracts and Boundaries
 
 Canonical contracts are documented in [`docs/CONTRACTS.md`](docs/CONTRACTS.md).
@@ -288,6 +301,7 @@ for timing large Thor segmentation runs.
 | Architecture | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
 | Contracts | [`docs/CONTRACTS.md`](docs/CONTRACTS.md) |
 | Operations | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) |
+| API container stack | [`docs/CONTAINER_API.md`](docs/CONTAINER_API.md) |
 | Runtime requirements | [`docs/RUNTIME_REQUIREMENTS.md`](docs/RUNTIME_REQUIREMENTS.md) |
 | Decisions | [`docs/DECISIONS.md`](docs/DECISIONS.md) |
 | API contracts | [`docs/API.md`](docs/API.md) |

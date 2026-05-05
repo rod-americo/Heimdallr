@@ -1,0 +1,54 @@
+# VCS and local development state
+.git/
+.github/
+.githooks/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Python build/test caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Local environments and model caches
+.venv/
+.venv-totalseg/
+venv/
+env/
+ENV/
+models/
+TotalSegmentator/
+
+# Mutable runtime and PHI-bearing state
+runtime/
+database/*.db
+database/*.db-*
+*.nii.gz
+*.dcm
+*.zip
+!docs/branding/fonts/*.zip
+*.log
+
+# Host-local configuration. Keep examples and tracked defaults available.
+config/*.json
+!config/*.example.json
+!config/intake_pipeline.json
+!config/series_selection.json
+!config/doctor.json
+
+# Local scratch and non-runtime reports
+.tmp/
+.tmp_liver_segments_copy/
+docs/poc/

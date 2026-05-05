@@ -64,6 +64,16 @@ The optional dashboard TUI is:
 .venv/bin/python -m heimdallr.tui
 ```
 
+### API Container Stack
+
+The API-scoped container stack is documented separately in
+`docs/CONTAINER_API.md`. That stack includes control plane, prepare,
+segmentation, metrics, and integration delivery. It intentionally excludes DICOM
+C-STORE intake, DICOM egress, and integration dispatch.
+
+Build the image on `thor` for the current POC because the image build can bake
+TotalSegmentator weights and the host has the GPU runtime used for validation.
+
 ## 4. Operational Configuration
 
 Configuration is centralized in `heimdallr/shared/settings.py` and JSON files
@@ -349,6 +359,7 @@ Never remove without explicit intent:
 
 - Architecture: `docs/ARCHITECTURE.md`
 - Contracts: `docs/CONTRACTS.md`
+- API container stack: `docs/CONTAINER_API.md`
 - Runtime requirements: `docs/RUNTIME_REQUIREMENTS.md`
 - API: `docs/API.md`
 - Database: `database/README.md`

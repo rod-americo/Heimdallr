@@ -1,0 +1,74 @@
+# syntax=docker/dockerfile:1.7
+
+FROM python:3.12-slim-bookworm
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+ENV PIP_NO_CACHE_DIR=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    HEIMDALLR_SERVER_HOST=0.0.0.0 \
+    HEIMDALLR_SERVER_PORT=8001 \
+    HEIMDALLR_DCM2NIIX_BIN=/app/bin/linux-amd64/dcm2niix \
+    HEIMDALLR_DCMCJPEG_BIN=/app/bin/linux-amd64/dcmcjpeg \
+    HEIMDALLR_TOTALSEG_BIN_DIR=/usr/local/bin \
+    HEIMDALLR_TOTALSEGMENTATOR_BIN=/usr/local/bin/TotalSegmentator \
+    HEIMDALLR_TOTALSEG_GET_PHASE_BIN=/usr/local/bin/totalseg_get_phase \
+    TOTALSEG_HOME_DIR=/opt/totalsegmentator/config \
+    TOTALSEG_WEIGHTS_PATH=/opt/totalsegmentator/weights
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        ffmpeg \
+        libgl1 \
+        libglib2.0-0 \
+        libsm6 \
+        libxext6 \
+        libxrender1 \
+        procps \
+        xvfb \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt pyproject.toml README.md LICENSE.md NOTICE.md /app/
+
+ARG HEIMDALLR_TOTALSEG_BIG_SHAPE_SLICES=3000
+
+RUN python -m pip install --upgrade pip setuptools wheel \
+    && python -m pip install -r /app/requirements.txt \
+    && python -c "from pathlib import Path; p=Path('/usr/local/lib/python3.12/site-packages/totalsegmentator/nnunet.py'); text=p.read_text(); old='512*512*1000'; new='512*512*${HEIMDALLR_TOTALSEG_BIG_SHAPE_SLICES}'; assert old in text, 'TotalSegmentator big-shape guard not found'; p.write_text(text.replace(old, new, 1))" \
+    && mkdir -p /app/runtime /app/database "${TOTALSEG_HOME_DIR}" "${TOTALSEG_WEIGHTS_PATH}"
+
+ARG HEIMDALLR_BAKE_TOTALSEG_WEIGHTS=true
+ARG HEIMDALLR_TOTALSEG_WEIGHTS_TASKS=total_fast
+
+RUN if [ "${HEIMDALLR_BAKE_TOTALSEG_WEIGHTS}" = "true" ]; then \
+        old_ifs="${IFS}"; \
+        IFS=','; \
+        for task in ${HEIMDALLR_TOTALSEG_WEIGHTS_TASKS}; do \
+            task="$(printf '%s' "${task}" | tr -d '[:space:]')"; \
+            if [ -n "${task}" ]; then \
+                totalseg_download_weights --task "${task}"; \
+            fi; \
+        done; \
+        IFS="${old_ifs}"; \
+    fi
+
+COPY heimdallr /app/heimdallr
+COPY static /app/static
+COPY bin /app/bin
+COPY config/*.example.json config/intake_pipeline.json config/series_selection.json /app/config/
+COPY database/schema.sql database/README.md /app/database/
+
+RUN chmod +x /app/bin/linux-amd64/dcm2niix /app/bin/linux-amd64/dcmcjpeg /app/bin/linux-amd64/dcmcjpeg.bin \
+    && python -m pip install --no-deps /app \
+    && python -m compileall -q /app/heimdallr \
+    && find /usr/local/lib/python3.12 -type d -name __pycache__ -prune -exec rm -rf {} + 2>/dev/null || true \
+    && find /usr/local/lib/python3.12 -type f \( -name "*.pyc" -o -name "*.pyo" \) -delete
+
+EXPOSE 8001
+
+CMD ["python", "-m", "heimdallr.control_plane"]
