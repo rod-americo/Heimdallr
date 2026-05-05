@@ -269,6 +269,57 @@ class TestBoneHealthHelpers(unittest.TestCase):
             self.assertTrue(overlay_path.exists())
             self.assertGreater(overlay_path.stat().st_size, 0)
 
+    def test_l1_hu_job_writes_diagnostic_overlay_when_roi_is_empty(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            case_id = "CaseBone_20260502_002"
+            case_dir = tmp_path / case_id
+            (case_dir / "metadata").mkdir(parents=True)
+            (case_dir / "derived").mkdir(parents=True)
+            (case_dir / "artifacts" / "total").mkdir(parents=True)
+            (case_dir / "metadata" / "id.json").write_text(
+                json.dumps(
+                    {
+                        "CaseID": case_id,
+                        "Modality": "CT",
+                        "StudyInstanceUID": "1.2.826.0.1.3680043.10.543.2",
+                        "Pipeline": {"series_selection": {"SelectedPhase": "native"}},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (case_dir / "metadata" / "metadata.json").write_text("{}", encoding="utf-8")
+            (case_dir / "metadata" / "resultados.json").write_text("{}", encoding="utf-8")
+
+            ct = np.full((18, 18, 18), 90.0, dtype=np.float32)
+            l1_mask = np.zeros_like(ct, dtype=np.float32)
+            l1_mask[7:11, 7:11, 7:11] = 1.0
+
+            write_nifti(case_dir / "derived" / f"{case_id}.nii.gz", ct)
+            write_nifti(case_dir / "artifacts" / "total" / "vertebrae_L1.nii.gz", l1_mask)
+
+            job_config = json.dumps({"generate_overlay": True, "erosion_mm": 20.0})
+            with patch.object(settings, "STUDIES_DIR", tmp_path):
+                with (
+                    patch.object(
+                        sys,
+                        "argv",
+                        ["bone_health_l1_hu", "--case-id", case_id, "--job-config-json", job_config],
+                    ),
+                    patch("builtins.print"),
+                ):
+                    self.assertEqual(l1_hu_job.main(), 0)
+
+            result_path = case_dir / "artifacts" / "metrics" / "bone_health_l1_hu" / "result.json"
+            payload = json.loads(result_path.read_text(encoding="utf-8"))
+            overlay_path = case_dir / payload["artifacts"]["overlay_png"]
+
+            self.assertEqual(payload["status"], "done")
+            self.assertEqual(payload["measurement"]["job_status"], "empty_eroded_mask")
+            self.assertIn("overlay_png", payload["artifacts"])
+            self.assertTrue(overlay_path.exists())
+            self.assertGreater(overlay_path.stat().st_size, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
