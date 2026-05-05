@@ -25,6 +25,8 @@ templates, also read:
 
 - `database/README.md`
 - `database/schema.sql`
+- `docs/CONTAINER_API.md` when changing API container scope, Dockerfiles, or
+  compose services
 - `config/*.example.json`
 - `config/series_selection.json`
 - `config/intake_pipeline.json`
@@ -102,6 +104,8 @@ same change.
 - Default presentation locale for this project is `en_US`. Keep `pt_BR` as a
   supported locale, not as the default.
 - Mutable data belongs in `runtime/` or `database/*.db`, both ignored by Git.
+- Container build contexts must not include `runtime/`, database files,
+  host-local config JSON, PHI-bearing datasets, or local virtual environments.
 
 ## 5. Documentation Rules
 
