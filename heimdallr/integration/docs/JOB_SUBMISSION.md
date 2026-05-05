@@ -101,7 +101,12 @@ fails a job.
 
 Supported `requested_outputs` keys:
 
-| Key | Default | Current behavior |
+When the entire `requested_outputs` field is omitted, Heimdallr uses the legacy
+default completion package. When `requested_outputs` is provided, omitted keys
+are treated as `false`; consumers must explicitly request every output they
+expect to receive.
+
+| Key | Legacy default when field is omitted | Current behavior |
 | --- | --- | --- |
 | `id_json` | `true` | Includes `metadata/id.json`. Heimdallr still requires this file internally to build the package. |
 | `metadata_json` | `true` | Includes `metadata/metadata.json` when present. |
@@ -117,6 +122,9 @@ Supported `requested_outputs` keys:
 `overlays_png` and `overlays_dicom` are packaging selections. Metric jobs still
 determine which overlay artifacts exist. `bone_health_l1_hu` currently writes
 both `overlay.png` and `overlay_sc.dcm` when overlay generation is enabled.
+Instruction documents are separate from overlays. Request
+`artifact_instructions_pdf` or `artifact_instructions_dicom` only when the
+consumer needs those auxiliary instruction files.
 
 Do not infer delivery contents from `metadata/resultados.json` or per-metric
 `artifacts/metrics/<metric_key>/result.json` files. Those files describe what
