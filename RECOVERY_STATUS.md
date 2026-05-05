@@ -1,8 +1,8 @@
-# Start Checklist
+# Recovery Status
 
-This checklist tracks the structural recovery baseline for the existing
-Heimdallr repository. It is not a new-project checklist; completed items reflect
-what was observed or added during recovery.
+This document tracks the structural recovery and validation baseline for the
+existing Heimdallr repository. It is not a new-project checklist; completed
+items reflect what was observed or added during recovery.
 
 ## 0. Repository Existence
 
