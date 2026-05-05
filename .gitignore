@@ -51,6 +51,7 @@ Thumbs.db
 
 # Documentation / Project
 upcoming_features.md
+poc/
 
 # Host-local operational config
 config/dicom_egress.json

@@ -35,7 +35,7 @@ runtime artifacts under `runtime/` (ignored by Git).
 
 ## Current State
 
-- phase: `active structural recovery / validation-oriented operations`
+- phase: `structural baseline established / validation-oriented operations`
 - runtime principal: Python `>=3.12,<3.13`, single `.venv`
 - primary entrypoints:
   - `python -m heimdallr.control_plane`
@@ -126,7 +126,7 @@ Heimdallr/
 ├── bin/                        # Bundled conversion/DICOM helper binaries and notices
 ├── runtime/                    # Mutable runtime state, ignored by Git
 ├── PROJECT_GATE.md             # Repository existence and boundary gate
-├── START_CHECKLIST.md          # Current recovery checklist and next-round guardrails
+├── RECOVERY_STATUS.md          # Current recovery status and next-round guardrails
 ├── CHANGELOG.md                # Human-readable project change history
 └── AGENTS.md                   # Collaboration protocol for agents and maintainers
 ```
@@ -297,7 +297,7 @@ for timing large Thor segmentation runs.
 | --- | --- |
 | Project gate | [`PROJECT_GATE.md`](PROJECT_GATE.md) |
 | Agent protocol | [`AGENTS.md`](AGENTS.md) |
-| Start checklist | [`START_CHECKLIST.md`](START_CHECKLIST.md) |
+| Recovery status | [`RECOVERY_STATUS.md`](RECOVERY_STATUS.md) |
 | Architecture | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
 | Contracts | [`docs/CONTRACTS.md`](docs/CONTRACTS.md) |
 | Operations | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) |

@@ -17,7 +17,7 @@ REQUIRED_FILES = [
     ROOT / "AGENTS.md",
     ROOT / "PROJECT_GATE.md",
     ROOT / "CHANGELOG.md",
-    ROOT / "START_CHECKLIST.md",
+    ROOT / "RECOVERY_STATUS.md",
     DOCTOR_CONFIG_PATH,
     ROOT / "docs" / "ARCHITECTURE.md",
     ROOT / "docs" / "CONTRACTS.md",
