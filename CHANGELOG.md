@@ -5,6 +5,10 @@ changes.
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [0.2.1] - 2026-05-08
+
 ### Added
 
 - Added project gate, structural doctor policy, and adapted starter-kit
@@ -46,12 +50,17 @@ changes.
   addition to `overlay_sc.dcm` when overlays are enabled.
 - Clarified that integration consumers must use the delivery manifest, not
   per-metric result artifacts, as the authoritative ZIP inventory.
+- Restored the Heimdallr naming rationale and added conservative README badges.
+- Aligned GitHub Actions with the declared Python 3.12 runtime and structural
+  gate checks.
+- Updated the default control-plane title to radiological image MLOps wording.
 
 ### Removed
 
 - Removed legacy `heimdallr.integration_dispatcher` and
   `heimdallr.integration_delivery` compatibility module paths.
 - Moved the external-model de-identification gateway residue to Asha.
+- Removed unused `openai` and `anthropic` runtime dependency pins.
 
 ### Operational Notes
 
