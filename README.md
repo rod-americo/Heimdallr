@@ -3,46 +3,31 @@
 [![CI](https://github.com/rod-americo/Heimdallr/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rod-americo/Heimdallr/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.12-blue)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE.md)
-![Status](https://img.shields.io/badge/status-structural%20baseline-yellow)
+![Release](https://img.shields.io/badge/release-v0.2.1-blue)
 ![DICOM](https://img.shields.io/badge/DICOM-C--STORE-informational)
 ![TotalSegmentator](https://img.shields.io/badge/segmentation-TotalSegmentator-informational)
 
-Open-source radiological image MLOps infrastructure for DICOM intake, study
-preparation, DICOM-to-NIfTI conversion, TotalSegmentator-backed segmentation,
-deterministic quantitative metrics, SQLite state, operational dashboards, and
-outbound artifact delivery.
+Heimdallr is open-source infrastructure for radiological image operations. It
+receives DICOM studies, prepares selected series for deterministic processing,
+converts DICOM to NIfTI, orchestrates TotalSegmentator-backed segmentation,
+computes quantitative metrics, tracks queue state in SQLite, and delivers
+generated artifacts through operational dashboards, DICOM egress, and HTTP
+callbacks.
 
 The name references Heimdall, the vigilant Norse guardian, reflecting this
 stack's role as an operational watch layer for imaging intake, queues,
 segmentation, metrics, and artifact delivery.
 
-Heimdallr is an existing Python service stack, not a greenfield starter. The
-current architecture is organized around the `heimdallr/` package, host-local
-JSON configuration under `config/`, SQLite state under `database/`, and mutable
-runtime artifacts under `runtime/` (ignored by Git).
+The stack runs as multiple Python 3.12 entrypoints over one maintained package,
+`heimdallr/`. Host-specific configuration is created from versioned
+`config/*.example.json` files and kept local. Mutable study artifacts live under
+`runtime/`, while queue and case state are persisted in `database/dicom.db`.
 
-## What This Repository Is
-
-- A multi-entrypoint Python 3.12 radiological image processing and operations
-  stack.
-- A DICOM C-STORE listener, ZIP spool processor, segmentation worker, metrics
-  worker, DICOM egress worker, integration delivery worker, FastAPI control
-  plane, and Textual operations dashboard.
-- The open-source infrastructure layer for image ingestion, conversion,
-  deterministic calculations, artifact generation, queue state, and operational
-  observability.
-
-## What This Repository Is Not
-
-- It is not a proprietary clinical reporting system or final report drafting
-  system.
-- It is not the home for LLM, NLP, prompt-engineering, MedGemma, OpenAI,
-  Anthropic, or intelligence-layer workflows. Those responsibilities belong to
-  the companion Asha repository.
-- It is not a generic project template; starter-kit governance is adapted here
-  only where it reflects the current code and operation.
-- It is not declared production-ready for autonomous clinical decision-making.
-  Outputs are assistive infrastructure artifacts and require qualified review.
+Heimdallr owns the imaging infrastructure layer. Clinical report drafting,
+LLM/NLP workflows, prompt engineering, and proprietary intelligence belong in
+Asha or another explicit consumer. Generated outputs are deterministic
+infrastructure artifacts for qualified review, not autonomous clinical
+decisions.
 
 ## Current State
 

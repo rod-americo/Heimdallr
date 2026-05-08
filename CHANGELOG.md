@@ -5,7 +5,10 @@ changes.
 
 ## [Unreleased]
 
-No unreleased changes.
+### Changed
+
+- Polished the README opening narrative and replaced the structural-baseline
+  status badge with a release badge.
 
 ## [0.2.1] - 2026-05-08
 
