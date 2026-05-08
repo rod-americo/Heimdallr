@@ -4,7 +4,6 @@
 acvl_utils==0.2.5
 annotated-doc==0.0.4
 annotated-types==0.7.0
-anthropic==0.78.0
 anyio==4.12.1
 batchgenerators==0.25.1
 batchgeneratorsv2==0.3.0
@@ -69,7 +68,6 @@ nvidia-cusparselt-cu12==0.7.1 ; platform_system == "Linux" and platform_machine 
 nvidia-nccl-cu12==2.27.3 ; platform_system == "Linux" and platform_machine == "x86_64"
 nvidia-nvjitlink-cu12==12.8.93 ; platform_system == "Linux" and platform_machine == "x86_64"
 nvidia-nvtx-cu12==12.8.90 ; platform_system == "Linux" and platform_machine == "x86_64"
-openai==2.21.0
 packaging==26.0
 pandas==3.0.0
 pillow==12.1.0
