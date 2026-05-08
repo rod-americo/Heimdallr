@@ -86,6 +86,16 @@ def extract_section(text: str, heading: str) -> str | None:
     return None
 
 
+def extract_before_heading(text: str, heading: str) -> str:
+    lines = text.splitlines()
+    collected: list[str] = []
+    for line in lines:
+        if line.strip() == heading:
+            break
+        collected.append(line)
+    return "\n".join(collected).strip()
+
+
 def extract_first_code_block(section: str | None) -> str | None:
     if not section:
         return None
@@ -374,8 +384,6 @@ def main() -> int:
 
     required_sections = {
         ROOT / "README.md": [
-            "## What This Repository Is",
-            "## What This Repository Is Not",
             "### 4. Run",
         ],
         ROOT / "docs" / "ARCHITECTURE.md": [
@@ -421,7 +429,8 @@ def main() -> int:
         add_error(errors, "AGENTS.md and docs/OPERATIONS.md differ on minimum validation")
 
     comparison_reports: list[dict[str, object]] = []
-    negative_scope_readme = " ".join(extract_bullets(extract_section(readme_text, "## What This Repository Is Not")))
+    readme_intro = extract_before_heading(readme_text, "## Current State")
+    negative_scope_readme = readme_intro
     negative_scope_gate = " ".join(extract_bullets(extract_section(gate_text, "## 4. What can this project NOT carry?")))
     if negative_scope_readme and negative_scope_gate:
         comparison = compare_token_sets(negative_scope_readme, negative_scope_gate, alias_groups)
@@ -438,7 +447,7 @@ def main() -> int:
                 "README.md and PROJECT_GATE.md appear disconnected on out-of-scope boundaries",
             )
 
-    positive_scope_readme = " ".join(extract_bullets(extract_section(readme_text, "## What This Repository Is")))
+    positive_scope_readme = readme_intro
     positive_scope_gate = " ".join(extract_bullets(extract_section(gate_text, "## 1. Why does this project exist?")))
     if positive_scope_readme and positive_scope_gate:
         comparison = compare_token_sets(positive_scope_readme, positive_scope_gate, alias_groups)
