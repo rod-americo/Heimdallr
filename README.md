@@ -1,9 +1,9 @@
 # Heimdallr
 
+![Release](https://img.shields.io/badge/release-v0.2.1-blue)
 [![CI](https://github.com/rod-americo/Heimdallr/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rod-americo/Heimdallr/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.12-blue)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE.md)
-![Release](https://img.shields.io/badge/release-v0.2.1-blue)
 ![DICOM](https://img.shields.io/badge/DICOM-C--STORE-informational)
 ![TotalSegmentator](https://img.shields.io/badge/segmentation-TotalSegmentator-informational)
 
