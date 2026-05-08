@@ -137,3 +137,40 @@ document it as a boundary hotspot that must not be expanded inside Heimdallr.
 
 - Remove dependencies and settings immediately without impact analysis.
 - Treat the residue as permission to add intelligence workflows here.
+
+---
+
+### 2026-05-08 - Remove unused LLM-adjacent runtime clients
+
+**Context**
+
+Heimdallr's maintained boundary excludes LLM, NLP, prompt engineering, OpenAI,
+Anthropic, MedGemma, and report intelligence workflows. An impact audit found
+no production imports of the `openai` or `anthropic` Python clients; they
+remained only as dependency residue.
+
+**Decision**
+
+Remove unused LLM-adjacent client dependencies from `requirements.txt` and keep
+the default control-plane title aligned with radiological image MLOps instead
+of AI/reporting terminology.
+
+**Impact**
+
+- Reduces installation surface that does not belong to Heimdallr's current
+  runtime.
+- Makes the documented project boundary visible in dependency metadata and
+  operator-facing defaults.
+- Keeps future intelligence-layer work directed to Asha or another explicit
+  consumer.
+
+**Tradeoff**
+
+- Any untracked local workflow that still imports those clients must install
+  them outside Heimdallr or move to the appropriate companion repository.
+
+**Alternatives rejected**
+
+- Keep unused clients to preserve historical compatibility.
+- Replace the removed clients with optional extras before a real in-repository
+  use case exists.

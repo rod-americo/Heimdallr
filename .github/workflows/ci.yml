@@ -15,7 +15,14 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.12"
+
+      - name: Run structural gate
+        run: |
+          set -euo pipefail
+          python scripts/check_project_gate.py
+          python scripts/project_doctor.py
+          python scripts/project_doctor.py --audit-config
 
       - name: Compile tracked Python files
         run: |
