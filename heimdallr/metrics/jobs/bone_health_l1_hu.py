@@ -213,62 +213,6 @@ def main() -> int:
         completeness = mask_complete(l1_mask)
 
         if roi_mask_2d is None:
-            artifacts = {"result_json": str(result_path.relative_to(case_dir))}
-            dicom_exports: list[dict[str, str]] = []
-            generate_overlay = bool(job_config.get("generate_overlay", True))
-            emit_dicom = bool(job_config.get("emit_secondary_capture_dicom", generate_overlay))
-            plane_axis = roi_info.get("plane_axis")
-            plane_index = roi_info.get("plane_index")
-            if (generate_overlay or emit_dicom) and plane_axis in {"x", "y"} and plane_index is not None:
-                plane_index_int = int(plane_index)
-                plane_spacing = sagittal_plane_spacing_mm(spacing, str(plane_axis))
-                plane_source_codes = plane_source_axis_codes(ct_img.affine, str(plane_axis))
-                mask_plane = np.asarray(extract_plane(l1_mask, str(plane_axis), plane_index_int), dtype=bool)
-                ct_plane = np.asarray(extract_plane(ct_data, str(plane_axis), plane_index_int), dtype=np.float32)
-                artifact_locale = resolve_artifact_locale(job_config)
-                title, summary_lines = build_overlay_text(
-                    hu_mean=None,
-                    hu_std=None,
-                    locale=artifact_locale,
-                )
-                summary_lines.append(
-                    {
-                        "text": f"ROI status: {roi_info.get('status', 'indeterminate')}",
-                        "color": "#ffd166",
-                    }
-                )
-                overlay_rgb = render_sagittal_overlay_rgb(
-                    ct_plane=ct_plane,
-                    overlay_mask=np.zeros_like(mask_plane, dtype=bool),
-                    mask_outline=mask_plane,
-                    title=title,
-                    summary_lines=summary_lines,
-                    plane_spacing_mm=plane_spacing,
-                    source_axis_codes=plane_source_codes,
-                )
-                if generate_overlay:
-                    Image.fromarray(overlay_rgb).save(overlay_png_path)
-                    artifacts["overlay_png"] = str(overlay_png_path.relative_to(case_dir))
-                if emit_dicom:
-                    create_secondary_capture_from_rgb(
-                        overlay_rgb,
-                        overlay_sc_path,
-                        case_metadata,
-                        series_description=series_description(artifact_locale),
-                        series_number=SERIES_NUMBER,
-                        instance_number=1,
-                        derivation_description=derivation_description(
-                            artifact_locale,
-                            hu_mean=None,
-                        ),
-                    )
-                    artifacts["overlay_sc_dcm"] = str(overlay_sc_path.relative_to(case_dir))
-                    dicom_exports.append(
-                        {
-                            "path": artifacts["overlay_sc_dcm"],
-                            "kind": "secondary_capture",
-                        }
-                    )
             measurement = {
                 "job_status": roi_info.get("status", "indeterminate"),
                 "plane": roi_info.get("plane", "sagittal"),
@@ -277,11 +221,10 @@ def main() -> int:
                 "mask_complete": completeness,
                 "technique_context": technique_context,
             }
-            payload["status"] = "done"
+            payload["status"] = "skipped"
+            payload["skip_reason"] = roi_info.get("status", "indeterminate")
             payload["measurement"] = measurement
-            payload["artifacts"] = artifacts
-            if dicom_exports:
-                payload["dicom_exports"] = dicom_exports
+            payload["artifacts"] = {"result_json": str(result_path.relative_to(case_dir))}
             write_payload(result_path, payload)
             print(json.dumps(payload, indent=2))
             return 0

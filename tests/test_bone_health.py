@@ -269,7 +269,7 @@ class TestBoneHealthHelpers(unittest.TestCase):
             self.assertTrue(overlay_path.exists())
             self.assertGreater(overlay_path.stat().st_size, 0)
 
-    def test_l1_hu_job_writes_diagnostic_overlay_when_roi_is_empty(self):
+    def test_l1_hu_job_skips_when_roi_is_empty(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             case_id = "CaseBone_20260502_002"
@@ -312,13 +312,14 @@ class TestBoneHealthHelpers(unittest.TestCase):
 
             result_path = case_dir / "artifacts" / "metrics" / "bone_health_l1_hu" / "result.json"
             payload = json.loads(result_path.read_text(encoding="utf-8"))
-            overlay_path = case_dir / payload["artifacts"]["overlay_png"]
 
-            self.assertEqual(payload["status"], "done")
+            self.assertEqual(payload["status"], "skipped")
+            self.assertEqual(payload["skip_reason"], "empty_eroded_mask")
             self.assertEqual(payload["measurement"]["job_status"], "empty_eroded_mask")
-            self.assertIn("overlay_png", payload["artifacts"])
-            self.assertTrue(overlay_path.exists())
-            self.assertGreater(overlay_path.stat().st_size, 0)
+            self.assertNotIn("overlay_png", payload["artifacts"])
+            self.assertNotIn("overlay_sc_dcm", payload["artifacts"])
+            self.assertFalse((case_dir / "artifacts" / "metrics" / "bone_health_l1_hu" / "overlay.png").exists())
+            self.assertFalse((case_dir / "artifacts" / "metrics" / "bone_health_l1_hu" / "overlay_sc.dcm").exists())
 
 
 if __name__ == "__main__":
