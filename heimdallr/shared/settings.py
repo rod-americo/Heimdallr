@@ -102,7 +102,7 @@ DB_PATH = DB_DIR / "dicom.db"
 
 SERVER_HOST = os.getenv("HEIMDALLR_SERVER_HOST", "0.0.0.0")
 SERVER_PORT = int(os.getenv("HEIMDALLR_SERVER_PORT", "8001"))
-SERVER_TITLE = os.getenv("HEIMDALLR_SERVER_TITLE", "Heimdallr - Radiology AI Pipeline")
+SERVER_TITLE = os.getenv("HEIMDALLR_SERVER_TITLE", "Heimdallr - Radiological Image MLOps")
 TIMEZONE = os.getenv("HEIMDALLR_TIMEZONE", "America/Sao_Paulo")
 LOCAL_TZ = ZoneInfo(TIMEZONE)
 INTAKE_PIPELINE_CONFIG_PATH = Path(

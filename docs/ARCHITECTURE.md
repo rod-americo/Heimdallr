@@ -245,8 +245,6 @@ Minimum health signals:
 - FastAPI endpoints do not include built-in authentication.
 - Runtime state currently lives inside the repository worktree by default,
   though ignored.
-- LLM-adjacent dependencies/settings remain as compatibility residue and should
-  not grow inside Heimdallr.
 - Full end-to-end validation depends on external DICOM peers, TotalSegmentator,
   and non-PHI imaging samples.
 
@@ -255,5 +253,5 @@ Minimum health signals:
 - Whether to introduce a central structured logger across resident workers.
 - Whether to move operational SQLite/runtime state outside the worktree by
   default for managed deployments.
-- Whether to remove unused LLM-adjacent dependencies after an impact audit.
-- Whether to enforce gate/doctor in CI in addition to local hook support.
+- How far CI should go beyond structural gates without requiring heavyweight
+  TotalSegmentator, DICOM peer, or GPU dependencies.

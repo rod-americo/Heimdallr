@@ -144,8 +144,8 @@ Outbound DICOM destinations are host-local and defined in
   `print()` and per-case log files.
 - End-to-end smoke depends on external DICOM peer behavior, TotalSegmentator
   readiness, and non-PHI sample data that is not tracked in this repository.
-- LLM-adjacent dependencies and settings exist as compatibility residue but are
-  not a license to add intelligence-layer behavior here.
+- LLM-adjacent runtime clients are intentionally not part of Heimdallr's
+  dependency set; intelligence-layer behavior belongs outside this repository.
 
 ## 9. Breaking Contract Log
 

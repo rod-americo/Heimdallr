@@ -1,9 +1,20 @@
 # Heimdallr
 
+[![CI](https://github.com/rod-americo/Heimdallr/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rod-americo/Heimdallr/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.12-blue)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE.md)
+![Status](https://img.shields.io/badge/status-structural%20baseline-yellow)
+![DICOM](https://img.shields.io/badge/DICOM-C--STORE-informational)
+![TotalSegmentator](https://img.shields.io/badge/segmentation-TotalSegmentator-informational)
+
 Open-source radiological image MLOps infrastructure for DICOM intake, study
 preparation, DICOM-to-NIfTI conversion, TotalSegmentator-backed segmentation,
 deterministic quantitative metrics, SQLite state, operational dashboards, and
 outbound artifact delivery.
+
+The name references Heimdall, the vigilant Norse guardian, reflecting this
+stack's role as an operational watch layer for imaging intake, queues,
+segmentation, metrics, and artifact delivery.
 
 Heimdallr is an existing Python service stack, not a greenfield starter. The
 current architecture is organized around the `heimdallr/` package, host-local
@@ -110,7 +121,6 @@ FastAPI dashboard/API + optional Textual TUI
 | `heimdallr.tui` | operational support tool | Reads SQLite/process state for live operations. |
 | `heimdallr.space_manager` | operational guardrail | Purges completed study artifacts when configured disk thresholds are exceeded. |
 | `heimdallr.resource_monitor` | operational telemetry | Samples service and case memory state into SQLite. |
-| LLM-related settings/deps | boundary hotspot | Existing compatibility residue around external model calls; do not expand here. Keep future intelligence work in Asha. |
 
 ## Repository Layout
 
