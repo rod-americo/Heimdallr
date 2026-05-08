@@ -114,6 +114,18 @@ def parse_optional_float(value):
         return None
 
 
+def update_global_biometrics_from_dataset(global_meta: dict, ds) -> None:
+    """Fill missing study-level biometrics from any readable DICOM instance."""
+    if global_meta.get("Height") is None:
+        height = parse_optional_float(get_tag_value(ds, "PatientSize", None))
+        if height is not None:
+            global_meta["Height"] = height
+    if global_meta.get("Weight") is None:
+        weight = parse_optional_float(get_tag_value(ds, "PatientWeight", None))
+        if weight is not None:
+            global_meta["Weight"] = weight
+
+
 def normalize_patient_name_for_prepare(name):
     """Normalize DICOM PatientName for stored metadata and case naming."""
     normalized = normalize_patient_name_display(str(name or ""), settings.PATIENT_NAME_PROFILE)
@@ -928,9 +940,9 @@ def process_zip(zip_path):
                                 global_meta["StudyDate"] = str(get_tag_value(ds, "StudyDate", ""))
                                 global_meta["KVP"] = str(get_tag_value(ds, "KVP", "Unknown"))
                                 global_meta["Modality"] = modality
-                                global_meta["Height"] = parse_optional_float(get_tag_value(ds, "PatientSize", None))
-                                global_meta["Weight"] = parse_optional_float(get_tag_value(ds, "PatientWeight", None))
                                 reference_dicom_context = build_reference_dicom_context(ds)
+
+                            update_global_biometrics_from_dataset(global_meta, ds)
 
                         series_map[uid]["files"].append(fpath)
                         if modality == "CT": found_ct = True

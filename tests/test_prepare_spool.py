@@ -4,6 +4,7 @@ import zipfile
 import sqlite3
 from pathlib import Path
 from unittest.mock import patch
+from pydicom.dataset import Dataset
 
 from heimdallr.prepare import worker
 from heimdallr.shared import store
@@ -11,6 +12,38 @@ from heimdallr.shared.spool import CLAIM_SUFFIX
 
 
 class TestPrepareSpoolOrder(unittest.TestCase):
+    def test_update_global_biometrics_from_dataset_fills_missing_values(self):
+        global_meta = {"Height": None, "Weight": None}
+
+        first = Dataset()
+        first.PatientName = "Example^Patient"
+        worker.update_global_biometrics_from_dataset(global_meta, first)
+        self.assertIsNone(global_meta["Height"])
+        self.assertIsNone(global_meta["Weight"])
+
+        second = Dataset()
+        second.PatientWeight = "72"
+        worker.update_global_biometrics_from_dataset(global_meta, second)
+        self.assertEqual(global_meta["Weight"], 72.0)
+        self.assertIsNone(global_meta["Height"])
+
+        third = Dataset()
+        third.PatientSize = "1.68"
+        worker.update_global_biometrics_from_dataset(global_meta, third)
+        self.assertEqual(global_meta["Weight"], 72.0)
+        self.assertEqual(global_meta["Height"], 1.68)
+
+    def test_update_global_biometrics_from_dataset_preserves_existing_values(self):
+        global_meta = {"Height": 1.70, "Weight": 80.0}
+        ds = Dataset()
+        ds.PatientWeight = "65"
+        ds.PatientSize = "1.55"
+
+        worker.update_global_biometrics_from_dataset(global_meta, ds)
+
+        self.assertEqual(global_meta["Weight"], 80.0)
+        self.assertEqual(global_meta["Height"], 1.70)
+
     def test_iter_claimable_uploads_prioritizes_from_prepare_then_external_in_fifo(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             upload_root = Path(tmpdir)
