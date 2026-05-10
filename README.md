@@ -291,7 +291,6 @@ for timing large Thor segmentation runs.
 | --- | --- |
 | Project gate | [`PROJECT_GATE.md`](PROJECT_GATE.md) |
 | Agent protocol | [`AGENTS.md`](AGENTS.md) |
-| Recovery status | [`RECOVERY_STATUS.md`](RECOVERY_STATUS.md) |
 | Architecture | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
 | Contracts | [`docs/CONTRACTS.md`](docs/CONTRACTS.md) |
 | Operations | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) |
