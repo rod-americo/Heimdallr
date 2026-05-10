@@ -31,7 +31,6 @@ database/*.db-journal
 *.nii.gz
 *.dcm
 *.zip
-!docs/branding/fonts/*.zip
 *.log
 
 # Model Weights and Large Binaries
@@ -51,7 +50,8 @@ Thumbs.db
 
 # Documentation / Project
 upcoming_features.md
-poc/
+docs/poc/
+docs/branding/
 
 # Host-local operational config
 config/dicom_egress.json
