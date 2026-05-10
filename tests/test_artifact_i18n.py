@@ -14,6 +14,12 @@ from heimdallr.metrics.jobs._parenchymal_overlay_text import (  # noqa: E402
     resolve_artifact_locale as resolve_parenchymal_locale,
     series_description as parenchymal_series_description,
 )
+from heimdallr.metrics.jobs._brain_volumetry_overlay_text import (  # noqa: E402
+    build_overlay_text as build_brain_overlay_text,
+    derivation_description as brain_derivation_description,
+    resolve_artifact_locale as resolve_brain_locale,
+    series_description as brain_series_description,
+)
 
 
 class TestArtifactI18n(unittest.TestCase):
@@ -176,6 +182,30 @@ class TestArtifactI18n(unittest.TestCase):
                 "Fígado: 1.355 cm³",
             ],
         )
+
+    def test_brain_volumetry_overlay_text_in_en_us(self):
+        with patch("heimdallr.metrics.jobs._brain_volumetry_overlay_text.settings.ARTIFACTS_LOCALE", "pt_BR"):
+            self.assertEqual(resolve_brain_locale({"locale": "en_US"}), "en_US")
+
+        lines = build_brain_overlay_text(
+            measurement={"analysis_status": "complete", "observed_volume_cm3": 1325.0},
+            locale="en_US",
+        )
+
+        self.assertEqual(lines, ["Brain volumetry:", "Brain: 1,325 cm³"])
+        self.assertEqual(brain_series_description("en_US"), "Heimdallr Brain Volumetry Overlay 5 mm")
+        self.assertIn("5 mm axial reconstruction", brain_derivation_description("en_US"))
+
+    def test_brain_volumetry_overlay_text_in_pt_br(self):
+        with patch("heimdallr.metrics.jobs._brain_volumetry_overlay_text.settings.ARTIFACTS_LOCALE", "pt_BR"):
+            self.assertEqual(resolve_brain_locale({}), "pt_BR")
+
+        lines = build_brain_overlay_text(
+            measurement={"analysis_status": "complete", "observed_volume_cm3": 1325.0},
+            locale="pt_BR",
+        )
+
+        self.assertEqual(lines, ["Volumetria cerebral:", "Encéfalo: 1.325 cm³"])
 
 
 if __name__ == "__main__":

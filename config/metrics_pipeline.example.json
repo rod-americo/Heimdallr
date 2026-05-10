@@ -40,6 +40,15 @@
           "emit_secondary_capture_dicom": true
         },
         {
+          "name": "brain_volumetry",
+          "enabled": false,
+          "requires_segmentation_tasks": [
+            "total"
+          ],
+          "generate_overlay": true,
+          "emit_secondary_capture_dicom": true
+        },
+        {
           "name": "bone_health_l1_hu",
           "enabled": true,
           "requires_segmentation_tasks": [

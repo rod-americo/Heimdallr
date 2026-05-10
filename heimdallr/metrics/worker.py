@@ -606,6 +606,7 @@ def _payload_summary(payload: dict) -> str:
         measurement.get("exported_slice_count"),
         measurement.get("l1_trabecular_hu_mean"),
         measurement.get("bone_health_l1_volumetric_trabecular_hu_mean"),
+        measurement.get("brain_volume_cm3"),
         measurement.get("aggregate", {}).get("visceral_proxy_volume_cm3")
         if isinstance(measurement.get("aggregate"), dict)
         else None,
