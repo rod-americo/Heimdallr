@@ -67,6 +67,21 @@ msgstr "Heimdallr Overlay de Órgãos Parenquimatosos 5 mm"
 msgid "parenchymal.overlay.derivation_description"
 msgstr "Reconstrução axial de 5 mm com overlays de órgãos parenquimatosos (fígado, baço, pâncreas, rim direito, rim esquerdo)"
 
+msgid "brain_volumetry.overlay.title"
+msgstr "Volumetria cerebral:"
+
+msgid "brain_volumetry.overlay.brain"
+msgstr "Encéfalo: {volume} cm³"
+
+msgid "brain_volumetry.overlay.incomplete"
+msgstr "Máscara cerebral incompleta"
+
+msgid "brain_volumetry.overlay.series_description"
+msgstr "Heimdallr Overlay de Volumetria Cerebral 5 mm"
+
+msgid "brain_volumetry.overlay.derivation_description"
+msgstr "Reconstrução axial de 5 mm com overlay de segmentação cerebral"
+
 msgid "bone_health.overlay.title"
 msgstr "Atenuação trabecular em L1"
 

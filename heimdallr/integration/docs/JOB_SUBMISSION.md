@@ -120,8 +120,10 @@ expect to receive.
 | `artifacts_tree` | `true` | Includes every file under `artifacts/metrics/`. Set this to `false` for strictly selected output packages. |
 
 `overlays_png` and `overlays_dicom` are packaging selections. Metric jobs still
-determine which overlay artifacts exist. `bone_health_l1_hu` currently writes
-both `overlay.png` and `overlay_sc.dcm` when overlay generation is enabled.
+determine which overlay artifacts exist. For example, `bone_health_l1_hu`
+writes single-image overlay artifacts when overlay generation is enabled, while
+`parenchymal_organ_volumetry` and opt-in `brain_volumetry` write Secondary
+Capture overlay series.
 Instruction documents are separate from overlays. Request
 `artifact_instructions_pdf` or `artifact_instructions_dicom` only when the
 consumer needs those auxiliary instruction files.
@@ -147,7 +149,10 @@ When the active metrics profile declares `requires_segmentation_tasks` for the
 requested jobs, the segmentation worker limits TotalSegmentator tasks to the
 union of those requirements. For example, a request that only includes
 `bone_health_l1_hu` can run `total` without `tissue_types`, while
-`l3_muscle_area` still requires both `total` and `tissue_types`.
+`l3_muscle_area` still requires both `total` and `tissue_types`. The
+`brain_volumetry` job is present in the tracked example profile as disabled
+opt-in behavior; hosts must enable it in their local metrics profile before
+external jobs can request it.
 
 Example:
 
