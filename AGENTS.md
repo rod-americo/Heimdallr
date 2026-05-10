@@ -209,7 +209,21 @@ worker before timing or validating segmentation behavior.
 - Do not overwrite local runtime state, database files, or ignored host config.
 - Do not revert user changes in the worktree.
 
-## 10. Git Workflow
+## 10. Current Open Guardrails
+
+The structural recovery baseline is established. Remaining gaps are operational
+or validation boundaries, not startup blockers:
+
+- Shared worker logging is not yet fully structured across all resident
+  services.
+- Built-in authentication for the FastAPI control plane is not implemented in
+  this repository; use the network, gateway, VPN, or deployment boundary.
+- End-to-end smoke against the local anonymized sample on `thor` is still a
+  separate validation step.
+- Full unit test execution depends on local dependency availability.
+- Clinical validation remains outside automated repository checks.
+
+## 11. Git Workflow
 
 Use the branch that is already checked out for the current task. Do not create
 or switch branches unless the user explicitly asks for that branch workflow.
@@ -226,7 +240,7 @@ Allowed common types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`,
 Keep subjects at 72 characters or less and never include PHI/PII, dumps, local
 secrets, or patient identifiers.
 
-## 11. Local Gate and Doctor
+## 12. Local Gate and Doctor
 
 Use:
 

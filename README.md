@@ -121,7 +121,6 @@ Heimdallr/
 ├── bin/                        # Bundled conversion/DICOM helper binaries and notices
 ├── runtime/                    # Mutable runtime state, ignored by Git
 ├── PROJECT_GATE.md             # Repository existence and boundary gate
-├── RECOVERY_STATUS.md          # Current recovery status and next-round guardrails
 ├── CHANGELOG.md                # Human-readable project change history
 └── AGENTS.md                   # Collaboration protocol for agents and maintainers
 ```
