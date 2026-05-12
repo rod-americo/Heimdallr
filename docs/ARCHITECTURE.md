@@ -2,12 +2,7 @@
 
 ## 1. Purpose
 
-Heimdallr is the imaging infrastructure layer for receiving radiology studies,
-preparing them for deterministic processing, running segmentation and metrics,
-persisting operational state, and delivering generated artifacts. It exists to
-keep DICOM/PACS operations, filesystem runtime state, SQLite queues,
-TotalSegmentator orchestration, and deterministic calculations outside
-proprietary reporting or intelligence repositories.
+Heimdallr is the imaging infrastructure layer for receiving radiology studies, preparing them for deterministic processing, running segmentation and metrics, persisting operational state, and delivering generated artifacts. It exists to keep DICOM/PACS operations, filesystem runtime state, SQLite queues, TotalSegmentator orchestration, and deterministic calculations outside proprietary reporting or intelligence repositories.
 
 ## 2. Scope
 
@@ -28,10 +23,10 @@ Does not include:
 
 - Proprietary clinical report drafting or final report generation.
 - LLM, NLP, prompt-engineering, MedGemma, OpenAI, Anthropic, or other
-  intelligence-layer workflows.
+intelligence-layer workflows.
 - Autonomous diagnosis or clinical decision automation.
 - Checked-in PHI fixtures, DICOM samples, NIfTI outputs, local databases, or
-  host secrets.
+host secrets.
 
 ## 3. System Context
 
@@ -79,39 +74,35 @@ Each resident service has its own module entrypoint:
 - `heimdallr/resource_monitor/__main__.py`
 - `heimdallr/tui/__main__.py`
 
-`heimdallr/control_plane/app.py` is the FastAPI composition root. It builds the
-application, ensures runtime directories, includes routers, and mounts static
-assets when present.
+`heimdallr/control_plane/app.py` is the FastAPI composition root. It builds the application, ensures runtime directories, includes routers, and mounts static assets when present.
 
 ### 4.2 Orchestration Workers
 
 - `heimdallr/intake/gateway.py`: DICOM SCP, study grouping, idle flush, ZIP
-  handoff, duplicate handoff metadata.
+handoff, duplicate handoff metadata.
 - `heimdallr/prepare/worker.py`: upload spool claiming, DICOM scan, conversion,
-  metadata persistence, `id.json` creation, dispatch enqueue, segmentation
-  enqueue.
+metadata persistence, `id.json` creation, dispatch enqueue, segmentation enqueue.
 - `heimdallr/segmentation/worker.py`: queue claiming, selected-series reuse,
-  TotalSegmentator tasks, canonical NIfTI materialization, metrics enqueue.
+TotalSegmentator tasks, canonical NIfTI materialization, metrics enqueue.
 - `heimdallr/metrics/worker.py`: metrics profile loading, job dependency graph,
-  deterministic job execution, artifacts, DICOM egress enqueue, final delivery
-  enqueue.
+deterministic job execution, artifacts, DICOM egress enqueue, final delivery enqueue.
 - `heimdallr/dicom_egress/worker.py`: outbound C-STORE retry worker.
 - `heimdallr/integration/dispatch/worker.py`: outbound JSON event retry
-  worker.
+worker.
 - `heimdallr/integration/delivery/worker.py`: final package callback retry
-  worker.
+worker.
 - `heimdallr/space_manager/worker.py`: disk threshold monitor and completed
-  study purge.
+study purge.
 - `heimdallr/resource_monitor/worker.py`: process and case memory telemetry
-  sampler.
+sampler.
 
 ### 4.3 Shared Infrastructure
 
 - `heimdallr/shared/settings.py`: environment parsing, config paths, runtime
-  paths, binary resolution, service stdio behavior.
+paths, binary resolution, service stdio behavior.
 - `heimdallr/shared/paths.py`: canonical study path helpers.
 - `heimdallr/shared/store.py`: SQLite schema, migrations, queue lifecycle,
-  retry/claim helpers, resource monitor persistence.
+retry/claim helpers, resource monitor persistence.
 - `heimdallr/shared/sqlite.py`: SQLite connection helper.
 - `heimdallr/shared/spool.py`: atomic spool file operations.
 - `heimdallr/shared/study_manifest.py`: intake manifest fingerprinting.
@@ -119,11 +110,10 @@ assets when present.
 
 ### 4.4 Deterministic Domain Logic
 
-The code does not currently expose a separate `domain/` package. Domain rules
-are concentrated in:
+The code does not currently expose a separate `domain/` package. Domain rules are concentrated in:
 
 - series selection rules in `config/series_selection.json` and segmentation
-  worker helpers.
+worker helpers.
 - metrics jobs under `heimdallr/metrics/jobs/`.
 - analysis helpers under `heimdallr/metrics/analysis/`.
 - patient-name presentation helpers under `heimdallr/shared/patient_names.py`.
@@ -135,23 +125,17 @@ Future extraction should be behavior-driven and tested, not directory-first.
 1. A study arrives through DICOM C-STORE, `/upload`, or `/jobs`.
 2. Intake or the control plane writes a ZIP into the upload spool.
 3. `prepare` claims a stable ZIP, extracts it, scans DICOM metadata, filters
-   candidate series, converts DICOM to NIfTI, writes study metadata, and
-   enqueues segmentation.
+candidate series, converts DICOM to NIfTI, writes study metadata, and enqueues segmentation.
 4. `segmentation` claims the case, resolves the active segmentation profile,
-   selects the target series, narrows TotalSegmentator tasks when an external
-   submission requested metrics with declared segmentation requirements, runs
-   or reuses outputs, writes pipeline state, and enqueues metrics.
+selects the target series, narrows TotalSegmentator tasks when an external submission requested metrics with declared segmentation requirements, runs or reuses outputs, writes pipeline state, and enqueues metrics.
 5. `metrics` claims the case, resolves the active metrics profile, executes
-   enabled jobs and dependencies, writes `metadata/resultados.json`, creates
-   artifacts, and enqueues outbound delivery where configured.
+enabled jobs and dependencies, writes `metadata/resultados.json`, creates artifacts, and enqueues outbound delivery where configured.
 6. `dicom_egress`, `integration.dispatch`, and `integration.delivery` drain
-   their queues independently. External `/jobs` submissions can request a
-   subset of enabled metrics jobs through `requested_metrics_modules` and a
-   subset of returned files through `requested_outputs`.
+their queues independently. External `/jobs` submissions can request a subset of enabled metrics jobs through `requested_metrics_modules` and a subset of returned files through `requested_outputs`.
 7. `control_plane` and `tui` read SQLite and runtime files to expose current
-   state to operators.
+state to operators.
 8. `space_manager` and `resource_monitor` provide operational guardrails around
-   storage and memory.
+storage and memory.
 
 ## 6. Contracts and Invariants
 
@@ -164,26 +148,26 @@ Future extraction should be behavior-driven and tested, not directory-first.
 Invariants:
 
 - Do not assume `StudyInstanceUID`, `case_id`, accession number, and
-  `client_case_id` are equivalent.
+`client_case_id` are equivalent.
 - Host-local operational config remains ignored; examples are the tracked
-  contract.
+contract.
 - Queue claim, heartbeat, retry, and completion semantics live in
-  `heimdallr/shared/store.py`.
+`heimdallr/shared/store.py`.
 - `metadata/id.json` and `metadata/resultados.json` are externally meaningful
-  artifacts and require contract updates when their shape changes.
+artifacts and require contract updates when their shape changes.
 - Metrics additions must update the tracked example profile when production
-  facing.
+facing.
 
 ## 7. Persistence
 
 - main database: `database/dicom.db` (ignored by Git).
 - schema and migrations: `heimdallr/shared/store.py`, with reference schema in
-  `database/schema.sql`.
+`database/schema.sql`.
 - runtime state: `runtime/` (ignored by Git).
 - case workspace: `runtime/studies/<case_id>/`.
 - upload spool: `runtime/intake/uploads/`.
 - queue filesystem paths: `runtime/queue/pending/`, `runtime/queue/active/`,
-  `runtime/queue/failed/`.
+`runtime/queue/failed/`.
 
 SQLite queue tables include:
 
@@ -239,19 +223,19 @@ Minimum health signals:
 ## 10. Hotspots and Debt
 
 - `prepare`, `segmentation`, and `metrics` workers are large orchestration
-  modules with broad side effects.
+modules with broad side effects.
 - Queue semantics are centralized in `store.py`; small changes can affect many
-  workers.
+workers.
 - FastAPI endpoints do not include built-in authentication.
 - Runtime state currently lives inside the repository worktree by default,
-  though ignored.
+though ignored.
 - Full end-to-end validation depends on external DICOM peers, TotalSegmentator,
-  and non-PHI imaging samples.
+and non-PHI imaging samples.
 
 ## 11. Open Decisions
 
 - Whether to introduce a central structured logger across resident workers.
 - Whether to move operational SQLite/runtime state outside the worktree by
-  default for managed deployments.
+default for managed deployments.
 - How far CI should go beyond structural gates without requiring heavyweight
-  TotalSegmentator, DICOM peer, or GPU dependencies.
+TotalSegmentator, DICOM peer, or GPU dependencies.

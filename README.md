@@ -1,33 +1,14 @@
 # Heimdallr
 
-![Release](https://img.shields.io/badge/release-v0.2.1-blue)
-[![CI](https://github.com/rod-americo/Heimdallr/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rod-americo/Heimdallr/actions/workflows/ci.yml)
-![Python](https://img.shields.io/badge/python-3.12-blue)
-[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE.md)
-![DICOM](https://img.shields.io/badge/DICOM-C--STORE-informational)
-![TotalSegmentator](https://img.shields.io/badge/segmentation-TotalSegmentator-informational)
+![Release](https://img.shields.io/badge/release-v0.2.1-blue) [![CI](https://github.com/rod-americo/Heimdallr/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rod-americo/Heimdallr/actions/workflows/ci.yml) ![Python](https://img.shields.io/badge/python-3.12-blue) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE.md) ![DICOM](https://img.shields.io/badge/DICOM-C--STORE-informational) ![TotalSegmentator](https://img.shields.io/badge/segmentation-TotalSegmentator-informational)
 
-Heimdallr is open-source infrastructure for radiological image operations. It
-receives DICOM studies, prepares selected series for deterministic processing,
-converts DICOM to NIfTI, orchestrates TotalSegmentator-backed segmentation,
-computes quantitative metrics, tracks queue state in SQLite, and delivers
-generated artifacts through operational dashboards, DICOM egress, and HTTP
-callbacks.
+Heimdallr is open-source infrastructure for radiological image operations. It receives DICOM studies, prepares selected series for deterministic processing, converts DICOM to NIfTI, orchestrates TotalSegmentator-backed segmentation, computes quantitative metrics, tracks queue state in SQLite, and delivers generated artifacts through operational dashboards, DICOM egress, and HTTP callbacks.
 
-The name references Heimdall, the vigilant Norse guardian, reflecting this
-stack's role as an operational watch layer for imaging intake, queues,
-segmentation, metrics, and artifact delivery.
+The name references Heimdall, the vigilant Norse guardian, reflecting this stack's role as an operational watch layer for imaging intake, queues, segmentation, metrics, and artifact delivery.
 
-The stack runs as multiple Python 3.12 entrypoints over one maintained package,
-`heimdallr/`. Host-specific configuration is created from versioned
-`config/*.example.json` files and kept local. Mutable study artifacts live under
-`runtime/`, while queue and case state are persisted in `database/dicom.db`.
+The stack runs as multiple Python 3.12 entrypoints over one maintained package, `heimdallr/`. Host-specific configuration is created from versioned `config/*.example.json` files and kept local. Mutable study artifacts live under `runtime/`, while queue and case state are persisted in `database/dicom.db`.
 
-Heimdallr owns the imaging infrastructure layer. Clinical report drafting,
-LLM/NLP workflows, prompt engineering, and proprietary intelligence belong in
-Asha or another explicit consumer. Generated outputs are deterministic
-infrastructure artifacts for qualified review, not autonomous clinical
-decisions.
+Heimdallr owns the imaging infrastructure layer. Clinical report drafting, LLM/NLP workflows, prompt engineering, and proprietary intelligence belong in Asha or another explicit consumer. Generated outputs are deterministic infrastructure artifacts for qualified review, not autonomous clinical decisions.
 
 ## Current State
 
@@ -54,41 +35,7 @@ decisions.
 
 ## System Overview
 
-```text
-PACS / Modality
-      |
-      | DICOM C-STORE
-      v
-heimdallr.intake
-      |
-      | ZIP + intake manifest
-      v
-runtime/intake/uploads/from_prepare/
-runtime/intake/uploads/external/
-      |
-      v
-heimdallr.prepare
-      |  metadata/id.json, selected series, NIfTI, SQLite upsert
-      |------------------> integration_dispatch_queue
-      v
-segmentation_queue
-      |
-      v
-heimdallr.segmentation
-      |  TotalSegmentator outputs, canonical NIfTI, coverage state
-      v
-metrics_queue
-      |
-      v
-heimdallr.metrics
-      |  deterministic metrics, overlays, PDF/SC artifacts
-      |------------------> dicom_egress_queue
-      |------------------> integration_delivery_queue
-      v
-runtime/studies/<case_id>/ + database/dicom.db
-      |
-      v
-FastAPI dashboard/API + optional Textual TUI
+```text PACS / Modality | | DICOM C-STORE v heimdallr.intake | | ZIP + intake manifest v runtime/intake/uploads/from_prepare/ runtime/intake/uploads/external/ | v heimdallr.prepare |  metadata/id.json, selected series, NIfTI, SQLite upsert |------------------> integration_dispatch_queue v segmentation_queue | v heimdallr.segmentation |  TotalSegmentator outputs, canonical NIfTI, coverage state v metrics_queue | v heimdallr.metrics |  deterministic metrics, overlays, PDF/SC artifacts |------------------> dicom_egress_queue |------------------> integration_delivery_queue v runtime/studies/<case_id>/ + database/dicom.db | v FastAPI dashboard/API + optional Textual TUI
 ```
 
 ## Component Maturity
@@ -136,9 +83,7 @@ External integration code is canonical under `heimdallr/integration/`:
 
 ### 1. Clone
 
-```bash
-git clone git@github.com:rod-americo/Heimdallr.git
-cd Heimdallr
+```bash git clone git@github.com:rod-americo/Heimdallr.git cd Heimdallr
 ```
 
 ### 2. Prepare environment
@@ -150,20 +95,11 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-All long-running services should use the same interpreter:
-`.venv/bin/python`.
+All long-running services should use the same interpreter: `.venv/bin/python`.
 
 ### 3. Configure
 
-```bash
-cp config/segmentation_pipeline.example.json config/segmentation_pipeline.json
-cp config/metrics_pipeline.example.json config/metrics_pipeline.json
-cp config/integration_dispatch.example.json config/integration_dispatch.json
-cp config/integration_delivery.example.json config/integration_delivery.json
-cp config/dicom_egress.example.json config/dicom_egress.json
-cp config/presentation.example.json config/presentation.json
-cp config/space_manager.example.json config/space_manager.json
-cp config/resource_monitor.example.json config/resource_monitor.json
+```bash cp config/segmentation_pipeline.example.json config/segmentation_pipeline.json cp config/metrics_pipeline.example.json config/metrics_pipeline.json cp config/integration_dispatch.example.json config/integration_dispatch.json cp config/integration_delivery.example.json config/integration_delivery.json cp config/dicom_egress.example.json config/dicom_egress.json cp config/presentation.example.json config/presentation.json cp config/space_manager.example.json config/space_manager.json cp config/resource_monitor.example.json config/resource_monitor.json
 ```
 
 Only example files are versioned. The concrete host-local files above are
@@ -180,17 +116,7 @@ or inject `TOTALSEGMENTATOR_LICENSE` through host supervision.
 
 ### 4. Run
 
-```bash
-.venv/bin/python -m heimdallr.control_plane
-.venv/bin/python -m heimdallr.prepare
-.venv/bin/python -m heimdallr.segmentation
-.venv/bin/python -m heimdallr.metrics
-.venv/bin/python -m heimdallr.intake
-.venv/bin/python -m heimdallr.dicom_egress
-.venv/bin/python -m heimdallr.integration.dispatch
-.venv/bin/python -m heimdallr.integration.delivery
-.venv/bin/python -m heimdallr.space_manager
-.venv/bin/python -m heimdallr.resource_monitor
+```bash .venv/bin/python -m heimdallr.control_plane .venv/bin/python -m heimdallr.prepare .venv/bin/python -m heimdallr.segmentation .venv/bin/python -m heimdallr.metrics .venv/bin/python -m heimdallr.intake .venv/bin/python -m heimdallr.dicom_egress .venv/bin/python -m heimdallr.integration.dispatch .venv/bin/python -m heimdallr.integration.delivery .venv/bin/python -m heimdallr.space_manager .venv/bin/python -m heimdallr.resource_monitor
 ```
 
 Run each resident service under its own terminal, supervisor unit, or container.
@@ -202,8 +128,7 @@ The TUI is optional:
 
 ## Configuration
 
-Configuration is centralized in `heimdallr/shared/settings.py` plus JSON files
-under `config/`.
+Configuration is centralized in `heimdallr/shared/settings.py` plus JSON files under `config/`.
 
 | Entry | Type | Required | Origin | Example |
 | --- | --- | --- | --- | --- |
@@ -217,26 +142,17 @@ under `config/`.
 | `HEIMDALLR_INTEGRATION_DELIVERY_CONFIG` | env/file | no | host-local | `config/integration_delivery.json` |
 | `TOTALSEGMENTATOR_LICENSE` | env | task-dependent | host secret | injected by supervisor |
 
-See [`docs/OPERATIONS.md`](docs/OPERATIONS.md) for the full runtime and restart
-model.
+See [`docs/OPERATIONS.md`](docs/OPERATIONS.md) for the full runtime and restart model.
 
 ## API Container Scope
 
-The experimental API container stack is documented in
-[`docs/CONTAINER_API.md`](docs/CONTAINER_API.md). It includes the control plane,
-prepare, segmentation, metrics, and integration delivery services. It
-intentionally excludes DICOM C-STORE intake, DICOM egress, and integration
-dispatch.
+The experimental API container stack is documented in [`docs/CONTAINER_API.md`](docs/CONTAINER_API.md). It includes the control plane, prepare, segmentation, metrics, and integration delivery services. It intentionally excludes DICOM C-STORE intake, DICOM egress, and integration dispatch.
 
-Build and GPU validation should be done on `thor`, where Docker and the POC GPU
-environment are available. The image is Python 3.12-based and can bake
-TotalSegmentator weights for the requested task set; by default it bakes
-`total_fast`, matching the current Thor POC `total --fast` profile.
+Build and GPU validation should be done on `thor`, where Docker and the POC GPU environment are available. The image is Python 3.12-based and can bake TotalSegmentator weights for the requested task set; by default it bakes `total_fast`, matching the current Thor POC `total --fast` profile.
 
 ## Contracts and Boundaries
 
-Canonical contracts are documented in [`docs/CONTRACTS.md`](docs/CONTRACTS.md).
-High-value references:
+Canonical contracts are documented in [`docs/CONTRACTS.md`](docs/CONTRACTS.md). High-value references:
 
 - inbound DICOM studies grouped by `StudyInstanceUID`
 - ZIP study payloads accepted by `/upload` and `/jobs`
@@ -245,17 +161,13 @@ High-value references:
 - queue tables in `database/dicom.db`
 - outbound DICOM artifacts and external delivery callbacks
 
-API details remain in [`docs/API.md`](docs/API.md). Database details remain in
-[`database/README.md`](database/README.md).
+API details remain in [`docs/API.md`](docs/API.md). Database details remain in [`database/README.md`](database/README.md).
 
 ## Validation
 
 Minimum structural validation:
 
-```bash
-python3 scripts/check_project_gate.py
-python3 scripts/project_doctor.py
-python3 scripts/project_doctor.py --audit-config
+```bash python3 scripts/check_project_gate.py python3 scripts/project_doctor.py python3 scripts/project_doctor.py --audit-config
 ```
 
 Python syntax validation:
@@ -266,8 +178,7 @@ Python syntax validation:
 
 Relevant unit coverage can be run with:
 
-```bash
-.venv/bin/python -m unittest discover -s tests
+```bash .venv/bin/python -m unittest discover -s tests
 ```
 
 Full end-to-end smoke requires a known non-PHI study payload, DICOM peer

@@ -1,14 +1,10 @@
 # Container API Stack
 
-This document describes the current container experiment for the Heimdallr API
-integration scope. It is not a replacement for the full DICOM intake and egress
-deployment model described in `docs/OPERATIONS.md`.
+This document describes the current container experiment for the Heimdallr API integration scope. It is not a replacement for the full DICOM intake and egress deployment model described in `docs/OPERATIONS.md`.
 
 ## Scope
 
-The API container stack is intended for an external application that submits an
-image package and receives requested outputs through Heimdallr's integration
-delivery contract.
+The API container stack is intended for an external application that submits an image package and receives requested outputs through Heimdallr's integration delivery contract.
 
 Included services:
 
@@ -26,24 +22,17 @@ Excluded services:
 - `heimdallr.dicom_egress`
 - `heimdallr.integration.dispatch`
 
-DICOM C-STORE intake and outbound DICOM egress remain part of the broader
-Heimdallr stack, but they are not necessary for this API-scoped container.
+DICOM C-STORE intake and outbound DICOM egress remain part of the broader Heimdallr stack, but they are not necessary for this API-scoped container.
 
 ## Image
 
-`Dockerfile.api` builds a Python 3.12 image, installs `requirements.txt`, installs
-the local Heimdallr package, copies only tracked defaults/examples, and can bake
-TotalSegmentator weights into the image.
+`Dockerfile.api` builds a Python 3.12 image, installs `requirements.txt`, installs the local Heimdallr package, copies only tracked defaults/examples, and can bake TotalSegmentator weights into the image.
 
-The API image currently carries an experimental TotalSegmentator dependency
-patch for Thor validation: the internal single-thread saving guard is raised
-from `512*512*1000` voxels to `512*512*3000` voxels. This is controlled by the
-`HEIMDALLR_TOTALSEG_BIG_SHAPE_SLICES` build arg and defaults to `3000`.
+The API image currently carries an experimental TotalSegmentator dependency patch for Thor validation: the internal single-thread saving guard is raised from `512*512*1000` voxels to `512*512*3000` voxels. This is controlled by the `HEIMDALLR_TOTALSEG_BIG_SHAPE_SLICES` build arg and defaults to `3000`.
 
 The default baked TotalSegmentator task set is:
 
-```text
-total_fast
+```text total_fast
 ```
 
 That matches the current Thor POC GPU segmentation profile, where `total` is
@@ -56,9 +45,7 @@ HEIMDALLR_TOTALSEG_WEIGHTS_TASKS=total_fast,tissue_types \
 
 The dependency guard patch can be changed at build time:
 
-```bash
-HEIMDALLR_TOTALSEG_BIG_SHAPE_SLICES=3000 \
-  docker compose -f docker-compose.api.yml build
+```bash HEIMDALLR_TOTALSEG_BIG_SHAPE_SLICES=3000 \ docker compose -f docker-compose.api.yml build
 ```
 
 Licensed TotalSegmentator tasks still require a valid TotalSegmentator license
@@ -82,8 +69,7 @@ ssh thor 'cd ~/Heimdallr && DOCKER_BUILDKIT=1 docker compose -f docker-compose.a
 
 To disable baked weights for a fast syntax/build-context check:
 
-```bash
-ssh thor 'cd ~/Heimdallr && HEIMDALLR_BAKE_TOTALSEG_WEIGHTS=false docker compose -f docker-compose.api.yml build'
+```bash ssh thor 'cd ~/Heimdallr && HEIMDALLR_BAKE_TOTALSEG_WEIGHTS=false docker compose -f docker-compose.api.yml build'
 ```
 
 ## Host-Local Runtime Requirements
@@ -128,9 +114,7 @@ Use `config/segmentation_pipeline.gpu.example.json` for Thor GPU validation.
 
 Start the API scope:
 
-```bash
-docker compose -f docker-compose.api.yml up -d \
-  control-plane prepare segmentation metrics integration-delivery
+```bash docker compose -f docker-compose.api.yml up -d \ control-plane prepare segmentation metrics integration-delivery
 ```
 
 Optional maintenance and monitoring services:
@@ -142,8 +126,7 @@ docker compose -f docker-compose.api.yml --profile monitoring up -d resource-mon
 
 Stop the API scope:
 
-```bash
-docker compose -f docker-compose.api.yml down
+```bash docker compose -f docker-compose.api.yml down
 ```
 
 ## Validation
@@ -156,14 +139,7 @@ curl -fsS http://127.0.0.1:8001/docs >/dev/null
 
 Container Python and CUDA visibility:
 
-```bash
-docker compose -f docker-compose.api.yml exec segmentation python --version
-docker compose -f docker-compose.api.yml exec segmentation python - <<'PY'
-import torch
-print(torch.__version__)
-print(torch.cuda.is_available())
-print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "no cuda")
-PY
+```bash docker compose -f docker-compose.api.yml exec segmentation python --version docker compose -f docker-compose.api.yml exec segmentation python - <<'PY' import torch print(torch.__version__) print(torch.cuda.is_available()) print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "no cuda") PY
 ```
 
 Single-container Thor GPU smoke without starting the stack:
@@ -181,9 +157,7 @@ docker run --rm \
 
 TotalSegmentator CLI visibility:
 
-```bash
-docker compose -f docker-compose.api.yml exec segmentation TotalSegmentator --version
-docker compose -f docker-compose.api.yml exec segmentation totalseg_download_weights --help
+```bash docker compose -f docker-compose.api.yml exec segmentation TotalSegmentator --version docker compose -f docker-compose.api.yml exec segmentation totalseg_download_weights --help
 ```
 
 End-to-end validation still requires a non-PHI test package and the integration

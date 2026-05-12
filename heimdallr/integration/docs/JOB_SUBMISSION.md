@@ -1,13 +1,10 @@
 # External Job Submission
 
-This contract is for applications that send a DICOM ZIP to Heimdallr and expect
-an asynchronous callback when the case is complete.
+This contract is for applications that send a DICOM ZIP to Heimdallr and expect an asynchronous callback when the case is complete.
 
 ## Endpoint
 
-```text
-POST /jobs
-Content-Type: multipart/form-data
+```text POST /jobs Content-Type: multipart/form-data
 ```
 
 Required fields:
@@ -45,25 +42,11 @@ curl -X POST "http://localhost:8001/jobs" \
 
 ## Acceptance Response
 
-Heimdallr returns after the file and sidecar metadata are stored in the external
-upload spool. This response does not mean the study was prepared, segmented,
-measured, or delivered.
+Heimdallr returns after the file and sidecar metadata are stored in the external upload spool. This response does not mean the study was prepared, segmented, measured, or delivered.
 
 Example response:
 
-```json
-{
-  "accepted": true,
-  "job_id": "9d3fdaf7-82df-4ee8-a0c0-fb927bc8c3d1",
-  "client_case_id": "external-123",
-  "status": "queued",
-  "received_at": "2026-05-01T14:30:00-03:00",
-  "stored_file": "study_20260501143000.zip",
-  "requested_metrics_modules": [
-    "l3_muscle_area",
-    "bone_health_l1_hu"
-  ]
-}
+```json { "accepted": true, "job_id": "9d3fdaf7-82df-4ee8-a0c0-fb927bc8c3d1", "client_case_id": "external-123", "status": "queued", "received_at": "2026-05-01T14:30:00-03:00", "stored_file": "study_20260501143000.zip", "requested_metrics_modules": [ "l3_muscle_area", "bone_health_l1_hu" ] }
 ```
 
 External applications should persist `job_id` and `client_case_id`. Heimdallr
@@ -80,17 +63,7 @@ GET /jobs/{job_id}
 
 Example response while processing:
 
-```json
-{
-  "job_id": "9d3fdaf7-82df-4ee8-a0c0-fb927bc8c3d1",
-  "status": "processing",
-  "stage": "segmentation",
-  "case_id": "Case123_20260501_001",
-  "study_instance_uid": "1.2.840.113619.2.55.3.604688432.123.1714560000.1",
-  "client_case_id": "external-123",
-  "source_system": "partner_a",
-  "received_at": "2026-05-01T14:30:00-03:00"
-}
+```json { "job_id": "9d3fdaf7-82df-4ee8-a0c0-fb927bc8c3d1", "status": "processing", "stage": "segmentation", "case_id": "Case123_20260501_001", "study_instance_uid": "1.2.840.113619.2.55.3.604688432.123.1714560000.1", "client_case_id": "external-123", "source_system": "partner_a", "received_at": "2026-05-01T14:30:00-03:00" }
 ```
 
 The endpoint is operational status, not a replacement for the terminal callback.
@@ -163,19 +136,13 @@ Example:
 ]
 ```
 
-If the field is omitted or empty, Heimdallr runs the enabled jobs and
-segmentation tasks from the active profiles. Unknown job names fail during
-segmentation or metrics execution rather than at `/jobs` admission time.
+If the field is omitted or empty, Heimdallr runs the enabled jobs and segmentation tasks from the active profiles. Unknown job names fail during segmentation or metrics execution rather than at `/jobs` admission time.
 
 ## Terminal Callbacks
 
-When metrics processing enqueues final delivery, or when a terminal failure is
-detected for an externally submitted job and the delivery worker is enabled,
-Heimdallr sends:
+When metrics processing enqueues final delivery, or when a terminal failure is detected for an externally submitted job and the delivery worker is enabled, Heimdallr sends:
 
-```text
-POST <callback_url>
-Content-Type: multipart/form-data
+```text POST <callback_url> Content-Type: multipart/form-data
 ```
 
 Multipart parts:
@@ -249,28 +216,7 @@ Example callback manifest:
 
 Example failure callback manifest:
 
-```json
-{
-  "event_type": "case.failed",
-  "event_version": 1,
-  "event_id": "case.failed:9d3fdaf7-82df-4ee8-a0c0-fb927bc8c3d1",
-  "job_id": "9d3fdaf7-82df-4ee8-a0c0-fb927bc8c3d1",
-  "case_id": "Case123_20260501_001",
-  "study_instance_uid": "1.2.840.113619.2.55.3.604688432.123.1714560000.1",
-  "client_case_id": "external-123",
-  "source_system": "partner_a",
-  "status": "failed",
-  "failure_stage": "metrics",
-  "error": "Metrics finished with failure return status",
-  "received_at": "2026-05-01T14:30:00-03:00",
-  "package_name": null,
-  "package_sha256": null,
-  "package_size_bytes": 0,
-  "contents": {},
-  "requested_outputs": {},
-  "delivered_outputs": {},
-  "missing_outputs": []
-}
+```json { "event_type": "case.failed", "event_version": 1, "event_id": "case.failed:9d3fdaf7-82df-4ee8-a0c0-fb927bc8c3d1", "job_id": "9d3fdaf7-82df-4ee8-a0c0-fb927bc8c3d1", "case_id": "Case123_20260501_001", "study_instance_uid": "1.2.840.113619.2.55.3.604688432.123.1714560000.1", "client_case_id": "external-123", "source_system": "partner_a", "status": "failed", "failure_stage": "metrics", "error": "Metrics finished with failure return status", "received_at": "2026-05-01T14:30:00-03:00", "package_name": null, "package_sha256": null, "package_size_bytes": 0, "contents": {}, "requested_outputs": {}, "delivered_outputs": {}, "missing_outputs": [] }
 ```
 
 Package ZIP layout:
@@ -285,10 +231,7 @@ metadata/report.dcm
 artifacts/metrics/<metric_key>/...
 ```
 
-Some files may be absent when they were not generated, not requested, or not
-available for the completed case. The package-level `manifest.json` inside the
-ZIP has the same high-level identity and content summary, but is not a detached
-signature.
+Some files may be absent when they were not generated, not requested, or not available for the completed case. The package-level `manifest.json` inside the ZIP has the same high-level identity and content summary, but is not a detached signature.
 
 ## Receiver Requirements
 
@@ -297,10 +240,10 @@ Callback receivers should:
 - accept multipart HTTP `POST`
 - treat `job_id` plus `event_type` as the idempotency key
 - return any `2xx` status only after persisting the package or a durable
-  handoff record
+handoff record
 - ignore unknown JSON fields
 - verify `package_sha256` after reading the ZIP when `event_type` is
-  `case.completed`
+`case.completed`
 - store the original manifest for audit
 
 ## Current Limitations
@@ -309,6 +252,6 @@ Callback receivers should:
 - Callback delivery has no built-in HMAC, mTLS, or signature.
 - Callback delivery does not currently support custom headers.
 - Archive contents are validated later by the prepare worker, not at admission
-  time.
+time.
 - Failed terminal deliveries remain in SQLite queue state; a full dead-letter
-  queue export process is not implemented yet.
+queue export process is not implemented yet.

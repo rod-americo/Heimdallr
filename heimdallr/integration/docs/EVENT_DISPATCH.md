@@ -1,16 +1,12 @@
 # Outbound Event Dispatch
 
-This contract is for applications that receive JSON events from Heimdallr after
-internal pipeline milestones.
+This contract is for applications that receive JSON events from Heimdallr after internal pipeline milestones.
 
-Event dispatch is configuration-driven. Heimdallr writes events to the SQLite
-`integration_dispatch_queue`, and the resident dispatch worker posts them to
-destinations from `config/integration_dispatch.json`.
+Event dispatch is configuration-driven. Heimdallr writes events to the SQLite `integration_dispatch_queue`, and the resident dispatch worker posts them to destinations from `config/integration_dispatch.json`.
 
 ## Worker Entrypoint
 
-```bash
-.venv/bin/python -m heimdallr.integration.dispatch
+```bash .venv/bin/python -m heimdallr.integration.dispatch
 ```
 
 ## Destination Configuration
@@ -23,8 +19,7 @@ config/integration_dispatch.json
 
 Template:
 
-```text
-config/integration_dispatch.example.json
+```text config/integration_dispatch.example.json
 ```
 
 Example destination:
@@ -55,48 +50,25 @@ Example destination:
 }
 ```
 
-Only HTTP `POST` is supported. If `events` is omitted, the destination receives
-all event types. Headers in `headers_from_env` are added only when the
-environment variable is set and non-empty.
+Only HTTP `POST` is supported. If `events` is omitted, the destination receives all event types. Headers in `headers_from_env` are added only when the environment variable is set and non-empty.
 
 ## Delivery Semantics
 
 - Any HTTP `2xx` response marks the queue item as done.
 - Non-`2xx` responses and transport failures are retried according to the
-  dispatch config.
+dispatch config.
 - Queue uniqueness is `event_key` plus `destination_name`.
 - Re-enqueueing the same `event_key` for the same destination resets the queue
-  item to `pending` with the latest payload.
+item to `pending` with the latest payload.
 - Consumers should treat `event_id` as the event idempotency key.
 
 ## Event: `patient_identified`
 
-Emitted by the prepare stage after Heimdallr extracts patient and study
-identity metadata from an incoming study.
+Emitted by the prepare stage after Heimdallr extracts patient and study identity metadata from an incoming study.
 
 Current version:
 
-```json
-{
-  "event_type": "patient_identified",
-  "event_version": 1,
-  "event_id": "patient_identified:1.2.840.113619.2.55.3.604688432.123.1714560000.1",
-  "source": "heimdallr.prepare",
-  "occurred_at": "2026-05-01T14:32:10-03:00",
-  "study_instance_uid": "1.2.840.113619.2.55.3.604688432.123.1714560000.1",
-  "case_id": "Case123_20260501_001",
-  "clinical_name": "Case123_20260501_001",
-  "accession_number": "5001",
-  "study_date": "20260501",
-  "modality": "CT",
-  "patient_id": "PID123",
-  "patient_birth_date": "19800115",
-  "patient_sex": "F",
-  "patient_name_display": "DISPLAY NAME",
-  "patient_name_raw": "RAW^NAME",
-  "calling_aet": "MODALITY_AE",
-  "remote_ip": "10.0.0.5"
-}
+```json { "event_type": "patient_identified", "event_version": 1, "event_id": "patient_identified:1.2.840.113619.2.55.3.604688432.123.1714560000.1", "source": "heimdallr.prepare", "occurred_at": "2026-05-01T14:32:10-03:00", "study_instance_uid": "1.2.840.113619.2.55.3.604688432.123.1714560000.1", "case_id": "Case123_20260501_001", "clinical_name": "Case123_20260501_001", "accession_number": "5001", "study_date": "20260501", "modality": "CT", "patient_id": "PID123", "patient_birth_date": "19800115", "patient_sex": "F", "patient_name_display": "DISPLAY NAME", "patient_name_raw": "RAW^NAME", "calling_aet": "MODALITY_AE", "remote_ip": "10.0.0.5" }
 ```
 
 Field notes:

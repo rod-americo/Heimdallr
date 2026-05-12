@@ -1,13 +1,10 @@
 # Operations
 
-This runbook describes the real Heimdallr boot, configuration, runtime state,
-validation, restart, and troubleshooting model.
+This runbook describes the real Heimdallr boot, configuration, runtime state, validation, restart, and troubleshooting model.
 
 ## 1. Purpose
 
-Heimdallr is operated as multiple independent Python services that share a
-single package, SQLite database, runtime filesystem, and host-local
-configuration. Operators should supervise each resident service separately.
+Heimdallr is operated as multiple independent Python services that share a single package, SQLite database, runtime filesystem, and host-local configuration. Operators should supervise each resident service separately.
 
 ## 2. Environments
 
@@ -22,11 +19,7 @@ configuration. Operators should supervise each resident service separately.
 
 ### Local Boot
 
-```bash
-python3.12 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-pip install -r requirements.txt
+```bash python3.12 -m venv .venv source .venv/bin/activate python -m pip install --upgrade pip pip install -r requirements.txt
 ```
 
 Create host-local config files from examples when the related service is used:
@@ -44,17 +37,7 @@ cp config/resource_monitor.example.json config/resource_monitor.json
 
 ### Primary Boot
 
-```bash
-.venv/bin/python -m heimdallr.control_plane
-.venv/bin/python -m heimdallr.prepare
-.venv/bin/python -m heimdallr.segmentation
-.venv/bin/python -m heimdallr.metrics
-.venv/bin/python -m heimdallr.intake
-.venv/bin/python -m heimdallr.dicom_egress
-.venv/bin/python -m heimdallr.integration.dispatch
-.venv/bin/python -m heimdallr.integration.delivery
-.venv/bin/python -m heimdallr.space_manager
-.venv/bin/python -m heimdallr.resource_monitor
+```bash .venv/bin/python -m heimdallr.control_plane .venv/bin/python -m heimdallr.prepare .venv/bin/python -m heimdallr.segmentation .venv/bin/python -m heimdallr.metrics .venv/bin/python -m heimdallr.intake .venv/bin/python -m heimdallr.dicom_egress .venv/bin/python -m heimdallr.integration.dispatch .venv/bin/python -m heimdallr.integration.delivery .venv/bin/python -m heimdallr.space_manager .venv/bin/python -m heimdallr.resource_monitor
 ```
 
 Run each command in its own process supervisor unit, terminal, or container.
@@ -66,18 +49,13 @@ The optional dashboard TUI is:
 
 ### API Container Stack
 
-The API-scoped container stack is documented separately in
-`docs/CONTAINER_API.md`. That stack includes control plane, prepare,
-segmentation, metrics, and integration delivery. It intentionally excludes DICOM
-C-STORE intake, DICOM egress, and integration dispatch.
+The API-scoped container stack is documented separately in `docs/CONTAINER_API.md`. That stack includes control plane, prepare, segmentation, metrics, and integration delivery. It intentionally excludes DICOM C-STORE intake, DICOM egress, and integration dispatch.
 
-Build the image on `thor` for the current POC because the image build can bake
-TotalSegmentator weights and the host has the GPU runtime used for validation.
+Build the image on `thor` for the current POC because the image build can bake TotalSegmentator weights and the host has the GPU runtime used for validation.
 
 ## 4. Operational Configuration
 
-Configuration is centralized in `heimdallr/shared/settings.py` and JSON files
-under `config/`.
+Configuration is centralized in `heimdallr/shared/settings.py` and JSON files under `config/`.
 
 Critical environment variables:
 
@@ -127,21 +105,17 @@ Ignored host-local config:
 - `config/space_manager.json`
 - `config/resource_monitor.json`
 
-When `resource_monitor` samples services installed as user-scoped systemd
-units, prefix the unit name with `user:` in `config/resource_monitor.json`, for
-example `user:heimdallr-segmentation.service`. Unprefixed names are read from
-the system systemd manager.
+When `resource_monitor` samples services installed as user-scoped systemd units, prefix the unit name with `user:` in `config/resource_monitor.json`, for example `user:heimdallr-segmentation.service`. Unprefixed names are read from the system systemd manager.
 
 Project presentation default:
 
 - `en_US` is the default artifact and TUI locale.
 - `pt_BR` remains a supported locale for explicit host-local overrides and i18n
-  tests.
+tests.
 
 ## 5. Minimum Validation
 
-```bash
-python3 scripts/check_project_gate.py && python3 scripts/project_doctor.py && python3 scripts/project_doctor.py --audit-config
+```bash python3 scripts/check_project_gate.py && python3 scripts/project_doctor.py && python3 scripts/project_doctor.py --audit-config
 ```
 
 Additional checks by change type:
@@ -168,9 +142,7 @@ runtime/test_datasets/
 
 On `thor`, the current local smoke fixture is:
 
-```text
-runtime/test_datasets/prometheus_smoke/heimdallr_smoke_001_anonymized.zip
-runtime/test_datasets/prometheus_smoke/heimdallr_smoke_001_manifest.json
+```text runtime/test_datasets/prometheus_smoke/heimdallr_smoke_001_anonymized.zip runtime/test_datasets/prometheus_smoke/heimdallr_smoke_001_manifest.json
 ```
 
 It was generated from a local Prometheus ZIP using:
@@ -181,19 +153,13 @@ It was generated from a local Prometheus ZIP using:
   --manifest runtime/test_datasets/prometheus_smoke/heimdallr_smoke_001_manifest.json
 ```
 
-The helper performs metadata anonymization, rewrites DICOM UIDs, replaces direct
-patient identifiers with `HEIMDALLR-SMOKE-001` / `Heimdallr^Smoke`, and writes
-safe archive member names. It does not OCR-scrub burned-in pixel text; do not
-publish the output or commit it to the repository.
+The helper performs metadata anonymization, rewrites DICOM UIDs, replaces direct patient identifiers with `HEIMDALLR-SMOKE-001` / `Heimdallr^Smoke`, and writes safe archive member names. It does not OCR-scrub burned-in pixel text; do not publish the output or commit it to the repository.
 
 ### Thor POC Validation
 
 Before using `thor`, ensure local and host Git states match:
 
-```bash
-git status --short --branch
-git rev-parse --short HEAD
-ssh thor 'cd ~/Heimdallr && git status --short --branch && git rev-parse --short HEAD'
+```bash git status --short --branch git rev-parse --short HEAD ssh thor 'cd ~/Heimdallr && git status --short --branch && git rev-parse --short HEAD'
 ```
 
 Expected: same branch, same upstream target, same commit hash, and no unexpected
@@ -207,14 +173,9 @@ ssh thor 'cd ~/Heimdallr && .venv/bin/python -m pip check'
 ssh thor 'cd ~/Heimdallr && .venv/bin/python scripts/check_runtime_requirements.py'
 ```
 
-Thor has an NVIDIA RTX 3090 and the in-repository `.venv` has CUDA-capable
-PyTorch. Do not run large smoke segmentation with
-`config/segmentation_pipeline.example.json`, because that example is CPU-first.
-For Thor smoke and resident segmentation, create the ignored host-local config
-from the GPU template:
+Thor has an NVIDIA RTX 3090 and the in-repository `.venv` has CUDA-capable PyTorch. Do not run large smoke segmentation with `config/segmentation_pipeline.example.json`, because that example is CPU-first. For Thor smoke and resident segmentation, create the ignored host-local config from the GPU template:
 
-```bash
-cp config/segmentation_pipeline.gpu.example.json config/segmentation_pipeline.json
+```bash cp config/segmentation_pipeline.gpu.example.json config/segmentation_pipeline.json
 ```
 
 Then restart the segmentation worker so it reloads
@@ -254,12 +215,12 @@ Common failure signals:
 - ZIP remains in upload spool and `prepare` is not running or cannot claim it.
 - queue rows stay `claimed` until claim TTL recovery on restart.
 - `segmentation` fails because TotalSegmentator binary, license, or compute is
-  unavailable.
+unavailable.
 - `metrics` skips jobs because masks or required profile inputs are missing.
 - `dicom_egress` retries because the remote SCP rejects association, syntax, or
-  generated artifact type.
+generated artifact type.
 - `integration_delivery` retries because callback URL is unreachable or
-  returns non-2xx.
+returns non-2xx.
 
 ## 7. Restart Policy
 
@@ -300,8 +261,7 @@ Primary state:
 
 Backup example:
 
-```bash
-sqlite3 database/dicom.db ".backup 'database/dicom_backup_$(date +%Y%m%d_%H%M%S).db'"
+```bash sqlite3 database/dicom.db ".backup 'database/dicom_backup_$(date +%Y%m%d_%H%M%S).db'"
 ```
 
 Restore example:
@@ -315,7 +275,7 @@ Safe cleanup candidates:
 
 - old failed upload ZIPs after investigation
 - generated runtime artifacts only when `space_manager` policy or an operator
-  decision says they are no longer needed
+decision says they are no longer needed
 - local caches outside tracked source
 
 Never remove without explicit intent:
@@ -334,7 +294,7 @@ Never remove without explicit intent:
 5. Inspect the relevant case directory under `runtime/studies/<case_id>/`.
 6. Check worker output and per-case logs.
 7. Confirm external dependency reachability: DICOM peer, callback URL,
-   TotalSegmentator binary/license, conversion binaries.
+TotalSegmentator binary/license, conversion binaries.
 8. Confirm filesystem permissions for `runtime/` and `database/`.
 9. Run structural validation if docs/contracts were changed.
 10. Capture exact error text before cleaning failed runtime state.

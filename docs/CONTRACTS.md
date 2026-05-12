@@ -1,14 +1,10 @@
 # Contracts
 
-This document records the canonical inputs, outputs, identifiers, queue
-contracts, integrations, and invariants that matter for safe Heimdallr changes.
+This document records the canonical inputs, outputs, identifiers, queue contracts, integrations, and invariants that matter for safe Heimdallr changes.
 
 ## 1. Purpose
 
-Heimdallr transforms incoming radiological imaging studies into traceable
-runtime artifacts, deterministic measurements, database state, and outbound
-delivery events. Contracts here describe what the current code supports; they
-do not claim clinical readiness.
+Heimdallr transforms incoming radiological imaging studies into traceable runtime artifacts, deterministic measurements, database state, and outbound delivery events. Contracts here describe what the current code supports; they do not claim clinical readiness.
 
 ## 2. Canonical Inputs
 
@@ -73,8 +69,7 @@ do not claim clinical readiness.
 
 ### HTTP Uploads
 
-`POST /upload` accepts only `.zip` uploads and returns acceptance after the file
-is stored in the external spool. Acceptance does not mean processing completed.
+`POST /upload` accepts only `.zip` uploads and returns acceptance after the file is stored in the external spool. Acceptance does not mean processing completed.
 
 `POST /jobs` requires:
 
@@ -87,16 +82,11 @@ Optional fields:
 - `source_system`
 - `requested_outputs` as JSON object for returned files
 - `requested_metrics_modules` as JSON array or CSV string for requested metrics
-  jobs from the active profile. Declared metrics dependencies are included, and
-  declared `requires_segmentation_tasks` values can narrow the segmentation
-  task set before metrics run.
+jobs from the active profile. Declared metrics dependencies are included, and declared `requires_segmentation_tasks` values can narrow the segmentation task set before metrics run.
 
-If `requested_outputs` is present, omitted output keys are `false`. If the
-field is omitted entirely, Heimdallr keeps the legacy default completion
-package.
+If `requested_outputs` is present, omitted output keys are `false`. If the field is omitted entirely, Heimdallr keeps the legacy default completion package.
 
-The external consumer contract is maintained in
-`heimdallr/integration/docs/JOB_SUBMISSION.md`.
+The external consumer contract is maintained in `heimdallr/integration/docs/JOB_SUBMISSION.md`.
 
 ### Final Delivery
 
@@ -105,12 +95,9 @@ For `/jobs` submissions, successful final callbacks are multipart and include:
 - `manifest.json`
 - `package.zip`
 
-Terminal failed callbacks use `event_type=case.failed` and include a multipart
-`manifest.json` without `package.zip`. `GET /jobs/{job_id}` exposes best-effort
-status for accepted jobs while processing and delivery are still in progress.
+Terminal failed callbacks use `event_type=case.failed` and include a multipart `manifest.json` without `package.zip`. `GET /jobs/{job_id}` exposes best-effort status for accepted jobs while processing and delivery are still in progress.
 
-Outbound event dispatch consumers are documented in
-`heimdallr/integration/docs/EVENT_DISPATCH.md`.
+Outbound event dispatch consumers are documented in `heimdallr/integration/docs/EVENT_DISPATCH.md`.
 
 ### DICOM
 
@@ -120,34 +107,33 @@ Inbound DICOM defaults:
 - port: `11114`
 - supported storage contexts from `pynetdicom`
 
-Outbound DICOM destinations are host-local and defined in
-`config/dicom_egress.json`.
+Outbound DICOM destinations are host-local and defined in `config/dicom_egress.json`.
 
 ## 7. Invariants
 
 - Runtime state is mutable and must not be committed.
 - Host-local operational JSON files must remain ignored.
 - `config/metrics_pipeline.example.json` must be updated when adding a new
-  production metrics module.
+production metrics module.
 - Experimental metrics modules must not silently enter the default
-  production-facing profile.
+production-facing profile.
 - `StudyInstanceUID`, `case_id`, and `job_id` are not interchangeable.
 - FastAPI upload acceptance is asynchronous and not proof that segmentation,
-  metrics, or delivery succeeded.
+metrics, or delivery succeeded.
 - Clinical review is required before outputs influence patient care.
 
 ## 8. Assumptions and Partial Areas
 
 - Built-in FastAPI authentication is not implemented; production access control
-  is assumed to be enforced outside the app.
+is assumed to be enforced outside the app.
 - Worker logs are not uniformly structured JSON; some workers use line-buffered
-  `print()` and per-case log files.
+`print()` and per-case log files.
 - End-to-end smoke depends on external DICOM peer behavior, TotalSegmentator
-  readiness, and non-PHI sample data that is not tracked in this repository.
+readiness, and non-PHI sample data that is not tracked in this repository.
 - LLM-adjacent runtime clients are intentionally not part of Heimdallr's
-  dependency set; intelligence-layer behavior belongs outside this repository.
+dependency set; intelligence-layer behavior belongs outside this repository.
 
 ## 9. Breaking Contract Log
 
 - No breaking contract is introduced by the structural recovery documentation
-  and governance scripts.
+and governance scripts.
