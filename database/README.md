@@ -103,10 +103,7 @@ heimdallr.integration.delivery
 ## Querying Examples
 
 ### Get all studies
-```sql
-SELECT StudyInstanceUID, ClinicalName, Modality, ProcessedAt 
-FROM dicom_metadata 
-ORDER BY ProcessedAt DESC;
+```sql SELECT StudyInstanceUID, ClinicalName, Modality, ProcessedAt FROM dicom_metadata ORDER BY ProcessedAt DESC;
 ```
 
 ### Get studies with calculation results
@@ -117,10 +114,7 @@ WHERE CalculationResults IS NOT NULL;
 ```
 
 ### Get CT studies from specific date
-```sql
-SELECT * FROM dicom_metadata 
-WHERE Modality = 'CT' 
-AND StudyDate = '20260201';
+```sql SELECT * FROM dicom_metadata WHERE Modality = 'CT' AND StudyDate = '20260201';
 ```
 
 ### Search by patient name
@@ -131,8 +125,7 @@ WHERE PatientName LIKE '%Silva%';
 
 ## Backup
 
-To backup the database:
-```bash
+To backup the database: ```bash
 # Create backup
 cp database/dicom.db database/dicom_backup_$(date +%Y%m%d).db
 
@@ -154,8 +147,7 @@ sqlite3 database/dicom.db < database/backup.sql
 ## Maintenance
 
 ### Vacuum (optimize database)
-```bash
-sqlite3 database/dicom.db "VACUUM;"
+```bash sqlite3 database/dicom.db "VACUUM;"
 ```
 
 ### Check integrity

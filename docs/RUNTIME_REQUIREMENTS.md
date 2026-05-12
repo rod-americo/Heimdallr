@@ -1,15 +1,12 @@
 # Runtime Requirements
 
-This document explains how `requirements.txt` should be treated when rebuilding
-or auditing a Heimdallr runtime. It also records the current POC host baseline
-observed on `thor`.
+This document explains how `requirements.txt` should be treated when rebuilding or auditing a Heimdallr runtime. It also records the current POC host baseline observed on `thor`.
 
 ## 1. Canonical Runtime Contract
 
 The canonical dependency file is:
 
-```text
-requirements.txt
+```text requirements.txt
 ```
 
 The Python version contract is declared in `pyproject.toml`:
@@ -18,16 +15,13 @@ The Python version contract is declared in `pyproject.toml`:
 >=3.12,<3.13
 ```
 
-Use Python 3.12 for runtime rebuilds. Do not treat a locally working Python
-3.13 or 3.14 environment as the supported target unless `pyproject.toml`,
-tests, and host operations are deliberately updated.
+Use Python 3.12 for runtime rebuilds. Do not treat a locally working Python 3.13 or 3.14 environment as the supported target unless `pyproject.toml`, tests, and host operations are deliberately updated.
 
 ## 2. POC Host Baseline
 
 The current POC test host is:
 
-```text
-thor
+```text thor
 ```
 
 The current in-repository POC venv on `thor` is:
@@ -38,13 +32,7 @@ The current in-repository POC venv on `thor` is:
 
 Observed baseline:
 
-```text
-python: 3.12.3
-pip: 24.0
-pip check: No broken requirements found.
-requirements audit: matches requirements.txt
-gpu: NVIDIA GeForce RTX 3090
-torch cuda: available in ~/Heimdallr/.venv
+```text python: 3.12.3 pip: 24.0 pip check: No broken requirements found. requirements audit: matches requirements.txt gpu: NVIDIA GeForce RTX 3090 torch cuda: available in ~/Heimdallr/.venv
 ```
 
 Historical drift observed in the older external POC venv
@@ -65,21 +53,15 @@ Thor segmentation smoke must use the GPU host-local profile:
 cp config/segmentation_pipeline.gpu.example.json config/segmentation_pipeline.json
 ```
 
-`config/segmentation_pipeline.json` is ignored because it is operational host
-state. Restart the segmentation worker after changing it. The CPU-first
-`config/segmentation_pipeline.example.json` remains a conservative portable
-example and should not be used for large Thor smoke runs.
+`config/segmentation_pipeline.json` is ignored because it is operational host state. Restart the segmentation worker after changing it. The CPU-first `config/segmentation_pipeline.example.json` remains a conservative portable example and should not be used for large Thor smoke runs.
 
 ## 3. Git Parity Rule: Local and Thor
 
-Before using `thor` for code tests, local and `thor` must point at the same
-branch and commit, with no unexpected worktree changes.
+Before using `thor` for code tests, local and `thor` must point at the same branch and commit, with no unexpected worktree changes.
 
 Local check:
 
-```bash
-git status --short --branch
-git rev-parse --short HEAD
+```bash git status --short --branch git rev-parse --short HEAD
 ```
 
 Thor check:
@@ -94,14 +76,11 @@ Expected rule:
 - upstream tracking must match the intended remote branch
 - commit hashes must match before comparing test results
 - worktrees must be clean unless the active task explicitly requires a known
-  local-only change
+local-only change
 
-When local code changes should be tested on `thor`, push the branch first and
-then update `thor` with a fast-forward pull:
+When local code changes should be tested on `thor`, push the branch first and then update `thor` with a fast-forward pull:
 
-```bash
-git push
-ssh thor 'cd ~/Heimdallr && git pull --ff-only'
+```bash git push ssh thor 'cd ~/Heimdallr && git pull --ff-only'
 ```
 
 Do not edit code directly on `thor` unless the user explicitly requests host-side
@@ -120,8 +99,7 @@ Local:
 
 Thor POC venv:
 
-```bash
-ssh thor 'cd ~/Heimdallr && .venv/bin/python scripts/check_runtime_requirements.py'
+```bash ssh thor 'cd ~/Heimdallr && .venv/bin/python scripts/check_runtime_requirements.py'
 ```
 
 The command exits non-zero when required packages are missing or pinned versions
@@ -153,7 +131,7 @@ Only promote the new venv after:
 - `scripts/check_runtime_requirements.py` passes or all drift is documented
 - relevant Heimdallr tests pass on `thor`
 - TotalSegmentator task smoke is verified when segmentation behavior is in
-  scope
+scope
 
 ## 6. Requirements Review Notes
 
@@ -161,7 +139,7 @@ Only promote the new venv after:
 - Do not add `python-dotenv`.
 - Do not update pins from a working host venv without confirming code impact.
 - CUDA-related packages are Linux x86_64 specific and are guarded by environment
-  markers in `requirements.txt`.
+markers in `requirements.txt`.
 - TUI support requires `textual==8.1.1` in the selected venv.
 - Default presentation locale is `en_US`; use `pt_BR` only through an explicit
-  host-local override or targeted i18n tests.
+host-local override or targeted i18n tests.

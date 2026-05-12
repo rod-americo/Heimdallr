@@ -1,7 +1,6 @@
 # Decisions
 
-This file records lightweight architectural decisions that affect how Heimdallr
-should evolve.
+This file records lightweight architectural decisions that affect how Heimdallr should evolve.
 
 ## How to Add a Decision
 
@@ -20,15 +19,11 @@ Each decision should include:
 
 **Context**
 
-The starter kit recommends a clean package root and allows `src/` only when it
-is a conscious packaging requirement. Heimdallr already has a maintained
-`heimdallr/` package with many module entrypoints, tests, imports, docs, and
-runtime assumptions.
+The starter kit recommends a clean package root and allows `src/` only when it is a conscious packaging requirement. Heimdallr already has a maintained `heimdallr/` package with many module entrypoints, tests, imports, docs, and runtime assumptions.
 
 **Decision**
 
-Keep production code under `heimdallr/` and do not migrate to `src/heimdallr/`
-during structural recovery.
+Keep production code under `heimdallr/` and do not migrate to `src/heimdallr/` during structural recovery.
 
 **Impact**
 
@@ -39,7 +34,7 @@ during structural recovery.
 
 - The package does not mirror every starter-kit layer name.
 - Structural clarity must be documented through real module boundaries instead
-  of a cosmetic directory move.
+of a cosmetic directory move.
 
 **Alternatives rejected**
 
@@ -52,9 +47,7 @@ during structural recovery.
 
 **Context**
 
-Heimdallr already uses `config/` for versioned examples and operational
-configuration. The starter-kit doctor policy is small, versioned, and not
-host-local.
+Heimdallr already uses `config/` for versioned examples and operational configuration. The starter-kit doctor policy is small, versioned, and not host-local.
 
 **Decision**
 
@@ -68,9 +61,9 @@ Store doctor policy in `config/doctor.json`.
 **Tradeoff**
 
 - `config/` now contains both runtime examples and repository governance
-  policy.
+policy.
 - Docs must make clear that `config/doctor.json` is tracked and not a secret or
-  host-local override.
+host-local override.
 
 **Alternatives rejected**
 
@@ -83,14 +76,11 @@ Store doctor policy in `config/doctor.json`.
 
 **Context**
 
-The repository is existing, may have local workflows, and the user requested a
-one-off branch for this task. Forcing hook installation could disrupt the
-maintainer's environment.
+The repository is existing, may have local workflows, and the user requested a one-off branch for this task. Forcing hook installation could disrupt the maintainer's environment.
 
 **Decision**
 
-Add `.githooks/pre-commit` and `scripts/install_git_hooks.sh`, but do not run
-the installer automatically.
+Add `.githooks/pre-commit` and `scripts/install_git_hooks.sh`, but do not run the installer automatically.
 
 **Impact**
 
@@ -113,14 +103,11 @@ the installer automatically.
 
 **Context**
 
-The repository contains existing dependency and settings residue related to
-external model services, while the repository boundary states that LLM,
-prompting, NLP, and report intelligence belong to Asha.
+The repository contains existing dependency and settings residue related to external model services, while the repository boundary states that LLM, prompting, NLP, and report intelligence belong to Asha.
 
 **Decision**
 
-Do not remove compatibility residue in this structural recovery round, but
-document it as a boundary hotspot that must not be expanded inside Heimdallr.
+Do not remove compatibility residue in this structural recovery round, but document it as a boundary hotspot that must not be expanded inside Heimdallr.
 
 **Impact**
 
@@ -131,7 +118,7 @@ document it as a boundary hotspot that must not be expanded inside Heimdallr.
 
 - Some dependency/config names still appear broader than the desired domain.
 - A later cleanup may be needed to remove unused LLM-adjacent dependencies after
-  runtime impact is confirmed.
+runtime impact is confirmed.
 
 **Alternatives rejected**
 
@@ -144,33 +131,28 @@ document it as a boundary hotspot that must not be expanded inside Heimdallr.
 
 **Context**
 
-Heimdallr's maintained boundary excludes LLM, NLP, prompt engineering, OpenAI,
-Anthropic, MedGemma, and report intelligence workflows. An impact audit found
-no production imports of the `openai` or `anthropic` Python clients; they
-remained only as dependency residue.
+Heimdallr's maintained boundary excludes LLM, NLP, prompt engineering, OpenAI, Anthropic, MedGemma, and report intelligence workflows. An impact audit found no production imports of the `openai` or `anthropic` Python clients; they remained only as dependency residue.
 
 **Decision**
 
-Remove unused LLM-adjacent client dependencies from `requirements.txt` and keep
-the default control-plane title aligned with radiological image MLOps instead
-of AI/reporting terminology.
+Remove unused LLM-adjacent client dependencies from `requirements.txt` and keep the default control-plane title aligned with radiological image MLOps instead of AI/reporting terminology.
 
 **Impact**
 
 - Reduces installation surface that does not belong to Heimdallr's current
-  runtime.
+runtime.
 - Makes the documented project boundary visible in dependency metadata and
-  operator-facing defaults.
+operator-facing defaults.
 - Keeps future intelligence-layer work directed to Asha or another explicit
-  consumer.
+consumer.
 
 **Tradeoff**
 
 - Any untracked local workflow that still imports those clients must install
-  them outside Heimdallr or move to the appropriate companion repository.
+them outside Heimdallr or move to the appropriate companion repository.
 
 **Alternatives rejected**
 
 - Keep unused clients to preserve historical compatibility.
 - Replace the removed clients with optional extras before a real in-repository
-  use case exists.
+use case exists.
