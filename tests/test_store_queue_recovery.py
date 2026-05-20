@@ -431,6 +431,48 @@ class TestStoreQueueRecovery(unittest.TestCase):
             self.assertEqual(row["BoneHealthL1QcPass"], 0)
             conn.close()
 
+    def test_update_id_json_preserves_existing_biometrics_when_absent(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "dicom.db"
+            conn = _connect_row_db(db_path)
+            store.ensure_schema(conn)
+            conn.execute(
+                """
+                INSERT INTO dicom_metadata (
+                    StudyInstanceUID, PatientName, AccessionNumber, StudyDate, Modality, Weight, Height, IdJson
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "1.2.5",
+                    "Cara Example",
+                    "125",
+                    "20260502",
+                    "CT",
+                    68.0,
+                    1.72,
+                    json.dumps({"CaseID": "CaseA", "Weight": 68.0, "Height": 1.72}),
+                ),
+            )
+
+            store.update_id_json(
+                conn,
+                "1.2.5",
+                {
+                    "CaseID": "CaseA",
+                    "SegmentationStatus": "done",
+                },
+            )
+
+            row = conn.execute(
+                "SELECT Weight, Height, IdJson FROM dicom_metadata WHERE StudyInstanceUID = ?",
+                ("1.2.5",),
+            ).fetchone()
+            self.assertEqual(row["Weight"], 68.0)
+            self.assertEqual(row["Height"], 1.72)
+            self.assertEqual(json.loads(row["IdJson"])["SegmentationStatus"], "done")
+            conn.close()
+
     def test_claim_next_pending_metrics_queue_item_reclaims_stale_claim(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "dicom.db"

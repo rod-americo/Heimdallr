@@ -2027,7 +2027,13 @@ def update_full_dicom_metadata(conn: sqlite3.Connection, study_uid: str, full_me
 
 def update_id_json(conn: sqlite3.Connection, study_uid: str, metadata: dict[str, Any]) -> None:
     conn.execute(
-        "UPDATE dicom_metadata SET IdJson = ?, Weight = ?, Height = ? WHERE StudyInstanceUID = ?",
+        """
+        UPDATE dicom_metadata
+        SET IdJson = ?,
+            Weight = COALESCE(?, Weight),
+            Height = COALESCE(?, Height)
+        WHERE StudyInstanceUID = ?
+        """,
         (json.dumps(metadata), metadata.get("Weight"), metadata.get("Height"), study_uid),
     )
     conn.commit()
