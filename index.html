@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<!--
+  Copyright (c) 2026 Rodrigo Americo
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Heimdallr is open-source infrastructure for radiological image operations: DICOM intake, DICOM-to-NIfTI preparation, segmentation orchestration, deterministic metrics, queue state, and artifact delivery.">
+    <meta name="theme-color" content="#486864">
+    <meta property="og:title" content="Heimdallr">
+    <meta property="og:description"
+        content="Open-source operational infrastructure for radiological image intake, preparation, segmentation, metrics, and artifact delivery.">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="static/branding/logos/heimdallr_logo_horizontal_dark.png">
+    <title>Heimdallr | Radiological Image Operations Infrastructure</title>
+    <link rel="icon" type="image/png" href="static/favicon.png">
+    <link rel="apple-touch-icon" href="static/apple-touch-icon.png">
+    <link rel="stylesheet" href="static/landing.css">
+</head>
+
+<body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header">
+        <nav class="nav-shell" aria-label="Main navigation">
+            <a class="brand-link" href="./" aria-label="Heimdallr home">
+                <img src="static/branding/watermarks/heimdallr_watermark_12.png" alt="" width="986" height="986">
+                <span>Heimdallr</span>
+            </a>
+            <div class="nav-links" aria-label="Page sections">
+                <a href="#why">Why</a>
+                <a href="#architecture">Flow</a>
+                <a href="#capabilities">Capabilities</a>
+                <a href="#start">Start</a>
+            </div>
+            <a class="nav-action" href="https://github.com/rod-americo/Heimdallr">GitHub</a>
+        </nav>
+    </header>
+
+    <main id="main">
+        <section class="hero" aria-labelledby="hero-title">
+            <div class="hero-background" aria-hidden="true"></div>
+            <div class="hero-shell">
+                <p class="eyebrow">Open-source radiological image MLOps stack</p>
+                <h1 id="hero-title">Heimdallr</h1>
+                <p class="tagline">Operational infrastructure for imaging intake, preparation, segmentation,
+                    deterministic metrics, and artifact delivery.</p>
+                <p class="hero-copy">Heimdallr receives DICOM studies, prepares selected series, converts to NIfTI,
+                    orchestrates TotalSegmentator-backed segmentation, tracks SQLite queue state, and delivers artifacts
+                    through dashboards, DICOM egress, and HTTP callbacks.</p>
+                <div class="hero-actions" aria-label="Primary links">
+                    <a class="button button-primary" href="https://github.com/rod-americo/Heimdallr">View repository</a>
+                    <a class="button button-secondary"
+                        href="https://github.com/rod-americo/Heimdallr/blob/main/docs/ARCHITECTURE.md">Read
+                        architecture</a>
+                </div>
+                <dl class="signal-strip" aria-label="Operational scope">
+                    <div>
+                        <dt>Runtime</dt>
+                        <dd>Python 3.12</dd>
+                    </div>
+                    <div>
+                        <dt>State</dt>
+                        <dd>SQLite + filesystem</dd>
+                    </div>
+                    <div>
+                        <dt>Boundary</dt>
+                        <dd>Infrastructure, not reporting</dd>
+                    </div>
+                </dl>
+            </div>
+        </section>
+
+        <section class="section section-light" id="purpose" aria-labelledby="purpose-title">
+            <div class="section-shell purpose-grid">
+                <div>
+                    <p class="section-kicker">Purpose</p>
+                    <h2 id="purpose-title">A governed operational layer for radiology image pipelines.</h2>
+                </div>
+                <p>Heimdallr keeps PACS-facing intake, DICOM conversion, segmentation orchestration, deterministic
+                    measurements, queue state, runtime artifacts, and delivery workflows in one auditable open-source
+                    stack. It is designed for technical operators who need clear state transitions and repeatable
+                    outputs, not autonomous clinical decision making.</p>
+            </div>
+        </section>
+
+        <section class="section" id="why" aria-labelledby="why-title">
+            <div class="section-shell">
+                <div class="section-heading">
+                    <p class="section-kicker">Why Heimdallr</p>
+                    <h2 id="why-title">Built around operational boundaries.</h2>
+                    <p>Radiology image processing has infrastructure concerns that should stay separate from reporting,
+                        NLP, and proprietary intelligence layers.</p>
+                </div>
+                <div class="feature-grid">
+                    <article class="feature-card">
+                        <span class="feature-index">01</span>
+                        <h3>DICOM-native intake</h3>
+                        <p>C-STORE study handoff, ZIP upload ingress, and deterministic study grouping by
+                            StudyInstanceUID.</p>
+                    </article>
+                    <article class="feature-card">
+                        <span class="feature-index">02</span>
+                        <h3>Traceable runtime state</h3>
+                        <p>Case workspaces, SQLite queues, metadata payloads, and generated artifacts remain explicit
+                            and inspectable.</p>
+                    </article>
+                    <article class="feature-card">
+                        <span class="feature-index">03</span>
+                        <h3>Deterministic outputs</h3>
+                        <p>Segmentation and metrics jobs produce reproducible infrastructure artifacts for qualified
+                            review.</p>
+                    </article>
+                    <article class="feature-card">
+                        <span class="feature-index">04</span>
+                        <h3>Clear repository scope</h3>
+                        <p>Report drafting, prompt workflows, and clinical narrative intelligence remain outside this
+                            codebase.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="section section-dark" id="architecture" aria-labelledby="architecture-title">
+            <div class="section-shell">
+                <div class="section-heading compact">
+                    <p class="section-kicker">Architecture</p>
+                    <h2 id="architecture-title">From incoming studies to delivered artifacts.</h2>
+                </div>
+                <ol class="flow-list" aria-label="Operational flow">
+                    <li>
+                        <span>01</span>
+                        <strong>Intake</strong>
+                        <p>DICOM C-STORE or ZIP uploads enter the stable spool.</p>
+                    </li>
+                    <li>
+                        <span>02</span>
+                        <strong>Prepare</strong>
+                        <p>Metadata extraction, selected-series policy, and DICOM-to-NIfTI conversion.</p>
+                    </li>
+                    <li>
+                        <span>03</span>
+                        <strong>Segment</strong>
+                        <p>TotalSegmentator tasks run from host-local profiles with queue heartbeats.</p>
+                    </li>
+                    <li>
+                        <span>04</span>
+                        <strong>Measure</strong>
+                        <p>Metrics jobs write results JSON, overlays, PDFs, and DICOM artifacts.</p>
+                    </li>
+                    <li>
+                        <span>05</span>
+                        <strong>Deliver</strong>
+                        <p>Dashboards, DICOM egress, event dispatch, and final callback packages expose the result.</p>
+                    </li>
+                </ol>
+                <div class="architecture-panel" aria-label="Canonical runtime surfaces">
+                    <div>
+                        <span class="panel-label">Canonical workspace</span>
+                        <code>runtime/studies/&lt;case_id&gt;/</code>
+                    </div>
+                    <div>
+                        <span class="panel-label">Queue and case state</span>
+                        <code>database/dicom.db</code>
+                    </div>
+                    <div>
+                        <span class="panel-label">Primary package</span>
+                        <code>heimdallr/</code>
+                    </div>
+                    <div>
+                        <span class="panel-label">Operational config</span>
+                        <code>config/*.example.json</code>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" id="capabilities" aria-labelledby="capabilities-title">
+            <div class="section-shell">
+                <div class="section-heading">
+                    <p class="section-kicker">Core capabilities</p>
+                    <h2 id="capabilities-title">Resident services with explicit responsibilities.</h2>
+                </div>
+                <div class="capability-grid">
+                    <article>
+                        <h3>Control plane</h3>
+                        <p>FastAPI dashboard, upload ingress, patient/results API, and deterministic PDF export.</p>
+                    </article>
+                    <article>
+                        <h3>Prepare worker</h3>
+                        <p>ZIP claiming, DICOM scan, metadata extraction, conversion, and segmentation enqueue.</p>
+                    </article>
+                    <article>
+                        <h3>Segmentation worker</h3>
+                        <p>Selected-series reuse, TotalSegmentator supervision, canonical NIfTI, and output layout.</p>
+                    </article>
+                    <article>
+                        <h3>Metrics worker</h3>
+                        <p>Dynamic job loading, dependency graph execution, generated artifacts, and delivery enqueue.
+                        </p>
+                    </article>
+                    <article>
+                        <h3>DICOM egress</h3>
+                        <p>Outbound C-STORE delivery through retry-aware queue workers and peer configuration.</p>
+                    </article>
+                    <article>
+                        <h3>Operational guards</h3>
+                        <p>Resource telemetry, disk usage protection, Textual TUI, and structural validation scripts.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="section section-light" id="start" aria-labelledby="start-title">
+            <div class="section-shell start-grid">
+                <div>
+                    <p class="section-kicker">First steps</p>
+                    <h2 id="start-title">Run the stack with a single Python 3.12 environment.</h2>
+                    <p>Host-specific values stay outside Git. Create local JSON config from the versioned examples,
+                        inject secrets through the host supervisor or container runtime, and keep mutable data under
+                        ignored runtime paths.</p>
+                    <div class="link-row">
+                        <a href="https://github.com/rod-americo/Heimdallr/blob/main/README.md">README</a>
+                        <a href="https://github.com/rod-americo/Heimdallr/blob/main/docs/OPERATIONS.md">Operations</a>
+                        <a href="https://github.com/rod-americo/Heimdallr/blob/main/docs/API.md">API</a>
+                    </div>
+                </div>
+                <div class="terminal-window" aria-label="Quick start commands">
+                    <div class="terminal-bar">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    <pre><code>git clone git@github.com:rod-americo/Heimdallr.git
+cd Heimdallr
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+cp config/segmentation_pipeline.example.json config/segmentation_pipeline.json
+cp config/metrics_pipeline.example.json config/metrics_pipeline.json
+
+.venv/bin/python -m heimdallr.control_plane
+.venv/bin/python -m heimdallr.prepare
+.venv/bin/python -m heimdallr.segmentation
+.venv/bin/python -m heimdallr.metrics</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <section class="section closing-band" aria-labelledby="closing-title">
+            <div class="section-shell closing-shell">
+                <div>
+                    <p class="section-kicker">Open source</p>
+                    <h2 id="closing-title">Infrastructure for auditable radiology operations.</h2>
+                </div>
+                <a class="button button-primary" href="https://github.com/rod-americo/Heimdallr">Open on GitHub</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <div class="footer-shell">
+            <span>Heimdallr - Apache-2.0</span>
+            <span>Generated artifacts require qualified review before clinical use.</span>
+        </div>
+    </footer>
+</body>
+
+</html>
