@@ -220,8 +220,8 @@ code {
     background:
         linear-gradient(90deg, rgba(17, 21, 20, 0.95), rgba(40, 60, 57, 0.78), rgba(72, 104, 100, 0.36)),
         url("branding/watermarks/heimdallr_watermark_05.png");
-    background-position: center, right -1rem center;
-    background-size: auto, min(58vw, 760px) auto;
+    background-position: center, right 3rem center;
+    background-size: auto, min(54vw, 720px) auto;
     background-repeat: no-repeat;
 }
 
@@ -567,8 +567,8 @@ h1 {
 
 @media (max-width: 1040px) {
     .hero-background {
-        background-position: center, right -10rem center;
-        background-size: auto, 740px auto;
+        background-position: center, right 1.5rem center;
+        background-size: auto, min(48vw, 600px) auto;
     }
 
     .hero-shell > *:not(.hero-background) {
@@ -666,15 +666,16 @@ h1 {
     }
 
     .hero {
-        min-height: auto;
+        min-height: 500px;
+        align-items: stretch;
     }
 
     .hero-background {
         background:
             linear-gradient(90deg, rgba(17, 21, 20, 0.97), rgba(40, 60, 57, 0.9), rgba(72, 104, 100, 0.76)),
             url("branding/watermarks/heimdallr_watermark_05.png");
-        background-position: center, center;
-        background-size: auto, min(92vw, 460px) auto;
+        background-position: center, center 58%;
+        background-size: auto, min(88vw, 430px) auto;
         background-repeat: no-repeat;
     }
 
@@ -683,6 +684,9 @@ h1 {
     }
 
     .hero-shell {
+        display: flex;
+        flex-direction: column;
+        min-height: 500px;
         padding: 2.7rem 0 2.4rem;
     }
 
@@ -706,14 +710,30 @@ h1 {
         font-size: 0.95rem;
     }
 
-    .hero-actions,
+    .hero-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.7rem;
+        margin-top: auto;
+        padding-top: 2.4rem;
+    }
+
     .link-row {
         flex-direction: column;
     }
 
-    .button,
+    .hero-actions .button {
+        min-height: 48px;
+        padding: 0.7rem 0.75rem;
+    }
+
+    .hero-actions .button,
     .link-row a {
         width: 100%;
+    }
+
+    .hero-actions .button-secondary {
+        background: rgba(17, 21, 20, 0.34);
     }
 
     .feature-grid,
