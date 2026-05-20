@@ -290,38 +290,6 @@ h1 {
     background: rgba(255, 255, 255, 0.08);
 }
 
-.signal-strip {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1px;
-    max-width: 860px;
-    margin: 3rem 0 0;
-    padding: 0;
-    border: 1px solid var(--line-dark);
-    border-radius: var(--radius);
-    overflow: hidden;
-    background: var(--line-dark);
-}
-
-.signal-strip div {
-    margin: 0;
-    padding: 1rem;
-    background: rgba(17, 21, 20, 0.6);
-}
-
-.signal-strip dt {
-    color: rgba(255, 255, 255, 0.58);
-    font-size: 0.78rem;
-    font-weight: 800;
-    text-transform: uppercase;
-}
-
-.signal-strip dd {
-    margin: 0.25rem 0 0;
-    color: var(--paper);
-    font-weight: 700;
-}
-
 .section {
     padding: 5.6rem 0;
     background: var(--paper-soft);
@@ -692,18 +660,6 @@ h1 {
 
     .hero-copy {
         font-size: 0.95rem;
-    }
-
-    .signal-strip div {
-        padding: 0.8rem;
-    }
-
-    .signal-strip dt {
-        font-size: 0.66rem;
-    }
-
-    .signal-strip dd {
-        font-size: 0.78rem;
     }
 
     .hero-actions,
