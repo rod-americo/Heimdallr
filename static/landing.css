@@ -518,12 +518,16 @@ h1 {
 }
 
 .terminal-window pre {
+    max-width: 100%;
     margin: 0;
     padding: 1.15rem;
     overflow-x: auto;
 }
 
 .terminal-window code {
+    display: block;
+    min-width: 100%;
+    width: max-content;
     color: #e7eeeb;
     font-size: 0.86rem;
     line-height: 1.65;
@@ -666,8 +670,12 @@ h1 {
     }
 
     .hero-background {
-        background-position: center, 45% 45%;
-        background-size: auto, 900px auto;
+        background:
+            linear-gradient(90deg, rgba(17, 21, 20, 0.97), rgba(40, 60, 57, 0.9), rgba(72, 104, 100, 0.76)),
+            url("branding/watermarks/heimdallr_watermark_05.png");
+        background-position: center, center;
+        background-size: auto, min(92vw, 460px) auto;
+        background-repeat: no-repeat;
     }
 
     .hero-shell > *:not(.hero-background) {
