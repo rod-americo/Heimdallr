@@ -19,7 +19,11 @@ Heimdallr is operated as multiple independent Python services that share a singl
 
 ### Local Boot
 
-```bash python3.12 -m venv .venv source .venv/bin/activate python -m pip install --upgrade pip pip install -r requirements.txt
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
 ```
 
 Create host-local config files from examples when the related service is used:
@@ -37,7 +41,17 @@ cp config/resource_monitor.example.json config/resource_monitor.json
 
 ### Primary Boot
 
-```bash .venv/bin/python -m heimdallr.control_plane .venv/bin/python -m heimdallr.prepare .venv/bin/python -m heimdallr.segmentation .venv/bin/python -m heimdallr.metrics .venv/bin/python -m heimdallr.intake .venv/bin/python -m heimdallr.dicom_egress .venv/bin/python -m heimdallr.integration.dispatch .venv/bin/python -m heimdallr.integration.delivery .venv/bin/python -m heimdallr.space_manager .venv/bin/python -m heimdallr.resource_monitor
+```bash
+.venv/bin/python -m heimdallr.control_plane
+.venv/bin/python -m heimdallr.prepare
+.venv/bin/python -m heimdallr.segmentation
+.venv/bin/python -m heimdallr.metrics
+.venv/bin/python -m heimdallr.intake
+.venv/bin/python -m heimdallr.dicom_egress
+.venv/bin/python -m heimdallr.integration.dispatch
+.venv/bin/python -m heimdallr.integration.delivery
+.venv/bin/python -m heimdallr.space_manager
+.venv/bin/python -m heimdallr.resource_monitor
 ```
 
 Run each command in its own process supervisor unit, terminal, or container.
@@ -115,7 +129,8 @@ tests.
 
 ## 5. Minimum Validation
 
-```bash python3 scripts/check_project_gate.py && python3 scripts/project_doctor.py && python3 scripts/project_doctor.py --audit-config
+```bash
+python3 scripts/check_project_gate.py && python3 scripts/project_doctor.py && python3 scripts/project_doctor.py --audit-config
 ```
 
 Additional checks by change type:
@@ -159,7 +174,10 @@ The helper performs metadata anonymization, rewrites DICOM UIDs, replaces direct
 
 Before using `thor`, ensure local and host Git states match:
 
-```bash git status --short --branch git rev-parse --short HEAD ssh thor 'cd ~/Heimdallr && git status --short --branch && git rev-parse --short HEAD'
+```bash
+git status --short --branch
+git rev-parse --short HEAD
+ssh thor 'cd ~/Heimdallr && git status --short --branch && git rev-parse --short HEAD'
 ```
 
 Expected: same branch, same upstream target, same commit hash, and no unexpected

@@ -99,7 +99,15 @@ All long-running services should use the same interpreter: `.venv/bin/python`.
 
 ### 3. Configure
 
-```bash cp config/segmentation_pipeline.example.json config/segmentation_pipeline.json cp config/metrics_pipeline.example.json config/metrics_pipeline.json cp config/integration_dispatch.example.json config/integration_dispatch.json cp config/integration_delivery.example.json config/integration_delivery.json cp config/dicom_egress.example.json config/dicom_egress.json cp config/presentation.example.json config/presentation.json cp config/space_manager.example.json config/space_manager.json cp config/resource_monitor.example.json config/resource_monitor.json
+```bash
+cp config/segmentation_pipeline.example.json config/segmentation_pipeline.json
+cp config/metrics_pipeline.example.json config/metrics_pipeline.json
+cp config/integration_dispatch.example.json config/integration_dispatch.json
+cp config/integration_delivery.example.json config/integration_delivery.json
+cp config/dicom_egress.example.json config/dicom_egress.json
+cp config/presentation.example.json config/presentation.json
+cp config/space_manager.example.json config/space_manager.json
+cp config/resource_monitor.example.json config/resource_monitor.json
 ```
 
 Only example files are versioned. The concrete host-local files above are
@@ -116,7 +124,17 @@ or inject `TOTALSEGMENTATOR_LICENSE` through host supervision.
 
 ### 4. Run
 
-```bash .venv/bin/python -m heimdallr.control_plane .venv/bin/python -m heimdallr.prepare .venv/bin/python -m heimdallr.segmentation .venv/bin/python -m heimdallr.metrics .venv/bin/python -m heimdallr.intake .venv/bin/python -m heimdallr.dicom_egress .venv/bin/python -m heimdallr.integration.dispatch .venv/bin/python -m heimdallr.integration.delivery .venv/bin/python -m heimdallr.space_manager .venv/bin/python -m heimdallr.resource_monitor
+```bash
+.venv/bin/python -m heimdallr.control_plane
+.venv/bin/python -m heimdallr.prepare
+.venv/bin/python -m heimdallr.segmentation
+.venv/bin/python -m heimdallr.metrics
+.venv/bin/python -m heimdallr.intake
+.venv/bin/python -m heimdallr.dicom_egress
+.venv/bin/python -m heimdallr.integration.dispatch
+.venv/bin/python -m heimdallr.integration.delivery
+.venv/bin/python -m heimdallr.space_manager
+.venv/bin/python -m heimdallr.resource_monitor
 ```
 
 Run each resident service under its own terminal, supervisor unit, or container.
@@ -167,7 +185,10 @@ API details remain in [`docs/API.md`](docs/API.md). Database details remain in [
 
 Minimum structural validation:
 
-```bash python3 scripts/check_project_gate.py python3 scripts/project_doctor.py python3 scripts/project_doctor.py --audit-config
+```bash
+python3 scripts/check_project_gate.py
+python3 scripts/project_doctor.py
+python3 scripts/project_doctor.py --audit-config
 ```
 
 Python syntax validation:
@@ -178,7 +199,8 @@ Python syntax validation:
 
 Relevant unit coverage can be run with:
 
-```bash .venv/bin/python -m unittest discover -s tests
+```bash
+.venv/bin/python -m unittest discover -s tests
 ```
 
 Full end-to-end smoke requires a known non-PHI study payload, DICOM peer
