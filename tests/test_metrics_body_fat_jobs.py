@@ -12,8 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from heimdallr.metrics.jobs import body_fat_abdominal_volumes, body_fat_l3_slice  # noqa: E402
-from heimdallr.metrics.jobs._body_fat_job_common import (  # noqa: E402
+from heimdallr.metrics.jobs.tests import body_fat_abdominal_volumes, body_fat_l3_slice  # noqa: E402
+from heimdallr.metrics.jobs.tests._body_fat_job_common import (  # noqa: E402
     build_abdominal_aggregate,
     compute_level_measurements,
 )
@@ -50,7 +50,7 @@ class TestMetricsBodyFatJobs(unittest.TestCase):
         level_measurements, complete_levels, measurable_levels = compute_level_measurements(
             level_masks=level_masks,
             sat_mask=sat,
-            vat_mask=torso,
+            torso_mask=torso,
             spacing_xyz=(1.0, 1.0, 2.0),
         )
         aggregate = build_abdominal_aggregate(
@@ -58,7 +58,7 @@ class TestMetricsBodyFatJobs(unittest.TestCase):
             complete_levels=complete_levels,
             measurable_levels=measurable_levels,
             sat_mask=sat,
-            vat_mask=torso,
+            torso_mask=torso,
             spacing_xyz=(1.0, 1.0, 2.0),
         )
 
@@ -128,12 +128,10 @@ class TestMetricsBodyFatJobs(unittest.TestCase):
 
             self.assertEqual(abdominal_result["status"], "done")
             self.assertTrue(abdominal_result["measurement"]["aggregate"]["coverage_complete"])
-            self.assertGreater(abdominal_result["measurement"]["aggregate"]["vat_volume_cm3"], 0)
             self.assertGreater(abdominal_result["measurement"]["aggregate"]["visceral_proxy_volume_cm3"], 0)
             self.assertIn("overlay_png", abdominal_result["artifacts"])
 
             self.assertEqual(l3_result["status"], "done")
-            self.assertGreater(l3_result["measurement"]["vat_area_cm2"], 0)
             self.assertGreater(l3_result["measurement"]["visceral_proxy_area_cm2"], 0)
             self.assertIn("overlay_png", l3_result["artifacts"])
 

@@ -58,17 +58,7 @@
           "strict_qc": false
         },
         {
-          "name": "body_fat_abdominal_volumes",
-          "enabled": false,
-          "requires_segmentation_tasks": [
-            "total",
-            "tissue_types"
-          ],
-          "generate_overlay": true,
-          "emit_secondary_capture_dicom": false
-        },
-        {
-          "name": "body_fat_l3_slice",
+          "name": "vat_sat_ratio",
           "enabled": false,
           "requires_segmentation_tasks": [
             "total",
