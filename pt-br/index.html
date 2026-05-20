@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<!--
+  Copyright (c) 2026 Rodrigo Americo
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Heimdallr é infraestrutura open-source para operações com imagens radiológicas: ingestão DICOM, preparação DICOM-to-NIfTI, orquestração de segmentação, métricas determinísticas, estado de filas e entrega de artefatos.">
+    <meta name="theme-color" content="#486864">
+    <meta property="og:title" content="Heimdallr">
+    <meta property="og:description"
+        content="Infraestrutura operacional open-source para ingestão, preparação, segmentação, métricas e entrega de artefatos em imagens radiológicas.">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="../static/branding/logos/heimdallr_logo_horizontal_dark.png">
+    <title>Heimdallr | Infraestrutura Operacional para Imagens Radiológicas</title>
+    <link rel="alternate" hreflang="en" href="../">
+    <link rel="alternate" hreflang="pt-BR" href="./">
+    <link rel="icon" type="image/png" href="../static/favicon.png">
+    <link rel="apple-touch-icon" href="../static/apple-touch-icon.png">
+    <link rel="stylesheet" href="../static/landing.css">
+    <script>
+        try {
+            sessionStorage.setItem("heimdallr-language-choice", "pt-BR");
+        } catch {
+            /* Ignore storage restrictions. */
+        }
+    </script>
+</head>
+
+<body>
+    <a class="skip-link" href="#main">Ir para o conteúdo</a>
+
+    <header class="site-header">
+        <nav class="nav-shell" aria-label="Navegação principal">
+            <a class="brand-link" href="./" aria-label="Página inicial do Heimdallr">
+                <img src="../static/branding/watermarks/heimdallr_watermark_12.png" alt="" width="986" height="986">
+                <span>Heimdallr</span>
+            </a>
+            <div class="nav-links" aria-label="Seções da página">
+                <a href="#why">Por que</a>
+                <a href="#architecture">Fluxo</a>
+                <a href="#capabilities">Recursos</a>
+                <a href="#start">Início</a>
+            </div>
+            <div class="nav-actions">
+                <a class="language-link" href="../?lang=en" lang="en" hreflang="en">EN</a>
+                <a class="nav-action" href="https://github.com/rod-americo/Heimdallr">GitHub</a>
+            </div>
+        </nav>
+    </header>
+
+    <main id="main">
+        <section class="hero" aria-labelledby="hero-title">
+            <div class="hero-background" aria-hidden="true"></div>
+            <div class="hero-shell">
+                <p class="eyebrow">Stack open-source de MLOps para imagens radiológicas</p>
+                <h1 id="hero-title">Heimdallr</h1>
+                <p class="tagline">Infraestrutura operacional para ingestão, preparação, segmentação, métricas
+                    determinísticas e entrega de artefatos.</p>
+                <p class="hero-copy">Heimdallr recebe estudos DICOM, prepara séries selecionadas, converte para NIfTI,
+                    orquestra segmentação com TotalSegmentator, rastreia filas em SQLite e entrega artefatos por
+                    dashboards, DICOM egress e callbacks HTTP.</p>
+                <div class="hero-actions" aria-label="Links principais">
+                    <a class="button button-primary" href="https://github.com/rod-americo/Heimdallr">Ver repositório</a>
+                    <a class="button button-secondary"
+                        href="https://github.com/rod-americo/Heimdallr/blob/main/docs/ARCHITECTURE.md">Ler
+                        arquitetura</a>
+                </div>
+            </div>
+        </section>
+
+        <section class="section section-light" id="purpose" aria-labelledby="purpose-title">
+            <div class="section-shell purpose-grid">
+                <div>
+                    <p class="section-kicker">Propósito</p>
+                    <h2 id="purpose-title">Uma camada operacional governada para pipelines de imagem radiológica.</h2>
+                </div>
+                <p>Heimdallr mantém ingestão voltada a PACS, conversão DICOM, orquestração de segmentação, medições
+                    determinísticas, estado de filas, artefatos de runtime e fluxos de entrega em um stack open-source
+                    auditável. Ele foi desenhado para operadores técnicos que precisam de transições de estado claras e
+                    saídas repetíveis, não para tomada de decisão clínica autônoma.</p>
+            </div>
+        </section>
+
+        <section class="section" id="why" aria-labelledby="why-title">
+            <div class="section-shell">
+                <div class="section-heading">
+                    <p class="section-kicker">Por que Heimdallr</p>
+                    <h2 id="why-title">Construído em torno de limites operacionais.</h2>
+                    <p>Processamento de imagens radiológicas tem responsabilidades de infraestrutura que devem ficar
+                        separadas de laudos, NLP e camadas proprietárias de inteligência.</p>
+                </div>
+                <div class="feature-grid">
+                    <article class="feature-card">
+                        <span class="feature-index">01</span>
+                        <h3>Ingestão nativa DICOM</h3>
+                        <p>Handoff C-STORE, entrada por ZIP e agrupamento determinístico por StudyInstanceUID.</p>
+                    </article>
+                    <article class="feature-card">
+                        <span class="feature-index">02</span>
+                        <h3>Estado rastreável de runtime</h3>
+                        <p>Workspaces de casos, filas SQLite, payloads de metadados e artefatos gerados permanecem
+                            explícitos e inspecionáveis.</p>
+                    </article>
+                    <article class="feature-card">
+                        <span class="feature-index">03</span>
+                        <h3>Saídas determinísticas</h3>
+                        <p>Jobs de segmentação e métricas produzem artefatos reprodutíveis de infraestrutura para
+                            revisão qualificada.</p>
+                    </article>
+                    <article class="feature-card">
+                        <span class="feature-index">04</span>
+                        <h3>Escopo claro do repositório</h3>
+                        <p>Rascunho de laudos, fluxos de prompt e inteligência narrativa clínica ficam fora deste
+                            codebase.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="section section-dark" id="architecture" aria-labelledby="architecture-title">
+            <div class="section-shell">
+                <div class="section-heading compact">
+                    <p class="section-kicker">Arquitetura</p>
+                    <h2 id="architecture-title">De estudos recebidos a artefatos entregues.</h2>
+                </div>
+                <ol class="flow-list" aria-label="Fluxo operacional">
+                    <li>
+                        <span>01</span>
+                        <strong>Ingestão</strong>
+                        <p>DICOM C-STORE ou uploads ZIP entram no spool estável.</p>
+                    </li>
+                    <li>
+                        <span>02</span>
+                        <strong>Preparação</strong>
+                        <p>Extração de metadados, política de séries selecionadas e conversão DICOM-to-NIfTI.</p>
+                    </li>
+                    <li>
+                        <span>03</span>
+                        <strong>Segmentação</strong>
+                        <p>Tarefas TotalSegmentator rodam a partir de perfis host-local com heartbeats de fila.</p>
+                    </li>
+                    <li>
+                        <span>04</span>
+                        <strong>Métricas</strong>
+                        <p>Jobs escrevem JSON de resultados, overlays, PDFs e artefatos DICOM.</p>
+                    </li>
+                    <li>
+                        <span>05</span>
+                        <strong>Entrega</strong>
+                        <p>Dashboards, DICOM egress, eventos e pacotes finais de callback expõem o resultado.</p>
+                    </li>
+                </ol>
+                <div class="architecture-panel" aria-label="Superfícies canônicas de runtime">
+                    <div>
+                        <span class="panel-label">Workspace canônico</span>
+                        <code>runtime/studies/&lt;case_id&gt;/</code>
+                    </div>
+                    <div>
+                        <span class="panel-label">Estado de caso e filas</span>
+                        <code>database/dicom.db</code>
+                    </div>
+                    <div>
+                        <span class="panel-label">Pacote principal</span>
+                        <code>heimdallr/</code>
+                    </div>
+                    <div>
+                        <span class="panel-label">Config operacional</span>
+                        <code>config/*.example.json</code>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" id="capabilities" aria-labelledby="capabilities-title">
+            <div class="section-shell">
+                <div class="section-heading">
+                    <p class="section-kicker">Recursos principais</p>
+                    <h2 id="capabilities-title">Serviços residentes com responsabilidades explícitas.</h2>
+                </div>
+                <div class="capability-grid">
+                    <article>
+                        <h3>Control plane</h3>
+                        <p>Dashboard FastAPI, entrada de uploads, API de pacientes/resultados e exportação PDF
+                            determinística.</p>
+                    </article>
+                    <article>
+                        <h3>Prepare worker</h3>
+                        <p>Claim de ZIP, varredura DICOM, extração de metadados, conversão e enqueue de segmentação.</p>
+                    </article>
+                    <article>
+                        <h3>Segmentation worker</h3>
+                        <p>Reuso de séries selecionadas, supervisão do TotalSegmentator, NIfTI canônico e layout de
+                            saída.</p>
+                    </article>
+                    <article>
+                        <h3>Metrics worker</h3>
+                        <p>Carregamento dinâmico de jobs, execução por grafo de dependências, artefatos gerados e
+                            enqueue de entrega.</p>
+                    </article>
+                    <article>
+                        <h3>DICOM egress</h3>
+                        <p>Entrega C-STORE de saída por workers de fila com retry e configuração de peers.</p>
+                    </article>
+                    <article>
+                        <h3>Guardrails operacionais</h3>
+                        <p>Telemetria de recursos, proteção de disco, TUI em Textual e scripts de validação estrutural.
+                        </p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="section section-light" id="start" aria-labelledby="start-title">
+            <div class="section-shell start-grid">
+                <div>
+                    <p class="section-kicker">Primeiros passos</p>
+                    <h2 id="start-title">Rode o stack com um único ambiente Python 3.12.</h2>
+                    <p>Valores específicos do host ficam fora do Git. Crie configurações JSON locais a partir dos
+                        exemplos versionados, injete segredos pelo supervisor ou runtime de container e mantenha dados
+                        mutáveis sob caminhos ignorados de runtime.</p>
+                    <div class="link-row">
+                        <a href="https://github.com/rod-americo/Heimdallr/blob/main/README.md">README</a>
+                        <a href="https://github.com/rod-americo/Heimdallr/blob/main/docs/OPERATIONS.md">Operação</a>
+                        <a href="https://github.com/rod-americo/Heimdallr/blob/main/docs/API.md">API</a>
+                    </div>
+                </div>
+                <div class="terminal-window" aria-label="Comandos de início rápido">
+                    <div class="terminal-bar">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    <pre><code>git clone git@github.com:rod-americo/Heimdallr.git
+cd Heimdallr
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+cp config/segmentation_pipeline.example.json config/segmentation_pipeline.json
+cp config/metrics_pipeline.example.json config/metrics_pipeline.json
+
+.venv/bin/python -m heimdallr.control_plane
+.venv/bin/python -m heimdallr.prepare
+.venv/bin/python -m heimdallr.segmentation
+.venv/bin/python -m heimdallr.metrics</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <section class="section closing-band" aria-labelledby="closing-title">
+            <div class="section-shell closing-shell">
+                <div>
+                    <p class="section-kicker">Open source</p>
+                    <h2 id="closing-title">Infraestrutura para operações radiológicas auditáveis.</h2>
+                </div>
+                <a class="button button-primary" href="https://github.com/rod-americo/Heimdallr">Abrir no GitHub</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <div class="footer-shell">
+            <span>Heimdallr - Apache-2.0</span>
+            <span>Artefatos gerados exigem revisão qualificada antes de uso clínico.</span>
+        </div>
+    </footer>
+</body>
+
+</html>

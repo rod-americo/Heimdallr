@@ -150,6 +150,7 @@ code {
 
 .nav-links a,
 .nav-action,
+.language-link,
 .button,
 .link-row a {
     transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease;
@@ -160,6 +161,7 @@ code {
 }
 
 .nav-action,
+.language-link,
 .button {
     display: inline-flex;
     align-items: center;
@@ -170,6 +172,12 @@ code {
     line-height: 1.2;
 }
 
+.nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+}
+
 .nav-action {
     border: 1px solid var(--line);
     background: var(--paper);
@@ -177,8 +185,21 @@ code {
     color: var(--brand-deep);
 }
 
+.language-link {
+    border: 1px solid transparent;
+    padding: 0.7rem 0.8rem;
+    color: var(--ink-soft);
+    font-size: 0.9rem;
+}
+
 .nav-action:hover {
     border-color: var(--brand);
+}
+
+.language-link:hover {
+    border-color: var(--line);
+    background: var(--paper);
+    color: var(--brand-deep);
 }
 
 .hero {

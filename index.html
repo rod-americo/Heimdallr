@@ -28,9 +28,50 @@
     <meta property="og:type" content="website">
     <meta property="og:image" content="static/branding/logos/heimdallr_logo_horizontal_dark.png">
     <title>Heimdallr | Radiological Image Operations Infrastructure</title>
+    <link rel="alternate" hreflang="en" href="./">
+    <link rel="alternate" hreflang="pt-BR" href="pt-br/">
     <link rel="icon" type="image/png" href="static/favicon.png">
     <link rel="apple-touch-icon" href="static/apple-touch-icon.png">
     <link rel="stylesheet" href="static/landing.css">
+    <script>
+        (function () {
+            var languageChoiceKey = "heimdallr-language-choice";
+            var params = new URLSearchParams(window.location.search);
+            if (params.get("lang") === "en") {
+                try {
+                    sessionStorage.setItem(languageChoiceKey, "en");
+                } catch {
+                    /* Ignore storage restrictions. */
+                }
+                if (window.history && window.history.replaceState) {
+                    window.history.replaceState(null, "", window.location.pathname + window.location.hash);
+                }
+                return;
+            }
+
+            var savedLanguage = null;
+            try {
+                savedLanguage = sessionStorage.getItem(languageChoiceKey);
+            } catch {
+                /* Ignore storage restrictions. */
+            }
+            if (savedLanguage === "en") {
+                return;
+            }
+            if (savedLanguage === "pt-BR") {
+                window.location.replace("pt-br/");
+                return;
+            }
+
+            var languages = navigator.languages && navigator.languages.length
+                ? navigator.languages
+                : [navigator.language || ""];
+            var primaryLanguage = languages[0] || "";
+            if (/^pt(?:-|$)/i.test(primaryLanguage)) {
+                window.location.replace("pt-br/");
+            }
+        }());
+    </script>
 </head>
 
 <body>
@@ -48,7 +89,10 @@
                 <a href="#capabilities">Capabilities</a>
                 <a href="#start">Start</a>
             </div>
-            <a class="nav-action" href="https://github.com/rod-americo/Heimdallr">GitHub</a>
+            <div class="nav-actions">
+                <a class="language-link" href="pt-br/" lang="pt-BR" hreflang="pt-BR">PT-BR</a>
+                <a class="nav-action" href="https://github.com/rod-americo/Heimdallr">GitHub</a>
+            </div>
         </nav>
     </header>
 

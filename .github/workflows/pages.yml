@@ -27,8 +27,9 @@ jobs:
       - name: Prepare static site
         run: |
           set -euo pipefail
-          mkdir -p _site/static
+          mkdir -p _site/static _site/pt-br
           cp index.html _site/
+          cp pt-br/index.html _site/pt-br/
           cp static/landing.css _site/static/
           cp static/favicon.png _site/static/
           cp static/apple-touch-icon.png _site/static/
