@@ -27,7 +27,7 @@ Heimdallr transforms incoming radiological imaging studies into traceable runtim
 | Name | Destination | Format | Guarantees |
 | --- | --- | --- | --- |
 | Study directory | `runtime/studies/<case_id>/` | filesystem tree | Current canonical case workspace. |
-| Study identity metadata | `metadata/id.json` | JSON | Contains study identifiers, selected-series audit, and pipeline state when available. |
+| Study identity metadata | `metadata/id.json` | JSON | Contains study identifiers, available-series metadata, selected-series audit, and pipeline state when available. |
 | Results payload | `metadata/resultados.json` | JSON | Stores deterministic metrics and generated-artifact references after metrics execution. |
 | Canonical NIfTI | `derived/<case_id>.nii.gz` | NIfTI | Produced or materialized by segmentation for the selected series. |
 | Segmentation artifacts | `artifacts/<task>/` | files | TotalSegmentator task outputs according to active profile. |
@@ -46,7 +46,7 @@ Heimdallr transforms incoming radiological imaging studies into traceable runtim
 | Heimdallr case | `case_id` / `ClinicalName` | Filesystem-safe operational identifier generated during prepare. Do not assume it equals accession or study UID. |
 | External submitted job | `job_id` | Generated for `/jobs` submissions and used by integration delivery. |
 | External caller case | `client_case_id` | Caller-owned identifier echoed back in final delivery. |
-| Series selected for segmentation | `SeriesInstanceUID` plus slice count | Used for selection audit and reuse decisions. |
+| Series selected for segmentation | `SeriesInstanceUID` plus slice count and geometry summary | Used for selection audit and reuse decisions. Geometry fields may include measured `CoverageMm`, `ZSpacingMm`, `SliceThicknessMm`, and selection thresholds when available. |
 | Queue item | queue table `id` | Internal claim/retry identity, not an external contract. |
 | Artifact digest | `artifact_digest` | Used to preserve or reset DICOM egress queue state when artifacts change. |
 | Handoff duplicate state | `study_uid` + `manifest_digest` | Used to suppress repeated intake handoffs while prepare is pending or complete. |
@@ -118,6 +118,10 @@ production metrics module.
 - Experimental metrics modules must not silently enter the default
 production-facing profile.
 - `StudyInstanceUID`, `case_id`, and `job_id` are not interchangeable.
+- Series selection should prefer maximum measured anatomical coverage first and
+the thinnest available reconstruction only among coverage-equivalent eligible
+series. If geometric metadata is absent, the selector falls back to the legacy
+slice-count ranking.
 - FastAPI upload acceptance is asynchronous and not proof that segmentation,
 metrics, or delivery succeeded.
 - Clinical review is required before outputs influence patient care.

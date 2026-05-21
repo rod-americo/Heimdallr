@@ -603,6 +603,96 @@ def _safe_int(value, default=0):
         return default
 
 
+def _positive_float(value) -> float | None:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed <= 0:
+        return None
+    return parsed
+
+
+def _series_geometry_metrics(series: dict) -> dict:
+    coverage_mm = _positive_float(series.get("CoverageMm"))
+    z_spacing_mm = _positive_float(series.get("ZSpacingMm"))
+    spacing_between_mm = _positive_float(series.get("SpacingBetweenSlicesMm"))
+    slice_thickness_mm = _positive_float(series.get("SliceThicknessMm"))
+    if slice_thickness_mm is None:
+        slice_thickness_mm = _positive_float(series.get("SliceThickness"))
+    effective_thickness_mm = z_spacing_mm or spacing_between_mm or slice_thickness_mm
+    return {
+        "coverage_mm": coverage_mm,
+        "z_spacing_mm": z_spacing_mm,
+        "spacing_between_mm": spacing_between_mm,
+        "slice_thickness_mm": slice_thickness_mm,
+        "effective_thickness_mm": effective_thickness_mm,
+        "geometry_confidence": str(series.get("GeometryConfidence", "") or ""),
+    }
+
+
+def _geometry_priority_settings(profile: dict) -> dict:
+    raw = profile.get("geometry_priority")
+    if not isinstance(raw, dict):
+        return {"enabled": False}
+    return {
+        "enabled": bool(raw.get("enabled", False)),
+        "coverage_equivalence_ratio": _safe_float(raw.get("coverage_equivalence_ratio"), 0.92),
+        "coverage_equivalence_mm": _safe_float(raw.get("coverage_equivalence_mm"), 50.0),
+        "prefer_thinner_within_equivalent_coverage": bool(
+            raw.get("prefer_thinner_within_equivalent_coverage", True)
+        ),
+    }
+
+
+def _apply_geometry_priority(candidates: list[dict], settings: dict) -> bool:
+    if not settings.get("enabled"):
+        return False
+
+    grouped_max_coverage: dict[int, float] = {}
+    for candidate in candidates:
+        coverage = candidate.get("coverage_mm")
+        if coverage is None:
+            continue
+        rank = int(candidate["phase_rank"])
+        grouped_max_coverage[rank] = max(grouped_max_coverage.get(rank, 0.0), float(coverage))
+
+    if not grouped_max_coverage:
+        return False
+
+    ratio = min(max(float(settings.get("coverage_equivalence_ratio", 0.92)), 0.0), 1.0)
+    equivalence_mm = max(float(settings.get("coverage_equivalence_mm", 50.0)), 0.0)
+    for candidate in candidates:
+        max_coverage = grouped_max_coverage.get(int(candidate["phase_rank"]))
+        coverage = candidate.get("coverage_mm")
+        if max_coverage is None or coverage is None:
+            candidate["geometry_missing"] = True
+            candidate["coverage_tier"] = 2
+            candidate["max_coverage_mm"] = max_coverage
+            candidate["coverage_equivalence_floor_mm"] = None
+            continue
+        coverage_floor = max(max_coverage * ratio, max_coverage - equivalence_mm)
+        candidate["geometry_missing"] = False
+        candidate["max_coverage_mm"] = max_coverage
+        candidate["coverage_equivalence_floor_mm"] = coverage_floor
+        candidate["coverage_tier"] = 0 if float(coverage) >= coverage_floor else 1
+    return True
+
+
+def _candidate_geometry_audit(candidate: dict) -> dict:
+    series = candidate["series"]
+    return {
+        "SeriesInstanceUID": series.get("SeriesInstanceUID"),
+        "SeriesNumber": series.get("SeriesNumber"),
+        "Phase": candidate.get("phase"),
+        "CoverageMm": candidate.get("coverage_mm"),
+        "ZSpacingMm": candidate.get("z_spacing_mm"),
+        "SliceThicknessMm": candidate.get("slice_thickness_mm"),
+        "EffectiveThicknessMm": candidate.get("effective_thickness_mm"),
+        "CoverageTier": candidate.get("coverage_tier"),
+    }
+
+
 def _normalize_phase(value):
     raw = str(value or "").strip().lower()
     return raw or "unknown"
@@ -721,6 +811,7 @@ def select_prepared_series(case_id, id_data):
     hard_reject = profile.get("hard_reject", {})
     text_hints = profile.get("text_hints", {})
     follow_up_coverage = profile.get("follow_up_coverage", {})
+    geometry_priority = _geometry_priority_settings(profile)
     phase_priority = [_normalize_phase(p) for p in profile.get("phase_priority", ["unknown"])]
     phase_rank = {phase: idx for idx, phase in enumerate(phase_priority)}
     contrast_fallback_rank = len(phase_priority)
@@ -796,6 +887,7 @@ def select_prepared_series(case_id, id_data):
         probability = _safe_float(phase_data.get("probability"))
         phase_detected = bool(series.get("PhaseDetected"))
         text_penalty = _series_text_penalty(series, text_hints)
+        geometry_metrics = _series_geometry_metrics(series)
 
         candidates.append(
             {
@@ -808,6 +900,7 @@ def select_prepared_series(case_id, id_data):
                 "text_penalty": text_penalty,
                 "phase_rank": resolved_phase_rank,
                 "fallback_reason": fallback_reason,
+                **geometry_metrics,
             }
         )
 
@@ -816,16 +909,42 @@ def select_prepared_series(case_id, id_data):
             f"No eligible series found for profile '{profile_name}' in study {case_id}. Rejected: {json.dumps(rejected, ensure_ascii=False)}"
         )
 
-    candidates.sort(
-        key=lambda c: (
-            c["phase_rank"],
-            0 if c["phase_detected"] else 1,
-            -c["phase_probability"],
-            -c["slice_count"],
-            c["text_penalty"],
-            str(c["series"].get("SeriesNumber", "")),
+    geometry_priority_applied = _apply_geometry_priority(candidates, geometry_priority)
+    if geometry_priority_applied:
+        prefer_thinner = bool(geometry_priority.get("prefer_thinner_within_equivalent_coverage", True))
+        candidates.sort(
+            key=lambda c: (
+                c["phase_rank"],
+                1 if c.get("geometry_missing") else 0,
+                c.get("coverage_tier", 2),
+                (
+                    c.get("effective_thickness_mm")
+                    if (
+                        prefer_thinner
+                        and c.get("coverage_tier") == 0
+                        and c.get("effective_thickness_mm") is not None
+                    )
+                    else float("inf")
+                ),
+                -(c.get("coverage_mm") or 0.0),
+                0 if c["phase_detected"] else 1,
+                -c["phase_probability"],
+                -c["slice_count"],
+                c["text_penalty"],
+                str(c["series"].get("SeriesNumber", "")),
+            )
         )
-    )
+    else:
+        candidates.sort(
+            key=lambda c: (
+                c["phase_rank"],
+                0 if c["phase_detected"] else 1,
+                -c["phase_probability"],
+                -c["slice_count"],
+                c["text_penalty"],
+                str(c["series"].get("SeriesNumber", "")),
+            )
+        )
     selected = candidates[0]
     recorded = None
     study_uid = str(id_data.get("StudyInstanceUID", "") or "").strip()
@@ -868,9 +987,22 @@ def select_prepared_series(case_id, id_data):
         "PhaseDetected": selected["phase_detected"],
         "PhaseProbability": selected["phase_probability"],
         "SliceCount": selected["slice_count"],
+        "GeometryPriorityApplied": geometry_priority_applied,
+        "SelectedCoverageMm": selected.get("coverage_mm"),
+        "SelectedZSpacingMm": selected.get("z_spacing_mm"),
+        "SelectedSliceThicknessMm": selected.get("slice_thickness_mm"),
+        "SelectedEffectiveThicknessMm": selected.get("effective_thickness_mm"),
+        "MaxCoverageMm": selected.get("max_coverage_mm"),
+        "CoverageEquivalenceFloorMm": selected.get("coverage_equivalence_floor_mm"),
         "SelectionReason": (
             f"phase={selected['phase']}, detected={selected['phase_detected']}, "
             f"probability={selected['phase_probability']}, slices={selected['slice_count']}"
+            + (
+                f", coverage_mm={selected.get('coverage_mm')}, "
+                f"effective_thickness_mm={selected.get('effective_thickness_mm')}"
+                if geometry_priority_applied
+                else ""
+            )
             + (
                 f", fallback={selected['fallback_reason']}"
                 if selected.get("fallback_reason")
@@ -895,6 +1027,8 @@ def select_prepared_series(case_id, id_data):
         ),
         "RejectedSeries": rejected,
     }
+    if geometry_priority_applied:
+        selection_info["CandidateSeriesGeometry"] = [_candidate_geometry_audit(candidate) for candidate in candidates]
     return selected["path"], selection_info
 
 

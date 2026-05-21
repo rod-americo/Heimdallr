@@ -44,6 +44,37 @@ class TestPrepareSpoolOrder(unittest.TestCase):
         self.assertEqual(global_meta["Weight"], 80.0)
         self.assertEqual(global_meta["Height"], 1.70)
 
+    def test_compute_series_geometry_summary_uses_projected_positions(self):
+        series_data = {
+            "files": ["a", "b", "c", "d"],
+            "SliceThicknessValues": [1.0, 1.0, 1.0, 1.0],
+            "SpacingBetweenSlicesValues": [1.0, 1.0, 1.0, 1.0],
+            "GeometryPositions": [0.0, 1.0, 2.0, 3.0],
+        }
+
+        summary = worker.compute_series_geometry_summary(series_data)
+
+        self.assertEqual(summary["CoverageMm"], 3.0)
+        self.assertEqual(summary["ZSpacingMm"], 1.0)
+        self.assertEqual(summary["SliceThicknessMm"], 1.0)
+        self.assertEqual(summary["GeometrySlicePositions"], 4)
+        self.assertEqual(summary["GeometryConfidence"], "position")
+
+    def test_compute_series_geometry_summary_keeps_estimate_separate(self):
+        series_data = {
+            "files": ["a", "b", "c"],
+            "SliceThicknessValues": [2.5, 2.5, 2.5],
+            "SpacingBetweenSlicesValues": [],
+            "GeometryPositions": [],
+        }
+
+        summary = worker.compute_series_geometry_summary(series_data)
+
+        self.assertNotIn("CoverageMm", summary)
+        self.assertEqual(summary["EstimatedCoverageMm"], 5.0)
+        self.assertEqual(summary["GeometryConfidence"], "estimated")
+        self.assertIn("missing_image_position_patient", summary["GeometryWarnings"])
+
     def test_iter_claimable_uploads_prioritizes_from_prepare_then_external_in_fifo(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             upload_root = Path(tmpdir)

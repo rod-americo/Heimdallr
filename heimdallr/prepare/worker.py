@@ -114,6 +114,96 @@ def parse_optional_float(value):
         return None
 
 
+def _parse_float_sequence(value, expected_len: int | None = None) -> list[float]:
+    if value is None or value == "":
+        return []
+    if isinstance(value, (pydicom.multival.MultiValue, list, tuple)):
+        raw_items = value
+    else:
+        raw_items = str(value).replace("\\", ",").split(",")
+    values: list[float] = []
+    for item in raw_items:
+        parsed = parse_optional_float(item)
+        if parsed is None:
+            return []
+        values.append(parsed)
+    if expected_len is not None and len(values) != expected_len:
+        return []
+    return values
+
+
+def _round_mm(value: float | None) -> float | None:
+    if value is None:
+        return None
+    return round(float(value), 4)
+
+
+def _median_positive(values: list[float]) -> float | None:
+    positives = sorted(float(value) for value in values if float(value) > 0)
+    if not positives:
+        return None
+    middle = len(positives) // 2
+    if len(positives) % 2:
+        return positives[middle]
+    return (positives[middle - 1] + positives[middle]) / 2.0
+
+
+def _project_slice_position_mm(ds) -> float | None:
+    """Project ImagePositionPatient onto the slice normal when geometry tags exist."""
+    position = _parse_float_sequence(get_tag_value(ds, "ImagePositionPatient", None), expected_len=3)
+    orientation = _parse_float_sequence(get_tag_value(ds, "ImageOrientationPatient", None), expected_len=6)
+    if not position or not orientation:
+        return None
+    row = np.asarray(orientation[:3], dtype=float)
+    col = np.asarray(orientation[3:], dtype=float)
+    normal = np.cross(row, col)
+    norm = float(np.linalg.norm(normal))
+    if norm <= 0:
+        return None
+    normal = normal / norm
+    return float(np.dot(np.asarray(position, dtype=float), normal))
+
+
+def compute_series_geometry_summary(series_data: dict) -> dict:
+    """Summarize per-series slice coverage and spacing from scanned DICOM metadata."""
+    positions = sorted({round(float(value), 4) for value in series_data.get("GeometryPositions", [])})
+    thickness_mm = _round_mm(_median_positive(series_data.get("SliceThicknessValues", [])))
+    spacing_between_mm = _round_mm(_median_positive(series_data.get("SpacingBetweenSlicesValues", [])))
+
+    summary = {
+        "SliceThicknessMm": thickness_mm,
+        "SpacingBetweenSlicesMm": spacing_between_mm,
+        "GeometryConfidence": "none",
+        "GeometryWarnings": [],
+    }
+
+    if len(positions) >= 2:
+        diffs = [
+            abs(positions[idx + 1] - positions[idx])
+            for idx in range(len(positions) - 1)
+            if abs(positions[idx + 1] - positions[idx]) > 1e-4
+        ]
+        z_spacing_mm = _round_mm(_median_positive(diffs))
+        coverage_mm = _round_mm(max(positions) - min(positions))
+        summary.update(
+            {
+                "ZSpacingMm": z_spacing_mm,
+                "CoverageMm": coverage_mm,
+                "GeometrySlicePositions": len(positions),
+                "GeometryConfidence": "position",
+            }
+        )
+    else:
+        summary["GeometryWarnings"].append("missing_image_position_patient")
+        spacing_for_estimate = spacing_between_mm or thickness_mm
+        image_count = len(series_data.get("files", []))
+        if spacing_for_estimate is not None and image_count >= 2:
+            summary["EstimatedCoverageMm"] = _round_mm((image_count - 1) * spacing_for_estimate)
+            summary["GeometryConfidence"] = "estimated"
+
+    return {key: value for key, value in summary.items() if value not in (None, [], {})}
+
+
 def update_global_biometrics_from_dataset(global_meta: dict, ds) -> None:
     """Fill missing study-level biometrics from any readable DICOM instance."""
     if global_meta.get("Height") is None:
@@ -673,6 +763,7 @@ def process_ct_series_concurrency(uid, s_data, case_output_dir, temp_dir):
             "convert_seconds": convert_seconds,
             "phase_seconds": phase_seconds,
             "phase_detected": phase_detected,
+            "geometry_summary": compute_series_geometry_summary(s_data),
             "series_total_seconds": round(time.perf_counter() - series_started, 3),
         }
     except Exception as e:
@@ -925,7 +1016,10 @@ def process_zip(zip_path):
                                 "ConvolutionKernel": str(get_tag_value(ds, "ConvolutionKernel", "")),
                                 "SeriesDescriptionOriginal": str(get_tag_value(ds, "SeriesDescription", "")).strip(),
                                 "SeriesDescription": str(get_tag_value(ds, "SeriesDescription", "")).strip().lower(),
-                                "files": []
+                                "files": [],
+                                "SliceThicknessValues": [],
+                                "SpacingBetweenSlicesValues": [],
+                                "GeometryPositions": [],
                             }
                             # Global Metadata (first encounter)
                             if global_meta["PatientName"] == "Unknown":
@@ -945,6 +1039,15 @@ def process_zip(zip_path):
                             update_global_biometrics_from_dataset(global_meta, ds)
 
                         series_map[uid]["files"].append(fpath)
+                        slice_thickness = parse_optional_float(get_tag_value(ds, "SliceThickness", None))
+                        if slice_thickness is not None:
+                            series_map[uid]["SliceThicknessValues"].append(slice_thickness)
+                        spacing_between = parse_optional_float(get_tag_value(ds, "SpacingBetweenSlices", None))
+                        if spacing_between is not None:
+                            series_map[uid]["SpacingBetweenSlicesValues"].append(spacing_between)
+                        slice_position = _project_slice_position_mm(ds)
+                        if slice_position is not None:
+                            series_map[uid]["GeometryPositions"].append(slice_position)
                         if modality == "CT": found_ct = True
                         
                 except Exception:
@@ -1157,6 +1260,7 @@ def process_zip(zip_path):
                     "ConvertMethod": conversion["method"],
                     "DerivedNiftiPath": str(nii_path.relative_to(derived_dir)),
                 }
+                series_info.update(compute_series_geometry_summary(s_data))
                 available_series.append(series_info)
                 candidate["path"] = nii_path
                 converted_candidates.append(candidate)
@@ -1222,6 +1326,7 @@ def process_zip(zip_path):
                     "PhaseData": phase_data,
                     "DerivedNiftiPath": str(candidate["path"].relative_to(derived_dir)),
                     "PhaseJsonPath": str(phase_json_path.relative_to(derived_dir)) if phase_json_path and phase_json_path.exists() else None,
+                    **candidate.get("geometry_summary", {}),
                 })
             print(f"  Preserved CT series: {len(candidates)}")
             

@@ -80,10 +80,12 @@ Each resident service has its own module entrypoint:
 
 - `heimdallr/intake/gateway.py`: DICOM SCP, study grouping, idle flush, ZIP
 handoff, duplicate handoff metadata.
-- `heimdallr/prepare/worker.py`: upload spool claiming, DICOM scan, conversion,
-metadata persistence, `id.json` creation, dispatch enqueue, segmentation enqueue.
-- `heimdallr/segmentation/worker.py`: queue claiming, selected-series reuse,
-TotalSegmentator tasks, canonical NIfTI materialization, metrics enqueue.
+- `heimdallr/prepare/worker.py`: upload spool claiming, DICOM scan, series
+geometry summary, conversion, metadata persistence, `id.json` creation,
+dispatch enqueue, segmentation enqueue.
+- `heimdallr/segmentation/worker.py`: queue claiming, coverage/thickness-aware
+selected-series reuse, TotalSegmentator tasks, canonical NIfTI materialization,
+metrics enqueue.
 - `heimdallr/metrics/worker.py`: metrics profile loading, job dependency graph,
 deterministic job execution, artifacts, DICOM egress enqueue, final delivery enqueue.
 - `heimdallr/dicom_egress/worker.py`: outbound C-STORE retry worker.
@@ -113,7 +115,9 @@ retry/claim helpers, resource monitor persistence.
 The code does not currently expose a separate `domain/` package. Domain rules are concentrated in:
 
 - series selection rules in `config/series_selection.json` and segmentation
-worker helpers.
+worker helpers. CT selection preserves the existing phase and rejection rules,
+then uses measured DICOM coverage and z-spacing when available to prefer
+maximum coverage before thinner reconstructions.
 - metrics jobs under `heimdallr/metrics/jobs/`.
 - analysis helpers under `heimdallr/metrics/analysis/`.
 - patient-name presentation helpers under `heimdallr/shared/patient_names.py`.
@@ -124,8 +128,9 @@ Future extraction should be behavior-driven and tested, not directory-first.
 
 1. A study arrives through DICOM C-STORE, `/upload`, or `/jobs`.
 2. Intake or the control plane writes a ZIP into the upload spool.
-3. `prepare` claims a stable ZIP, extracts it, scans DICOM metadata, filters
-candidate series, converts DICOM to NIfTI, writes study metadata, and enqueues segmentation.
+3. `prepare` claims a stable ZIP, extracts it, scans DICOM metadata, records
+candidate-series geometry, converts DICOM to NIfTI, writes study metadata, and
+enqueues segmentation.
 4. `segmentation` claims the case, resolves the active segmentation profile,
 selects the target series, narrows TotalSegmentator tasks when an external submission requested metrics with declared segmentation requirements, runs or reuses outputs, writes pipeline state, and enqueues metrics.
 5. `metrics` claims the case, resolves the active metrics profile, executes

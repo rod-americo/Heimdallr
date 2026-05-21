@@ -229,6 +229,243 @@ class TestSeriesSelection(unittest.TestCase):
         self.assertEqual(selection_info["SelectedPhase"], "arterial")
         self.assertIn("fallback=contrast_fallback", selection_info["SelectionReason"])
 
+    def test_prefers_maximum_coverage_over_thinner_partial_series(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            case_id = "case-series-selection"
+            derived_dir = root / "runtime" / "studies" / case_id / "derived" / "series"
+            derived_dir.mkdir(parents=True, exist_ok=True)
+
+            thin_partial_path = derived_dir / "thin_partial.nii.gz"
+            thicker_complete_path = derived_dir / "thicker_complete.nii.gz"
+            thin_partial_path.write_bytes(b"thin")
+            thicker_complete_path.write_bytes(b"complete")
+
+            config_path = root / "series_selection.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "default_profile": "ct_test",
+                        "profiles": {
+                            "ct_test": {
+                                "required": {"modality": "CT", "min_slices": 120},
+                                "hard_reject": {},
+                                "phase_priority": ["native"],
+                                "geometry_priority": {
+                                    "enabled": True,
+                                    "coverage_equivalence_ratio": 0.92,
+                                    "coverage_equivalence_mm": 50,
+                                    "prefer_thinner_within_equivalent_coverage": True,
+                                },
+                                "text_hints": {"description_avoid": [], "kernel_avoid": []},
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            id_data = {
+                "AvailableSeries": [
+                    {
+                        "SeriesInstanceUID": "1.2.3.thin",
+                        "SeriesNumber": "2",
+                        "DerivedNiftiPath": "series/thin_partial.nii.gz",
+                        "Modality": "CT",
+                        "SliceCount": 620,
+                        "DetectedPhase": "native",
+                        "PhaseDetected": True,
+                        "PhaseData": {"probability": 0.99},
+                        "SeriesDescription": "BODY THIN PARTIAL",
+                        "ConvolutionKernel": "FC18",
+                        "CoverageMm": 360.0,
+                        "ZSpacingMm": 0.6,
+                        "SliceThicknessMm": 0.6,
+                    },
+                    {
+                        "SeriesInstanceUID": "1.2.3.complete",
+                        "SeriesNumber": "3",
+                        "DerivedNiftiPath": "series/thicker_complete.nii.gz",
+                        "Modality": "CT",
+                        "SliceCount": 360,
+                        "DetectedPhase": "native",
+                        "PhaseDetected": True,
+                        "PhaseData": {"probability": 0.90},
+                        "SeriesDescription": "BODY COMPLETE",
+                        "ConvolutionKernel": "FC18",
+                        "CoverageMm": 900.0,
+                        "ZSpacingMm": 2.5,
+                        "SliceThicknessMm": 2.5,
+                    },
+                ]
+            }
+
+            with patch.object(settings, "STUDIES_DIR", root / "runtime" / "studies"), patch.object(
+                settings,
+                "SERIES_SELECTION_CONFIG_PATH",
+                config_path,
+            ):
+                selected_path, selection_info = select_prepared_series(case_id, id_data)
+
+        self.assertEqual(selected_path.name, "thicker_complete.nii.gz")
+        self.assertEqual(selection_info["SelectedSeriesInstanceUID"], "1.2.3.complete")
+        self.assertTrue(selection_info["GeometryPriorityApplied"])
+        self.assertEqual(selection_info["SelectedCoverageMm"], 900.0)
+
+    def test_prefers_thinner_series_when_coverage_is_equivalent(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            case_id = "case-series-selection"
+            derived_dir = root / "runtime" / "studies" / case_id / "derived" / "series"
+            derived_dir.mkdir(parents=True, exist_ok=True)
+
+            thick_path = derived_dir / "thick.nii.gz"
+            thin_path = derived_dir / "thin.nii.gz"
+            thick_path.write_bytes(b"thick")
+            thin_path.write_bytes(b"thin")
+
+            config_path = root / "series_selection.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "default_profile": "ct_test",
+                        "profiles": {
+                            "ct_test": {
+                                "required": {"modality": "CT", "min_slices": 120},
+                                "hard_reject": {},
+                                "phase_priority": ["native"],
+                                "geometry_priority": {
+                                    "enabled": True,
+                                    "coverage_equivalence_ratio": 0.92,
+                                    "coverage_equivalence_mm": 50,
+                                    "prefer_thinner_within_equivalent_coverage": True,
+                                },
+                                "text_hints": {"description_avoid": [], "kernel_avoid": []},
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            id_data = {
+                "AvailableSeries": [
+                    {
+                        "SeriesInstanceUID": "1.2.3.thick",
+                        "SeriesNumber": "2",
+                        "DerivedNiftiPath": "series/thick.nii.gz",
+                        "Modality": "CT",
+                        "SliceCount": 400,
+                        "DetectedPhase": "native",
+                        "PhaseDetected": True,
+                        "PhaseData": {"probability": 0.99},
+                        "SeriesDescription": "BODY COMPLETE",
+                        "ConvolutionKernel": "FC18",
+                        "CoverageMm": 1000.0,
+                        "ZSpacingMm": 2.5,
+                        "SliceThicknessMm": 2.5,
+                    },
+                    {
+                        "SeriesInstanceUID": "1.2.3.thin",
+                        "SeriesNumber": "3",
+                        "DerivedNiftiPath": "series/thin.nii.gz",
+                        "Modality": "CT",
+                        "SliceCount": 1200,
+                        "DetectedPhase": "native",
+                        "PhaseDetected": True,
+                        "PhaseData": {"probability": 0.90},
+                        "SeriesDescription": "BODY THIN COMPLETE",
+                        "ConvolutionKernel": "FC18",
+                        "CoverageMm": 960.0,
+                        "ZSpacingMm": 0.8,
+                        "SliceThicknessMm": 0.8,
+                    },
+                ]
+            }
+
+            with patch.object(settings, "STUDIES_DIR", root / "runtime" / "studies"), patch.object(
+                settings,
+                "SERIES_SELECTION_CONFIG_PATH",
+                config_path,
+            ):
+                selected_path, selection_info = select_prepared_series(case_id, id_data)
+
+        self.assertEqual(selected_path.name, "thin.nii.gz")
+        self.assertEqual(selection_info["SelectedSeriesInstanceUID"], "1.2.3.thin")
+        self.assertTrue(selection_info["GeometryPriorityApplied"])
+        self.assertEqual(selection_info["SelectedEffectiveThicknessMm"], 0.8)
+
+    def test_uses_legacy_ranking_when_geometry_is_unavailable(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            case_id = "case-series-selection"
+            derived_dir = root / "runtime" / "studies" / case_id / "derived" / "series"
+            derived_dir.mkdir(parents=True, exist_ok=True)
+
+            fewer_slices_path = derived_dir / "fewer.nii.gz"
+            more_slices_path = derived_dir / "more.nii.gz"
+            fewer_slices_path.write_bytes(b"fewer")
+            more_slices_path.write_bytes(b"more")
+
+            config_path = root / "series_selection.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "default_profile": "ct_test",
+                        "profiles": {
+                            "ct_test": {
+                                "required": {"modality": "CT", "min_slices": 120},
+                                "hard_reject": {},
+                                "phase_priority": ["native"],
+                                "geometry_priority": {"enabled": True},
+                                "text_hints": {"description_avoid": [], "kernel_avoid": []},
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            id_data = {
+                "AvailableSeries": [
+                    {
+                        "SeriesInstanceUID": "1.2.3.fewer",
+                        "SeriesNumber": "2",
+                        "DerivedNiftiPath": "series/fewer.nii.gz",
+                        "Modality": "CT",
+                        "SliceCount": 180,
+                        "DetectedPhase": "native",
+                        "PhaseDetected": True,
+                        "PhaseData": {"probability": 0.95},
+                        "SeriesDescription": "BODY",
+                        "ConvolutionKernel": "FC18",
+                    },
+                    {
+                        "SeriesInstanceUID": "1.2.3.more",
+                        "SeriesNumber": "3",
+                        "DerivedNiftiPath": "series/more.nii.gz",
+                        "Modality": "CT",
+                        "SliceCount": 260,
+                        "DetectedPhase": "native",
+                        "PhaseDetected": True,
+                        "PhaseData": {"probability": 0.95},
+                        "SeriesDescription": "BODY",
+                        "ConvolutionKernel": "FC18",
+                    },
+                ]
+            }
+
+            with patch.object(settings, "STUDIES_DIR", root / "runtime" / "studies"), patch.object(
+                settings,
+                "SERIES_SELECTION_CONFIG_PATH",
+                config_path,
+            ):
+                selected_path, selection_info = select_prepared_series(case_id, id_data)
+
+        self.assertEqual(selected_path.name, "more.nii.gz")
+        self.assertEqual(selection_info["SelectedSeriesInstanceUID"], "1.2.3.more")
+        self.assertFalse(selection_info["GeometryPriorityApplied"])
+
     def test_prefers_follow_up_abdomen_when_previous_coverage_was_chest_only(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

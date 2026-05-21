@@ -156,3 +156,44 @@ them outside Heimdallr or move to the appropriate companion repository.
 - Keep unused clients to preserve historical compatibility.
 - Replace the removed clients with optional extras before a real in-repository
 use case exists.
+
+---
+
+### 2026-05-21 - Prefer measured coverage before slice thickness in CT series selection
+
+**Context**
+
+CT studies can contain multiple reconstructions where the thinnest series is
+not necessarily the most anatomically complete. Selecting only by slice count
+or thickness can choose a high-resolution partial reconstruction instead of a
+series that covers the anatomy needed for deterministic segmentation and
+metrics.
+
+**Decision**
+
+Preserve the existing modality, phase, hard-reject, and follow-up rules, but
+enrich prepared `AvailableSeries` metadata with measured DICOM geometry. When
+configured, segmentation series selection ranks eligible CT series by measured
+coverage first and uses the thinnest available spacing only among
+coverage-equivalent series. If measured geometry is unavailable, selection
+falls back to the legacy ranking.
+
+**Impact**
+
+- Improves default segmentation input selection for studies with partial thin
+reconstructions.
+- Keeps older prepared studies processable because the selector does not
+require geometry fields.
+- Adds audit fields to `metadata/id.json` so operators can inspect coverage and
+thickness decisions.
+
+**Tradeoff**
+
+- Series selection now depends on DICOM geometry tags when present.
+- Host overrides of `config/series_selection.json` must opt in to the new
+`geometry_priority` settings if they replace the tracked profile.
+
+**Alternatives rejected**
+
+- Always choose the thinnest reconstruction regardless of coverage.
+- Continue using slice count as the main proxy for anatomical coverage.

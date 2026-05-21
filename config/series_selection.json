@@ -27,6 +27,12 @@
         "native",
         "portal_venous"
       ],
+      "geometry_priority": {
+        "enabled": true,
+        "coverage_equivalence_ratio": 0.92,
+        "coverage_equivalence_mm": 50,
+        "prefer_thinner_within_equivalent_coverage": true
+      },
       "follow_up_coverage": {
         "enabled": true,
         "when_previous_coverage": [
