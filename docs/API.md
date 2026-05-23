@@ -66,6 +66,22 @@ that submitted job only. Supported `secondary_capture_transfer_syntax` values
 are `original`, `deflated`, `jpeg_ls_lossless`, `jpeg_2000_lossless`, and
 `rle_lossless`.
 
+Example:
+
+```bash
+-F 'artifact_dicom_policy={"secondary_capture_transfer_syntax":"deflated"}'
+```
+
+The options map to these DICOM transfer syntaxes:
+
+| API value | DICOM transfer syntax | Compression |
+| --- | --- | --- |
+| `original` | Explicit VR Little Endian | none |
+| `deflated` | Deflated Explicit VR Little Endian | lossless |
+| `jpeg_ls_lossless` | JPEG-LS Lossless | lossless |
+| `jpeg_2000_lossless` | JPEG 2000 Lossless Only | lossless |
+| `rle_lossless` | RLE Lossless | lossless |
+
 `GET /ops/queues` returns non-identifying operational capacity for external
 feeders: queue status counts, oldest pending timestamps, segmentation
 concurrency, and runtime disk usage. It does not return case IDs, study UIDs,

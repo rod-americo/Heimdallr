@@ -75,6 +75,15 @@ def metadata_value(case_metadata: dict[str, Any], key: str, default: Any = None)
     return default
 
 
+def _copy_text_attr(ds: FileDataset, case_metadata: dict[str, Any], key: str) -> None:
+    value = metadata_value(case_metadata, key)
+    if value in (None, ""):
+        return
+    text = str(value).strip()
+    if text:
+        setattr(ds, key, text)
+
+
 def resolve_secondary_capture_transfer_syntax(value: Any):
     key = str(value or DEFAULT_SECONDARY_CAPTURE_TRANSFER_SYNTAX).strip().lower()
     transfer_syntax = SECONDARY_CAPTURE_TRANSFER_SYNTAXES.get(key)
@@ -161,9 +170,14 @@ def create_secondary_capture_from_rgb(
     if patient_id:
         ds.PatientID = patient_id
 
+    _copy_text_attr(ds, case_metadata, "IssuerOfPatientID")
+    _copy_text_attr(ds, case_metadata, "PatientBirthDate")
+    _copy_text_attr(ds, case_metadata, "PatientBirthTime")
+
     patient_sex = str(metadata_value(case_metadata, "PatientSex", "") or "").strip()
     if patient_sex:
         ds.PatientSex = patient_sex
+    _copy_text_attr(ds, case_metadata, "PatientAge")
 
     patient_size = parse_optional_float(case_metadata.get("Height"))
     if patient_size is None:
@@ -188,6 +202,18 @@ def create_secondary_capture_from_rgb(
     study_time = str(metadata_value(case_metadata, "StudyTime", "") or "").strip()
     if study_time:
         ds.StudyTime = study_time
+
+    _copy_text_attr(ds, case_metadata, "StudyID")
+    _copy_text_attr(ds, case_metadata, "StudyDescription")
+    _copy_text_attr(ds, case_metadata, "InstitutionName")
+    _copy_text_attr(ds, case_metadata, "InstitutionAddress")
+    _copy_text_attr(ds, case_metadata, "StationName")
+    _copy_text_attr(ds, case_metadata, "ReferringPhysicianName")
+    _copy_text_attr(ds, case_metadata, "PerformingPhysicianName")
+    _copy_text_attr(ds, case_metadata, "OperatorsName")
+    _copy_text_attr(ds, case_metadata, "FrameOfReferenceUID")
+    _copy_text_attr(ds, case_metadata, "BodyPartExamined")
+    _copy_text_attr(ds, case_metadata, "ManufacturerModelName")
 
     ds.ContentDate = now.strftime("%Y%m%d")
     ds.ContentTime = now.strftime("%H%M%S.%f")

@@ -157,6 +157,13 @@ profile.
 `artifact_dicom_policy.secondary_capture_transfer_syntax`. The supported
 lossless options are original uncompressed, Deflated Explicit VR Little Endian,
 JPEG-LS lossless, JPEG 2000 lossless, and RLE lossless.
+- Compression validation on 512 x 512 RGB parenchymal volumetry overlays found
+approximate per-slice sizes of ~787 KB uncompressed, ~82-113 KB Deflated,
+~114-164 KB JPEG-LS, ~173-219 KB JPEG 2000, and ~187-264 KB RLE. These are
+operational measurements, not contractual file-size guarantees.
+- Derived Secondary Capture artifacts should preserve source patient and study
+identity tags from the reference DICOM while assigning new derived series and
+instance UIDs.
 - FastAPI upload acceptance is asynchronous and not proof that segmentation,
 metrics, or delivery succeeded.
 - Clinical review is required before outputs influence patient care.

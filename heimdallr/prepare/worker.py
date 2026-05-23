@@ -224,21 +224,38 @@ def normalize_patient_name_for_prepare(name):
 
 def build_reference_dicom_context(ds):
     """Extract the subset of DICOM metadata needed by downstream derived artifacts."""
+    person_name_fields = {
+        "PatientName",
+        "ReferringPhysicianName",
+        "PerformingPhysicianName",
+        "OperatorsName",
+    }
     field_names = [
         "StudyInstanceUID",
+        "StudyID",
         "StudyDate",
         "StudyTime",
+        "StudyDescription",
         "AccessionNumber",
         "PatientName",
         "PatientID",
+        "IssuerOfPatientID",
         "PatientSex",
         "PatientBirthDate",
+        "PatientBirthTime",
         "PatientAge",
         "PatientSize",
         "PatientWeight",
         "InstitutionName",
+        "InstitutionAddress",
+        "StationName",
         "ReferringPhysicianName",
+        "PerformingPhysicianName",
+        "OperatorsName",
         "Modality",
+        "Manufacturer",
+        "ManufacturerModelName",
+        "BodyPartExamined",
         "SeriesInstanceUID",
         "SeriesNumber",
         "SeriesDescription",
@@ -257,7 +274,7 @@ def build_reference_dicom_context(ds):
         if isinstance(value, (pydicom.multival.MultiValue, list, tuple)):
             context[field_name] = [str(item) for item in value]
         else:
-            if field_name == "PatientName":
+            if field_name in person_name_fields:
                 context[field_name] = str(value).strip()
             else:
                 context[field_name] = str(value).replace("^", " ").strip()

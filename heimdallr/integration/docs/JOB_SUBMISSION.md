@@ -121,6 +121,23 @@ intake/direct pipeline runs and per `/jobs` submission through
 `artifact_dicom_policy.secondary_capture_transfer_syntax`. Supported values are
 `original`, `deflated`, `jpeg_ls_lossless`, `jpeg_2000_lossless`, and
 `rle_lossless`. The default remains `original` unless configured otherwise.
+
+Compression experiment on a `parenchymal_organ_volumetry` Secondary Capture
+series with 512 x 512 RGB slices showed the following approximate per-slice
+sizes:
+
+| `secondary_capture_transfer_syntax` | Observed size per slice | Notes |
+| --- | ---: | --- |
+| `original` | ~787 KB | Explicit VR Little Endian, uncompressed |
+| `deflated` | ~82-113 KB | Deflated Explicit VR Little Endian, lossless |
+| `jpeg_ls_lossless` | ~114-164 KB | JPEG-LS Lossless |
+| `jpeg_2000_lossless` | ~173-219 KB | JPEG 2000 Lossless Only |
+| `rle_lossless` | ~187-264 KB | RLE Lossless |
+
+All tested compressed variants were pixel-identical when read back with the
+runtime DICOM stack, and all imported successfully in the OsiriX validation
+environment. Treat these sizes as representative for overlay-like images, not
+as a fixed guarantee across every artifact.
 Instruction documents are separate from overlays. Request
 `artifact_instructions_pdf` or `artifact_instructions_dicom` only when the
 consumer needs those auxiliary instruction files.
