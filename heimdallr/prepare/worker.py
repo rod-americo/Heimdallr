@@ -1410,6 +1410,7 @@ def process_zip(zip_path):
                     "requested_metrics_modules": external_submission.get("requested_metrics_modules", []),
                     "artifact_locale": external_submission.get("artifact_locale"),
                     "series_selection_policy": external_submission.get("series_selection_policy", {}),
+                    "artifact_dicom_policy": external_submission.get("artifact_dicom_policy", {}),
                     "received_at": external_submission.get("received_at"),
                 }
                 output_meta["ExternalDelivery"] = external_delivery_payload

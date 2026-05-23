@@ -24,6 +24,7 @@ Optional fields:
 | `requested_metrics_modules` | JSON array string or CSV string | Limits metrics jobs to requested modules plus dependencies from the active metrics profile. Not fully validated at admission time. |
 | `artifact_locale` | string | Presentation locale for generated presentation artifacts where supported, for example `pt_BR` or `en_US`. |
 | `series_selection_policy` | JSON object string | Overrides the active series-selection profile for this submitted job only. |
+| `artifact_dicom_policy` | JSON object string | Overrides generated DICOM artifact encoding for this submitted job only. |
 
 `requested_metrics_modules` and `requested_outputs` are intentionally separate:
 
@@ -34,6 +35,8 @@ presentation artifacts where localization is supported, including burned-in
 overlays and case-report DICOM metadata.
 - `series_selection_policy` chooses which prepared CT series should feed
 segmentation for this job.
+- `artifact_dicom_policy` chooses the transfer syntax used for generated
+Secondary Capture DICOM artifacts in this job.
 
 Example request:
 
@@ -46,6 +49,7 @@ curl -X POST "http://localhost:8001/jobs" \
   -F 'requested_outputs={"metrics_json":true,"overlays_dicom":true,"report_pdf":true,"report_pdf_dicom":true,"artifacts_tree":false}' \
   -F 'requested_metrics_modules=["l3_muscle_area","bone_health_l1_hu"]' \
   -F 'artifact_locale=pt_BR' \
+  -F 'artifact_dicom_policy={"secondary_capture_transfer_syntax":"deflated"}' \
   -F 'series_selection_policy={"name":"orchestrum_ct_opportunistic_v1","required":{"modality":"CT","min_slices":60},"phase_priority":["native","portal_venous"]}'
 ```
 
@@ -105,6 +109,18 @@ determine which overlay artifacts exist. For example, `bone_health_l1_hu`
 writes single-image overlay artifacts when overlay generation is enabled, while
 `parenchymal_organ_volumetry` and opt-in `brain_volumetry` write Secondary
 Capture overlay series.
+`parenchymal_organ_volumetry` suppresses overlay artifacts when no organ has a
+complete publishable volume; the result JSON records the incomplete organ state
+instead.
+Generated Secondary Capture overlays are capped to a bounded maximum matrix
+dimension to keep callback packages and DICOM egress payloads bounded. The
+shared default is 512 pixels; `l3_muscle_area` and `vat_sat_ratio` use the
+validated 1024-pixel cap in the tracked metrics profile.
+Secondary Capture transfer syntax is configurable in the metrics profile for
+intake/direct pipeline runs and per `/jobs` submission through
+`artifact_dicom_policy.secondary_capture_transfer_syntax`. Supported values are
+`original`, `deflated`, `jpeg_ls_lossless`, `jpeg_2000_lossless`, and
+`rle_lossless`. The default remains `original` unless configured otherwise.
 Instruction documents are separate from overlays. Request
 `artifact_instructions_pdf` or `artifact_instructions_dicom` only when the
 consumer needs those auxiliary instruction files.

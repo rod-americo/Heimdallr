@@ -59,7 +59,7 @@ Heimdallr transforms incoming radiological imaging studies into traceable runtim
 | `intake` | inbound DICOM instances | ZIP payload and intake manifest | invalid DICOM, association failure, idle flush timing, upload/local handoff failure |
 | `prepare` | claimable ZIP payload | study directory, metadata, queue rows | bad ZIP, no valid DICOM series, conversion failure, insufficient series images |
 | `segmentation` | prepared case queue item | segmentation artifacts and metrics queue item | TotalSegmentator failure, missing license, resource exhaustion, stale claim |
-| `metrics` | metrics queue item | results JSON, overlays, PDFs, DICOM artifacts, delivery queues | missing masks, unsupported profile, job dependency errors, artifact generation failure |
+| `metrics` | metrics queue item | results JSON, overlays, PDFs, DICOM artifacts, delivery queues | missing masks, incomplete masks, unsupported profile, job dependency errors, artifact generation failure |
 | `integration.dispatch` | dispatch queue item | HTTP event delivery state | unreachable endpoint, non-2xx response, config error |
 | `integration.delivery` | delivery queue item | final callback delivery state | missing case outputs, callback failure, package build failure |
 | `dicom_egress` | DICOM egress queue item | remote C-STORE delivery state | peer rejects association, transfer syntax mismatch, compression fallback unavailable |
@@ -145,6 +145,18 @@ production-facing profile.
 the thinnest available reconstruction only among coverage-equivalent eligible
 series. If geometric metadata is absent, the selector falls back to the legacy
 slice-count ranking.
+- Volumetry artifacts should not be published when every candidate organ is
+missing, empty, or incomplete. The metrics result JSON should preserve the
+reason and per-organ status for audit.
+- Generated Secondary Capture overlays should use a bounded matrix size. The
+shared helper defaults the largest image dimension to 512 pixels; the validated
+`l3_muscle_area` and `vat_sat_ratio` jobs set 1024 pixels in the tracked metrics
+profile.
+- Secondary Capture DICOM transfer syntax is configurable per metrics job in
+`config/metrics_pipeline.json` and per external `/jobs` submission through
+`artifact_dicom_policy.secondary_capture_transfer_syntax`. The supported
+lossless options are original uncompressed, Deflated Explicit VR Little Endian,
+JPEG-LS lossless, JPEG 2000 lossless, and RLE lossless.
 - FastAPI upload acceptance is asynchronous and not proof that segmentation,
 metrics, or delivery succeeded.
 - Clinical review is required before outputs influence patient care.

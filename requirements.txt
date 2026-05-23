@@ -75,7 +75,11 @@ pyarrow==23.0.0
 pydantic==2.12.5
 pydantic_core==2.41.5
 pydicom==3.0.1
+pyjpegls==1.5.1
 Pygments==2.19.2
+pylibjpeg==2.1.0
+pylibjpeg-libjpeg==2.4.0
+pylibjpeg-openjpeg==2.5.0
 pynetdicom==3.0.4
 pyparsing==3.3.2
 python-dateutil==2.9.0.post0

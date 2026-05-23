@@ -26,7 +26,10 @@ from heimdallr.metrics.jobs._bone_job_common import (
     resolve_canonical_nifti,
     write_payload,
 )
-from heimdallr.metrics.jobs._dicom_secondary_capture import create_secondary_capture_from_rgb
+from heimdallr.metrics.jobs._dicom_secondary_capture import (
+    create_secondary_capture_from_rgb,
+    secondary_capture_options_from_job_config,
+)
 from heimdallr.metrics.jobs._parenchymal_overlay_text import (
     build_overlay_text,
     derivation_description,
@@ -317,8 +320,6 @@ def main() -> int:
 
     try:
         case_dir, metric_dir, result_path = metric_output_dir(args.case_id, metric_key)
-        dicom_dir = metric_dir / "dicom"
-        dicom_dir.mkdir(parents=True, exist_ok=True)
 
         ct_path = resolve_canonical_nifti(args.case_id)
         total_dir = case_dir / "artifacts" / "total"
@@ -379,6 +380,25 @@ def main() -> int:
             print(json.dumps(payload, indent=2))
             return 0
 
+        publishable_organs = [
+            organ_key
+            for organ_key, measurement in organ_measurements.items()
+            if measurement.get("volume_cm3") is not None
+        ]
+        if not publishable_organs:
+            payload["status"] = "skipped"
+            payload["measurement"] = {
+                "job_status": "no_complete_organ_volume",
+                "selected_phase": selected_phase or None,
+                "density_suppressed_due_to_contrast": bool(suppress_density),
+                "organs": organ_measurements,
+            }
+            payload["artifacts"] = {"result_json": str(result_path.relative_to(case_dir))}
+            payload["dicom_exports"] = []
+            write_payload(result_path, payload)
+            print(json.dumps(payload, indent=2))
+            return 0
+
         union_mask = np.zeros(ct_data.shape, dtype=bool)
         for mask in organ_masks.values():
             if mask is not None:
@@ -407,8 +427,12 @@ def main() -> int:
 
         if job_config.get("generate_overlay", True):
             emit_dicom = bool(job_config.get("emit_secondary_capture_dicom", True))
+            secondary_capture_options = secondary_capture_options_from_job_config(job_config)
             artifact_locale = resolve_artifact_locale(job_config)
             series_instance_uid = generate_uid()
+            dicom_dir = metric_dir / "dicom"
+            if emit_dicom:
+                dicom_dir.mkdir(parents=True, exist_ok=True)
             for output_idx, slab in enumerate(export_slabs, start=1):
                 source_indices = slab["source_indices"]
                 masks_for_slice = []
@@ -441,6 +465,7 @@ def main() -> int:
                         series_number=SERIES_NUMBER,
                         instance_number=output_idx,
                         derivation_description=derivation_description(artifact_locale),
+                        **secondary_capture_options,
                     )
                     dicom_exports.append(
                         {

@@ -4,7 +4,8 @@
     "job_addition": "To add a new job, create the module under heimdallr/metrics/jobs/ and declare it in jobs[]. Use jobs[].module only for non-conventional names inside heimdallr.metrics.jobs.",
     "parallel_execution": "Profiles may set execution.max_parallel_jobs. Jobs may declare needs to wait for prerequisite job names while still allowing independent jobs to run in parallel.",
     "segmentation_requirements": "Jobs should declare requires_segmentation_tasks so external requested_metrics_modules can avoid unnecessary TotalSegmentator tasks.",
-    "experimental_jobs": "Experimental metrics modules should live under heimdallr.metrics.jobs.tests or heimdallr.metrics.analysis and be enabled only via explicit jobs[].module overrides in host-local config."
+    "experimental_jobs": "Experimental metrics modules should live under heimdallr.metrics.jobs.tests or heimdallr.metrics.analysis and be enabled only via explicit jobs[].module overrides in host-local config.",
+    "secondary_capture_transfer_syntax": "Jobs that emit Secondary Capture DICOM may set secondary_capture_transfer_syntax to original, deflated, jpeg_ls_lossless, jpeg_2000_lossless, or rle_lossless."
   },
   "default_profile": "ct_native_basic_metrics",
   "profiles": {
@@ -28,7 +29,9 @@
             "tissue_types"
           ],
           "generate_overlay": true,
-          "emit_secondary_capture_dicom": true
+          "emit_secondary_capture_dicom": true,
+          "secondary_capture_transfer_syntax": "original",
+          "secondary_capture_max_dimension": 1024
         },
         {
           "name": "parenchymal_organ_volumetry",
@@ -37,7 +40,8 @@
             "total"
           ],
           "generate_overlay": true,
-          "emit_secondary_capture_dicom": true
+          "emit_secondary_capture_dicom": true,
+          "secondary_capture_transfer_syntax": "original"
         },
         {
           "name": "brain_volumetry",
@@ -46,7 +50,8 @@
             "total"
           ],
           "generate_overlay": true,
-          "emit_secondary_capture_dicom": true
+          "emit_secondary_capture_dicom": true,
+          "secondary_capture_transfer_syntax": "original"
         },
         {
           "name": "bone_health_l1_hu",
@@ -55,7 +60,8 @@
             "total"
           ],
           "generate_overlay": true,
-          "strict_qc": false
+          "strict_qc": false,
+          "secondary_capture_transfer_syntax": "original"
         },
         {
           "name": "vat_sat_ratio",
@@ -65,7 +71,9 @@
             "tissue_types"
           ],
           "generate_overlay": true,
-          "emit_secondary_capture_dicom": true
+          "emit_secondary_capture_dicom": true,
+          "secondary_capture_transfer_syntax": "original",
+          "secondary_capture_max_dimension": 1024
         }
       ]
     }

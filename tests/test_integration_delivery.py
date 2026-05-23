@@ -12,7 +12,11 @@ from heimdallr.control_plane.app import create_app
 from heimdallr.integration.delivery import package as delivery_package
 from heimdallr.integration.delivery import worker
 from heimdallr.shared import settings, store
-from heimdallr.integration.submissions import load_external_submission_sidecar, normalize_requested_outputs
+from heimdallr.integration.submissions import (
+    load_external_submission_sidecar,
+    normalize_artifact_dicom_policy,
+    normalize_requested_outputs,
+)
 
 
 class TestJobSubmissionRoute(unittest.TestCase):
@@ -20,6 +24,12 @@ class TestJobSubmissionRoute(unittest.TestCase):
         outputs = normalize_requested_outputs(None)
 
         self.assertFalse(any(outputs.values()))
+
+    def test_artifact_dicom_policy_normalizes_secondary_capture_transfer_syntax(self):
+        self.assertEqual(
+            normalize_artifact_dicom_policy({"secondary_capture_transfer_syntax": "Deflated_Lossless"}),
+            {"secondary_capture_transfer_syntax": "deflated"},
+        )
 
     def test_submit_job_stores_zip_and_submission_sidecar(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -39,6 +49,9 @@ class TestJobSubmissionRoute(unittest.TestCase):
                         "requested_outputs": json.dumps({"report_pdf": False}),
                         "requested_metrics_modules": json.dumps(["l3_muscle_area", "bone_health_l1_hu"]),
                         "artifact_locale": "pt_BR",
+                        "artifact_dicom_policy": json.dumps(
+                            {"secondary_capture_transfer_syntax": "jpeg_ls_lossless"}
+                        ),
                         "series_selection_policy": json.dumps(
                             {
                                 "name": "orchestrum_ct_opportunistic_v1",
@@ -60,6 +73,10 @@ class TestJobSubmissionRoute(unittest.TestCase):
             self.assertFalse(sidecar["requested_outputs"]["report_pdf"])
             self.assertEqual(sidecar["artifact_locale"], "pt_BR")
             self.assertEqual(
+                sidecar["artifact_dicom_policy"],
+                {"secondary_capture_transfer_syntax": "jpeg_ls_lossless"},
+            )
+            self.assertEqual(
                 sidecar["requested_metrics_modules"],
                 ["l3_muscle_area", "bone_health_l1_hu"],
             )
@@ -75,6 +92,10 @@ class TestJobSubmissionRoute(unittest.TestCase):
                 ["l3_muscle_area", "bone_health_l1_hu"],
             )
             self.assertEqual(body["artifact_locale"], "pt_BR")
+            self.assertEqual(
+                body["artifact_dicom_policy"],
+                {"secondary_capture_transfer_syntax": "jpeg_ls_lossless"},
+            )
             self.assertEqual(body["series_selection_policy"]["required"]["min_slices"], 60)
 
             with patch.object(settings, "UPLOAD_EXTERNAL_DIR", upload_dir):
@@ -105,6 +126,29 @@ class TestJobSubmissionRoute(unittest.TestCase):
 
             self.assertEqual(response.status_code, 400)
             self.assertIn("series_selection_policy", response.json()["detail"])
+
+    def test_submit_job_rejects_invalid_artifact_dicom_policy(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            upload_dir = Path(tmpdir) / "uploads" / "external"
+            upload_dir.mkdir(parents=True, exist_ok=True)
+            app = create_app()
+            client = TestClient(app)
+
+            with patch.object(settings, "UPLOAD_EXTERNAL_DIR", upload_dir):
+                response = client.post(
+                    "/jobs",
+                    files={"study_file": ("study.zip", io.BytesIO(b"fake zip payload"), "application/zip")},
+                    data={
+                        "client_case_id": "external-123",
+                        "callback_url": "http://receiver.local/callback",
+                        "artifact_dicom_policy": json.dumps(
+                            {"secondary_capture_transfer_syntax": "jpeg_baseline_lossy"}
+                        ),
+                    },
+                )
+
+            self.assertEqual(response.status_code, 400)
+            self.assertIn("artifact_dicom_policy.secondary_capture_transfer_syntax", response.json()["detail"])
 
 
 class TestIntegrationDeliveryStore(unittest.TestCase):

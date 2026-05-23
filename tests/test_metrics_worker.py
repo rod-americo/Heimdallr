@@ -9,7 +9,9 @@ from unittest.mock import MagicMock, patch
 from heimdallr.metrics.worker import (
     MetricsLogger,
     _record_metrics_pipeline_state,
+    _apply_artifact_dicom_policy,
     _apply_artifact_locale,
+    _artifact_dicom_policy_from_metadata,
     _requested_metrics_modules_from_metadata,
     _execute_jobs,
     _validate_case_against_profile,
@@ -22,6 +24,19 @@ from heimdallr.metrics.worker import (
 
 
 class TestMetricsWorker(unittest.TestCase):
+    def test_example_profile_limits_secondary_capture_1024_to_validated_jobs(self):
+        config_path = Path(__file__).resolve().parents[1] / "config" / "metrics_pipeline.example.json"
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+        jobs = {
+            job["name"]: job
+            for job in config["profiles"]["ct_native_basic_metrics"]["jobs"]
+        }
+
+        self.assertEqual(jobs["l3_muscle_area"]["secondary_capture_max_dimension"], 1024)
+        self.assertEqual(jobs["vat_sat_ratio"]["secondary_capture_max_dimension"], 1024)
+        self.assertNotIn("secondary_capture_max_dimension", jobs["parenchymal_organ_volumetry"])
+        self.assertNotIn("secondary_capture_max_dimension", jobs["brain_volumetry"])
+
     def test_record_metrics_pipeline_state_closes_failed_stage(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             id_json_path = Path(tmpdir) / "id.json"
@@ -164,6 +179,34 @@ class TestMetricsWorker(unittest.TestCase):
         self.assertEqual(configured[0]["locale"], "pt_BR")
         self.assertEqual(configured[1]["locale"], "pt_BR")
         self.assertNotIn("locale", jobs[0])
+
+    def test_artifact_dicom_policy_from_metadata_reads_external_delivery(self):
+        policy = _artifact_dicom_policy_from_metadata(
+            {
+                "ExternalDelivery": {
+                    "artifact_dicom_policy": {
+                        "secondary_capture_transfer_syntax": "jpeg_2000_lossless"
+                    }
+                }
+            }
+        )
+
+        self.assertEqual(policy, {"secondary_capture_transfer_syntax": "jpeg_2000_lossless"})
+
+    def test_apply_artifact_dicom_policy_sets_job_transfer_syntax(self):
+        jobs = [
+            {"name": "l3_muscle_area"},
+            {"name": "vat_sat_ratio", "secondary_capture_transfer_syntax": "original"},
+        ]
+
+        configured = _apply_artifact_dicom_policy(
+            jobs,
+            {"secondary_capture_transfer_syntax": "rle_lossless"},
+        )
+
+        self.assertEqual(configured[0]["secondary_capture_transfer_syntax"], "rle_lossless")
+        self.assertEqual(configured[1]["secondary_capture_transfer_syntax"], "rle_lossless")
+        self.assertNotIn("secondary_capture_transfer_syntax", jobs[0])
 
     def test_resolve_max_parallel_jobs_uses_profile_execution(self):
         self.assertEqual(_resolve_max_parallel_jobs({"execution": {"max_parallel_jobs": 3}}), 3)

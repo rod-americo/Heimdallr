@@ -4,8 +4,13 @@ from pathlib import Path
 
 import numpy as np
 import pydicom
+from pydicom.uid import DeflatedExplicitVRLittleEndian
 
-from heimdallr.metrics.jobs._dicom_secondary_capture import create_secondary_capture_from_rgb, metadata_value
+from heimdallr.metrics.jobs._dicom_secondary_capture import (
+    create_secondary_capture_from_rgb,
+    metadata_value,
+    resolve_secondary_capture_transfer_syntax,
+)
 
 
 class TestDicomSecondaryCapture(unittest.TestCase):
@@ -44,6 +49,72 @@ class TestDicomSecondaryCapture(unittest.TestCase):
 
         self.assertEqual(str(ds.PatientName), "SILVA^JOAO")
         self.assertEqual(ds.PatientID, "123")
+
+    def test_secondary_capture_downscales_large_rgb_canvas_to_shared_default(self):
+        rgb = np.zeros((800, 1260, 3), dtype=np.uint8)
+        case_metadata = {"StudyInstanceUID": "1.2.3", "PatientName": "Test^Patient"}
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "overlay_sc.dcm"
+            create_secondary_capture_from_rgb(
+                rgb,
+                output_path,
+                case_metadata,
+                series_description="Test Overlay",
+                series_number=9001,
+                instance_number=1,
+                derivation_description="Test artifact",
+            )
+            ds = pydicom.dcmread(str(output_path))
+
+        self.assertEqual(ds.Columns, 512)
+        self.assertLess(ds.Rows, 512)
+        self.assertLess(len(ds.PixelData), 800 * 1260 * 3)
+
+    def test_secondary_capture_can_write_deflated_lossless(self):
+        rgb = np.zeros((64, 64, 3), dtype=np.uint8)
+        rgb[8:56, 8:56, 0] = 255
+        case_metadata = {"StudyInstanceUID": "1.2.3", "PatientName": "Test^Patient"}
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_path = Path(tmpdir) / "original.dcm"
+            deflated_path = Path(tmpdir) / "deflated.dcm"
+            create_secondary_capture_from_rgb(
+                rgb,
+                original_path,
+                case_metadata,
+                series_description="Test Overlay",
+                series_number=9001,
+                instance_number=1,
+                derivation_description="Test artifact",
+            )
+            create_secondary_capture_from_rgb(
+                rgb,
+                deflated_path,
+                case_metadata,
+                series_description="Test Overlay",
+                series_number=9001,
+                instance_number=1,
+                derivation_description="Test artifact",
+                transfer_syntax="deflated_explicit_vr_little_endian",
+            )
+            ds = pydicom.dcmread(str(deflated_path))
+            original_size = original_path.stat().st_size
+            deflated_size = deflated_path.stat().st_size
+
+        self.assertEqual(ds.file_meta.TransferSyntaxUID, DeflatedExplicitVRLittleEndian)
+        self.assertTrue(np.array_equal(ds.pixel_array, rgb))
+        self.assertLess(deflated_size, original_size)
+
+    def test_secondary_capture_transfer_syntax_accepts_named_options(self):
+        for name in [
+            "original",
+            "deflated_explicit_vr_little_endian",
+            "jpeg_ls_lossless",
+            "jpeg2000_lossless",
+            "rle_lossless",
+        ]:
+            self.assertIsNotNone(resolve_secondary_capture_transfer_syntax(name))
 
 
 if __name__ == "__main__":

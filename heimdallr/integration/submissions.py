@@ -28,6 +28,30 @@ DEFAULT_REQUESTED_OUTPUTS = {
     "artifacts_tree": True,
 }
 
+ARTIFACT_DICOM_SECONDARY_CAPTURE_TRANSFER_SYNTAXES = {
+    "original": "original",
+    "uncompressed": "original",
+    "none": "original",
+    "explicit_vr_little_endian": "original",
+    "1.2.840.10008.1.2.1": "original",
+    "deflated": "deflated",
+    "deflated_lossless": "deflated",
+    "deflated_explicit_vr_little_endian": "deflated",
+    "1.2.840.10008.1.2.1.99": "deflated",
+    "jpeg_ls_lossless": "jpeg_ls_lossless",
+    "jpegls_lossless": "jpeg_ls_lossless",
+    "jpegls": "jpeg_ls_lossless",
+    "1.2.840.10008.1.2.4.80": "jpeg_ls_lossless",
+    "jpeg_2000_lossless": "jpeg_2000_lossless",
+    "jpeg2000_lossless": "jpeg_2000_lossless",
+    "jp2k_lossless": "jpeg_2000_lossless",
+    "1.2.840.10008.1.2.4.90": "jpeg_2000_lossless",
+    "rle_lossless": "rle_lossless",
+    "rle": "rle_lossless",
+    "1.2.840.10008.1.2.5": "rle_lossless",
+}
+
+
 def normalize_requested_outputs(raw: dict[str, Any] | None) -> dict[str, bool]:
     normalized = {key: False for key in DEFAULT_REQUESTED_OUTPUTS}
     if raw is None:
@@ -83,6 +107,44 @@ def normalize_series_selection_policy(raw: Any) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raise ValueError("series_selection_policy must be a JSON object")
     return raw
+
+
+def normalize_artifact_dicom_policy(raw: Any) -> dict[str, Any]:
+    if raw in (None, ""):
+        return {}
+    if not isinstance(raw, dict):
+        raise ValueError("artifact_dicom_policy must be a JSON object")
+
+    policy: dict[str, Any] = {}
+    if "secondary_capture_transfer_syntax" not in raw:
+        return policy
+
+    value = (
+        str(raw.get("secondary_capture_transfer_syntax") or "")
+        .strip()
+        .lower()
+        .replace("-", "_")
+        .replace(" ", "_")
+    )
+    if not value:
+        return policy
+    normalized = ARTIFACT_DICOM_SECONDARY_CAPTURE_TRANSFER_SYNTAXES.get(value)
+    if normalized is None:
+        allowed = ", ".join(
+            [
+                "original",
+                "deflated",
+                "jpeg_ls_lossless",
+                "jpeg_2000_lossless",
+                "rle_lossless",
+            ]
+        )
+        raise ValueError(
+            "artifact_dicom_policy.secondary_capture_transfer_syntax "
+            f"must be one of: {allowed}"
+        )
+    policy["secondary_capture_transfer_syntax"] = normalized
+    return policy
 
 
 def new_external_job_id() -> str:
@@ -145,6 +207,7 @@ def build_external_submission_payload(
     requested_metrics_modules: Any = None,
     artifact_locale: Any = None,
     series_selection_policy: Any = None,
+    artifact_dicom_policy: Any = None,
 ) -> dict[str, Any]:
     return {
         "job_id": str(job_id),
@@ -155,5 +218,6 @@ def build_external_submission_payload(
         "requested_metrics_modules": normalize_requested_metrics_modules(requested_metrics_modules),
         "artifact_locale": normalize_artifact_locale(artifact_locale),
         "series_selection_policy": normalize_series_selection_policy(series_selection_policy),
+        "artifact_dicom_policy": normalize_artifact_dicom_policy(artifact_dicom_policy),
         "received_at": settings.local_now().isoformat(),
     }

@@ -38,7 +38,10 @@ from heimdallr.metrics.jobs._bone_health_overlay_text import (
     resolve_artifact_locale,
     series_description,
 )
-from heimdallr.metrics.jobs._dicom_secondary_capture import create_secondary_capture_from_rgb
+from heimdallr.metrics.jobs._dicom_secondary_capture import (
+    create_secondary_capture_from_rgb,
+    secondary_capture_options_from_job_config,
+)
 from heimdallr.metrics.analysis.bone_health import (
     build_bone_health_qc_flags,
     calculate_mask_hu_statistics,
@@ -282,6 +285,7 @@ def main() -> int:
                     artifact_locale,
                     hu_mean=slice_stats["mean_hu"],
                 ),
+                **secondary_capture_options_from_job_config(job_config),
             )
             artifacts["overlay_sc_dcm"] = str(overlay_sc_path.relative_to(case_dir))
             dicom_exports.append(

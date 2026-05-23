@@ -11,6 +11,7 @@ from ...integration.status import external_job_status
 from ...integration.submissions import (
     build_external_submission_payload,
     new_external_job_id,
+    normalize_artifact_dicom_policy,
     normalize_requested_metrics_modules,
     normalize_series_selection_policy,
     write_external_submission_sidecar,
@@ -54,6 +55,7 @@ async def submit_job(
     requested_metrics_modules: str | None = Form(None),
     artifact_locale: str | None = Form(None),
     series_selection_policy: str | None = Form(None),
+    artifact_dicom_policy: str | None = Form(None),
 ):
     if not study_file.filename.lower().endswith(".zip"):
         raise HTTPException(status_code=400, detail="Only .zip files are allowed.")
@@ -102,6 +104,17 @@ async def submit_job(
                 detail="series_selection_policy must be a JSON object.",
             ) from exc
 
+    parsed_artifact_dicom_policy: dict | None = None
+    if artifact_dicom_policy:
+        try:
+            candidate_policy = json.loads(artifact_dicom_policy)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=400, detail="artifact_dicom_policy must be valid JSON.") from exc
+        try:
+            parsed_artifact_dicom_policy = normalize_artifact_dicom_policy(candidate_policy)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     upload_name = f"study_{settings.local_timestamp('%Y%m%d%H%M%S')}.zip"
     file_path = settings.UPLOAD_EXTERNAL_DIR / upload_name
     if file_path.exists():
@@ -118,6 +131,7 @@ async def submit_job(
         requested_metrics_modules=parsed_requested_metrics_modules,
         artifact_locale=artifact_locale,
         series_selection_policy=parsed_series_selection_policy,
+        artifact_dicom_policy=parsed_artifact_dicom_policy,
     )
 
     try:
@@ -138,6 +152,7 @@ async def submit_job(
         "requested_metrics_modules": submission_payload["requested_metrics_modules"],
         "artifact_locale": submission_payload["artifact_locale"],
         "series_selection_policy": submission_payload["series_selection_policy"],
+        "artifact_dicom_policy": submission_payload["artifact_dicom_policy"],
     }
 
 

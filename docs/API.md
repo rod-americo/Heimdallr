@@ -45,6 +45,8 @@ generated presentation artifacts when supported, including localized burned-in
 overlays and case-report DICOM metadata
 - optional `series_selection_policy` JSON object, which overrides the active
 series-selection profile for this submitted job only
+- optional `artifact_dicom_policy` JSON object, which overrides generated DICOM
+artifact encoding for this submitted job only
 
 It returns an immediate acceptance payload with `job_id` and `status=queued`. `GET /jobs/{job_id}` returns the best available asynchronous status for that external job. When processing finishes, `heimdallr.integration.delivery` performs an outbound multipart callback. Successful jobs emit `case.completed` with `manifest.json` plus `package.zip`; terminal failed jobs emit `case.failed` with `manifest.json` and no package. The consumer-facing callback contract is documented in `heimdallr/integration/docs/JOB_SUBMISSION.md`.
 
@@ -58,6 +60,11 @@ If `series_selection_policy` is provided, Heimdallr deep-merges that object over
 the active `config/series_selection.json` profile for the submitted job. The
 selected series audit in `metadata/id.json` records `PolicySource` and
 `ExternalPolicyName`.
+
+If `artifact_dicom_policy` is provided, Heimdallr applies it to metric jobs for
+that submitted job only. Supported `secondary_capture_transfer_syntax` values
+are `original`, `deflated`, `jpeg_ls_lossless`, `jpeg_2000_lossless`, and
+`rle_lossless`.
 
 `GET /ops/queues` returns non-identifying operational capacity for external
 feeders: queue status counts, oldest pending timestamps, segmentation

@@ -8,15 +8,44 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from PIL import Image
 from pydicom.dataset import FileDataset, FileMetaDataset
 from pydicom.uid import (
+    DeflatedExplicitVRLittleEndian,
     ExplicitVRLittleEndian,
+    JPEG2000Lossless,
+    JPEGLSLossless,
     PYDICOM_IMPLEMENTATION_UID,
+    RLELossless,
     SecondaryCaptureImageStorage,
     generate_uid,
 )
 
 from heimdallr.shared import settings
+
+DEFAULT_SECONDARY_CAPTURE_MAX_DIMENSION = 512
+DEFAULT_SECONDARY_CAPTURE_TRANSFER_SYNTAX = "explicit_vr_little_endian"
+SECONDARY_CAPTURE_TRANSFER_SYNTAXES = {
+    "explicit_vr_little_endian": ExplicitVRLittleEndian,
+    "original": ExplicitVRLittleEndian,
+    "none": ExplicitVRLittleEndian,
+    "uncompressed": ExplicitVRLittleEndian,
+    str(ExplicitVRLittleEndian): ExplicitVRLittleEndian,
+    "deflated_explicit_vr_little_endian": DeflatedExplicitVRLittleEndian,
+    "deflated": DeflatedExplicitVRLittleEndian,
+    str(DeflatedExplicitVRLittleEndian): DeflatedExplicitVRLittleEndian,
+    "rle_lossless": RLELossless,
+    "rle": RLELossless,
+    str(RLELossless): RLELossless,
+    "jpeg_ls_lossless": JPEGLSLossless,
+    "jpegls_lossless": JPEGLSLossless,
+    "jpegls": JPEGLSLossless,
+    str(JPEGLSLossless): JPEGLSLossless,
+    "jpeg2000_lossless": JPEG2000Lossless,
+    "jpeg_2000_lossless": JPEG2000Lossless,
+    "jp2k_lossless": JPEG2000Lossless,
+    str(JPEG2000Lossless): JPEG2000Lossless,
+}
 
 
 def parse_optional_float(value: Any) -> float | None:
@@ -46,6 +75,32 @@ def metadata_value(case_metadata: dict[str, Any], key: str, default: Any = None)
     return default
 
 
+def resolve_secondary_capture_transfer_syntax(value: Any):
+    key = str(value or DEFAULT_SECONDARY_CAPTURE_TRANSFER_SYNTAX).strip().lower()
+    transfer_syntax = SECONDARY_CAPTURE_TRANSFER_SYNTAXES.get(key)
+    if transfer_syntax is None:
+        allowed = ", ".join(sorted({key for key in SECONDARY_CAPTURE_TRANSFER_SYNTAXES if not key.startswith("1.")}))
+        raise ValueError(f"Unsupported secondary_capture_transfer_syntax: {value!r}. Allowed values: {allowed}")
+    return transfer_syntax
+
+
+def secondary_capture_options_from_job_config(job_config: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "max_dimension": int(
+            job_config.get(
+                "secondary_capture_max_dimension",
+                DEFAULT_SECONDARY_CAPTURE_MAX_DIMENSION,
+            )
+            or 0
+        )
+        or None,
+        "transfer_syntax": job_config.get(
+            "secondary_capture_transfer_syntax",
+            DEFAULT_SECONDARY_CAPTURE_TRANSFER_SYNTAX,
+        ),
+    }
+
+
 def create_secondary_capture_from_rgb(
     rgb: np.ndarray,
     output_path: Path,
@@ -56,15 +111,30 @@ def create_secondary_capture_from_rgb(
     series_number: int,
     instance_number: int,
     derivation_description: str,
+    max_dimension: int | None = DEFAULT_SECONDARY_CAPTURE_MAX_DIMENSION,
+    transfer_syntax: Any = DEFAULT_SECONDARY_CAPTURE_TRANSFER_SYNTAX,
 ) -> None:
     rgb_u8 = np.asarray(rgb, dtype=np.uint8)
     if rgb_u8.ndim != 3 or rgb_u8.shape[2] != 3:
         raise ValueError(f"RGB image must have shape (rows, cols, 3). Got {rgb_u8.shape}")
+    if max_dimension is not None:
+        max_dimension = int(max_dimension)
+        if max_dimension > 0:
+            rows, cols = rgb_u8.shape[:2]
+            largest = max(rows, cols)
+            if largest > max_dimension:
+                scale = float(max_dimension) / float(largest)
+                resized = Image.fromarray(rgb_u8).resize(
+                    (max(1, int(round(cols * scale))), max(1, int(round(rows * scale)))),
+                    Image.Resampling.LANCZOS,
+                )
+                rgb_u8 = np.asarray(resized, dtype=np.uint8)
 
     file_meta = FileMetaDataset()
     file_meta.FileMetaInformationVersion = b"\x00\x01"
     file_meta.MediaStorageSOPClassUID = SecondaryCaptureImageStorage
     file_meta.MediaStorageSOPInstanceUID = generate_uid()
+    transfer_syntax_uid = resolve_secondary_capture_transfer_syntax(transfer_syntax)
     file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
     file_meta.ImplementationClassUID = PYDICOM_IMPLEMENTATION_UID
 
@@ -138,4 +208,8 @@ def create_secondary_capture_from_rgb(
     ds.HighBit = 7
     ds.PixelRepresentation = 0
     ds.PixelData = rgb_u8.tobytes()
+    if transfer_syntax_uid == DeflatedExplicitVRLittleEndian:
+        ds.file_meta.TransferSyntaxUID = DeflatedExplicitVRLittleEndian
+    elif transfer_syntax_uid != ExplicitVRLittleEndian:
+        ds.compress(transfer_syntax_uid)
     ds.save_as(str(output_path), write_like_original=False)

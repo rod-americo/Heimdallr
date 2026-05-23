@@ -75,7 +75,7 @@ class TestVatSatRatioJob(unittest.TestCase):
                         "--case-id",
                         case_id,
                         "--job-config-json",
-                        '{"emit_secondary_capture_dicom": true}',
+                        '{"emit_secondary_capture_dicom": true, "secondary_capture_max_dimension": 1024}',
                     ],
                 ):
                     self.assertEqual(vat_sat_ratio.main(), 0)
@@ -97,6 +97,7 @@ class TestVatSatRatioJob(unittest.TestCase):
             self.assertEqual(ds.Modality, "OT")
             self.assertEqual(ds.SeriesDescription, "Heimdallr VAT/SAT Ratio Overlay")
             self.assertEqual(str(ds.SeriesNumber), "9102")
+            self.assertLessEqual(max(int(ds.Rows), int(ds.Columns)), 1024)
 
 
 if __name__ == "__main__":

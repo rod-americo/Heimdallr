@@ -271,6 +271,14 @@ def _artifact_locale_from_metadata(metadata: dict) -> str | None:
     return value or None
 
 
+def _artifact_dicom_policy_from_metadata(metadata: dict) -> dict:
+    external_delivery = metadata.get("ExternalDelivery", {})
+    if not isinstance(external_delivery, dict):
+        return {}
+    policy = external_delivery.get("artifact_dicom_policy", {})
+    return policy if isinstance(policy, dict) else {}
+
+
 def _apply_artifact_locale(jobs: list[dict], locale: str | None) -> list[dict]:
     if not locale:
         return jobs
@@ -278,6 +286,21 @@ def _apply_artifact_locale(jobs: list[dict], locale: str | None) -> list[dict]:
     for job in jobs:
         configured = dict(job)
         configured["locale"] = locale
+        configured_jobs.append(configured)
+    return configured_jobs
+
+
+def _apply_artifact_dicom_policy(jobs: list[dict], policy: dict | None) -> list[dict]:
+    if not policy:
+        return jobs
+    transfer_syntax = str(policy.get("secondary_capture_transfer_syntax") or "").strip()
+    if not transfer_syntax:
+        return jobs
+
+    configured_jobs: list[dict] = []
+    for job in jobs:
+        configured = dict(job)
+        configured["secondary_capture_transfer_syntax"] = transfer_syntax
         configured_jobs.append(configured)
     return configured_jobs
 
@@ -906,9 +929,13 @@ def segment_case_metrics(case_input: Path) -> bool:
         _validate_case_against_profile(case_id, metadata, profile_name, profile)
         requested_job_names = _requested_metrics_modules_from_metadata(metadata)
         artifact_locale = _artifact_locale_from_metadata(metadata)
-        jobs = _apply_artifact_locale(
-            _resolve_enabled_jobs(profile, requested_job_names=requested_job_names),
-            artifact_locale,
+        artifact_dicom_policy = _artifact_dicom_policy_from_metadata(metadata)
+        jobs = _apply_artifact_dicom_policy(
+            _apply_artifact_locale(
+                _resolve_enabled_jobs(profile, requested_job_names=requested_job_names),
+                artifact_locale,
+            ),
+            artifact_dicom_policy,
         )
         if not jobs:
             logger.log(f"[Metrics] No enabled jobs for profile {profile_name}")
@@ -925,6 +952,11 @@ def segment_case_metrics(case_input: Path) -> bool:
             logger.log(f"[Metrics] Requested jobs: {', '.join(requested_job_names)}")
         if artifact_locale:
             logger.log(f"[Metrics] Artifact locale: {artifact_locale}")
+        if artifact_dicom_policy:
+            logger.log(
+                "[Metrics] Artifact DICOM policy: "
+                f"{json.dumps(artifact_dicom_policy, sort_keys=True)}"
+            )
         logger.log(f"[Metrics] Jobs: {', '.join(job['name'] for job in jobs)}")
         logger.log(f"[Metrics] Max parallel jobs: {max_parallel_jobs}")
         logger.log(f"[Metrics] Instruction DICOM kind: {instruction_dicom_kind}")
@@ -980,6 +1012,7 @@ def segment_case_metrics(case_input: Path) -> bool:
             "profile": profile_name,
             "requested_jobs": requested_job_names,
             "artifact_locale": artifact_locale,
+            "artifact_dicom_policy": artifact_dicom_policy,
             "max_parallel_jobs": max_parallel_jobs,
             "instruction_dicom_kind": instruction_dicom_kind,
             "jobs": completed_jobs,

@@ -24,6 +24,7 @@ from heimdallr.metrics.jobs._bone_job_common import (
 from heimdallr.metrics.jobs._dicom_secondary_capture import (
     create_secondary_capture_from_rgb,
     parse_optional_float,
+    secondary_capture_options_from_job_config,
 )
 from heimdallr.metrics.jobs._vat_sat_overlay_text import (
     build_overlay_text,
@@ -397,6 +398,7 @@ def main() -> int:
                         sat_area_cm2=sat_area,
                         ratio=ratio,
                     ),
+                    **secondary_capture_options_from_job_config(job_config),
                 )
                 artifacts["overlay_sc_dcm"] = str(overlay_sc_path.relative_to(case_dir))
                 dicom_exports.append(

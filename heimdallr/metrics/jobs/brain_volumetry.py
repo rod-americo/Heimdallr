@@ -31,7 +31,10 @@ from heimdallr.metrics.jobs._brain_volumetry_overlay_text import (
     resolve_artifact_locale,
     series_description,
 )
-from heimdallr.metrics.jobs._dicom_secondary_capture import create_secondary_capture_from_rgb
+from heimdallr.metrics.jobs._dicom_secondary_capture import (
+    create_secondary_capture_from_rgb,
+    secondary_capture_options_from_job_config,
+)
 from heimdallr.shared.paths import study_metadata_json
 
 
@@ -353,6 +356,7 @@ def main() -> int:
         if job_config.get("generate_overlay", True):
             emit_dicom = bool(job_config.get("emit_secondary_capture_dicom", True))
             artifact_locale = resolve_artifact_locale(job_config)
+            secondary_capture_options = secondary_capture_options_from_job_config(job_config)
             summary_lines = build_overlay_text(
                 measurement=brain_measurement,
                 locale=artifact_locale,
@@ -377,6 +381,7 @@ def main() -> int:
                         series_number=SERIES_NUMBER,
                         instance_number=output_idx,
                         derivation_description=derivation_description(artifact_locale),
+                        **secondary_capture_options,
                     )
                     dicom_exports.append(
                         {
