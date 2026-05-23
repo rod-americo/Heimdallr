@@ -66,3 +66,39 @@ def build_overlay_panel_titles(*, locale: str) -> tuple[str, str]:
         translate("l3.overlay.axial_title", locale=locale),
         translate("l3.overlay.sagittal_title", locale=locale),
     )
+
+
+def build_sagittal_level_text(*, slice_idx: int, sagittal_slab_thickness_mm: float, locale: str) -> str:
+    """Build localized sagittal reference text for the L3 overlay."""
+    return translate(
+        "l3.overlay.sagittal_level",
+        locale=locale,
+        slice_idx=slice_idx,
+        slab_mm=format_decimal(sagittal_slab_thickness_mm, 0, locale=locale),
+    )
+
+
+def series_description(locale: str) -> str:
+    """Return the localized DICOM SeriesDescription."""
+    return translate("l3.overlay.series_description", locale=locale)
+
+
+def derivation_description(
+    locale: str,
+    *,
+    muscle_area_cm2: float,
+    smi_cm2_m2: float | None,
+    muscle_density_hu_mean: float | None,
+) -> str:
+    """Return the localized DICOM DerivationDescription."""
+    return translate(
+        "l3.overlay.derivation_description",
+        locale=locale,
+        muscle_area=format_decimal(muscle_area_cm2, 2, locale=locale),
+        smi=format_decimal(smi_cm2_m2, 2, locale=locale) if smi_cm2_m2 is not None else "-",
+        density=(
+            format_decimal(muscle_density_hu_mean, 2, locale=locale)
+            if muscle_density_hu_mean is not None
+            else "-"
+        ),
+    )

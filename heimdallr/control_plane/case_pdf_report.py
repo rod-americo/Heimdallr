@@ -9,6 +9,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from heimdallr.metrics.analysis.hepatic_steatosis import estimate_pdff_from_unenhanced_ct_hu
 from heimdallr.shared import settings
+from heimdallr.shared.i18n import normalize_locale
 from heimdallr.shared.patient_names import normalize_patient_name_display
 
 
@@ -50,6 +51,96 @@ FONT_BODY = _load_font(18)
 FONT_BODY_BOLD = _load_font(18, bold=True)
 FONT_SMALL = _load_font(15)
 FONT_TINY = _load_font(13)
+
+PT_BR_LABELS = {
+    "Heimdallr Case Report": "Relatório do Caso Heimdallr",
+    "Page": "Página",
+    "Patient": "Paciente",
+    "Study": "Estudo",
+    "Accession": "AN",
+    "Modality": "Modalidade",
+    "Series": "Série",
+    "Phase": "Fase",
+    "T Prep": "T preparo",
+    "T Seg": "T segmentação",
+    "Hemorrhage": "Hemorragia",
+    "Segmented stones": "Cálculos segmentados",
+    "HU triage components": "Componentes da triagem UH",
+    "No major automated alert flagged by current modules.": "Nenhum alerta automatizado maior sinalizado pelos módulos atuais.",
+    "Decision Summary": "Resumo de Decisão",
+    "Overview": "Visão Geral",
+    "Sex": "Sexo",
+    "Body regions": "Regiões corporais",
+    "Selected phase": "Fase selecionada",
+    "Selected series": "Série selecionada",
+    "Musculoskeletal": "Musculoesquelético",
+    "Weight": "Peso",
+    "Height": "Altura",
+    "Muscle density": "Densidade muscular",
+    "L1 trabecular HU": "UH trabecular L1",
+    "L1 BMD class": "Classe BMD L1",
+    "Liver and Organs": "Fígado e Órgãos",
+    "Liver volume": "Volume hepático",
+    "Liver mean HU": "UH média hepática",
+    "Estimated PDFF": "PDFF estimado",
+    "Spleen volume": "Volume esplênico",
+    "Right kidney volume": "Volume do rim direito",
+    "Left kidney volume": "Volume do rim esquerdo",
+    "Thoracic and Neuro": "Torácico e Neuro",
+    "Lung analysis": "Análise pulmonar",
+    "Total emphysema": "Enfisema total",
+    "Emphysema burden": "Carga de enfisema",
+    "Hemorrhage status": "Status de hemorragia",
+    "Hemorrhage volume": "Volume de hemorragia",
+    "Segmented Stone Burden": "Carga de Cálculos Segmentados",
+    "Status": "Status",
+    "Stone count": "Contagem de cálculos",
+    "Total volume": "Volume total",
+    "Largest axis": "Maior eixo",
+    "Right kidney complete": "Rim direito completo",
+    "Left kidney complete": "Rim esquerdo completo",
+    "HU Stone Triage": "Triagem de Cálculos por UH",
+    "Right components": "Componentes direitos",
+    "Right burden": "Carga direita",
+    "Right max axis": "Maior eixo direito",
+    "Left components": "Componentes esquerdos",
+    "Left burden": "Carga esquerda",
+    "Left max axis": "Maior eixo esquerdo",
+    "Technical Timing": "Tempos Técnicos",
+    "Prepare": "Preparo",
+    "Segmentation": "Segmentação",
+    "Prepare stats": "Estatísticas de preparo",
+    "Prepare stage timings": "Tempos das etapas de preparo",
+    "Findings Summary": "Resumo dos Achados",
+    "Lung analysis status": "Status da análise pulmonar",
+    "Stone burden status": "Status da carga de cálculos",
+    "Stone total volume": "Volume total dos cálculos",
+    "Largest stone axis": "Maior eixo do cálculo",
+    "Triage status": "Status da triagem",
+    "Right heuristic burden": "Carga heurística direita",
+    "Left heuristic burden": "Carga heurística esquerda",
+    "Largest component axis": "Maior eixo do componente",
+    "Kidney Stone HU Triage": "Triagem de Cálculos Renais por UH",
+    "Selected Overlays": "Overlays Selecionados",
+    "Technical Appendix": "Apêndice Técnico",
+    "Selected series payload": "Payload da série selecionada",
+    "Triage report path": "Caminho do relatório de triagem",
+    "Available images": "Imagens disponíveis",
+    "Structured Data": "Dados Estruturados",
+    "Right kidney": "Rim direito",
+    "Left kidney": "Rim esquerdo",
+    "axial": "axial",
+    "coronal": "coronal",
+    "Image unavailable": "Imagem indisponível",
+    "Yes": "Sim",
+    "No": "Não",
+}
+
+
+def _t(text: str, locale: str) -> str:
+    if normalize_locale(locale) == "pt_BR":
+        return PT_BR_LABELS.get(text, text)
+    return text
 
 
 def _page() -> tuple[Image.Image, ImageDraw.ImageDraw]:
@@ -139,8 +230,8 @@ def _draw_card(draw: ImageDraw.ImageDraw, title: str, rows: list[tuple[str, str]
     return y + card_height
 
 
-def _draw_footer(draw: ImageDraw.ImageDraw, page_number: int) -> None:
-    footer = f"Heimdallr case report  |  Page {page_number}"
+def _draw_footer(draw: ImageDraw.ImageDraw, page_number: int, locale: str) -> None:
+    footer = f"{_t('Heimdallr Case Report', locale)}  |  {_t('Page', locale)} {page_number}"
     y = PAGE_HEIGHT - MARGIN + 14
     draw.line((MARGIN, y - 14, PAGE_WIDTH - MARGIN, y - 14), fill="#d7dee7", width=1)
     draw.text((MARGIN, y), footer, font=FONT_TINY, fill="#64748b")
@@ -156,10 +247,10 @@ def _fmt_number(value, unit: str | None = None, digits: int = 1) -> str:
     return f"{rendered} {unit}".strip() if unit else rendered
 
 
-def _fmt_bool(value) -> str:
+def _fmt_bool(value, locale: str = "en_US") -> str:
     if value is None:
         return "-"
-    return "Yes" if value else "No"
+    return _t("Yes" if value else "No", locale)
 
 
 def _fmt_components(value) -> str:
@@ -175,7 +266,7 @@ def _safe_json(path: Path) -> dict:
         return json.load(handle)
 
 
-def _collect_report_images(case_folder: Path, results: dict, triage_report: dict) -> list[tuple[str, Path]]:
+def _collect_report_images(case_folder: Path, results: dict, triage_report: dict, locale: str) -> list[tuple[str, Path]]:
     images: list[tuple[str, Path]] = []
     seen: set[Path] = set()
 
@@ -197,7 +288,7 @@ def _collect_report_images(case_folder: Path, results: dict, triage_report: dict
             break
 
     for kidney in triage_report.get("kidneys", []):
-        side = "Right kidney" if kidney.get("mask_name") == "kidney_right" else "Left kidney"
+        side = _t("Right kidney", locale) if kidney.get("mask_name") == "kidney_right" else _t("Left kidney", locale)
         for component in (kidney.get("components") or [])[:2]:
             for plane_key, plane_name in [("axial_overlay_png", "axial"), ("coronal_overlay_png", "coronal")]:
                 raw_path = component.get(plane_key)
@@ -211,7 +302,7 @@ def _collect_report_images(case_folder: Path, results: dict, triage_report: dict
                 resolved = path.resolve()
                 if resolved in seen:
                     continue
-                label = f"{side} {component.get('component_id', '').replace('_', ' ')} {plane_name}"
+                label = f"{side} {component.get('component_id', '').replace('_', ' ')} {_t(plane_name, locale)}"
                 images.append((label, path))
                 seen.add(resolved)
                 if len(images) >= 10:
@@ -220,7 +311,7 @@ def _collect_report_images(case_folder: Path, results: dict, triage_report: dict
     return images
 
 
-def _render_image_page(title: str, items: list[tuple[str, Path]]) -> Image.Image:
+def _render_image_page(title: str, items: list[tuple[str, Path]], locale: str) -> Image.Image:
     page, draw = _page()
     draw.text((MARGIN, MARGIN), title, font=FONT_TITLE, fill="black")
     y = MARGIN + _text_height(draw, title, FONT_TITLE) + 30
@@ -244,7 +335,7 @@ def _render_image_page(title: str, items: list[tuple[str, Path]]) -> Image.Image
             paste_y = top + ((cell_height - image.height) // 2)
             page.paste(image, (paste_x, paste_y))
         except Exception:
-            draw.text((x + 20, top + 20), "Image unavailable", font=FONT_BODY, fill="#a00")
+            draw.text((x + 20, top + 20), _t("Image unavailable", locale), font=FONT_BODY, fill="#a00")
 
         caption_y = top + cell_height + 12
         _draw_wrapped(draw, label, x, caption_y, FONT_SMALL, cell_width)
@@ -252,8 +343,9 @@ def _render_image_page(title: str, items: list[tuple[str, Path]]) -> Image.Image
     return page
 
 
-def build_case_report(case_folder: Path, output_path: Path | None = None) -> Path:
+def build_case_report(case_folder: Path, output_path: Path | None = None, locale: str | None = None) -> Path:
     case_folder = Path(case_folder)
+    locale = normalize_locale(locale)
     if output_path is None:
         output_path = case_folder / "metadata" / "report.pdf"
 
@@ -267,7 +359,7 @@ def build_case_report(case_folder: Path, output_path: Path | None = None) -> Pat
     pages: list[Image.Image] = []
 
     overview_page, draw = _page()
-    title = "Heimdallr Case Report"
+    title = _t("Heimdallr Case Report", locale)
     draw.text((MARGIN, MARGIN), title, font=FONT_TITLE, fill="black")
     subtitle = metadata.get("CaseID", case_folder.name)
     draw.text((MARGIN, MARGIN + 44), subtitle, font=FONT_HEADER, fill="#334155")
@@ -284,20 +376,20 @@ def build_case_report(case_folder: Path, output_path: Path | None = None) -> Pat
 
     summary_items = [
         (
-            "Patient",
+            _t("Patient", locale),
             normalize_patient_name_display(
                 metadata.get("PatientName", "-"),
                 settings.PATIENT_NAME_PROFILE,
             ),
         ),
-        ("Study", metadata.get("StudyDate", "-")),
-        ("Accession", metadata.get("AccessionNumber", "-")),
-        ("Modality", metadata.get("Modality", "-")),
-        ("Series", str(selected_series.get("SeriesNumber", "-"))),
-        ("Phase", str(selected_phase)),
-        ("T Prep", pipeline.get("prepare_elapsed_time", "-")),
+        (_t("Study", locale), metadata.get("StudyDate", "-")),
+        (_t("Accession", locale), metadata.get("AccessionNumber", "-")),
+        (_t("Modality", locale), metadata.get("Modality", "-")),
+        (_t("Series", locale), str(selected_series.get("SeriesNumber", "-"))),
+        (_t("Phase", locale), str(selected_phase)),
+        (_t("T Prep", locale), pipeline.get("prepare_elapsed_time", "-")),
         (
-            "T Seg",
+            _t("T Seg", locale),
             pipeline.get("segmentation_elapsed_time")
             or pipeline.get("processing_elapsed_time")
             or pipeline.get("elapsed_time", "-"),
@@ -315,16 +407,16 @@ def build_case_report(case_folder: Path, output_path: Path | None = None) -> Pat
 
     alerts = []
     if (results.get("hemorrhage_vol_cm3") or 0) > 0.1:
-        alerts.append(f"Hemorrhage { _fmt_number(results.get('hemorrhage_vol_cm3'), 'cm3') }")
+        alerts.append(f"{_t('Hemorrhage', locale)} { _fmt_number(results.get('hemorrhage_vol_cm3'), 'cm3') }")
     if results.get("L1_bmd_classification") not in (None, "-", "Normal"):
         alerts.append(f"L1 BMD {results.get('L1_bmd_classification')}")
     if (results.get("renal_stone_count") or 0) > 0:
-        alerts.append(f"Segmented stones {results.get('renal_stone_count')}")
+        alerts.append(f"{_t('Segmented stones', locale)} {results.get('renal_stone_count')}")
     if (results.get("kidney_stone_triage_total_components") or 0) > 0:
-        alerts.append(f"HU triage components {results.get('kidney_stone_triage_total_components')}")
-    alert_text = " | ".join(alerts) if alerts else "No major automated alert flagged by current modules."
+        alerts.append(f"{_t('HU triage components', locale)} {results.get('kidney_stone_triage_total_components')}")
+    alert_text = " | ".join(alerts) if alerts else _t("No major automated alert flagged by current modules.", locale)
     alert_y = summary_top + summary_height + 18
-    draw.text((MARGIN, alert_y), "Decision Summary", font=FONT_SUBTITLE, fill="#0f172a")
+    draw.text((MARGIN, alert_y), _t("Decision Summary", locale), font=FONT_SUBTITLE, fill="#0f172a")
     _draw_wrapped(draw, alert_text, MARGIN + 210, alert_y + 2, FONT_BODY, PAGE_WIDTH - (2 * MARGIN) - 210, fill="#991b1b" if alerts else "#166534")
 
     col_gap = 24
@@ -336,129 +428,131 @@ def build_case_report(case_folder: Path, output_path: Path | None = None) -> Pat
     left_y = top_y
     right_y = top_y
 
-    left_y = _draw_card(draw, "Overview", [
-        ("Sex", metadata.get("PatientSex", "-")),
-        ("Body regions", ", ".join(results.get("body_regions", [])) or "-"),
-        ("Selected phase", str(selected_phase)),
-        ("Selected series", str(selected_series.get("SeriesNumber", "-"))),
+    left_y = _draw_card(draw, _t("Overview", locale), [
+        (_t("Sex", locale), metadata.get("PatientSex", "-")),
+        (_t("Body regions", locale), ", ".join(results.get("body_regions", [])) or "-"),
+        (_t("Selected phase", locale), str(selected_phase)),
+        (_t("Selected series", locale), str(selected_series.get("SeriesNumber", "-"))),
     ], left_x, left_y, col_width)
     left_y += 16
-    left_y = _draw_card(draw, "Musculoskeletal", [
-        ("Weight", _fmt_number(metadata.get("Weight"), "kg")),
-        ("Height", _fmt_number(metadata.get("Height"), "m", 2)),
+    left_y = _draw_card(draw, _t("Musculoskeletal", locale), [
+        (_t("Weight", locale), _fmt_number(metadata.get("Weight"), "kg")),
+        (_t("Height", locale), _fmt_number(metadata.get("Height"), "m", 2)),
         ("SMA", _fmt_number(results.get("SMA_cm2"), "cm2", 2)),
-        ("Muscle density", _fmt_number(results.get("muscle_HU_mean"), "HU")),
-        ("L1 trabecular HU", _fmt_number(results.get("L1_trabecular_HU_mean"), "HU")),
-        ("L1 BMD class", str(results.get("L1_bmd_classification", "-"))),
+        (_t("Muscle density", locale), _fmt_number(results.get("muscle_HU_mean"), "HU")),
+        (_t("L1 trabecular HU", locale), _fmt_number(results.get("L1_trabecular_HU_mean"), "HU")),
+        (_t("L1 BMD class", locale), str(results.get("L1_bmd_classification", "-"))),
     ], left_x, left_y, col_width)
     left_y += 16
     liver_pdff_percent = results.get("liver_pdff_percent")
     if liver_pdff_percent in (None, ""):
         liver_pdff_percent = estimate_pdff_from_unenhanced_ct_hu(results.get("liver_hu_mean"))
 
-    left_y = _draw_card(draw, "Liver and Organs", [
-        ("Liver volume", _fmt_number(results.get("liver_vol_cm3"), "cm3")),
-        ("Liver mean HU", _fmt_number(results.get("liver_hu_mean"), "HU")),
-        ("Estimated PDFF", _fmt_number(liver_pdff_percent, "%")),
-        ("Spleen volume", _fmt_number(results.get("spleen_vol_cm3"), "cm3")),
-        ("Right kidney volume", _fmt_number(results.get("kidney_right_vol_cm3"), "cm3")),
-        ("Left kidney volume", _fmt_number(results.get("kidney_left_vol_cm3"), "cm3")),
+    left_y = _draw_card(draw, _t("Liver and Organs", locale), [
+        (_t("Liver volume", locale), _fmt_number(results.get("liver_vol_cm3"), "cm3")),
+        (_t("Liver mean HU", locale), _fmt_number(results.get("liver_hu_mean"), "HU")),
+        (_t("Estimated PDFF", locale), _fmt_number(liver_pdff_percent, "%")),
+        (_t("Spleen volume", locale), _fmt_number(results.get("spleen_vol_cm3"), "cm3")),
+        (_t("Right kidney volume", locale), _fmt_number(results.get("kidney_right_vol_cm3"), "cm3")),
+        (_t("Left kidney volume", locale), _fmt_number(results.get("kidney_left_vol_cm3"), "cm3")),
     ], left_x, left_y, col_width)
 
-    right_y = _draw_card(draw, "Thoracic and Neuro", [
-        ("Lung analysis", str(results.get("lung_analysis_status", "-"))),
-        ("Total emphysema", _fmt_number(results.get("total_lung_emphysema_percent"), "%")),
-        ("Emphysema burden", _fmt_number(results.get("total_lung_emphysema_vol_cm3"), "cm3")),
-        ("Hemorrhage status", str(results.get("hemorrhage_analysis_status", "-"))),
-        ("Hemorrhage volume", _fmt_number(results.get("hemorrhage_vol_cm3"), "cm3")),
+    right_y = _draw_card(draw, _t("Thoracic and Neuro", locale), [
+        (_t("Lung analysis", locale), str(results.get("lung_analysis_status", "-"))),
+        (_t("Total emphysema", locale), _fmt_number(results.get("total_lung_emphysema_percent"), "%")),
+        (_t("Emphysema burden", locale), _fmt_number(results.get("total_lung_emphysema_vol_cm3"), "cm3")),
+        (_t("Hemorrhage status", locale), str(results.get("hemorrhage_analysis_status", "-"))),
+        (_t("Hemorrhage volume", locale), _fmt_number(results.get("hemorrhage_vol_cm3"), "cm3")),
     ], right_x, right_y, col_width)
     right_y += 16
-    right_y = _draw_card(draw, "Segmented Stone Burden", [
-        ("Status", str(results.get("renal_stone_analysis_status", "-"))),
-        ("Stone count", str(results.get("renal_stone_count", "-"))),
-        ("Total volume", _fmt_number(results.get("renal_stone_total_volume_mm3"), "mm3")),
-        ("Largest axis", _fmt_number(results.get("renal_stone_largest_diameter_mm"), "mm")),
-        ("Right kidney complete", _fmt_bool(results.get("renal_stone_kidney_right_complete"))),
-        ("Left kidney complete", _fmt_bool(results.get("renal_stone_kidney_left_complete"))),
+    right_y = _draw_card(draw, _t("Segmented Stone Burden", locale), [
+        (_t("Status", locale), str(results.get("renal_stone_analysis_status", "-"))),
+        (_t("Stone count", locale), str(results.get("renal_stone_count", "-"))),
+        (_t("Total volume", locale), _fmt_number(results.get("renal_stone_total_volume_mm3"), "mm3")),
+        (_t("Largest axis", locale), _fmt_number(results.get("renal_stone_largest_diameter_mm"), "mm")),
+        (_t("Right kidney complete", locale), _fmt_bool(results.get("renal_stone_kidney_right_complete"), locale)),
+        (_t("Left kidney complete", locale), _fmt_bool(results.get("renal_stone_kidney_left_complete"), locale)),
     ], right_x, right_y, col_width)
     right_y += 16
-    right_y = _draw_card(draw, "HU Stone Triage", [
-        ("Right components", _fmt_components(results.get("kidney_stone_triage_right_components"))),
-        ("Right burden", _fmt_number(results.get("kidney_stone_triage_right_volume_mm3"), "mm3")),
-        ("Right max axis", _fmt_number(results.get("kidney_stone_triage_right_largest_axis_mm"), "mm")),
-        ("Left components", _fmt_components(results.get("kidney_stone_triage_left_components"))),
-        ("Left burden", _fmt_number(results.get("kidney_stone_triage_left_volume_mm3"), "mm3")),
-        ("Left max axis", _fmt_number(results.get("kidney_stone_triage_left_largest_axis_mm"), "mm")),
+    right_y = _draw_card(draw, _t("HU Stone Triage", locale), [
+        (_t("Right components", locale), _fmt_components(results.get("kidney_stone_triage_right_components"))),
+        (_t("Right burden", locale), _fmt_number(results.get("kidney_stone_triage_right_volume_mm3"), "mm3")),
+        (_t("Right max axis", locale), _fmt_number(results.get("kidney_stone_triage_right_largest_axis_mm"), "mm")),
+        (_t("Left components", locale), _fmt_components(results.get("kidney_stone_triage_left_components"))),
+        (_t("Left burden", locale), _fmt_number(results.get("kidney_stone_triage_left_volume_mm3"), "mm3")),
+        (_t("Left max axis", locale), _fmt_number(results.get("kidney_stone_triage_left_largest_axis_mm"), "mm")),
     ], right_x, right_y, col_width)
 
     bottom_y = max(left_y, right_y) + 20
-    _draw_card(draw, "Technical Timing", [
-        ("Prepare", pipeline.get("prepare_elapsed_time", "-")),
+    _draw_card(draw, _t("Technical Timing", locale), [
+        (_t("Prepare", locale), pipeline.get("prepare_elapsed_time", "-")),
         (
-            "Segmentation",
+            _t("Segmentation", locale),
             pipeline.get("segmentation_elapsed_time")
             or pipeline.get("processing_elapsed_time")
             or pipeline.get("elapsed_time", "-"),
         ),
-        ("Prepare stats", json.dumps(pipeline.get("prepare_stats", {}), ensure_ascii=True)),
-        ("Prepare stage timings", json.dumps(pipeline.get("prepare_stage_timings_seconds", {}), ensure_ascii=True)),
+        (_t("Prepare stats", locale), json.dumps(pipeline.get("prepare_stats", {}), ensure_ascii=True)),
+        (_t("Prepare stage timings", locale), json.dumps(pipeline.get("prepare_stage_timings_seconds", {}), ensure_ascii=True)),
     ], MARGIN, bottom_y, PAGE_WIDTH - 2 * MARGIN, fill="#f8fafc")
-    _draw_footer(draw, 1)
+    _draw_footer(draw, 1, locale)
     pages.append(overview_page)
 
     findings_page, draw = _page()
-    draw.text((MARGIN, MARGIN), "Findings Summary", font=FONT_TITLE, fill="black")
-    y = MARGIN + _text_height(draw, "Findings Summary", FONT_TITLE) + 24
+    findings_title = _t("Findings Summary", locale)
+    draw.text((MARGIN, MARGIN), findings_title, font=FONT_TITLE, fill="black")
+    y = MARGIN + _text_height(draw, findings_title, FONT_TITLE) + 24
 
     lung_rows = [
-        ("Lung analysis status", str(results.get("lung_analysis_status", "-"))),
-        ("Total emphysema", _fmt_number(results.get("total_lung_emphysema_percent"), "%")),
-        ("Emphysema burden", _fmt_number(results.get("total_lung_emphysema_vol_cm3"), "cm3")),
-        ("Hemorrhage status", str(results.get("hemorrhage_analysis_status", "-"))),
-        ("Hemorrhage volume", _fmt_number(results.get("hemorrhage_vol_cm3"), "cm3")),
+        (_t("Lung analysis status", locale), str(results.get("lung_analysis_status", "-"))),
+        (_t("Total emphysema", locale), _fmt_number(results.get("total_lung_emphysema_percent"), "%")),
+        (_t("Emphysema burden", locale), _fmt_number(results.get("total_lung_emphysema_vol_cm3"), "cm3")),
+        (_t("Hemorrhage status", locale), str(results.get("hemorrhage_analysis_status", "-"))),
+        (_t("Hemorrhage volume", locale), _fmt_number(results.get("hemorrhage_vol_cm3"), "cm3")),
     ]
-    y = _draw_section(draw, "Thoracic and Neuro", lung_rows, MARGIN, y, PAGE_WIDTH - (2 * MARGIN))
+    y = _draw_section(draw, _t("Thoracic and Neuro", locale), lung_rows, MARGIN, y, PAGE_WIDTH - (2 * MARGIN))
 
     stone_rows = [
-        ("Stone burden status", str(results.get("renal_stone_analysis_status", "-"))),
-        ("Stone count", str(results.get("renal_stone_count", "-"))),
-        ("Stone total volume", _fmt_number(results.get("renal_stone_total_volume_mm3"), "mm3")),
-        ("Largest stone axis", _fmt_number(results.get("renal_stone_largest_diameter_mm"), "mm")),
-        ("Right kidney complete", _fmt_bool(results.get("renal_stone_kidney_right_complete"))),
-        ("Left kidney complete", _fmt_bool(results.get("renal_stone_kidney_left_complete"))),
+        (_t("Stone burden status", locale), str(results.get("renal_stone_analysis_status", "-"))),
+        (_t("Stone count", locale), str(results.get("renal_stone_count", "-"))),
+        (_t("Stone total volume", locale), _fmt_number(results.get("renal_stone_total_volume_mm3"), "mm3")),
+        (_t("Largest stone axis", locale), _fmt_number(results.get("renal_stone_largest_diameter_mm"), "mm")),
+        (_t("Right kidney complete", locale), _fmt_bool(results.get("renal_stone_kidney_right_complete"), locale)),
+        (_t("Left kidney complete", locale), _fmt_bool(results.get("renal_stone_kidney_left_complete"), locale)),
     ]
-    y = _draw_section(draw, "Segmented Stone Burden", stone_rows, MARGIN, y, PAGE_WIDTH - (2 * MARGIN))
+    y = _draw_section(draw, _t("Segmented Stone Burden", locale), stone_rows, MARGIN, y, PAGE_WIDTH - (2 * MARGIN))
 
     triage_rows = [
-        ("Triage status", str(results.get("kidney_stone_triage_status", "-"))),
-        ("Right components", str(results.get("kidney_stone_triage_right_components", "-"))),
-        ("Left components", str(results.get("kidney_stone_triage_left_components", "-"))),
-        ("Right heuristic burden", _fmt_number(results.get("kidney_stone_triage_right_volume_mm3"), "mm3")),
-        ("Left heuristic burden", _fmt_number(results.get("kidney_stone_triage_left_volume_mm3"), "mm3")),
-        ("Largest component axis", _fmt_number(results.get("kidney_stone_triage_max_component_axis_mm"), "mm")),
+        (_t("Triage status", locale), str(results.get("kidney_stone_triage_status", "-"))),
+        (_t("Right components", locale), str(results.get("kidney_stone_triage_right_components", "-"))),
+        (_t("Left components", locale), str(results.get("kidney_stone_triage_left_components", "-"))),
+        (_t("Right heuristic burden", locale), _fmt_number(results.get("kidney_stone_triage_right_volume_mm3"), "mm3")),
+        (_t("Left heuristic burden", locale), _fmt_number(results.get("kidney_stone_triage_left_volume_mm3"), "mm3")),
+        (_t("Largest component axis", locale), _fmt_number(results.get("kidney_stone_triage_max_component_axis_mm"), "mm")),
     ]
-    y = _draw_section(draw, "Kidney Stone HU Triage", triage_rows, MARGIN, y, PAGE_WIDTH - (2 * MARGIN))
+    y = _draw_section(draw, _t("Kidney Stone HU Triage", locale), triage_rows, MARGIN, y, PAGE_WIDTH - (2 * MARGIN))
 
-    _draw_footer(draw, 2)
+    _draw_footer(draw, 2, locale)
     pages.append(findings_page)
 
-    image_items = _collect_report_images(case_folder, results, triage_report)
+    image_items = _collect_report_images(case_folder, results, triage_report, locale)
     for page_index in range(0, len(image_items), 4):
-        page = _render_image_page("Selected Overlays", image_items[page_index:page_index + 4])
-        _draw_footer(ImageDraw.Draw(page), len(pages) + 1)
+        page = _render_image_page(_t("Selected Overlays", locale), image_items[page_index:page_index + 4], locale)
+        _draw_footer(ImageDraw.Draw(page), len(pages) + 1, locale)
         pages.append(page)
 
     appendix_page, draw = _page()
-    draw.text((MARGIN, MARGIN), "Technical Appendix", font=FONT_TITLE, fill="black")
-    y = MARGIN + _text_height(draw, "Technical Appendix", FONT_TITLE) + 24
+    appendix_title = _t("Technical Appendix", locale)
+    draw.text((MARGIN, MARGIN), appendix_title, font=FONT_TITLE, fill="black")
+    y = MARGIN + _text_height(draw, appendix_title, FONT_TITLE) + 24
     appendix_rows = [
-        ("Prepare stats", json.dumps(pipeline.get("prepare_stats", {}), ensure_ascii=True)),
-        ("Selected series payload", json.dumps(selected_series, ensure_ascii=True)),
-        ("Triage report path", str(results.get("kidney_stone_triage_report_path", "-"))),
-        ("Available images", ", ".join(results.get("images", [])) or "-"),
+        (_t("Prepare stats", locale), json.dumps(pipeline.get("prepare_stats", {}), ensure_ascii=True)),
+        (_t("Selected series payload", locale), json.dumps(selected_series, ensure_ascii=True)),
+        (_t("Triage report path", locale), str(results.get("kidney_stone_triage_report_path", "-"))),
+        (_t("Available images", locale), ", ".join(results.get("images", [])) or "-"),
     ]
-    _draw_section(draw, "Structured Data", appendix_rows, MARGIN, y, PAGE_WIDTH - (2 * MARGIN))
-    _draw_footer(draw, len(pages) + 1)
+    _draw_section(draw, _t("Structured Data", locale), appendix_rows, MARGIN, y, PAGE_WIDTH - (2 * MARGIN))
+    _draw_footer(draw, len(pages) + 1, locale)
     pages.append(appendix_page)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

@@ -13,6 +13,7 @@ from typing import Any
 from heimdallr.control_plane.case_pdf_report import build_case_report
 from heimdallr.integration.submissions import normalize_requested_outputs
 from heimdallr.metrics.jobs._dicom_encapsulated_pdf import create_encapsulated_pdf_dicom
+from heimdallr.shared.i18n import normalize_locale, translate
 from heimdallr.shared.paths import (
     study_artifacts_dir,
     study_dir,
@@ -71,14 +72,21 @@ def _iter_metric_files(metrics_artifacts_root: Path, suffix: str) -> list[Path]:
     )
 
 
-def _build_report_dicom(case_root: Path, report_path: Path, metadata: dict[str, Any]) -> Path:
+def _build_report_dicom(
+    case_root: Path,
+    report_path: Path,
+    metadata: dict[str, Any],
+    artifact_locale: str | None,
+) -> Path:
     output_path = case_root / "metadata" / REPORT_DICOM_FILENAME
+    locale = normalize_locale(artifact_locale)
+    title = translate("case_report.dicom.title", locale=locale)
     create_encapsulated_pdf_dicom(
         pdf_path=report_path,
         output_path=output_path,
         case_metadata=metadata,
-        series_description="Heimdallr Case Report",
-        document_title="Heimdallr Case Report",
+        series_description=title,
+        document_title=title,
         series_number=942,
         instance_number=1,
     )
@@ -151,9 +159,9 @@ def build_delivery_package(
     instructions_root = metrics_artifacts_root / "instructions"
 
     if requested.get("report_pdf", True) or requested.get("report_pdf_dicom", False):
-        report_path = build_case_report(case_root)
+        report_path = build_case_report(case_root, locale=artifact_locale)
     if requested.get("report_pdf_dicom", False):
-        report_dicom_path = _build_report_dicom(case_root, report_path, metadata)
+        report_dicom_path = _build_report_dicom(case_root, report_path, metadata, artifact_locale)
 
     package_stem = _safe_package_stem(client_case_id or case_id)
     package_name = f"heimdallr_{package_stem}.zip"

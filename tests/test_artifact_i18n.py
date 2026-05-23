@@ -7,7 +7,18 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from heimdallr.metrics.jobs._l3_overlay_text import build_overlay_text, resolve_artifact_locale  # noqa: E402
+from heimdallr.metrics.jobs._l3_overlay_text import (  # noqa: E402
+    build_overlay_text,
+    derivation_description as l3_derivation_description,
+    resolve_artifact_locale,
+    series_description as l3_series_description,
+)
+from heimdallr.metrics.jobs._vat_sat_overlay_text import (  # noqa: E402
+    build_overlay_text as build_vat_sat_overlay_text,
+    derivation_description as vat_sat_derivation_description,
+    resolve_artifact_locale as resolve_vat_sat_locale,
+    series_description as vat_sat_series_description,
+)
 from heimdallr.metrics.jobs._parenchymal_overlay_text import (  # noqa: E402
     build_overlay_text as build_parenchymal_overlay_text,
     derivation_description as parenchymal_derivation_description,
@@ -54,6 +65,16 @@ class TestArtifactI18n(unittest.TestCase):
                 "SMI (Índice de Massa Muscular Esquelética): 13,8 cm²/m²",
             ],
         )
+        self.assertEqual(l3_series_description("pt_BR"), "Heimdallr Overlay de Área Muscular em L3")
+        self.assertIn(
+            "densidade=31,60 UH",
+            l3_derivation_description(
+                "pt_BR",
+                muscle_area_cm2=42.15,
+                smi_cm2_m2=13.76,
+                muscle_density_hu_mean=31.6,
+            ),
+        )
 
     def test_l3_overlay_text_in_en_us_uses_decimal_point(self):
         title, lines = build_overlay_text(
@@ -77,6 +98,46 @@ class TestArtifactI18n(unittest.TestCase):
                 "Patient height: 1.82 m",
                 "SMI (Skeletal Muscle Index): 11.5 cm²/m²",
             ],
+        )
+        self.assertEqual(l3_series_description("en_US"), "Heimdallr L3 Muscle Area Overlay")
+
+    def test_vat_sat_overlay_text_in_pt_br_uses_locale(self):
+        with patch("heimdallr.metrics.jobs._vat_sat_overlay_text.settings.ARTIFACTS_LOCALE", "pt_BR"):
+            self.assertEqual(resolve_vat_sat_locale({}), "pt_BR")
+
+        title, panel_titles, lines, legend, sagittal_level = build_vat_sat_overlay_text(
+            slice_idx=8,
+            probable_viewer_slice_index_one_based=12,
+            sat_area_cm2=184.5,
+            vat_area_cm2=42.25,
+            ratio=0.229,
+            locale="pt_BR",
+        )
+
+        self.assertEqual(title, "Razão VAT/SAT - Corte central em L3")
+        self.assertEqual(panel_titles, ("Medida axial", "Referência sagital"))
+        self.assertEqual(
+            lines,
+            [
+                "Nível: L3",
+                "Corte NIfTI: 8",
+                "Provável corte no visualizador: 12",
+                "SAT: 184,5 cm²",
+                "VAT: 42,2 cm²",
+                "VAT/SAT: 0,2290",
+            ],
+        )
+        self.assertIn("gordura subcutânea", legend)
+        self.assertEqual(sagittal_level, "Nível axial z=8 | espessura 3 mm")
+        self.assertEqual(vat_sat_series_description("pt_BR"), "Heimdallr Overlay de Razão VAT/SAT")
+        self.assertIn(
+            "razão=0,2290",
+            vat_sat_derivation_description(
+                "pt_BR",
+                vat_area_cm2=42.25,
+                sat_area_cm2=184.5,
+                ratio=0.229,
+            ),
         )
 
     def test_l3_overlay_text_omits_density_when_unavailable(self):

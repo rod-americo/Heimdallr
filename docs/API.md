@@ -40,7 +40,8 @@ metrics JSON, overlays, report PDF, and report Encapsulated PDF DICOM
 - optional `requested_metrics_modules` (JSON array or CSV string), which
 selects enabled metrics jobs to run from the active profile
 - optional `artifact_locale`, which selects the presentation locale for
-generated burned-in artifacts when supported by the requested metric module
+generated presentation artifacts when supported, including localized burned-in
+overlays and case-report DICOM metadata
 - optional `series_selection_policy` JSON object, which overrides the active
 series-selection profile for this submitted job only
 

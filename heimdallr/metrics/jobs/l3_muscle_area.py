@@ -28,7 +28,10 @@ from heimdallr.metrics.jobs._dicom_secondary_capture import (
 from heimdallr.metrics.jobs._l3_overlay_text import (
     build_overlay_panel_titles,
     build_overlay_text,
+    build_sagittal_level_text,
+    derivation_description,
     resolve_artifact_locale,
+    series_description,
 )
 from heimdallr.metrics.analysis.bone_health import extract_study_technique_context
 from heimdallr.shared.paths import study_artifacts_dir, study_dir, study_metadata_json, study_nifti
@@ -197,6 +200,7 @@ def render_overlay_rgb(
     title: str,
     summary_lines: list[str],
     panel_titles: tuple[str, str],
+    sagittal_level_text: str,
     spacing_mm: tuple[float, float, float],
     sagittal_slab_thickness_mm: float = 3.0,
 ) -> np.ndarray:
@@ -340,7 +344,7 @@ def render_overlay_rgb(
     ax_sagittal.text(
         0.03,
         0.03,
-        f"Axial level z={slice_idx} | slab {sagittal_slab_thickness_mm:.0f} mm",
+        sagittal_level_text,
         transform=ax_sagittal.transAxes,
         ha="left",
         va="bottom",
@@ -369,28 +373,20 @@ def create_secondary_capture(
     output_path: Path,
     case_metadata: dict,
     measurement: dict,
+    artifact_locale: str,
 ) -> None:
     create_secondary_capture_from_rgb(
         rgb,
         output_path,
         case_metadata,
-        series_description="Heimdallr L3 Muscle Area Overlay",
+        series_description=series_description(artifact_locale),
         series_number=9101,
         instance_number=1,
-        derivation_description=(
-            "Burned-in overlay generated from Heimdallr L3 muscle area metric "
-            f"(SMA={measurement['skeletal_muscle_area_cm2']:.2f} cm2"
-            + (
-                f", SMI={measurement['smi_cm2_m2']:.2f} cm2/m2"
-                if measurement.get("smi_cm2_m2") is not None
-                else ""
-            )
-            + (
-                f", density={measurement['skeletal_muscle_density_hu_mean']:.2f} HU"
-                if measurement.get("skeletal_muscle_density_hu_mean") is not None
-                else ""
-            )
-            + ")"
+        derivation_description=derivation_description(
+            artifact_locale,
+            muscle_area_cm2=measurement["skeletal_muscle_area_cm2"],
+            smi_cm2_m2=measurement.get("smi_cm2_m2"),
+            muscle_density_hu_mean=measurement.get("skeletal_muscle_density_hu_mean"),
         ),
     )
 
@@ -531,6 +527,11 @@ def main() -> int:
                 locale=artifact_locale,
             )
             panel_titles = build_overlay_panel_titles(locale=artifact_locale)
+            sagittal_level_text = build_sagittal_level_text(
+                slice_idx=slice_idx,
+                sagittal_slab_thickness_mm=3.0,
+                locale=artifact_locale,
+            )
             overlay_rgb = render_overlay_rgb(
                 ct_data,
                 ct_img.affine,
@@ -540,6 +541,7 @@ def main() -> int:
                 title,
                 summary_lines,
                 panel_titles,
+                sagittal_level_text,
                 spacing_mm=(spacing_x, spacing_y, spacing_z),
             )
             measurement_stub = {
@@ -551,7 +553,13 @@ def main() -> int:
                 ),
                 "smi_cm2_m2": float(smi_cm2_m2) if smi_cm2_m2 is not None else None,
             }
-            create_secondary_capture(overlay_rgb, overlay_sc_path, case_metadata, measurement_stub)
+            create_secondary_capture(
+                overlay_rgb,
+                overlay_sc_path,
+                case_metadata,
+                measurement_stub,
+                artifact_locale,
+            )
             artifacts["overlay_sc_dcm"] = str(overlay_sc_path.relative_to(case_dir))
 
         payload = {

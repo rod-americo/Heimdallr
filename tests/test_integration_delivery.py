@@ -184,7 +184,10 @@ class TestIntegrationDeliveryPackageAndWorker(unittest.TestCase):
                     {
                         "StudyInstanceUID": "1.2.3",
                         "Pipeline": {"metrics_end_time": "2026-04-27T10:00:00-03:00"},
-                        "ExternalDelivery": {"received_at": "2026-04-27T09:50:00-03:00"},
+                        "ExternalDelivery": {
+                            "received_at": "2026-04-27T09:50:00-03:00",
+                            "artifact_locale": "pt_BR",
+                        },
                     }
                 ),
                 encoding="utf-8",
@@ -210,11 +213,14 @@ class TestIntegrationDeliveryPackageAndWorker(unittest.TestCase):
 
             report_path = case_root / "metadata" / "report.pdf"
             report_dicom_path = case_root / "metadata" / "report.dcm"
-            def _fake_report(_case_root):
+            report_dicom_calls = []
+
+            def _fake_report(_case_root, **_kwargs):
                 report_path.write_bytes(b"%PDF")
                 return report_path
 
             def _fake_report_dicom(*, output_path, **_kwargs):
+                report_dicom_calls.append(_kwargs)
                 output_path.write_bytes(b"DICM")
 
             with (
@@ -268,6 +274,8 @@ class TestIntegrationDeliveryPackageAndWorker(unittest.TestCase):
             self.assertEqual(manifest["missing_outputs"], [])
             self.assertIn("report_pdf_dicom", manifest["delivered_outputs"])
             self.assertEqual(package_manifest["requested_outputs"]["report_pdf_dicom"], True)
+            self.assertEqual(report_dicom_calls[0]["series_description"], "Relatório do Caso Heimdallr")
+            self.assertEqual(report_dicom_calls[0]["document_title"], "Relatório do Caso Heimdallr")
 
     def test_build_delivery_package_honors_output_selection(self):
         with tempfile.TemporaryDirectory() as tmpdir:

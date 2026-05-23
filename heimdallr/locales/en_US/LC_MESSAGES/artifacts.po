@@ -30,6 +30,57 @@ msgstr "Axial"
 msgid "l3.overlay.sagittal_title"
 msgstr "Sagittal Reference"
 
+msgid "l3.overlay.sagittal_level"
+msgstr "Axial level z={slice_idx} | slab {slab_mm} mm"
+
+msgid "l3.overlay.series_description"
+msgstr "Heimdallr L3 Muscle Area Overlay"
+
+msgid "l3.overlay.derivation_description"
+msgstr "Burned-in overlay generated from Heimdallr L3 muscle area metric (SMA={muscle_area} cm2, SMI={smi} cm2/m2, density={density} HU)"
+
+msgid "vat_sat.overlay.title"
+msgstr "VAT/SAT Ratio - L3 Center Slice"
+
+msgid "vat_sat.overlay.axial_title"
+msgstr "Axial Measurement"
+
+msgid "vat_sat.overlay.sagittal_title"
+msgstr "Sagittal Reference"
+
+msgid "vat_sat.overlay.level"
+msgstr "Level: L3"
+
+msgid "vat_sat.overlay.nifti_slice"
+msgstr "NIfTI slice: {value}"
+
+msgid "vat_sat.overlay.viewer_slice"
+msgstr "Probable viewer slice: {value}"
+
+msgid "vat_sat.overlay.sat"
+msgstr "SAT: {value} cm²"
+
+msgid "vat_sat.overlay.vat"
+msgstr "VAT: {value} cm²"
+
+msgid "vat_sat.overlay.ratio"
+msgstr "VAT/SAT: {value}"
+
+msgid "vat_sat.overlay.legend"
+msgstr "Blue = subcutaneous fat | Orange = visceral fat | Cyan = vertebra"
+
+msgid "vat_sat.overlay.sagittal_level"
+msgstr "Axial level z={slice_idx} | slab {slab_mm} mm"
+
+msgid "vat_sat.overlay.series_description"
+msgstr "Heimdallr VAT/SAT Ratio Overlay"
+
+msgid "vat_sat.overlay.derivation_description"
+msgstr "Burned-in overlay generated from Heimdallr VAT/SAT ratio metric (VAT={vat} cm2, SAT={sat} cm2, ratio={ratio})"
+
+msgid "case_report.dicom.title"
+msgstr "Heimdallr Case Report"
+
 msgid "parenchymal.overlay.title"
 msgstr "Parenchymal organs:"
 

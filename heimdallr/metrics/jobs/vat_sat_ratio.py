@@ -25,6 +25,12 @@ from heimdallr.metrics.jobs._dicom_secondary_capture import (
     create_secondary_capture_from_rgb,
     parse_optional_float,
 )
+from heimdallr.metrics.jobs._vat_sat_overlay_text import (
+    build_overlay_text,
+    derivation_description,
+    resolve_artifact_locale,
+    series_description,
+)
 from heimdallr.metrics.analysis.bone_health import extract_study_technique_context
 from heimdallr.shared.paths import study_artifacts_dir, study_dir, study_metadata_json, study_nifti
 
@@ -172,7 +178,11 @@ def render_overlay_rgb(
     sat_mask: np.ndarray,
     vat_mask: np.ndarray,
     slice_idx: int,
+    title: str,
+    panel_titles: tuple[str, str],
     summary_lines: list[str],
+    legend_text: str,
+    sagittal_level_text: str,
     spacing_mm: tuple[float, float, float],
     sagittal_slab_thickness_mm: float = 3.0,
 ) -> np.ndarray:
@@ -220,7 +230,7 @@ def render_overlay_rgb(
     fig.patch.set_facecolor("black")
     ax_axial.set_facecolor("black")
     ax_sagittal.set_facecolor("black")
-    fig.suptitle("VAT/SAT Ratio - L3 Center Slice", fontsize=15, color="white")
+    fig.suptitle(title, fontsize=15, color="white")
 
     ax_axial.imshow(rotated_ct, cmap="gray", interpolation="nearest", aspect=axial_aspect)
     if rotated_sat.any():
@@ -229,14 +239,14 @@ def render_overlay_rgb(
         ax_axial.contour(rotated_vat, levels=[0.5], colors=["#ffb000"], linewidths=1.5)
     if rotated_l3.any():
         ax_axial.contour(rotated_l3, levels=[0.5], colors=["#00d5ff"], linewidths=1.2)
-    ax_axial.set_title("Axial Measurement", fontsize=12, color="white")
+    ax_axial.set_title(panel_titles[0], fontsize=12, color="white")
     ax_axial.text(
         0.03, 0.97, "\n".join(summary_lines), transform=ax_axial.transAxes,
         ha="left", va="top", fontsize=10, color="white",
         bbox={"boxstyle": "round,pad=0.4", "facecolor": "black", "alpha": 0.55, "edgecolor": "none"},
     )
     ax_axial.text(
-        0.02, 0.02, "Blue = subcutaneous fat | Orange = visceral fat | Cyan = vertebra",
+        0.02, 0.02, legend_text,
         transform=ax_axial.transAxes, ha="left", va="bottom", fontsize=9, color="white"
     )
     ax_axial.axis("off")
@@ -246,11 +256,11 @@ def render_overlay_rgb(
         ax_sagittal.contour(rotated_sagittal_l3, levels=[0.5], colors=["#ffb000"], linewidths=1.1)
     ax_sagittal.axhline(slice_row, color="#00d5ff", linewidth=1.3, linestyle="--")
     ax_sagittal.text(
-        0.03, 0.03, f"Axial level z={slice_idx} | slab {sagittal_slab_thickness_mm:.0f} mm",
+        0.03, 0.03, sagittal_level_text,
         transform=ax_sagittal.transAxes, ha="left", va="bottom", fontsize=9, color="white",
         bbox={"boxstyle": "round,pad=0.3", "facecolor": "black", "alpha": 0.45, "edgecolor": "none"},
     )
-    ax_sagittal.set_title("Sagittal Reference", fontsize=12, color="white")
+    ax_sagittal.set_title(panel_titles[1], fontsize=12, color="white")
     ax_sagittal.axis("off")
 
     fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.965), w_pad=0.15)
@@ -334,14 +344,15 @@ def main() -> int:
         ratio = round(vat_area / sat_area, 4) if sat_area > 0 else None
         total_slices = int(image_data.shape[2])
         probable_viewer_slice = int(total_slices - slice_idx)
-        summary_lines = [
-            "Level: L3",
-            f"NIfTI slice: {slice_idx}",
-            f"Probable viewer slice: {probable_viewer_slice}",
-            f"SAT: {sat_area:.1f} cm²",
-            f"VAT: {vat_area:.1f} cm²",
-            f"VAT/SAT: {ratio:.4f}" if ratio is not None else "VAT/SAT: -",
-        ]
+        artifact_locale = resolve_artifact_locale(job_config)
+        title, panel_titles, summary_lines, legend_text, sagittal_level_text = build_overlay_text(
+            slice_idx=slice_idx,
+            probable_viewer_slice_index_one_based=probable_viewer_slice,
+            sat_area_cm2=sat_area,
+            vat_area_cm2=vat_area,
+            ratio=ratio,
+            locale=artifact_locale,
+        )
         case_metadata = _load_case_metadata(case_id, case_dir)
         selected_phase = _selected_phase_from_metadata(case_metadata)
         technique = extract_study_technique_context(
@@ -362,7 +373,11 @@ def main() -> int:
                 sat_mask=sat_mask,
                 vat_mask=vat_mask,
                 slice_idx=slice_idx,
+                title=title,
+                panel_titles=panel_titles,
                 summary_lines=summary_lines,
+                legend_text=legend_text,
+                sagittal_level_text=sagittal_level_text,
                 spacing_mm=spacing_mm,
             )
             if generate_overlay:
@@ -373,14 +388,14 @@ def main() -> int:
                     rgb,
                     overlay_sc_path,
                     case_metadata,
-                    series_description="Heimdallr VAT/SAT Ratio Overlay",
+                    series_description=series_description(artifact_locale),
                     series_number=SERIES_NUMBER,
                     instance_number=1,
-                    derivation_description=(
-                        "Burned-in overlay generated from Heimdallr VAT/SAT ratio metric "
-                        f"(VAT={vat_area:.2f} cm2, SAT={sat_area:.2f} cm2"
-                        + (f", ratio={ratio:.4f}" if ratio is not None else "")
-                        + ")"
+                    derivation_description=derivation_description(
+                        artifact_locale,
+                        vat_area_cm2=vat_area,
+                        sat_area_cm2=sat_area,
+                        ratio=ratio,
                     ),
                 )
                 artifacts["overlay_sc_dcm"] = str(overlay_sc_path.relative_to(case_dir))

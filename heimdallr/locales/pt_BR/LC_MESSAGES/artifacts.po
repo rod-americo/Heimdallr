@@ -30,6 +30,57 @@ msgstr "Axial"
 msgid "l3.overlay.sagittal_title"
 msgstr "Referência sagital"
 
+msgid "l3.overlay.sagittal_level"
+msgstr "Nível axial z={slice_idx} | espessura {slab_mm} mm"
+
+msgid "l3.overlay.series_description"
+msgstr "Heimdallr Overlay de Área Muscular em L3"
+
+msgid "l3.overlay.derivation_description"
+msgstr "Overlay burned-in gerado a partir da métrica de área muscular em L3 do Heimdallr (SMA={muscle_area} cm2, SMI={smi} cm2/m2, densidade={density} UH)"
+
+msgid "vat_sat.overlay.title"
+msgstr "Razão VAT/SAT - Corte central em L3"
+
+msgid "vat_sat.overlay.axial_title"
+msgstr "Medida axial"
+
+msgid "vat_sat.overlay.sagittal_title"
+msgstr "Referência sagital"
+
+msgid "vat_sat.overlay.level"
+msgstr "Nível: L3"
+
+msgid "vat_sat.overlay.nifti_slice"
+msgstr "Corte NIfTI: {value}"
+
+msgid "vat_sat.overlay.viewer_slice"
+msgstr "Provável corte no visualizador: {value}"
+
+msgid "vat_sat.overlay.sat"
+msgstr "SAT: {value} cm²"
+
+msgid "vat_sat.overlay.vat"
+msgstr "VAT: {value} cm²"
+
+msgid "vat_sat.overlay.ratio"
+msgstr "VAT/SAT: {value}"
+
+msgid "vat_sat.overlay.legend"
+msgstr "Azul = gordura subcutânea | Laranja = gordura visceral | Ciano = vértebra"
+
+msgid "vat_sat.overlay.sagittal_level"
+msgstr "Nível axial z={slice_idx} | espessura {slab_mm} mm"
+
+msgid "vat_sat.overlay.series_description"
+msgstr "Heimdallr Overlay de Razão VAT/SAT"
+
+msgid "vat_sat.overlay.derivation_description"
+msgstr "Overlay burned-in gerado a partir da métrica de razão VAT/SAT do Heimdallr (VAT={vat} cm2, SAT={sat} cm2, razão={ratio})"
+
+msgid "case_report.dicom.title"
+msgstr "Relatório do Caso Heimdallr"
+
 msgid "parenchymal.overlay.title"
 msgstr "Órgãos parenquimatosos:"
 

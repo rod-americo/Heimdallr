@@ -22,7 +22,7 @@ Optional fields:
 | `source_system` | string | Caller system identifier. Echoed back in callback metadata. |
 | `requested_outputs` | JSON object string | Controls optional files in the final package. |
 | `requested_metrics_modules` | JSON array string or CSV string | Limits metrics jobs to requested modules plus dependencies from the active metrics profile. Not fully validated at admission time. |
-| `artifact_locale` | string | Presentation locale for generated burned-in artifacts where supported, for example `pt_BR` or `en_US`. |
+| `artifact_locale` | string | Presentation locale for generated presentation artifacts where supported, for example `pt_BR` or `en_US`. |
 | `series_selection_policy` | JSON object string | Overrides the active series-selection profile for this submitted job only. |
 
 `requested_metrics_modules` and `requested_outputs` are intentionally separate:
@@ -30,7 +30,8 @@ Optional fields:
 - `requested_metrics_modules` orders which metrics processing should run.
 - `requested_outputs` chooses which generated files should be returned.
 - `artifact_locale` chooses the language/formatting used by generated
-presentation artifacts where the metric module supports localization.
+presentation artifacts where localization is supported, including burned-in
+overlays and case-report DICOM metadata.
 - `series_selection_policy` chooses which prepared CT series should feed
 segmentation for this job.
 
