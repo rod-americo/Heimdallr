@@ -2,7 +2,7 @@
 
 ![Release](https://img.shields.io/badge/release-v0.2.1-blue) [![CI](https://github.com/rod-americo/Heimdallr/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rod-americo/Heimdallr/actions/workflows/ci.yml) ![Python](https://img.shields.io/badge/python-3.12-blue) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE.md) ![DICOM](https://img.shields.io/badge/DICOM-C--STORE-informational) ![TotalSegmentator](https://img.shields.io/badge/segmentation-TotalSegmentator-informational)
 
-Heimdallr is open-source infrastructure for radiological image operations. It receives DICOM studies, prepares selected series for deterministic processing, converts DICOM to NIfTI, orchestrates TotalSegmentator-backed segmentation, computes quantitative metrics, tracks queue state in SQLite, and delivers generated artifacts through operational dashboards, DICOM egress, and HTTP callbacks.
+Heimdallr is open-source infrastructure for radiological image operations. It receives DICOM studies and API submissions, prepares selected series for deterministic processing, converts DICOM to NIfTI, orchestrates TotalSegmentator-backed segmentation, computes quantitative metrics, tracks queue state in SQLite, and delivers generated artifacts through operational dashboards, DICOM egress, outbound HTTP events, and final API callbacks.
 
 The name references Heimdall, the vigilant Norse guardian, reflecting this stack's role as an operational watch layer for imaging intake, queues, segmentation, metrics, and artifact delivery.
 
@@ -28,6 +28,8 @@ Heimdallr owns the imaging infrastructure layer. Clinical report drafting, LLM/N
   - `python -m heimdallr.tui`
 - critical external dependencies:
   - DICOM peers/PACS for C-STORE intake and outbound C-STORE
+  - HTTP/API clients for ZIP upload, external job submission, outbound events,
+    and final delivery callbacks
   - `dcm2niix` for conversion
   - TotalSegmentator for segmentation tasks
   - SQLite filesystem access for queue and case state
@@ -47,9 +49,9 @@ Heimdallr owns the imaging infrastructure layer. Clinical report drafting, LLM/N
 | `heimdallr.segmentation` | operational, dependency-heavy hotspot | Runs TotalSegmentator tasks from host-local profile; depends on binary/license/GPU or CPU capacity. |
 | `heimdallr.metrics` | operational, mixed production/experimental surface | Production-facing jobs are enabled through `config/metrics_pipeline.example.json`; experimental jobs must stay opt-in. |
 | `heimdallr.dicom_egress` | operational | Queue-driven C-STORE SCU with retry and compression fallback. |
-| `heimdallr.integration.dispatch` | operational if configured | Delivers patient-identified events to configured HTTP destinations. |
-| `heimdallr.integration.delivery` | operational if configured | Sends terminal `case.completed` or `case.failed` callbacks for external submissions. |
-| `heimdallr.control_plane` | operational | FastAPI dashboard, upload ingress, patient/results API, PDF export. Built-in auth is not present. |
+| `heimdallr.integration.dispatch` | operational if configured | Delivers patient-identified API events to configured HTTP destinations. |
+| `heimdallr.integration.delivery` | operational if configured | Sends terminal `case.completed` or `case.failed` API callbacks for external submissions. |
+| `heimdallr.control_plane` | operational | FastAPI dashboard, `/upload` ingress, `/jobs` submission API, patient/results API, PDF export. Built-in auth is not present. |
 | `heimdallr.tui` | operational support tool | Reads SQLite/process state for live operations. |
 | `heimdallr.space_manager` | operational guardrail | Purges completed study artifacts when configured disk thresholds are exceeded. |
 | `heimdallr.resource_monitor` | operational telemetry | Samples service and case memory state into SQLite. |
@@ -173,12 +175,12 @@ Build and GPU validation should be done on `thor`, where Docker and the POC GPU 
 Canonical contracts are documented in [`docs/CONTRACTS.md`](docs/CONTRACTS.md). High-value references:
 
 - inbound DICOM studies grouped by `StudyInstanceUID`
-- ZIP study payloads accepted by `/upload` and `/jobs`
+- ZIP study payloads accepted by `/upload` and external `/jobs` API submissions
 - per-job series-selection overrides for external `/jobs` submissions
 - study directory state under `runtime/studies/<case_id>/`
 - `metadata/id.json` and `metadata/resultados.json`
 - queue tables in `database/dicom.db`
-- outbound DICOM artifacts and external delivery callbacks
+- outbound DICOM artifacts, outbound API events, and external delivery callbacks
 
 API details remain in [`docs/API.md`](docs/API.md). Database details remain in [`database/README.md`](database/README.md).
 
