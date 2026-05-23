@@ -1408,6 +1408,7 @@ def process_zip(zip_path):
                     "source_system": str(external_submission.get("source_system", "") or "").strip() or None,
                     "requested_outputs": external_submission.get("requested_outputs", {}),
                     "requested_metrics_modules": external_submission.get("requested_metrics_modules", []),
+                    "series_selection_policy": external_submission.get("series_selection_policy", {}),
                     "received_at": external_submission.get("received_at"),
                 }
                 output_meta["ExternalDelivery"] = external_delivery_payload

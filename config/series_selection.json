@@ -4,7 +4,7 @@
     "ct_default": {
       "required": {
         "modality": "CT",
-        "min_slices": 120
+        "min_slices": 60
       },
       "hard_reject": {
         "description_contains": [

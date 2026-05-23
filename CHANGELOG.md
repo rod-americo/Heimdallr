@@ -4,10 +4,17 @@ This file records notable behavior, architecture, documentation, and operation c
 
 ## [Unreleased]
 
+### Added
+
+- Added `series_selection_policy` to external `/jobs` submissions so callers
+can override series selection for a submitted study without changing the host
+global profile.
+
 ### Changed
 
 - Polished the README opening narrative and replaced the structural-baseline
 status badge with a release badge.
+- Lowered the tracked CT series-selection minimum from 120 to 60 slices.
 
 ## [0.2.1] - 2026-05-08
 

@@ -254,7 +254,7 @@ returns non-2xx.
 | `heimdallr/integration/dispatch/` | restart integration dispatch worker. |
 | `heimdallr/integration/delivery/` | restart integration delivery worker. |
 | `heimdallr/integration/delivery/package.py` | restart integration delivery worker before validating callback package contents. |
-| `heimdallr/integration/submissions.py` | restart control plane and prepare worker. |
+| `heimdallr/integration/submissions.py` | restart control plane, prepare worker, and segmentation worker when submission metadata affects selection behavior. |
 | `heimdallr/control_plane/` or `static/` | restart control plane; browser refresh may be needed. |
 | `config/series_selection.json` | restart prepare/segmentation services that load selection behavior. |
 | `config/metrics_pipeline.json` | restart metrics worker; restart segmentation worker too because external requested metrics can narrow segmentation tasks from this profile. |

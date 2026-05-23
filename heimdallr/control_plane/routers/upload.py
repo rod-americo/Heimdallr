@@ -12,6 +12,7 @@ from ...integration.submissions import (
     build_external_submission_payload,
     new_external_job_id,
     normalize_requested_metrics_modules,
+    normalize_series_selection_policy,
     write_external_submission_sidecar,
 )
 from ...shared.spool import atomic_copy_stream
@@ -51,6 +52,7 @@ async def submit_job(
     source_system: str | None = Form(None),
     requested_outputs: str | None = Form(None),
     requested_metrics_modules: str | None = Form(None),
+    series_selection_policy: str | None = Form(None),
 ):
     if not study_file.filename.lower().endswith(".zip"):
         raise HTTPException(status_code=400, detail="Only .zip files are allowed.")
@@ -85,6 +87,20 @@ async def submit_job(
                 detail="requested_metrics_modules must be a JSON array or CSV string.",
             ) from exc
 
+    parsed_series_selection_policy: dict | None = None
+    if series_selection_policy:
+        try:
+            candidate_policy = json.loads(series_selection_policy)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=400, detail="series_selection_policy must be valid JSON.") from exc
+        try:
+            parsed_series_selection_policy = normalize_series_selection_policy(candidate_policy)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail="series_selection_policy must be a JSON object.",
+            ) from exc
+
     upload_name = f"study_{settings.local_timestamp('%Y%m%d%H%M%S')}.zip"
     file_path = settings.UPLOAD_EXTERNAL_DIR / upload_name
     if file_path.exists():
@@ -99,6 +115,7 @@ async def submit_job(
         source_system=source_system,
         requested_outputs=parsed_requested_outputs,
         requested_metrics_modules=parsed_requested_metrics_modules,
+        series_selection_policy=parsed_series_selection_policy,
     )
 
     try:
@@ -117,6 +134,7 @@ async def submit_job(
         "received_at": submission_payload["received_at"],
         "stored_file": upload_name,
         "requested_metrics_modules": submission_payload["requested_metrics_modules"],
+        "series_selection_policy": submission_payload["series_selection_policy"],
     }
 
 

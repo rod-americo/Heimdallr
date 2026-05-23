@@ -22,6 +22,7 @@ cases to the metrics stage.
 """
 
 import os
+import copy
 import json
 import gzip
 import shutil
@@ -418,6 +419,40 @@ def load_series_selection_profile() -> tuple[str, dict]:
     return profile_name, profile
 
 
+def _external_series_selection_policy(id_data: dict) -> dict:
+    external_delivery = id_data.get("ExternalDelivery")
+    if not isinstance(external_delivery, dict):
+        return {}
+    policy = external_delivery.get("series_selection_policy")
+    return policy if isinstance(policy, dict) else {}
+
+
+def _merge_series_selection_profile(base: dict, overrides: dict, *, top_level: bool = False) -> dict:
+    merged = copy.deepcopy(base)
+    reserved_keys = {"name", "profile", "profile_name", "base_profile", "schema_version"}
+    for key, value in overrides.items():
+        if top_level and key in reserved_keys:
+            continue
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _merge_series_selection_profile(merged[key], value)
+        else:
+            merged[key] = copy.deepcopy(value)
+    return merged
+
+
+def resolve_series_selection_profile_for_case(id_data: dict) -> tuple[str, dict, str, str | None]:
+    profile_name, profile = load_series_selection_profile()
+    policy = _external_series_selection_policy(id_data)
+    if not policy:
+        return profile_name, profile, "config", None
+
+    policy_name = str(policy.get("name") or policy.get("profile_name") or "external_submission").strip()
+    if not policy_name:
+        policy_name = "external_submission"
+    merged = _merge_series_selection_profile(profile, policy, top_level=True)
+    return f"{profile_name}+{policy_name}", merged, "external_delivery", policy_name
+
+
 def load_segmentation_pipeline_profile() -> tuple[str, dict]:
     """Load the configured segmentation pipeline profile from JSON."""
     config_path = Path(settings.SEGMENTATION_PIPELINE_CONFIG_PATH)
@@ -806,7 +841,7 @@ def select_prepared_series(case_id, id_data):
     if not available_series:
         raise RuntimeError(f"No AvailableSeries found in study metadata for {case_id}")
 
-    profile_name, profile = load_series_selection_profile()
+    profile_name, profile, policy_source, external_policy_name = resolve_series_selection_profile_for_case(id_data)
     required = profile.get("required", {})
     hard_reject = profile.get("hard_reject", {})
     text_hints = profile.get("text_hints", {})
@@ -979,6 +1014,7 @@ def select_prepared_series(case_id, id_data):
     selected_series = dict(selected["series"])
     selection_info = {
         "Profile": profile_name,
+        "PolicySource": policy_source,
         "SelectedSeriesInstanceUID": selected_series.get("SeriesInstanceUID"),
         "SelectedSeriesNumber": selected_series.get("SeriesNumber"),
         "SelectedSeriesDescription": selected_series.get("SeriesDescription", ""),
@@ -1027,6 +1063,8 @@ def select_prepared_series(case_id, id_data):
         ),
         "RejectedSeries": rejected,
     }
+    if external_policy_name:
+        selection_info["ExternalPolicyName"] = external_policy_name
     if geometry_priority_applied:
         selection_info["CandidateSeriesGeometry"] = [_candidate_geometry_audit(candidate) for candidate in candidates]
     return selected["path"], selection_info

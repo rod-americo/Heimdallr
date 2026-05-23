@@ -174,6 +174,7 @@ Canonical contracts are documented in [`docs/CONTRACTS.md`](docs/CONTRACTS.md). 
 
 - inbound DICOM studies grouped by `StudyInstanceUID`
 - ZIP study payloads accepted by `/upload` and `/jobs`
+- per-job series-selection overrides for external `/jobs` submissions
 - study directory state under `runtime/studies/<case_id>/`
 - `metadata/id.json` and `metadata/resultados.json`
 - queue tables in `database/dicom.db`

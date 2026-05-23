@@ -70,6 +70,14 @@ def normalize_requested_metrics_modules(raw: Any) -> list[str]:
     return normalized
 
 
+def normalize_series_selection_policy(raw: Any) -> dict[str, Any]:
+    if raw in (None, ""):
+        return {}
+    if not isinstance(raw, dict):
+        raise ValueError("series_selection_policy must be a JSON object")
+    return raw
+
+
 def new_external_job_id() -> str:
     return str(uuid.uuid4())
 
@@ -128,6 +136,7 @@ def build_external_submission_payload(
     source_system: str | None,
     requested_outputs: dict[str, Any] | None,
     requested_metrics_modules: Any = None,
+    series_selection_policy: Any = None,
 ) -> dict[str, Any]:
     return {
         "job_id": str(job_id),
@@ -136,5 +145,6 @@ def build_external_submission_payload(
         "source_system": str(source_system or "").strip() or None,
         "requested_outputs": normalize_requested_outputs(requested_outputs),
         "requested_metrics_modules": normalize_requested_metrics_modules(requested_metrics_modules),
+        "series_selection_policy": normalize_series_selection_policy(series_selection_policy),
         "received_at": settings.local_now().isoformat(),
     }

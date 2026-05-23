@@ -22,11 +22,14 @@ Optional fields:
 | `source_system` | string | Caller system identifier. Echoed back in callback metadata. |
 | `requested_outputs` | JSON object string | Controls optional files in the final package. |
 | `requested_metrics_modules` | JSON array string or CSV string | Limits metrics jobs to requested modules plus dependencies from the active metrics profile. Not fully validated at admission time. |
+| `series_selection_policy` | JSON object string | Overrides the active series-selection profile for this submitted job only. |
 
 `requested_metrics_modules` and `requested_outputs` are intentionally separate:
 
 - `requested_metrics_modules` orders which metrics processing should run.
 - `requested_outputs` chooses which generated files should be returned.
+- `series_selection_policy` chooses which prepared CT series should feed
+segmentation for this job.
 
 Example request:
 
@@ -37,7 +40,8 @@ curl -X POST "http://localhost:8001/jobs" \
   -F "source_system=partner_a" \
   -F "callback_url=http://receiver.local/heimdallr/callback" \
   -F 'requested_outputs={"metrics_json":true,"overlays_dicom":true,"report_pdf":true,"report_pdf_dicom":true,"artifacts_tree":false}' \
-  -F 'requested_metrics_modules=["l3_muscle_area","bone_health_l1_hu"]'
+  -F 'requested_metrics_modules=["l3_muscle_area","bone_health_l1_hu"]' \
+  -F 'series_selection_policy={"name":"orchestrum_ct_opportunistic_v1","required":{"modality":"CT","min_slices":60},"phase_priority":["native","portal_venous"]}'
 ```
 
 ## Acceptance Response
@@ -46,7 +50,7 @@ Heimdallr returns after the file and sidecar metadata are stored in the external
 
 Example response:
 
-```json { "accepted": true, "job_id": "9d3fdaf7-82df-4ee8-a0c0-fb927bc8c3d1", "client_case_id": "external-123", "status": "queued", "received_at": "2026-05-01T14:30:00-03:00", "stored_file": "study_20260501143000.zip", "requested_metrics_modules": [ "l3_muscle_area", "bone_health_l1_hu" ] }
+```json { "accepted": true, "job_id": "9d3fdaf7-82df-4ee8-a0c0-fb927bc8c3d1", "client_case_id": "external-123", "status": "queued", "received_at": "2026-05-01T14:30:00-03:00", "stored_file": "study_20260501143000.zip", "requested_metrics_modules": [ "l3_muscle_area", "bone_health_l1_hu" ], "series_selection_policy": { "name": "orchestrum_ct_opportunistic_v1", "required": { "modality": "CT", "min_slices": 60 }, "phase_priority": [ "native", "portal_venous" ] } }
 ```
 
 External applications should persist `job_id` and `client_case_id`. Heimdallr
@@ -137,6 +141,19 @@ Example:
 ```
 
 If the field is omitted or empty, Heimdallr runs the enabled jobs and segmentation tasks from the active profiles. Unknown job names fail during segmentation or metrics execution rather than at `/jobs` admission time.
+
+## Series Selection Policy
+
+`series_selection_policy` accepts a JSON object with the same rule keys used by
+`config/series_selection.json`, such as `required`, `hard_reject`,
+`phase_priority`, `geometry_priority`, `follow_up_coverage`, and `text_hints`.
+Heimdallr deep-merges the object over the active profile for that job only.
+Top-level keys like `name`, `profile_name`, `base_profile`, and
+`schema_version` are audit labels and are not treated as selection rules.
+
+The selected-series audit in `metadata/id.json` records `PolicySource` and, when
+provided, `ExternalPolicyName`. If the field is omitted or empty, Heimdallr uses
+the configured series-selection profile unchanged.
 
 ## Terminal Callbacks
 

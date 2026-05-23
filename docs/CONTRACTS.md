@@ -12,7 +12,7 @@ Heimdallr transforms incoming radiological imaging studies into traceable runtim
 | --- | --- | --- | --- | --- |
 | DICOM C-STORE study | PACS/modality to `heimdallr.intake` | DICOM instances grouped by `StudyInstanceUID` | yes for listener flow | Default AE title is `HEIMDALLR`; default port is `11114`. |
 | Upload ZIP | `POST /upload` or intake local handoff | `.zip` containing DICOM files | yes for prepare flow | Stored in `runtime/intake/uploads/external/` or `from_prepare/`. |
-| External job ZIP | `POST /jobs` | multipart `study_file` ZIP plus form fields | no | Requires `client_case_id` and `callback_url`; optional requested outputs and metrics modules. |
+| External job ZIP | `POST /jobs` | multipart `study_file` ZIP plus form fields | no | Requires `client_case_id` and `callback_url`; optional requested outputs, metrics modules, and per-job series-selection policy. |
 | Intake pipeline config | repo or host | JSON | yes | `config/intake_pipeline.json` is versioned. |
 | Series selection config | repo or host | JSON | yes | `config/series_selection.json` defines selection rules. |
 | Segmentation pipeline config | host-local | JSON | yes for segmentation | Created from `config/segmentation_pipeline.example.json`. |
@@ -83,8 +83,16 @@ Optional fields:
 - `requested_outputs` as JSON object for returned files
 - `requested_metrics_modules` as JSON array or CSV string for requested metrics
 jobs from the active profile. Declared metrics dependencies are included, and declared `requires_segmentation_tasks` values can narrow the segmentation task set before metrics run.
+- `series_selection_policy` as JSON object for per-job overrides of the active
+series-selection profile
 
 If `requested_outputs` is present, omitted output keys are `false`. If the field is omitted entirely, Heimdallr keeps the legacy default completion package.
+
+If `series_selection_policy` is present, Heimdallr deep-merges it over the
+configured series-selection profile for that job only. Top-level metadata keys
+such as `name`, `profile_name`, `base_profile`, and `schema_version` are treated
+as audit labels, not selection rules. The selection audit in `metadata/id.json`
+records whether the active policy came from config or external delivery.
 
 The external consumer contract is maintained in `heimdallr/integration/docs/JOB_SUBMISSION.md`.
 

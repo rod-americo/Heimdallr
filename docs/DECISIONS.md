@@ -197,3 +197,42 @@ thickness decisions.
 
 - Always choose the thinnest reconstruction regardless of coverage.
 - Continue using slice count as the main proxy for anatomical coverage.
+
+---
+
+### 2026-05-22 - Accept per-job series selection policy for external submissions
+
+**Context**
+
+External orchestrators can already decide which metrics and delivery outputs a
+submitted study needs, but CT series selection still depended only on the host
+global `config/series_selection.json`. Broad opportunistic CT ingestion needs a
+caller-owned way to declare the selection rule for a job without rewriting the
+host profile for every consumer.
+
+**Decision**
+
+Add optional `series_selection_policy` to `POST /jobs`. The API accepts a JSON
+object, stores it in the external submission sidecar, copies it into
+`ExternalDelivery`, and the segmentation worker deep-merges it over the active
+series-selection profile for that job only. The selection audit records whether
+the policy came from config or external delivery.
+
+**Impact**
+
+- Lets external orchestrators evolve CT series eligibility without duplicating
+Heimdallr deployments or mutating host-local config.
+- Preserves the existing default profile for ordinary uploads and submissions
+that omit the field.
+- Keeps the selected series auditable in `metadata/id.json`.
+
+**Tradeoff**
+
+- The control plane, prepare worker, and segmentation worker must be restarted
+together before relying on the new field in production.
+
+**Alternatives rejected**
+
+- Create one host-local Heimdallr profile per external consumer.
+- Make the external orchestrator preselect and send only one series without
+recording the actual selection policy in Heimdallr metadata.

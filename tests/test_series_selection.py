@@ -100,6 +100,82 @@ class TestSeriesSelection(unittest.TestCase):
         self.assertEqual(selected_path.name, "accepted.nii.gz")
         self.assertEqual(selection_info["SelectedSeriesInstanceUID"], "1.2.3.good")
 
+    def test_external_policy_overrides_min_slices_for_job(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            case_id = "case-external-series-policy"
+            derived_dir = root / "runtime" / "studies" / case_id / "derived" / "series"
+            derived_dir.mkdir(parents=True, exist_ok=True)
+
+            selected_path = derived_dir / "selected.nii.gz"
+            rejected_path = derived_dir / "rejected.nii.gz"
+            selected_path.write_bytes(b"ok")
+            rejected_path.write_bytes(b"no")
+
+            config_path = root / "series_selection.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "default_profile": "ct_test",
+                        "profiles": {
+                            "ct_test": {
+                                "required": {"modality": "CT", "min_slices": 120},
+                                "hard_reject": {},
+                                "phase_priority": ["native"],
+                                "text_hints": {
+                                    "description_avoid": [],
+                                    "kernel_avoid": [],
+                                },
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            id_data = {
+                "ExternalDelivery": {
+                    "series_selection_policy": {
+                        "name": "orchestrum_ct_opportunistic_v1",
+                        "required": {"min_slices": 60},
+                    }
+                },
+                "AvailableSeries": [
+                    {
+                        "SeriesInstanceUID": "1.2.3.too_short",
+                        "SeriesNumber": "1",
+                        "DerivedNiftiPath": "series/rejected.nii.gz",
+                        "Modality": "CT",
+                        "SliceCount": 50,
+                        "DetectedPhase": "native",
+                        "PhaseDetected": True,
+                        "PhaseData": {"probability": 0.95},
+                    },
+                    {
+                        "SeriesInstanceUID": "1.2.3.selected",
+                        "SeriesNumber": "2",
+                        "DerivedNiftiPath": "series/selected.nii.gz",
+                        "Modality": "CT",
+                        "SliceCount": 80,
+                        "DetectedPhase": "native",
+                        "PhaseDetected": True,
+                        "PhaseData": {"probability": 0.90},
+                    },
+                ],
+            }
+
+            with patch.object(settings, "STUDIES_DIR", root / "runtime" / "studies"), patch.object(
+                settings,
+                "SERIES_SELECTION_CONFIG_PATH",
+                config_path,
+            ):
+                selected, selection_info = select_prepared_series(case_id, id_data)
+
+        self.assertEqual(selected.name, "selected.nii.gz")
+        self.assertEqual(selection_info["SelectedSeriesInstanceUID"], "1.2.3.selected")
+        self.assertEqual(selection_info["PolicySource"], "external_delivery")
+        self.assertEqual(selection_info["ExternalPolicyName"], "orchestrum_ct_opportunistic_v1")
+
     def test_falls_back_to_portal_venous_when_native_is_missing(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

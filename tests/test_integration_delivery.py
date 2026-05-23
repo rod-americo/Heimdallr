@@ -33,6 +33,12 @@ class TestJobSubmissionRoute(unittest.TestCase):
                         "source_system": "partner_a",
                         "requested_outputs": json.dumps({"report_pdf": False}),
                         "requested_metrics_modules": json.dumps(["l3_muscle_area", "bone_health_l1_hu"]),
+                        "series_selection_policy": json.dumps(
+                            {
+                                "name": "orchestrum_ct_opportunistic_v1",
+                                "required": {"modality": "CT", "min_slices": 60},
+                            }
+                        ),
                     },
                 )
             self.assertEqual(response.status_code, 200)
@@ -51,9 +57,17 @@ class TestJobSubmissionRoute(unittest.TestCase):
                 ["l3_muscle_area", "bone_health_l1_hu"],
             )
             self.assertEqual(
+                sidecar["series_selection_policy"],
+                {
+                    "name": "orchestrum_ct_opportunistic_v1",
+                    "required": {"modality": "CT", "min_slices": 60},
+                },
+            )
+            self.assertEqual(
                 body["requested_metrics_modules"],
                 ["l3_muscle_area", "bone_health_l1_hu"],
             )
+            self.assertEqual(body["series_selection_policy"]["required"]["min_slices"], 60)
 
             with patch.object(settings, "UPLOAD_EXTERNAL_DIR", upload_dir):
                 status_response = client.get(f"/jobs/{body['job_id']}")
@@ -62,6 +76,27 @@ class TestJobSubmissionRoute(unittest.TestCase):
             self.assertEqual(status_body["job_id"], body["job_id"])
             self.assertEqual(status_body["status"], "queued")
             self.assertEqual(status_body["client_case_id"], "external-123")
+
+    def test_submit_job_rejects_non_object_series_selection_policy(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            upload_dir = Path(tmpdir) / "uploads" / "external"
+            upload_dir.mkdir(parents=True, exist_ok=True)
+            app = create_app()
+            client = TestClient(app)
+
+            with patch.object(settings, "UPLOAD_EXTERNAL_DIR", upload_dir):
+                response = client.post(
+                    "/jobs",
+                    files={"study_file": ("study.zip", io.BytesIO(b"fake zip payload"), "application/zip")},
+                    data={
+                        "client_case_id": "external-123",
+                        "callback_url": "http://receiver.local/callback",
+                        "series_selection_policy": json.dumps(["not", "an", "object"]),
+                    },
+                )
+
+            self.assertEqual(response.status_code, 400)
+            self.assertIn("series_selection_policy", response.json()["detail"])
 
 
 class TestIntegrationDeliveryStore(unittest.TestCase):

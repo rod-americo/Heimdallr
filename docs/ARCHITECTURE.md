@@ -114,7 +114,8 @@ retry/claim helpers, resource monitor persistence.
 
 The code does not currently expose a separate `domain/` package. Domain rules are concentrated in:
 
-- series selection rules in `config/series_selection.json` and segmentation
+- series selection rules in `config/series_selection.json`, optional per-job
+`series_selection_policy` from external `/jobs` submissions, and segmentation
 worker helpers. CT selection preserves the existing phase and rejection rules,
 then uses measured DICOM coverage and z-spacing when available to prefer
 maximum coverage before thinner reconstructions.
@@ -132,11 +133,17 @@ Future extraction should be behavior-driven and tested, not directory-first.
 candidate-series geometry, converts DICOM to NIfTI, writes study metadata, and
 enqueues segmentation.
 4. `segmentation` claims the case, resolves the active segmentation profile,
-selects the target series, narrows TotalSegmentator tasks when an external submission requested metrics with declared segmentation requirements, runs or reuses outputs, writes pipeline state, and enqueues metrics.
+deep-merges any external per-job series-selection policy, selects the target
+series, narrows TotalSegmentator tasks when an external submission requested
+metrics with declared segmentation requirements, runs or reuses outputs, writes
+pipeline state, and enqueues metrics.
 5. `metrics` claims the case, resolves the active metrics profile, executes
 enabled jobs and dependencies, writes `metadata/resultados.json`, creates artifacts, and enqueues outbound delivery where configured.
 6. `dicom_egress`, `integration.dispatch`, and `integration.delivery` drain
-their queues independently. External `/jobs` submissions can request a subset of enabled metrics jobs through `requested_metrics_modules` and a subset of returned files through `requested_outputs`.
+their queues independently. External `/jobs` submissions can request a subset
+of enabled metrics jobs through `requested_metrics_modules`, a subset of
+returned files through `requested_outputs`, and per-job series selection through
+`series_selection_policy`.
 7. `control_plane` and `tui` read SQLite and runtime files to expose current
 state to operators.
 8. `space_manager` and `resource_monitor` provide operational guardrails around
