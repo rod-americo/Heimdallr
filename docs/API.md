@@ -69,7 +69,7 @@ are `original`, `deflated`, `jpeg_ls_lossless`, `jpeg_2000_lossless`, and
 Example:
 
 ```bash
--F 'artifact_dicom_policy={"secondary_capture_transfer_syntax":"deflated"}'
+-F 'artifact_dicom_policy={"secondary_capture_transfer_syntax":"jpeg_ls_lossless"}'
 ```
 
 The options map to these DICOM transfer syntaxes:
@@ -81,6 +81,10 @@ The options map to these DICOM transfer syntaxes:
 | `jpeg_ls_lossless` | JPEG-LS Lossless | lossless |
 | `jpeg_2000_lossless` | JPEG 2000 Lossless Only | lossless |
 | `rle_lossless` | RLE Lossless | lossless |
+
+Use `jpeg_ls_lossless` as the preferred compressed option for OsiriX-facing
+overlay delivery. `deflated` remains supported, but observed OsiriX behavior can
+be less reliable with Deflated Explicit VR Little Endian.
 
 `GET /ops/queues` returns non-identifying operational capacity for external
 feeders: queue status counts, oldest pending timestamps, segmentation

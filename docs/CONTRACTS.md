@@ -161,6 +161,9 @@ JPEG-LS lossless, JPEG 2000 lossless, and RLE lossless.
 approximate per-slice sizes of ~787 KB uncompressed, ~82-113 KB Deflated,
 ~114-164 KB JPEG-LS, ~173-219 KB JPEG 2000, and ~187-264 KB RLE. These are
 operational measurements, not contractual file-size guarantees.
+- Prefer JPEG-LS lossless for OsiriX-facing compressed Secondary Capture
+delivery. Deflated remains available as a supported contract value, but it has
+shown less reliable OsiriX handling in operational validation.
 - Derived Secondary Capture artifacts should preserve source patient and study
 identity tags from the reference DICOM while assigning new derived series and
 instance UIDs.

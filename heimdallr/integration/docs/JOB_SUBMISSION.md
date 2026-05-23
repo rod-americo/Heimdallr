@@ -49,7 +49,7 @@ curl -X POST "http://localhost:8001/jobs" \
   -F 'requested_outputs={"metrics_json":true,"overlays_dicom":true,"report_pdf":true,"report_pdf_dicom":true,"artifacts_tree":false}' \
   -F 'requested_metrics_modules=["l3_muscle_area","bone_health_l1_hu"]' \
   -F 'artifact_locale=pt_BR' \
-  -F 'artifact_dicom_policy={"secondary_capture_transfer_syntax":"deflated"}' \
+  -F 'artifact_dicom_policy={"secondary_capture_transfer_syntax":"jpeg_ls_lossless"}' \
   -F 'series_selection_policy={"name":"orchestrum_ct_opportunistic_v1","required":{"modality":"CT","min_slices":60},"phase_priority":["native","portal_venous"]}'
 ```
 
@@ -134,10 +134,13 @@ sizes:
 | `jpeg_2000_lossless` | ~173-219 KB | JPEG 2000 Lossless Only |
 | `rle_lossless` | ~187-264 KB | RLE Lossless |
 
+Use `jpeg_ls_lossless` as the preferred compressed option for OsiriX-facing
+overlay delivery. `deflated` remains supported, but operational validation found
+less reliable OsiriX handling for Deflated Explicit VR Little Endian.
+
 All tested compressed variants were pixel-identical when read back with the
-runtime DICOM stack, and all imported successfully in the OsiriX validation
-environment. Treat these sizes as representative for overlay-like images, not
-as a fixed guarantee across every artifact.
+runtime DICOM stack. Treat these sizes as representative for overlay-like
+images, not as a fixed guarantee across every artifact.
 Instruction documents are separate from overlays. Request
 `artifact_instructions_pdf` or `artifact_instructions_dicom` only when the
 consumer needs those auxiliary instruction files.

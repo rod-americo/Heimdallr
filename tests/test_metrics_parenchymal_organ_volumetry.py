@@ -8,7 +8,7 @@ from unittest.mock import patch
 import nibabel as nib
 import numpy as np
 import pydicom
-from pydicom.uid import DeflatedExplicitVRLittleEndian
+from pydicom.uid import JPEGLSLossless
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -113,7 +113,7 @@ class TestParenchymalOrganVolumetryJob(unittest.TestCase):
                             '{"generate_overlay": true, '
                             '"emit_secondary_capture_dicom": true, '
                             '"secondary_capture_max_dimension": 64, '
-                            '"secondary_capture_transfer_syntax": "deflated"}'
+                            '"secondary_capture_transfer_syntax": "jpeg_ls_lossless"}'
                         ),
                     ],
                 ):
@@ -142,7 +142,7 @@ class TestParenchymalOrganVolumetryJob(unittest.TestCase):
             self.assertEqual(int(ds.InstanceNumber), 1)
             self.assertEqual(str(ds.Modality), "OT")
             self.assertLessEqual(max(int(ds.Rows), int(ds.Columns)), 64)
-            self.assertEqual(ds.file_meta.TransferSyntaxUID, DeflatedExplicitVRLittleEndian)
+            self.assertEqual(ds.file_meta.TransferSyntaxUID, JPEGLSLossless)
 
     def test_job_skips_artifacts_when_no_organ_has_volume(self):
         with tempfile.TemporaryDirectory() as tmp:
