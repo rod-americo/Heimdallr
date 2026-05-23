@@ -65,7 +65,7 @@
             "tissue_types"
           ],
           "generate_overlay": true,
-          "emit_secondary_capture_dicom": false
+          "emit_secondary_capture_dicom": true
         }
       ]
     }

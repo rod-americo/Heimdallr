@@ -21,13 +21,19 @@ from heimdallr.metrics.jobs._bone_job_common import (
     reorient_display_array,
     reorient_display_spacing_mm,
 )
-from heimdallr.metrics.jobs._dicom_secondary_capture import parse_optional_float
+from heimdallr.metrics.jobs._dicom_secondary_capture import (
+    create_secondary_capture_from_rgb,
+    parse_optional_float,
+)
 from heimdallr.metrics.analysis.bone_health import extract_study_technique_context
 from heimdallr.shared.paths import study_artifacts_dir, study_dir, study_metadata_json, study_nifti
 
 
 class MetricSkip(RuntimeError):
     """Signal that a metrics job should be recorded as skipped, not failed."""
+
+
+SERIES_NUMBER = 9102
 
 
 def parse_args() -> argparse.Namespace:
@@ -281,6 +287,7 @@ def main() -> int:
     result_path = case_dir / result_relpath
     metrics_dir = case_dir / "artifacts" / "metrics" / "vat_sat_ratio"
     overlay_path = metrics_dir / "overlay.png"
+    overlay_sc_path = metrics_dir / "overlay_sc.dcm"
     metrics_dir.mkdir(parents=True, exist_ok=True)
 
     artifacts_dir = study_artifacts_dir(case_id)
@@ -335,24 +342,54 @@ def main() -> int:
             f"VAT: {vat_area:.1f} cm²",
             f"VAT/SAT: {ratio:.4f}" if ratio is not None else "VAT/SAT: -",
         ]
-        rgb = render_overlay_rgb(
-            image_data=image_data,
-            ct_affine=ct_img.affine,
-            l3_mask=l3_mask,
-            sat_mask=sat_mask,
-            vat_mask=vat_mask,
-            slice_idx=slice_idx,
-            summary_lines=summary_lines,
-            spacing_mm=spacing_mm,
-        )
-        plt.imsave(overlay_path, rgb)
-
         case_metadata = _load_case_metadata(case_id, case_dir)
         selected_phase = _selected_phase_from_metadata(case_metadata)
         technique = extract_study_technique_context(
             id_data=case_metadata,
             results={"SelectedPhase": selected_phase} if selected_phase else None,
         )
+        artifacts = {
+            "result_json": result_relpath,
+        }
+        dicom_exports: list[dict[str, str]] = []
+        generate_overlay = bool(job_config.get("generate_overlay", True))
+        emit_dicom = bool(job_config.get("emit_secondary_capture_dicom", generate_overlay))
+        if generate_overlay or emit_dicom:
+            rgb = render_overlay_rgb(
+                image_data=image_data,
+                ct_affine=ct_img.affine,
+                l3_mask=l3_mask,
+                sat_mask=sat_mask,
+                vat_mask=vat_mask,
+                slice_idx=slice_idx,
+                summary_lines=summary_lines,
+                spacing_mm=spacing_mm,
+            )
+            if generate_overlay:
+                plt.imsave(overlay_path, rgb)
+                artifacts["overlay_png"] = str(overlay_path.relative_to(case_dir))
+            if emit_dicom:
+                create_secondary_capture_from_rgb(
+                    rgb,
+                    overlay_sc_path,
+                    case_metadata,
+                    series_description="Heimdallr VAT/SAT Ratio Overlay",
+                    series_number=SERIES_NUMBER,
+                    instance_number=1,
+                    derivation_description=(
+                        "Burned-in overlay generated from Heimdallr VAT/SAT ratio metric "
+                        f"(VAT={vat_area:.2f} cm2, SAT={sat_area:.2f} cm2"
+                        + (f", ratio={ratio:.4f}" if ratio is not None else "")
+                        + ")"
+                    ),
+                )
+                artifacts["overlay_sc_dcm"] = str(overlay_sc_path.relative_to(case_dir))
+                dicom_exports.append(
+                    {
+                        "path": artifacts["overlay_sc_dcm"],
+                        "kind": "secondary_capture",
+                    }
+                )
         payload = {
             "metric_key": "vat_sat_ratio",
             "status": "done",
@@ -382,11 +419,8 @@ def main() -> int:
                 "patient_weight_kg": parse_optional_float(case_metadata.get("Weight") or case_metadata.get("PatientWeight")),
                 "study_technique": technique,
             },
-            "artifacts": {
-                "result_json": result_relpath,
-                "overlay_png": str(overlay_path.relative_to(case_dir)),
-            },
-            "dicom_exports": [],
+            "artifacts": artifacts,
+            "dicom_exports": dicom_exports,
         }
         result_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         print(json.dumps(payload, indent=2))

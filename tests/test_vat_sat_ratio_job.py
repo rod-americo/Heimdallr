@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import nibabel as nib
 import numpy as np
+import pydicom
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -66,7 +67,17 @@ class TestVatSatRatioJob(unittest.TestCase):
             write_nifti(case_dir / "artifacts" / "tissue_types" / "torso_fat.nii.gz", vat)
 
             with patch.object(settings, "STUDIES_DIR", tmp_path):
-                with patch.object(sys, "argv", ["vat_sat_ratio", "--case-id", case_id, "--job-config-json", "{}"]):
+                with patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "vat_sat_ratio",
+                        "--case-id",
+                        case_id,
+                        "--job-config-json",
+                        '{"emit_secondary_capture_dicom": true}',
+                    ],
+                ):
                     self.assertEqual(vat_sat_ratio.main(), 0)
 
             result = json.loads((case_dir / "artifacts" / "metrics" / "vat_sat_ratio" / "result.json").read_text(encoding="utf-8"))
@@ -76,6 +87,16 @@ class TestVatSatRatioJob(unittest.TestCase):
             self.assertGreater(result["measurement"]["visceral_fat_area_cm2"], 0)
             self.assertGreater(result["measurement"]["subcutaneous_fat_area_cm2"], 0)
             self.assertIn("overlay_png", result["artifacts"])
+            self.assertIn("overlay_sc_dcm", result["artifacts"])
+            self.assertEqual(
+                result["dicom_exports"],
+                [{"path": result["artifacts"]["overlay_sc_dcm"], "kind": "secondary_capture"}],
+            )
+            dcm_path = case_dir / result["artifacts"]["overlay_sc_dcm"]
+            ds = pydicom.dcmread(str(dcm_path))
+            self.assertEqual(ds.Modality, "OT")
+            self.assertEqual(ds.SeriesDescription, "Heimdallr VAT/SAT Ratio Overlay")
+            self.assertEqual(str(ds.SeriesNumber), "9102")
 
 
 if __name__ == "__main__":

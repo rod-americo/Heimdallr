@@ -12,6 +12,9 @@ global profile.
 
 ### Changed
 
+- `vat_sat_ratio` now emits a burned-in Secondary Capture DICOM overlay when
+  `emit_secondary_capture_dicom` is enabled, and the tracked metrics profile
+  example enables that DICOM output for the production-facing VAT/SAT metric.
 - Polished the README opening narrative and replaced the structural-baseline
 status badge with a release badge.
 - Lowered the tracked CT series-selection minimum from 120 to 60 slices.
