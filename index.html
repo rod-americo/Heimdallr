@@ -20,11 +20,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description"
-        content="Heimdallr is open-source infrastructure for radiological image operations: DICOM intake, DICOM-to-NIfTI preparation, segmentation orchestration, deterministic metrics, queue state, and artifact delivery.">
+        content="Heimdallr is open-source infrastructure for radiological image operations: DICOM and API intake, DICOM-to-NIfTI preparation, segmentation orchestration, deterministic metrics, queue state, and DICOM/API artifact delivery.">
     <meta name="theme-color" content="#486864">
     <meta property="og:title" content="Heimdallr">
     <meta property="og:description"
-        content="Open-source operational infrastructure for radiological image intake, preparation, segmentation, metrics, and artifact delivery.">
+        content="Open-source operational infrastructure for DICOM/API image intake, preparation, segmentation, metrics, and artifact delivery.">
     <meta property="og:type" content="website">
     <meta property="og:image" content="static/branding/logos/heimdallr_logo_horizontal_dark.png">
     <title>Heimdallr | Radiological Image Operations Infrastructure</title>
@@ -102,11 +102,11 @@
             <div class="hero-shell">
                 <p class="eyebrow">Open-source radiological image MLOps stack</p>
                 <h1 id="hero-title">Heimdallr</h1>
-                <p class="tagline">Operational infrastructure for imaging intake, preparation, segmentation,
+                <p class="tagline">Operational infrastructure for DICOM/API intake, preparation, segmentation,
                     deterministic metrics, and artifact delivery.</p>
-                <p class="hero-copy">Heimdallr receives DICOM studies, prepares selected series, converts to NIfTI,
-                    orchestrates TotalSegmentator-backed segmentation, tracks SQLite queue state, and delivers artifacts
-                    through dashboards, DICOM egress, and HTTP callbacks.</p>
+                <p class="hero-copy">Heimdallr receives DICOM studies and API submissions, prepares selected series,
+                    converts to NIfTI, orchestrates TotalSegmentator-backed segmentation, tracks SQLite queue state, and
+                    delivers artifacts through dashboards, DICOM egress, outbound API events, and HTTP callbacks.</p>
                 <div class="hero-actions" aria-label="Primary links">
                     <a class="button button-primary" href="https://github.com/rod-americo/Heimdallr">View repository</a>
                     <a class="button button-secondary"
@@ -122,10 +122,10 @@
                     <p class="section-kicker">Purpose</p>
                     <h2 id="purpose-title">A governed operational layer for radiology image pipelines.</h2>
                 </div>
-                <p>Heimdallr keeps PACS-facing intake, DICOM conversion, segmentation orchestration, deterministic
-                    measurements, queue state, runtime artifacts, and delivery workflows in one auditable open-source
-                    stack. It is designed for technical operators who need clear state transitions and repeatable
-                    outputs, not autonomous clinical decision making.</p>
+                <p>Heimdallr keeps PACS- and API-facing intake, DICOM conversion, segmentation orchestration,
+                    deterministic measurements, queue state, runtime artifacts, and DICOM/API delivery workflows in one
+                    auditable open-source stack. It is designed for technical operators who need clear state transitions
+                    and repeatable outputs, not autonomous clinical decision making.</p>
             </div>
         </section>
 
@@ -140,8 +140,8 @@
                 <div class="feature-grid">
                     <article class="feature-card">
                         <span class="feature-index">01</span>
-                        <h3>DICOM-native intake</h3>
-                        <p>C-STORE study handoff, ZIP upload ingress, and deterministic study grouping by
+                        <h3>DICOM and API intake</h3>
+                        <p>C-STORE study handoff, ZIP upload/API job ingress, and deterministic study grouping by
                             StudyInstanceUID.</p>
                     </article>
                     <article class="feature-card">
@@ -176,7 +176,7 @@
                     <li>
                         <span>01</span>
                         <strong>Intake</strong>
-                        <p>DICOM C-STORE or ZIP uploads enter the stable spool.</p>
+                        <p>DICOM C-STORE, ZIP uploads, or API job submissions enter the stable spool.</p>
                     </li>
                     <li>
                         <span>02</span>
@@ -196,7 +196,8 @@
                     <li>
                         <span>05</span>
                         <strong>Deliver</strong>
-                        <p>Dashboards, DICOM egress, event dispatch, and final callback packages expose the result.</p>
+                        <p>Dashboards, DICOM egress, outbound API events, and final callback packages expose the result.
+                        </p>
                     </li>
                 </ol>
                 <div class="architecture-panel" aria-label="Canonical runtime surfaces">
@@ -229,7 +230,8 @@
                 <div class="capability-grid">
                     <article>
                         <h3>Control plane</h3>
-                        <p>FastAPI dashboard, upload ingress, patient/results API, and deterministic PDF export.</p>
+                        <p>FastAPI dashboard, upload/job API ingress, patient/results API, and deterministic PDF export.
+                        </p>
                     </article>
                     <article>
                         <h3>Prepare worker</h3>
@@ -245,8 +247,9 @@
                         </p>
                     </article>
                     <article>
-                        <h3>DICOM egress</h3>
-                        <p>Outbound C-STORE delivery through retry-aware queue workers and peer configuration.</p>
+                        <h3>DICOM and API egress</h3>
+                        <p>Outbound C-STORE delivery, HTTP event dispatch, and final callback delivery through
+                            retry-aware queues.</p>
                     </article>
                     <article>
                         <h3>Operational guards</h3>

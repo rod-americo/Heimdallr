@@ -20,11 +20,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description"
-        content="Heimdallr é infraestrutura open-source para operações com imagens radiológicas: ingestão DICOM, preparação DICOM-to-NIfTI, orquestração de segmentação, métricas determinísticas, estado de filas e entrega de artefatos.">
+        content="Heimdallr é infraestrutura open-source para operações com imagens radiológicas: ingestão DICOM e API, preparação DICOM-to-NIfTI, orquestração de segmentação, métricas determinísticas, estado de filas e entrega DICOM/API de artefatos.">
     <meta name="theme-color" content="#486864">
     <meta property="og:title" content="Heimdallr">
     <meta property="og:description"
-        content="Infraestrutura operacional open-source para ingestão, preparação, segmentação, métricas e entrega de artefatos em imagens radiológicas.">
+        content="Infraestrutura operacional open-source para ingestão DICOM/API, preparação, segmentação, métricas e entrega de artefatos em imagens radiológicas.">
     <meta property="og:type" content="website">
     <meta property="og:image" content="../static/branding/logos/heimdallr_logo_horizontal_dark.png">
     <title>Heimdallr | Infraestrutura Operacional para Imagens Radiológicas</title>
@@ -70,11 +70,11 @@
             <div class="hero-shell">
                 <p class="eyebrow">Stack open-source de MLOps para imagens radiológicas</p>
                 <h1 id="hero-title">Heimdallr</h1>
-                <p class="tagline">Infraestrutura operacional para ingestão, preparação, segmentação, métricas
+                <p class="tagline">Infraestrutura operacional para ingestão DICOM/API, preparação, segmentação, métricas
                     determinísticas e entrega de artefatos.</p>
-                <p class="hero-copy">Heimdallr recebe estudos DICOM, prepara séries selecionadas, converte para NIfTI,
-                    orquestra segmentação com TotalSegmentator, rastreia filas em SQLite e entrega artefatos por
-                    dashboards, DICOM egress e callbacks HTTP.</p>
+                <p class="hero-copy">Heimdallr recebe estudos DICOM e submissões por API, prepara séries selecionadas,
+                    converte para NIfTI, orquestra segmentação com TotalSegmentator, rastreia filas em SQLite e entrega
+                    artefatos por dashboards, DICOM egress, eventos de API e callbacks HTTP.</p>
                 <div class="hero-actions" aria-label="Links principais">
                     <a class="button button-primary" href="https://github.com/rod-americo/Heimdallr">Ver repositório</a>
                     <a class="button button-secondary"
@@ -90,10 +90,10 @@
                     <p class="section-kicker">Propósito</p>
                     <h2 id="purpose-title">Uma camada operacional governada para pipelines de imagem radiológica.</h2>
                 </div>
-                <p>Heimdallr mantém ingestão voltada a PACS, conversão DICOM, orquestração de segmentação, medições
-                    determinísticas, estado de filas, artefatos de runtime e fluxos de entrega em um stack open-source
-                    auditável. Ele foi desenhado para operadores técnicos que precisam de transições de estado claras e
-                    saídas repetíveis, não para tomada de decisão clínica autônoma.</p>
+                <p>Heimdallr mantém ingestão voltada a PACS e API, conversão DICOM, orquestração de segmentação,
+                    medições determinísticas, estado de filas, artefatos de runtime e fluxos de entrega DICOM/API em um
+                    stack open-source auditável. Ele foi desenhado para operadores técnicos que precisam de transições
+                    de estado claras e saídas repetíveis, não para tomada de decisão clínica autônoma.</p>
             </div>
         </section>
 
@@ -108,8 +108,9 @@
                 <div class="feature-grid">
                     <article class="feature-card">
                         <span class="feature-index">01</span>
-                        <h3>Ingestão nativa DICOM</h3>
-                        <p>Handoff C-STORE, entrada por ZIP e agrupamento determinístico por StudyInstanceUID.</p>
+                        <h3>Ingestão DICOM e API</h3>
+                        <p>Handoff C-STORE, entrada por ZIP/API jobs e agrupamento determinístico por StudyInstanceUID.
+                        </p>
                     </article>
                     <article class="feature-card">
                         <span class="feature-index">02</span>
@@ -143,7 +144,7 @@
                     <li>
                         <span>01</span>
                         <strong>Ingestão</strong>
-                        <p>DICOM C-STORE ou uploads ZIP entram no spool estável.</p>
+                        <p>DICOM C-STORE, uploads ZIP ou submissões por API entram no spool estável.</p>
                     </li>
                     <li>
                         <span>02</span>
@@ -163,7 +164,7 @@
                     <li>
                         <span>05</span>
                         <strong>Entrega</strong>
-                        <p>Dashboards, DICOM egress, eventos e pacotes finais de callback expõem o resultado.</p>
+                        <p>Dashboards, DICOM egress, eventos de API e pacotes finais de callback expõem o resultado.</p>
                     </li>
                 </ol>
                 <div class="architecture-panel" aria-label="Superfícies canônicas de runtime">
@@ -196,7 +197,7 @@
                 <div class="capability-grid">
                     <article>
                         <h3>Control plane</h3>
-                        <p>Dashboard FastAPI, entrada de uploads, API de pacientes/resultados e exportação PDF
+                        <p>Dashboard FastAPI, entrada por upload/job API, API de pacientes/resultados e exportação PDF
                             determinística.</p>
                     </article>
                     <article>
@@ -214,8 +215,8 @@
                             enqueue de entrega.</p>
                     </article>
                     <article>
-                        <h3>DICOM egress</h3>
-                        <p>Entrega C-STORE de saída por workers de fila com retry e configuração de peers.</p>
+                        <h3>Egresso DICOM e API</h3>
+                        <p>Entrega C-STORE, despacho de eventos HTTP e callbacks finais por filas com retry.</p>
                     </article>
                     <article>
                         <h3>Guardrails operacionais</h3>
