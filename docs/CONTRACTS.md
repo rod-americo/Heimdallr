@@ -36,6 +36,7 @@ Heimdallr transforms incoming radiological imaging studies into traceable runtim
 | DICOM egress items | remote SCP | DICOM C-STORE | Queue worker attempts configured artifact delivery. |
 | Integration dispatch events | external HTTP endpoint | JSON HTTP POST | Delivered when configured destinations accept the event. |
 | Job status lookup | `GET /jobs/{job_id}` | JSON | Best-effort state for accepted external jobs. |
+| Queue capacity lookup | `GET /ops/queues` | JSON | Non-identifying queue counts, concurrency, and disk capacity for external feeders. |
 | Terminal delivery callback | external submitter | multipart HTTP POST | Sends `case.completed` with `manifest.json` and `package.zip`, or `case.failed` with manifest only. |
 
 ## 4. Identifiers and Keys
@@ -100,6 +101,15 @@ as audit labels, not selection rules. The selection audit in `metadata/id.json`
 records whether the active policy came from config or external delivery.
 
 The external consumer contract is maintained in `heimdallr/integration/docs/JOB_SUBMISSION.md`.
+
+### Operational Capacity
+
+`GET /ops/queues` returns non-identifying operational capacity for feeders that
+need backpressure before submitting more studies. The response includes queue
+status counts, oldest pending timestamps, `MAX_PARALLEL_CASES`, segmentation
+active counts, and runtime disk usage. It must not include `case_id`, study
+UIDs, patient identifiers, file paths inside a case, callback URLs, or package
+contents.
 
 ### Final Delivery
 

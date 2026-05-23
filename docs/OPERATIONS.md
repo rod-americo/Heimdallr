@@ -138,6 +138,7 @@ Additional checks by change type:
 - Python syntax: `.venv/bin/python -m compileall heimdallr scripts tests`
 - Unit tests: `.venv/bin/python -m unittest discover -s tests`
 - Control plane smoke: `curl -fsS http://localhost:8001/docs >/dev/null`
+- Queue capacity smoke: `curl -fsS http://localhost:8001/ops/queues`
 - DICOM listener smoke: send a known non-PHI DICOM sample with a DCMTK tool such
   as `dcmsend localhost 11114 -aec HEIMDALLR sample.dcm`
 - SQLite integrity: `sqlite3 database/dicom.db "PRAGMA integrity_check;"`
@@ -224,6 +225,7 @@ sqlite3 database/dicom.db ".tables"
 sqlite3 database/dicom.db "SELECT status, count(*) FROM segmentation_queue GROUP BY status;"
 sqlite3 database/dicom.db "SELECT status, count(*) FROM metrics_queue GROUP BY status;"
 sqlite3 database/dicom.db "SELECT status, count(*) FROM dicom_egress_queue GROUP BY status;"
+curl -fsS http://localhost:8001/ops/queues
 find runtime/intake/uploads -maxdepth 2 -type f | sort | tail
 find runtime/studies -maxdepth 2 -type d | sort | tail
 ```

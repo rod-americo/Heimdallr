@@ -236,3 +236,41 @@ together before relying on the new field in production.
 - Create one host-local Heimdallr profile per external consumer.
 - Make the external orchestrator preselect and send only one series without
 recording the actual selection policy in Heimdallr metadata.
+
+---
+
+### 2026-05-23 - Expose non-identifying queue capacity for external feeders
+
+**Context**
+
+External orchestrators can submit broad CT workloads through `/jobs`, but they
+need a safe way to avoid starving Heimdallr or flooding runtime storage. Direct
+SQLite reads over SSH would couple callers to host-local persistence and could
+expose case identifiers.
+
+**Decision**
+
+Expose `GET /ops/queues` from the control plane. The endpoint returns queue
+status counts, oldest pending timestamps, segmentation concurrency, and runtime
+disk usage without returning case IDs, study UIDs, patient identifiers, package
+paths, or callback URLs.
+
+**Impact**
+
+- Feeders such as Orchestrum can apply backpressure before downloading and
+submitting more studies.
+- Queue capacity becomes an HTTP contract instead of an SSH/SQLite convention.
+- The endpoint is operational metadata only and does not change `/jobs`
+acceptance, segmentation, metrics, or delivery semantics.
+
+**Tradeoff**
+
+The control plane must be restarted when this route is deployed, and access
+control still depends on the host/network boundary because built-in FastAPI
+authentication is not implemented.
+
+**Alternatives rejected**
+
+- Let feeders query `database/dicom.db` directly over SSH.
+- Encode capacity decisions into `/jobs` admission without first exposing a
+read-only operational signal.

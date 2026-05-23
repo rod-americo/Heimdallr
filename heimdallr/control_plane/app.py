@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from ..shared import settings
 from .routers.dashboard import router as dashboard_router
+from .routers.ops import router as ops_router
 from .routers.patients import router as patients_router
 from .routers.upload import router as upload_router
 
@@ -17,6 +18,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(title=settings.SERVER_TITLE)
     app.include_router(dashboard_router)
+    app.include_router(ops_router)
     app.include_router(upload_router)
     app.include_router(patients_router)
 
@@ -27,4 +29,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-

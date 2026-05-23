@@ -25,6 +25,7 @@ This document summarizes high-value API contracts used in Heimdallr workflows.
 
 - `POST /jobs`
 - `GET /jobs/{job_id}`
+- `GET /ops/queues`
 - `POST /upload`
 - `GET /api/tools/uploader`
 
@@ -57,6 +58,11 @@ If `series_selection_policy` is provided, Heimdallr deep-merges that object over
 the active `config/series_selection.json` profile for the submitted job. The
 selected series audit in `metadata/id.json` records `PolicySource` and
 `ExternalPolicyName`.
+
+`GET /ops/queues` returns non-identifying operational capacity for external
+feeders: queue status counts, oldest pending timestamps, segmentation
+concurrency, and runtime disk usage. It does not return case IDs, study UIDs,
+patient identifiers, or package paths.
 
 ### Patients and Results
 

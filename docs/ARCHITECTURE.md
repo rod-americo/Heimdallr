@@ -17,6 +17,7 @@ Includes:
 - SQLite queue and study state.
 - DICOM egress, HTTP integration dispatch, and final package delivery.
 - FastAPI dashboard/API and Textual operations dashboard.
+- Non-identifying queue capacity API for external feeders.
 - Runtime storage guard and resource monitor services.
 
 Does not include:
@@ -46,6 +47,7 @@ External outputs:
 - HTTP JSON event dispatches to configured destinations.
 - multipart final package callbacks to external submitters.
 - dashboard/API/TUI views of case and queue state.
+- non-identifying queue and disk-capacity summaries for external feeders.
 
 Critical dependencies:
 
