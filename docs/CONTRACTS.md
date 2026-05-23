@@ -83,10 +83,14 @@ Optional fields:
 - `requested_outputs` as JSON object for returned files
 - `requested_metrics_modules` as JSON array or CSV string for requested metrics
 jobs from the active profile. Declared metrics dependencies are included, and declared `requires_segmentation_tasks` values can narrow the segmentation task set before metrics run.
+- `artifact_locale` as an optional presentation locale for generated burned-in
+artifacts when supported by the requested metric module.
 - `series_selection_policy` as JSON object for per-job overrides of the active
 series-selection profile
 
-If `requested_outputs` is present, omitted output keys are `false`. If the field is omitted entirely, Heimdallr keeps the legacy default completion package.
+If `requested_outputs` is omitted or if keys are omitted inside it, those
+outputs are `false`. Heimdallr does not add package outputs by default for the
+external `/jobs` contract.
 
 If `series_selection_policy` is present, Heimdallr deep-merges it over the
 configured series-selection profile for that job only. Top-level metadata keys

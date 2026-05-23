@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from heimdallr.shared import settings
+from heimdallr.shared.i18n import normalize_locale
 from heimdallr.shared.spool import unclaim_path
 from heimdallr.shared.spool import atomic_write_bytes
 
@@ -28,10 +29,10 @@ DEFAULT_REQUESTED_OUTPUTS = {
 }
 
 def normalize_requested_outputs(raw: dict[str, Any] | None) -> dict[str, bool]:
-    if raw is None:
-        return dict(DEFAULT_REQUESTED_OUTPUTS)
-
     normalized = {key: False for key in DEFAULT_REQUESTED_OUTPUTS}
+    if raw is None:
+        return normalized
+
     if not isinstance(raw, dict):
         return normalized
     for key in tuple(DEFAULT_REQUESTED_OUTPUTS):
@@ -43,6 +44,12 @@ def normalize_requested_outputs(raw: dict[str, Any] | None) -> dict[str, bool]:
         else:
             normalized[key] = str(value).strip().lower() in {"1", "true", "yes", "on"}
     return normalized
+
+
+def normalize_artifact_locale(raw: Any) -> str | None:
+    if raw in (None, ""):
+        return None
+    return normalize_locale(str(raw))
 
 
 def normalize_requested_metrics_modules(raw: Any) -> list[str]:
@@ -136,6 +143,7 @@ def build_external_submission_payload(
     source_system: str | None,
     requested_outputs: dict[str, Any] | None,
     requested_metrics_modules: Any = None,
+    artifact_locale: Any = None,
     series_selection_policy: Any = None,
 ) -> dict[str, Any]:
     return {
@@ -145,6 +153,7 @@ def build_external_submission_payload(
         "source_system": str(source_system or "").strip() or None,
         "requested_outputs": normalize_requested_outputs(requested_outputs),
         "requested_metrics_modules": normalize_requested_metrics_modules(requested_metrics_modules),
+        "artifact_locale": normalize_artifact_locale(artifact_locale),
         "series_selection_policy": normalize_series_selection_policy(series_selection_policy),
         "received_at": settings.local_now().isoformat(),
     }

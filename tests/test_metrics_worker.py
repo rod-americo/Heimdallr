@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 from heimdallr.metrics.worker import (
     MetricsLogger,
     _record_metrics_pipeline_state,
+    _apply_artifact_locale,
     _requested_metrics_modules_from_metadata,
     _execute_jobs,
     _validate_case_against_profile,
@@ -151,6 +152,18 @@ class TestMetricsWorker(unittest.TestCase):
         )
 
         self.assertEqual(names, ["l3_muscle_area", "bone_health_l1_hu"])
+
+    def test_apply_artifact_locale_sets_job_locale_from_contract(self):
+        jobs = [
+            {"name": "bone_health_l1_hu"},
+            {"name": "vat_sat_ratio", "locale": "en_US"},
+        ]
+
+        configured = _apply_artifact_locale(jobs, "pt_BR")
+
+        self.assertEqual(configured[0]["locale"], "pt_BR")
+        self.assertEqual(configured[1]["locale"], "pt_BR")
+        self.assertNotIn("locale", jobs[0])
 
     def test_resolve_max_parallel_jobs_uses_profile_execution(self):
         self.assertEqual(_resolve_max_parallel_jobs({"execution": {"max_parallel_jobs": 3}}), 3)

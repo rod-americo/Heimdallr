@@ -22,12 +22,15 @@ Optional fields:
 | `source_system` | string | Caller system identifier. Echoed back in callback metadata. |
 | `requested_outputs` | JSON object string | Controls optional files in the final package. |
 | `requested_metrics_modules` | JSON array string or CSV string | Limits metrics jobs to requested modules plus dependencies from the active metrics profile. Not fully validated at admission time. |
+| `artifact_locale` | string | Presentation locale for generated burned-in artifacts where supported, for example `pt_BR` or `en_US`. |
 | `series_selection_policy` | JSON object string | Overrides the active series-selection profile for this submitted job only. |
 
 `requested_metrics_modules` and `requested_outputs` are intentionally separate:
 
 - `requested_metrics_modules` orders which metrics processing should run.
 - `requested_outputs` chooses which generated files should be returned.
+- `artifact_locale` chooses the language/formatting used by generated
+presentation artifacts where the metric module supports localization.
 - `series_selection_policy` chooses which prepared CT series should feed
 segmentation for this job.
 
@@ -41,6 +44,7 @@ curl -X POST "http://localhost:8001/jobs" \
   -F "callback_url=http://receiver.local/heimdallr/callback" \
   -F 'requested_outputs={"metrics_json":true,"overlays_dicom":true,"report_pdf":true,"report_pdf_dicom":true,"artifacts_tree":false}' \
   -F 'requested_metrics_modules=["l3_muscle_area","bone_health_l1_hu"]' \
+  -F 'artifact_locale=pt_BR' \
   -F 'series_selection_policy={"name":"orchestrum_ct_opportunistic_v1","required":{"modality":"CT","min_slices":60},"phase_priority":["native","portal_venous"]}'
 ```
 
@@ -50,7 +54,7 @@ Heimdallr returns after the file and sidecar metadata are stored in the external
 
 Example response:
 
-```json { "accepted": true, "job_id": "9d3fdaf7-82df-4ee8-a0c0-fb927bc8c3d1", "client_case_id": "external-123", "status": "queued", "received_at": "2026-05-01T14:30:00-03:00", "stored_file": "study_20260501143000.zip", "requested_metrics_modules": [ "l3_muscle_area", "bone_health_l1_hu" ], "series_selection_policy": { "name": "orchestrum_ct_opportunistic_v1", "required": { "modality": "CT", "min_slices": 60 }, "phase_priority": [ "native", "portal_venous" ] } }
+```json { "accepted": true, "job_id": "9d3fdaf7-82df-4ee8-a0c0-fb927bc8c3d1", "client_case_id": "external-123", "status": "queued", "received_at": "2026-05-01T14:30:00-03:00", "stored_file": "study_20260501143000.zip", "requested_metrics_modules": [ "l3_muscle_area", "bone_health_l1_hu" ], "artifact_locale": "pt_BR", "series_selection_policy": { "name": "orchestrum_ct_opportunistic_v1", "required": { "modality": "CT", "min_slices": 60 }, "phase_priority": [ "native", "portal_venous" ] } }
 ```
 
 External applications should persist `job_id` and `client_case_id`. Heimdallr
@@ -78,23 +82,22 @@ fails a job.
 
 Supported `requested_outputs` keys:
 
-When the entire `requested_outputs` field is omitted, Heimdallr uses the legacy
-default completion package. When `requested_outputs` is provided, omitted keys
-are treated as `false`; consumers must explicitly request every output they
-expect to receive.
+When the entire `requested_outputs` field is omitted, or when individual keys
+are omitted, those outputs are treated as `false`; consumers must explicitly
+request every output they expect to receive.
 
-| Key | Legacy default when field is omitted | Current behavior |
+| Key | Default when field or key is omitted | Current behavior |
 | --- | --- | --- |
-| `id_json` | `true` | Includes `metadata/id.json`. Heimdallr still requires this file internally to build the package. |
-| `metadata_json` | `true` | Includes `metadata/metadata.json` when present. |
-| `metrics_json` | `true` | Includes `metadata/resultados.json` and per-metric `artifacts/metrics/<metric_key>/result.json` files when present. |
-| `overlays_png` | `true` | Includes generated PNG files under `artifacts/metrics/` when present. |
-| `overlays_dicom` | `true` | Includes generated overlay DICOM files under `artifacts/metrics/`, excluding instruction-document DICOM files. |
-| `report_pdf` | `true` | Builds and includes `metadata/report.pdf` when possible. |
+| `id_json` | `false` | Includes `metadata/id.json`. Heimdallr still requires this file internally to build the package. |
+| `metadata_json` | `false` | Includes `metadata/metadata.json` when present. |
+| `metrics_json` | `false` | Includes `metadata/resultados.json` and per-metric `artifacts/metrics/<metric_key>/result.json` files when present. |
+| `overlays_png` | `false` | Includes generated PNG files under `artifacts/metrics/` when present. |
+| `overlays_dicom` | `false` | Includes generated overlay DICOM files under `artifacts/metrics/`, excluding instruction-document DICOM files. |
+| `report_pdf` | `false` | Builds and includes `metadata/report.pdf` when possible. |
 | `report_pdf_dicom` | `false` | Builds and includes `metadata/report.dcm` as Encapsulated PDF DICOM from the case report PDF. |
-| `artifact_instructions_pdf` | `true` | Includes `artifacts/metrics/instructions/artifact_instructions.pdf` when present. |
-| `artifact_instructions_dicom` | `true` | Includes instruction-document DICOM files under `artifacts/metrics/instructions/` when present. |
-| `artifacts_tree` | `true` | Includes every file under `artifacts/metrics/`. Set this to `false` for strictly selected output packages. |
+| `artifact_instructions_pdf` | `false` | Includes `artifacts/metrics/instructions/artifact_instructions.pdf` when present. |
+| `artifact_instructions_dicom` | `false` | Includes instruction-document DICOM files under `artifacts/metrics/instructions/` when present. |
+| `artifacts_tree` | `false` | Includes every file under `artifacts/metrics/`. |
 
 `overlays_png` and `overlays_dicom` are packaging selections. Metric jobs still
 determine which overlay artifacts exist. For example, `bone_health_l1_hu`

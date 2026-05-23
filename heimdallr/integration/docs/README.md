@@ -13,7 +13,11 @@ These contracts describe the current implementation under `heimdallr.integration
 | Terminal job delivery | Heimdallr to external app | multipart HTTP `POST` callback | implemented when configured |
 | Event dispatch | Heimdallr to configured destinations | JSON HTTP `POST` | implemented when configured |
 
-`requested_metrics_modules` controls what Heimdallr runs. `requested_outputs` controls what Heimdallr returns for `case.completed`. Failed jobs emit `case.failed` with a manifest and no package.
+`requested_metrics_modules` controls what Heimdallr runs. `requested_outputs`
+controls what Heimdallr returns for `case.completed`; omitted outputs are not
+delivered. `artifact_locale` controls the presentation locale for generated
+burned-in artifacts where supported. Failed jobs emit `case.failed` with a
+manifest and no package.
 
 ## Contract Files
 

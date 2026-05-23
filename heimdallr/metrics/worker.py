@@ -263,6 +263,25 @@ def _requested_metrics_modules_from_metadata(metadata: dict) -> list[str]:
     return normalized
 
 
+def _artifact_locale_from_metadata(metadata: dict) -> str | None:
+    external_delivery = metadata.get("ExternalDelivery", {})
+    if not isinstance(external_delivery, dict):
+        return None
+    value = str(external_delivery.get("artifact_locale") or "").strip()
+    return value or None
+
+
+def _apply_artifact_locale(jobs: list[dict], locale: str | None) -> list[dict]:
+    if not locale:
+        return jobs
+    configured_jobs: list[dict] = []
+    for job in jobs:
+        configured = dict(job)
+        configured["locale"] = locale
+        configured_jobs.append(configured)
+    return configured_jobs
+
+
 def _load_case_metadata(case_id: str) -> dict:
     metadata_path = study_id_json(case_id)
     with open(metadata_path, "r", encoding="utf-8") as handle:
@@ -886,7 +905,11 @@ def segment_case_metrics(case_input: Path) -> bool:
         profile_name, profile = load_metrics_pipeline_profile()
         _validate_case_against_profile(case_id, metadata, profile_name, profile)
         requested_job_names = _requested_metrics_modules_from_metadata(metadata)
-        jobs = _resolve_enabled_jobs(profile, requested_job_names=requested_job_names)
+        artifact_locale = _artifact_locale_from_metadata(metadata)
+        jobs = _apply_artifact_locale(
+            _resolve_enabled_jobs(profile, requested_job_names=requested_job_names),
+            artifact_locale,
+        )
         if not jobs:
             logger.log(f"[Metrics] No enabled jobs for profile {profile_name}")
             logger.close()
@@ -900,6 +923,8 @@ def segment_case_metrics(case_input: Path) -> bool:
         logger.log(f"[Metrics] Profile: {profile_name}")
         if requested_job_names:
             logger.log(f"[Metrics] Requested jobs: {', '.join(requested_job_names)}")
+        if artifact_locale:
+            logger.log(f"[Metrics] Artifact locale: {artifact_locale}")
         logger.log(f"[Metrics] Jobs: {', '.join(job['name'] for job in jobs)}")
         logger.log(f"[Metrics] Max parallel jobs: {max_parallel_jobs}")
         logger.log(f"[Metrics] Instruction DICOM kind: {instruction_dicom_kind}")
@@ -954,6 +979,7 @@ def segment_case_metrics(case_input: Path) -> bool:
         pipeline["metrics_pipeline"] = {
             "profile": profile_name,
             "requested_jobs": requested_job_names,
+            "artifact_locale": artifact_locale,
             "max_parallel_jobs": max_parallel_jobs,
             "instruction_dicom_kind": instruction_dicom_kind,
             "jobs": completed_jobs,

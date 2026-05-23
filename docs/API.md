@@ -39,12 +39,16 @@ This document summarizes high-value API contracts used in Heimdallr workflows.
 metrics JSON, overlays, report PDF, and report Encapsulated PDF DICOM
 - optional `requested_metrics_modules` (JSON array or CSV string), which
 selects enabled metrics jobs to run from the active profile
+- optional `artifact_locale`, which selects the presentation locale for
+generated burned-in artifacts when supported by the requested metric module
 - optional `series_selection_policy` JSON object, which overrides the active
 series-selection profile for this submitted job only
 
 It returns an immediate acceptance payload with `job_id` and `status=queued`. `GET /jobs/{job_id}` returns the best available asynchronous status for that external job. When processing finishes, `heimdallr.integration.delivery` performs an outbound multipart callback. Successful jobs emit `case.completed` with `manifest.json` plus `package.zip`; terminal failed jobs emit `case.failed` with `manifest.json` and no package. The consumer-facing callback contract is documented in `heimdallr/integration/docs/JOB_SUBMISSION.md`.
 
-When `requested_outputs` is provided, omitted output keys are treated as `false`. Consumers should request every file type they expect in the final package.
+When `requested_outputs` is omitted or when keys are omitted inside it, those
+outputs are treated as `false`. Consumers must request every file type they
+expect in the final package.
 
 If `requested_metrics_modules` is provided, Heimdallr constrains the case to that subset of metrics jobs and automatically includes declared dependencies from the active metrics profile. When metrics jobs declare `requires_segmentation_tasks`, segmentation is also constrained to the required TotalSegmentator tasks.
 

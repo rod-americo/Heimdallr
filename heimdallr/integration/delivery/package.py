@@ -136,6 +136,12 @@ def build_delivery_package(
         raise FileNotFoundError(f"Missing id.json for case {case_id}")
 
     metadata = _load_json(id_json_path)
+    external_delivery = metadata.get("ExternalDelivery", {})
+    artifact_locale = (
+        str(external_delivery.get("artifact_locale") or "").strip()
+        if isinstance(external_delivery, dict)
+        else ""
+    ) or None
     requested = normalize_requested_outputs(requested_outputs)
     results_path = study_results_json(case_id)
     metadata_json_path = study_metadata_json(case_id)
@@ -221,6 +227,7 @@ def build_delivery_package(
             "client_case_id": client_case_id,
             "source_system": source_system,
             "status": "done",
+            "artifact_locale": artifact_locale,
             "requested_outputs": requested,
             "delivered_outputs": delivered_outputs,
             "missing_outputs": missing_outputs,
@@ -238,6 +245,7 @@ def build_delivery_package(
         "client_case_id": client_case_id,
         "source_system": source_system,
         "status": "done",
+        "artifact_locale": artifact_locale,
         "received_at": metadata.get("ExternalDelivery", {}).get("received_at"),
         "completed_at": metadata.get("Pipeline", {}).get("metrics_end_time")
         or metadata.get("Pipeline", {}).get("pipeline_end_time"),

@@ -52,6 +52,7 @@ async def submit_job(
     source_system: str | None = Form(None),
     requested_outputs: str | None = Form(None),
     requested_metrics_modules: str | None = Form(None),
+    artifact_locale: str | None = Form(None),
     series_selection_policy: str | None = Form(None),
 ):
     if not study_file.filename.lower().endswith(".zip"):
@@ -115,6 +116,7 @@ async def submit_job(
         source_system=source_system,
         requested_outputs=parsed_requested_outputs,
         requested_metrics_modules=parsed_requested_metrics_modules,
+        artifact_locale=artifact_locale,
         series_selection_policy=parsed_series_selection_policy,
     )
 
@@ -134,6 +136,7 @@ async def submit_job(
         "received_at": submission_payload["received_at"],
         "stored_file": upload_name,
         "requested_metrics_modules": submission_payload["requested_metrics_modules"],
+        "artifact_locale": submission_payload["artifact_locale"],
         "series_selection_policy": submission_payload["series_selection_policy"],
     }
 

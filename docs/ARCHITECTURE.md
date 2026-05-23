@@ -142,8 +142,8 @@ enabled jobs and dependencies, writes `metadata/resultados.json`, creates artifa
 6. `dicom_egress`, `integration.dispatch`, and `integration.delivery` drain
 their queues independently. External `/jobs` submissions can request a subset
 of enabled metrics jobs through `requested_metrics_modules`, a subset of
-returned files through `requested_outputs`, and per-job series selection through
-`series_selection_policy`.
+returned files through `requested_outputs`, presentation locale through
+`artifact_locale`, and per-job series selection through `series_selection_policy`.
 7. `control_plane` and `tui` read SQLite and runtime files to expose current
 state to operators.
 8. `space_manager` and `resource_monitor` provide operational guardrails around

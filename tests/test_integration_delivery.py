@@ -12,10 +12,15 @@ from heimdallr.control_plane.app import create_app
 from heimdallr.integration.delivery import package as delivery_package
 from heimdallr.integration.delivery import worker
 from heimdallr.shared import settings, store
-from heimdallr.integration.submissions import load_external_submission_sidecar
+from heimdallr.integration.submissions import load_external_submission_sidecar, normalize_requested_outputs
 
 
 class TestJobSubmissionRoute(unittest.TestCase):
+    def test_requested_outputs_are_empty_by_default(self):
+        outputs = normalize_requested_outputs(None)
+
+        self.assertFalse(any(outputs.values()))
+
     def test_submit_job_stores_zip_and_submission_sidecar(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             upload_dir = Path(tmpdir) / "uploads" / "external"
@@ -33,6 +38,7 @@ class TestJobSubmissionRoute(unittest.TestCase):
                         "source_system": "partner_a",
                         "requested_outputs": json.dumps({"report_pdf": False}),
                         "requested_metrics_modules": json.dumps(["l3_muscle_area", "bone_health_l1_hu"]),
+                        "artifact_locale": "pt_BR",
                         "series_selection_policy": json.dumps(
                             {
                                 "name": "orchestrum_ct_opportunistic_v1",
@@ -52,6 +58,7 @@ class TestJobSubmissionRoute(unittest.TestCase):
             self.assertEqual(sidecar["callback_url"], "http://receiver.local/callback")
             self.assertEqual(sidecar["source_system"], "partner_a")
             self.assertFalse(sidecar["requested_outputs"]["report_pdf"])
+            self.assertEqual(sidecar["artifact_locale"], "pt_BR")
             self.assertEqual(
                 sidecar["requested_metrics_modules"],
                 ["l3_muscle_area", "bone_health_l1_hu"],
@@ -67,6 +74,7 @@ class TestJobSubmissionRoute(unittest.TestCase):
                 body["requested_metrics_modules"],
                 ["l3_muscle_area", "bone_health_l1_hu"],
             )
+            self.assertEqual(body["artifact_locale"], "pt_BR")
             self.assertEqual(body["series_selection_policy"]["required"]["min_slices"], 60)
 
             with patch.object(settings, "UPLOAD_EXTERNAL_DIR", upload_dir):
