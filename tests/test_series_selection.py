@@ -305,6 +305,66 @@ class TestSeriesSelection(unittest.TestCase):
         self.assertEqual(selection_info["SelectedPhase"], "arterial")
         self.assertIn("fallback=contrast_fallback", selection_info["SelectionReason"])
 
+    def test_allows_unknown_phase_as_last_priority(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            case_id = "case-series-selection"
+            derived_dir = root / "runtime" / "studies" / case_id / "derived" / "series"
+            derived_dir.mkdir(parents=True, exist_ok=True)
+
+            unknown_path = derived_dir / "unknown.nii.gz"
+            unknown_path.write_bytes(b"ok")
+
+            config_path = root / "series_selection.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "default_profile": "ct_test",
+                        "profiles": {
+                            "ct_test": {
+                                "required": {"modality": "CT", "min_slices": 60},
+                                "hard_reject": {},
+                                "phase_priority": ["native", "portal_venous", "unknown"],
+                                "geometry_priority": {"enabled": True},
+                                "text_hints": {"description_avoid": [], "kernel_avoid": []},
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            id_data = {
+                "AvailableSeries": [
+                    {
+                        "SeriesInstanceUID": "1.2.3.unknown",
+                        "SeriesNumber": "9",
+                        "DerivedNiftiPath": "series/unknown.nii.gz",
+                        "Modality": "CT",
+                        "SliceCount": 72,
+                        "DetectedPhase": "unknown",
+                        "PhaseDetected": False,
+                        "PhaseData": {},
+                        "SeriesDescription": "WRIST 0.6",
+                        "ConvolutionKernel": "FC18",
+                        "CoverageMm": 42.6,
+                        "ZSpacingMm": 0.6,
+                        "SliceThicknessMm": 0.6,
+                    }
+                ]
+            }
+
+            with patch.object(settings, "STUDIES_DIR", root / "runtime" / "studies"), patch.object(
+                settings,
+                "SERIES_SELECTION_CONFIG_PATH",
+                config_path,
+            ):
+                selected_path, selection_info = select_prepared_series(case_id, id_data)
+
+        self.assertEqual(selected_path.name, "unknown.nii.gz")
+        self.assertEqual(selection_info["SelectedPhase"], "unknown")
+        self.assertEqual(selection_info["SelectedSeriesInstanceUID"], "1.2.3.unknown")
+
     def test_prefers_maximum_coverage_over_thinner_partial_series(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

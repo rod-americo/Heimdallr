@@ -25,7 +25,8 @@
       },
       "phase_priority": [
         "native",
-        "portal_venous"
+        "portal_venous",
+        "unknown"
       ],
       "geometry_priority": {
         "enabled": true,
