@@ -209,6 +209,43 @@ class TestSegmentationReuse(unittest.TestCase):
 
         self.assertEqual([task["name"] for task in tasks], ["total", "tissue_types"])
 
+    def test_resolve_segmentation_plan_rejects_missing_required_task(self):
+        segmentation_profile = {
+            "required": {"modality": "CT", "selected_phase": ["native"]},
+            "tasks": [
+                {"name": "total", "enabled": True, "output_dir": "artifacts/total"},
+            ],
+        }
+        metrics_profile = {
+            "jobs": [
+                {
+                    "name": "head_complete_qc",
+                    "enabled": True,
+                    "requires_segmentation_tasks": [
+                        "total",
+                        "cerebral_bleed",
+                        "brain_structures",
+                    ],
+                },
+            ],
+        }
+        with (
+            patch(
+                "heimdallr.segmentation.worker.load_segmentation_pipeline_profile",
+                return_value=("ct_native_segmentation_only", segmentation_profile),
+            ),
+            patch(
+                "heimdallr.segmentation.worker.load_metrics_pipeline_profile_for_segmentation",
+                return_value=("ct_head_complete_metrics", metrics_profile),
+            ),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "cerebral_bleed"):
+                resolve_segmentation_plan(
+                    "CT",
+                    "native",
+                    requested_metrics_modules=["head_complete_qc"],
+                )
+
     def test_record_segmentation_pipeline_state_closes_failed_stage(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             id_json_path = Path(tmpdir) / "id.json"

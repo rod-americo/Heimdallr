@@ -614,6 +614,17 @@ def resolve_segmentation_plan(
     tasks = [task for task in profile.get("tasks", []) if task.get("enabled", True)]
     required_task_names = _requested_segmentation_task_names(requested_metrics_modules)
     if required_task_names is not None:
+        enabled_task_names = {
+            str(task.get("name", "") or "").strip()
+            for task in tasks
+            if str(task.get("name", "") or "").strip()
+        }
+        missing_required_tasks = sorted(required_task_names - enabled_task_names)
+        if missing_required_tasks:
+            raise RuntimeError(
+                f"Requested metrics require segmentation task(s) not enabled in profile "
+                f"'{profile_name}': {', '.join(missing_required_tasks)}"
+            )
         tasks = [
             task
             for task in tasks
