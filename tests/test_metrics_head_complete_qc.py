@@ -40,6 +40,7 @@ class TestHeadCompleteQcJob(unittest.TestCase):
         head_profile = config["profiles"]["ct_head_complete_metrics"]
 
         self.assertTrue(basic_jobs["head_complete_qc"]["enabled"])
+        self.assertTrue(basic_jobs["head_complete_qc"]["automatic"])
         self.assertTrue(head_jobs["head_complete_qc"]["enabled"])
         self.assertEqual(head_profile["required"]["selected_phase"], ["native", "unknown"])
         self.assertEqual(

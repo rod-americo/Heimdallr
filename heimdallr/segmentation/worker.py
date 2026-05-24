@@ -528,6 +528,10 @@ def _normalize_required_segmentation_tasks(job: dict) -> list[str] | None:
     return normalized
 
 
+def _is_automatic_metrics_job(job: dict) -> bool:
+    return bool(job.get("automatic", False))
+
+
 def _requested_segmentation_task_names(requested_job_names: list[str] | None) -> set[str] | None:
     if not requested_job_names:
         return None
@@ -567,6 +571,9 @@ def _requested_segmentation_task_names(requested_job_names: list[str] | None) ->
 
     for name in requested_job_names:
         include_job(name)
+    for name, job in jobs_by_name.items():
+        if _is_automatic_metrics_job(job):
+            include_job(name)
 
     required_tasks: set[str] = set()
     for name in resolved_job_names:

@@ -92,7 +92,9 @@ Optional fields:
 - `source_system`
 - `requested_outputs` as JSON object for returned files
 - `requested_metrics_modules` as JSON array or CSV string for requested metrics
-jobs from the active profile. Declared metrics dependencies are included, and declared `requires_segmentation_tasks` values can narrow the segmentation task set before metrics run.
+jobs from the active profile. Declared metrics dependencies and enabled
+`automatic=true` jobs are included, and declared `requires_segmentation_tasks`
+values can narrow the segmentation task set before metrics run.
 - `artifact_locale` as an optional presentation locale for generated
 presentation artifacts when supported, including localized burned-in overlays
 and case-report DICOM metadata.

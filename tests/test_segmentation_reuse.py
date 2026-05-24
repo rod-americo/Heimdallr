@@ -220,6 +220,56 @@ class TestSegmentationReuse(unittest.TestCase):
 
         self.assertEqual([task["name"] for task in tasks], ["total", "tissue_types"])
 
+    def test_resolve_segmentation_plan_includes_automatic_head_tasks_with_requested_metric(self):
+        segmentation_profile = {
+            "required": {"modality": "CT", "selected_phase": ["native"]},
+            "tasks": [
+                {"name": "total", "enabled": True, "output_dir": "artifacts/total"},
+                {"name": "tissue_types", "enabled": True, "output_dir": "artifacts/tissue_types"},
+                {"name": "cerebral_bleed", "enabled": True, "output_dir": "artifacts/cerebral_bleed"},
+                {"name": "brain_structures", "enabled": True, "output_dir": "artifacts/brain_structures"},
+            ],
+        }
+        metrics_profile = {
+            "jobs": [
+                {
+                    "name": "bone_health_l1_hu",
+                    "enabled": True,
+                    "requires_segmentation_tasks": ["total"],
+                },
+                {
+                    "name": "head_complete_qc",
+                    "enabled": True,
+                    "automatic": True,
+                    "requires_segmentation_tasks": [
+                        "total",
+                        "cerebral_bleed",
+                        "brain_structures",
+                    ],
+                },
+            ],
+        }
+        with (
+            patch(
+                "heimdallr.segmentation.worker.load_segmentation_pipeline_profile",
+                return_value=("ct_native_segmentation_only", segmentation_profile),
+            ),
+            patch(
+                "heimdallr.segmentation.worker.load_metrics_pipeline_profile_for_segmentation",
+                return_value=("ct_native_basic_metrics", metrics_profile),
+            ),
+        ):
+            _profile_name, tasks = resolve_segmentation_plan(
+                "CT",
+                "native",
+                requested_metrics_modules=["bone_health_l1_hu"],
+            )
+
+        self.assertEqual(
+            [task["name"] for task in tasks],
+            ["total", "cerebral_bleed", "brain_structures"],
+        )
+
     def test_resolve_segmentation_plan_rejects_missing_required_task(self):
         segmentation_profile = {
             "required": {"modality": "CT", "selected_phase": ["native"]},

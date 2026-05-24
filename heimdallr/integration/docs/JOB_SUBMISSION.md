@@ -161,13 +161,17 @@ as true when the sidecar is normalized.
 
 `requested_metrics_modules` accepts a JSON array string or a CSV string. Values
 must match enabled job names from the active metrics profile. Heimdallr includes
-declared job dependencies automatically.
+declared job dependencies and enabled jobs marked `automatic=true`
+automatically.
 
 When the active metrics profile declares `requires_segmentation_tasks` for the
-requested jobs, the segmentation worker limits TotalSegmentator tasks to the
-union of those requirements. For example, a request that only includes
-`bone_health_l1_hu` can run `total` without `tissue_types`, while
-`l3_muscle_area` still requires both `total` and `tissue_types`. The
+requested, dependency, or automatic jobs, the segmentation worker limits
+TotalSegmentator tasks to the union of those requirements. For example, a
+request that only includes `bone_health_l1_hu` can run `total` without
+`tissue_types`, while automatic head gatekeeping can still add
+`cerebral_bleed` and `brain_structures` to the plan and skip them at runtime
+unless `total/skull.nii.gz` plus `total/brain.nii.gz` define a complete head.
+The
 `brain_volumetry` job is present in the tracked example profile as disabled
 opt-in behavior; hosts must enable it in their local metrics profile before
 external jobs can request it.

@@ -150,6 +150,22 @@ class TestMetricsWorker(unittest.TestCase):
             ["l3_muscle_area", "parenchymal_organ_volumetry", "opportunistic_osteoporosis_composite"],
         )
 
+    def test_resolve_enabled_jobs_includes_automatic_jobs_with_requested_subset(self):
+        jobs = _resolve_enabled_jobs(
+            {
+                "jobs": [
+                    {"name": "bone_health_l1_hu"},
+                    {"name": "head_complete_qc", "automatic": True},
+                ]
+            },
+            requested_job_names=["bone_health_l1_hu"],
+        )
+
+        self.assertEqual(
+            [job["name"] for job in jobs],
+            ["bone_health_l1_hu", "head_complete_qc"],
+        )
+
     def test_resolve_enabled_jobs_rejects_unknown_requested_job(self):
         with self.assertRaisesRegex(RuntimeError, "Requested metrics job"):
             _resolve_enabled_jobs(

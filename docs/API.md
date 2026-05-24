@@ -54,7 +54,12 @@ When `requested_outputs` is omitted or when keys are omitted inside it, those
 outputs are treated as `false`. Consumers must request every file type they
 expect in the final package.
 
-If `requested_metrics_modules` is provided, Heimdallr constrains the case to that subset of metrics jobs and automatically includes declared dependencies from the active metrics profile. When metrics jobs declare `requires_segmentation_tasks`, segmentation is also constrained to the required TotalSegmentator tasks.
+If `requested_metrics_modules` is provided, Heimdallr constrains the case to
+that subset of metrics jobs, automatically includes declared dependencies from
+the active metrics profile, and still includes enabled jobs marked
+`automatic=true`. When metrics jobs declare `requires_segmentation_tasks`,
+segmentation is also constrained to the union of requested, dependency, and
+automatic job task requirements.
 
 The automatic CT pipeline runs `total` without `--fast` for eligible CT cases.
 It runs `tissue_types` only when the `total/vertebrae_L3.nii.gz` mask is present,

@@ -713,6 +713,10 @@ def _normalize_job_needs(job: dict) -> list[str]:
     return normalized
 
 
+def _is_automatic_metrics_job(job: dict) -> bool:
+    return bool(job.get("automatic", False))
+
+
 def _resolve_enabled_jobs(profile: dict, requested_job_names: list[str] | None = None) -> list[dict]:
     jobs = [dict(job) for job in profile.get("jobs", []) if job.get("enabled", True)]
     seen_names: set[str] = set()
@@ -746,6 +750,9 @@ def _resolve_enabled_jobs(profile: dict, requested_job_names: list[str] | None =
 
     for name in requested_job_names:
         include_job(name)
+    for name, job in jobs_by_name.items():
+        if _is_automatic_metrics_job(job):
+            include_job(name)
 
     return [jobs_by_name[name] for name in resolved_names]
 
