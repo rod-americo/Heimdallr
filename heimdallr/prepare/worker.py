@@ -297,6 +297,8 @@ def build_reference_dicom_context(ds):
         "BodyPartExamined",
         "SeriesInstanceUID",
         "SeriesNumber",
+        "SeriesDate",
+        "SeriesTime",
         "SeriesDescription",
         "SOPInstanceUID",
         "FrameOfReferenceUID",

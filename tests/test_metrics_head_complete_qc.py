@@ -93,6 +93,12 @@ class TestHeadCompleteQcJob(unittest.TestCase):
                         "CaseID": case_id,
                         "Modality": "CT",
                         "StudyInstanceUID": "1.2.826.0.1.3680043.8.498.1001",
+                        "ReferenceDicom": {
+                            "SeriesDate": "20260520",
+                            "SeriesTime": "101112.123",
+                            "StudyDate": "20260519",
+                            "StudyTime": "090000",
+                        },
                     }
                 ),
                 encoding="utf-8",
@@ -221,6 +227,9 @@ class TestHeadCompleteQcJob(unittest.TestCase):
             geometry_ds = pydicom.dcmread(str(geometry_dicoms[0]), stop_before_pixels=True)
             self.assertEqual(geometry_ds.Modality, "CT")
             self.assertEqual(geometry_ds.SeriesDescription, "Heimdallr Brain Geometry CT 2 mm")
+            self.assertEqual(geometry_ds.SeriesDate, "20260520")
+            self.assertEqual(geometry_ds.SeriesTime, "101112.123")
+            self.assertNotEqual(geometry_ds.ContentDate, geometry_ds.SeriesDate)
             self.assertEqual([float(value) for value in geometry_ds.PixelSpacing], [0.6, 0.6])
             self.assertEqual(float(geometry_ds.SliceThickness), 2.0)
             self.assertEqual(float(geometry_ds.SpacingBetweenSlices), 1.0)

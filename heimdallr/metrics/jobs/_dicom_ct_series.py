@@ -88,6 +88,21 @@ def _copy_patient_study_metadata(ds: FileDataset, case_metadata: dict[str, Any])
         _copy_text_attr(ds, case_metadata, key)
 
 
+def _source_series_datetime(case_metadata: dict[str, Any]) -> tuple[str | None, str | None]:
+    reference = case_metadata.get("ReferenceDicom")
+    if not isinstance(reference, dict):
+        reference = {}
+
+    series_date = str(reference.get("SeriesDate") or "").strip()
+    series_time = str(reference.get("SeriesTime") or "").strip()
+    if series_date:
+        return series_date, series_time or None
+
+    study_date = str(metadata_value(case_metadata, "StudyDate", "") or "").strip()
+    study_time = str(metadata_value(case_metadata, "StudyTime", "") or "").strip()
+    return study_date or None, study_time or None
+
+
 def create_derived_ct_series_from_nifti(
     nifti_path: Path,
     output_dir: Path,
@@ -122,6 +137,7 @@ def create_derived_ct_series_from_nifti(
         stale_path.unlink()
     series_uid = generate_uid()
     now = settings.local_now()
+    source_series_date, source_series_time = _source_series_datetime(case_metadata)
     output_paths: list[Path] = []
     slice_count = int(data.shape[2])
     preferred_slice_index = None
@@ -168,8 +184,8 @@ def create_derived_ct_series_from_nifti(
         ds.SoftwareVersions = "Heimdallr"
         ds.ContentDate = now.strftime("%Y%m%d")
         ds.ContentTime = now.strftime("%H%M%S.%f")
-        ds.SeriesDate = ds.ContentDate
-        ds.SeriesTime = ds.ContentTime
+        ds.SeriesDate = source_series_date or ds.ContentDate
+        ds.SeriesTime = source_series_time or ds.ContentTime
         ds.InstanceCreationDate = ds.ContentDate
         ds.InstanceCreationTime = ds.ContentTime
         ds.SeriesNumber = str(int(series_number))

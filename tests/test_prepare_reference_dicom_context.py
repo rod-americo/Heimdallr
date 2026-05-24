@@ -14,6 +14,8 @@ class TestPrepareReferenceDicomContext(unittest.TestCase):
         ds.StudyTime = "101112.123"
         ds.StudyDescription = "CT ABDOMEN"
         ds.AccessionNumber = "ACC123"
+        ds.SeriesDate = "20260406"
+        ds.SeriesTime = "121314.567"
         ds.PatientName = "SILVA^JOAO"
         ds.PatientID = "P001"
         ds.IssuerOfPatientID = "HOSPITAL_A"
@@ -34,6 +36,8 @@ class TestPrepareReferenceDicomContext(unittest.TestCase):
         self.assertEqual(context["StudyInstanceUID"], "1.2.3")
         self.assertEqual(context["StudyID"], "STUDY-42")
         self.assertEqual(context["StudyDescription"], "CT ABDOMEN")
+        self.assertEqual(context["SeriesDate"], "20260406")
+        self.assertEqual(context["SeriesTime"], "121314.567")
         self.assertEqual(context["PatientName"], "SILVA^JOAO")
         self.assertEqual(context["IssuerOfPatientID"], "HOSPITAL_A")
         self.assertEqual(context["PatientBirthDate"], "19800115")
