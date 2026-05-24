@@ -62,3 +62,4 @@ config/presentation.json
 config/resource_monitor.json
 config/segmentation_pipeline.json
 config/space_manager.json
+config/host_stack/*.json
