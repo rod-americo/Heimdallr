@@ -450,10 +450,11 @@ def main() -> int:
         if not metadata_exists:
             missing.append(str(metadata_json_path))
         if missing:
-            if str(l3_path) in missing and len(missing) == 1:
+            skippable_missing_masks = {str(l3_path), str(muscle_path)}
+            if set(missing).issubset(skippable_missing_masks):
                 payload = build_skip_payload(
                     case_id=args.case_id,
-                    reason="L3 mask not available for this study",
+                    reason="required segmentation masks not available for this study",
                     result_relpath=str(result_path.relative_to(case_dir)),
                     inputs={
                         "canonical_nifti": str(ct_path.relative_to(case_dir)),

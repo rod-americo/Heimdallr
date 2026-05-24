@@ -240,16 +240,20 @@ Then restart the segmentation worker so it reloads
 `config/segmentation_pipeline.json`. The concrete `config/segmentation_pipeline.json`
 file is host-local and must not be committed.
 
-For complete-head CT validation, use host-local profiles derived from the
-tracked examples:
+The tracked automatic CT examples now run `total` without `--fast`, gate
+`tissue_types` on a complete L3 mask, and gate `cerebral_bleed` plus
+`brain_structures` on a complete skull-plus-brain head mask from `total`.
+For dedicated complete-head CT validation, hosts can still use profiles derived
+from the tracked examples:
 
 - `HEIMDALLR_SEGMENTATION_PIPELINE_PROFILE=ct_head_complete_segmentation`
 - `HEIMDALLR_METRICS_PIPELINE_PROFILE=ct_head_complete_metrics`
 
-That path runs TotalSegmentator `total` for the `skull` and `brain` ROI subset
-plus `cerebral_bleed` and `brain_structures`, then runs `head_complete_qc` to
-validate `Head = skull + brain` without scan-bound truncation and produce the
-normalized axial head CT NIfTI artifact, canonical RAS 2 mm NIfTI artifact,
+That dedicated path runs TotalSegmentator `total` for the `skull` and `brain`
+ROI subset plus `cerebral_bleed` and `brain_structures`, then runs
+`head_complete_qc` to validate `Head = skull + brain` without scan-bound
+truncation and produce the normalized axial head CT NIfTI artifact, canonical
+RAS 2 mm NIfTI artifact,
 brain-mask geometry 1 mm slice-spacing NIfTI artifact, derived axial CT DICOM
 series encoded as JPEG-LS Lossless while preserving source in-plane pixel
 spacing, advancing 1 mm between images, and tagging 2 mm nominal slice

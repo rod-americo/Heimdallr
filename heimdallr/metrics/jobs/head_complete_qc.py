@@ -596,6 +596,50 @@ def main() -> int:
         artifact_locale = _artifact_locale(job_config)
         spacing_xyz = tuple(float(value) for value in ct_img.header.get_zooms()[:3])
         reference_shape = tuple(int(value) for value in ct_img.shape[:3])
+        head_components = collect_mask_statuses(
+            total_dir,
+            list(HEAD_COMPONENT_MASKS),
+            spacing_xyz,
+            reference_shape=reference_shape,
+        )
+        head_union = _head_union_status(total_dir, head_components, spacing_xyz, reference_shape)
+        head_complete = bool(head_components["complete"] and head_union["complete"])
+        if not head_complete:
+            payload = {
+                "metric_key": metric_key,
+                "status": "done",
+                "case_id": args.case_id,
+                "inputs": payload["inputs"],
+                "measurement": {
+                    "job_status": "incomplete_head_segmentation",
+                    "head_complete_without_truncation": False,
+                    "required_segmentation_complete": False,
+                    "source_spacing_mm": {
+                        "x": spacing_xyz[0],
+                        "y": spacing_xyz[1],
+                        "z": spacing_xyz[2],
+                    },
+                    "source_shape": [int(value) for value in reference_shape],
+                    "head_definition": {
+                        "components": list(HEAD_COMPONENT_MASKS),
+                        "rule": "head is complete when skull and brain masks are present, non-empty, and do not touch scan bounds",
+                    },
+                    "head_components": head_components,
+                    "head_union": head_union,
+                    "cerebral_bleed": {
+                        "mask_name": BLEED_MASK_NAME,
+                        "has_cerebral_bleed": None,
+                        "notification_bool": None,
+                        "reason": "head_gatekeeper_failed",
+                    },
+                },
+                "artifacts": {"result_json": _relpath(case_dir, result_path)},
+                "dicom_exports": [],
+            }
+            write_payload(result_path, payload)
+            print(json.dumps(payload, indent=2))
+            return 0
+
         normalization_spec = parse_normalization_spec(job_config)
         normalization = normalize_nifti_to_axial(ct_path, normalized_path, normalization_spec)
         normalization = _rewrite_normalized_relpath(case_dir, normalization)
@@ -629,13 +673,6 @@ def main() -> int:
             normalization_brain_geometry_2mm,
         )
 
-        head_components = collect_mask_statuses(
-            total_dir,
-            list(HEAD_COMPONENT_MASKS),
-            spacing_xyz,
-            reference_shape=reference_shape,
-        )
-        head_union = _head_union_status(total_dir, head_components, spacing_xyz, reference_shape)
         bleed_status = _bleed_mask_status(
             cerebral_bleed_dir / f"{BLEED_MASK_NAME}.nii.gz",
             spacing_xyz,
@@ -668,7 +705,6 @@ def main() -> int:
             locale=artifact_locale,
         )
 
-        head_complete = bool(head_components["complete"] and head_union["complete"])
         required_segmentation_complete = bool(
             head_complete
             and bleed_status.get("task_complete")

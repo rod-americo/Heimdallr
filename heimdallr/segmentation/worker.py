@@ -36,6 +36,10 @@ from pathlib import Path
 import datetime
 from zoneinfo import ZoneInfo
 
+import nibabel as nib
+import numpy as np
+
+from heimdallr.metrics.head import HEAD_COMPONENT_MASKS, collect_mask_statuses, compute_mask_status
 from heimdallr.shared import settings
 from heimdallr.shared import store
 from heimdallr.integration.delivery import enqueue_case_failed_delivery
@@ -48,6 +52,7 @@ from heimdallr.shared.paths import (
     study_metadata_dir,
 )
 from heimdallr.shared.segmentation_coverage import classify_segmentation_coverage
+from heimdallr.shared.segmentation_coverage import mask_complete as mask_complete_along_z
 from heimdallr.shared.sqlite import connect as db_connect
 
 settings.configure_service_stdio()
@@ -1099,6 +1104,131 @@ def materialize_canonical_nifti(source_path, final_path):
     return final_path
 
 
+def _task_name(task: dict) -> str:
+    return str(task.get("name", "") or "").strip()
+
+
+def _task_output_path(case_output: Path, task: dict) -> Path:
+    return case_output / str(task.get("output_dir") or f"artifacts/{_task_name(task)}")
+
+
+def _task_record(task: dict) -> dict:
+    return {
+        "name": _task_name(task),
+        "output_dir": str(task.get("output_dir") or f"artifacts/{_task_name(task)}"),
+        "extra_args": list(task.get("extra_args", [])),
+        "license_required": bool(task.get("license_required")),
+    }
+
+
+def _total_extra_args(extra_args: list) -> list:
+    return [str(arg) for arg in extra_args if str(arg) != "--fast"]
+
+
+def _clear_task_output(case_output: Path, task: dict) -> None:
+    output_dir = _task_output_path(case_output, task)
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+
+
+def _load_mask_status(mask_path: Path, reference_image_path: Path) -> dict:
+    try:
+        reference_image = nib.load(str(reference_image_path))
+        reference_shape = tuple(int(value) for value in reference_image.shape[:3])
+        spacing_xyz = tuple(float(value) for value in reference_image.header.get_zooms()[:3])
+    except Exception as exc:
+        return {
+            "complete": False,
+            "reason": "reference_read_error",
+            "error": str(exc),
+        }
+
+    if not mask_path.exists():
+        return {
+            "complete": False,
+            "reason": "missing_mask",
+            "mask": str(mask_path),
+        }
+
+    try:
+        mask_image = nib.load(str(mask_path))
+        mask = np.asarray(mask_image.get_fdata(), dtype=np.float32) > 0
+    except Exception as exc:
+        return {
+            "complete": False,
+            "reason": "mask_read_error",
+            "mask": str(mask_path),
+            "error": str(exc),
+        }
+
+    if tuple(mask.shape) != reference_shape:
+        return {
+            "complete": False,
+            "reason": "geometry_mismatch",
+            "mask": str(mask_path),
+            "shape": [int(value) for value in mask.shape],
+            "reference_shape": [int(value) for value in reference_shape],
+        }
+
+    status = compute_mask_status(mask, spacing_xyz)
+    complete = bool(status.get("present") and mask_complete_along_z(mask))
+    return {
+        "complete": complete,
+        "reason": "complete" if complete else "incomplete_or_empty_mask",
+        "mask": str(mask_path),
+        "status": status,
+    }
+
+
+def _head_union_status(total_dir: Path, head_components: dict, spacing_xyz: tuple[float, float, float]) -> dict:
+    union: np.ndarray | None = None
+    for mask_name in HEAD_COMPONENT_MASKS:
+        status = head_components.get("masks", {}).get(mask_name, {})
+        if not status.get("present") or not status.get("complete"):
+            return compute_mask_status(None, spacing_xyz)
+        mask_path = total_dir / f"{mask_name}.nii.gz"
+        image = nib.load(str(mask_path))
+        mask = np.asarray(image.get_fdata(), dtype=np.float32) > 0
+        union = mask if union is None else (union | mask)
+    return compute_mask_status(union, spacing_xyz)
+
+
+def _head_gatekeeper(total_dir: Path, reference_image_path: Path) -> dict:
+    try:
+        reference_image = nib.load(str(reference_image_path))
+        reference_shape = tuple(int(value) for value in reference_image.shape[:3])
+        spacing_xyz = tuple(float(value) for value in reference_image.header.get_zooms()[:3])
+    except Exception as exc:
+        return {
+            "complete": False,
+            "reason": "reference_read_error",
+            "error": str(exc),
+        }
+
+    try:
+        head_components = collect_mask_statuses(
+            total_dir,
+            list(HEAD_COMPONENT_MASKS),
+            spacing_xyz,
+            reference_shape=reference_shape,
+        )
+        head_union = _head_union_status(total_dir, head_components, spacing_xyz)
+    except Exception as exc:
+        return {
+            "complete": False,
+            "reason": "head_gate_error",
+            "error": str(exc),
+        }
+
+    complete = bool(head_components.get("complete") and head_union.get("complete"))
+    return {
+        "complete": complete,
+        "reason": "complete_head" if complete else "incomplete_head",
+        "head_components": head_components,
+        "head_union": head_union,
+    }
+
+
 def run_segmentation_pipeline(
     case_id,
     modality,
@@ -1116,17 +1246,61 @@ def run_segmentation_pipeline(
         selected_phase,
         requested_metrics_modules=requested_metrics_modules,
     )
+    ordered_tasks = sorted(tasks, key=lambda task: 0 if _task_name(task) == "total" else 1)
 
     logger.print(f"[Segmentation] Profile: {profile_name}")
     logger.print(f"[Segmentation] Selected phase: {_normalize_phase(selected_phase)}")
     if requested_metrics_modules:
         logger.print(f"[Segmentation] Requested metrics: {', '.join(requested_metrics_modules)}")
-    logger.print(f"[Segmentation] Tasks: {', '.join(task['name'] for task in tasks)}")
+    logger.print(f"[Segmentation] Tasks: {', '.join(_task_name(task) for task in ordered_tasks)}")
 
-    for task in tasks:
-        task_name = task["name"]
+    gatekeepers: dict[str, dict] = {}
+    executed_tasks: list[dict] = []
+    skipped_tasks: list[dict] = []
+    head_gate: dict | None = None
+
+    for task in ordered_tasks:
+        task_name = _task_name(task)
+        if task_name == "tissue_types":
+            l3_gate = gatekeepers.get("l3_complete")
+            if l3_gate is None:
+                l3_gate = _load_mask_status(
+                    artifacts_dir / "total" / "vertebrae_L3.nii.gz",
+                    nifti_path,
+                )
+                gatekeepers["l3_complete"] = l3_gate
+            if not l3_gate.get("complete"):
+                _clear_task_output(case_output, task)
+                logger.print(f"[Segmentation] Skipping tissue_types: {l3_gate.get('reason')}")
+                skipped_tasks.append(
+                    {
+                        **_task_record(task),
+                        "reason": "l3_gatekeeper_failed",
+                        "gatekeeper": "l3_complete",
+                    }
+                )
+                continue
+
+        if task_name in {"cerebral_bleed", "brain_structures"}:
+            if head_gate is None:
+                head_gate = _head_gatekeeper(artifacts_dir / "total", nifti_path)
+                gatekeepers["head_complete"] = head_gate
+            if not head_gate.get("complete"):
+                _clear_task_output(case_output, task)
+                logger.print(f"[Segmentation] Skipping {task_name}: {head_gate.get('reason')}")
+                skipped_tasks.append(
+                    {
+                        **_task_record(task),
+                        "reason": "head_gatekeeper_failed",
+                        "gatekeeper": "head_complete",
+                    }
+                )
+                continue
+
         extra_args = list(task.get("extra_args", []))
-        output_dir = case_output / task["output_dir"]
+        if task_name == "total":
+            extra_args = _total_extra_args(extra_args)
+        output_dir = _task_output_path(case_output, task)
         if output_dir.exists():
             shutil.rmtree(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -1139,19 +1313,16 @@ def run_segmentation_pipeline(
             extra_args=extra_args,
             log_file=log_file,
         )
+        executed = dict(task)
+        executed["extra_args"] = extra_args
+        executed_tasks.append(_task_record(executed))
 
     return {
         "profile": profile_name,
         "requested_metrics_modules": list(requested_metrics_modules or []),
-        "tasks": [
-            {
-                "name": task["name"],
-                "output_dir": task["output_dir"],
-                "extra_args": list(task.get("extra_args", [])),
-                "license_required": bool(task.get("license_required")),
-            }
-            for task in tasks
-        ],
+        "tasks": executed_tasks,
+        "skipped_tasks": skipped_tasks,
+        "gatekeepers": gatekeepers,
     }
 
 

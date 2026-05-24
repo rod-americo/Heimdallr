@@ -17,7 +17,6 @@
           "enabled": true,
           "output_dir": "artifacts/total",
           "extra_args": [
-            "--fast",
             "--device",
             "cpu",
             "--nr_thr_resamp",
@@ -31,6 +30,34 @@
           "name": "tissue_types",
           "enabled": true,
           "output_dir": "artifacts/tissue_types",
+          "extra_args": [
+            "--device",
+            "cpu",
+            "--nr_thr_resamp",
+            "14",
+            "--nr_thr_saving",
+            "14"
+          ],
+          "license_required": true
+        },
+        {
+          "name": "cerebral_bleed",
+          "enabled": true,
+          "output_dir": "artifacts/cerebral_bleed",
+          "extra_args": [
+            "--device",
+            "cpu",
+            "--nr_thr_resamp",
+            "14",
+            "--nr_thr_saving",
+            "14"
+          ],
+          "license_required": false
+        },
+        {
+          "name": "brain_structures",
+          "enabled": true,
+          "output_dir": "artifacts/brain_structures",
           "extra_args": [
             "--device",
             "cpu",

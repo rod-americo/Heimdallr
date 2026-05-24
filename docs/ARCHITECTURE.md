@@ -121,6 +121,10 @@ The code does not currently expose a separate `domain/` package. Domain rules ar
 worker helpers. CT selection preserves the existing phase and rejection rules,
 then uses measured DICOM coverage and z-spacing when available to prefer
 maximum coverage before thinner reconstructions.
+- segmentation task gatekeepers in `heimdallr/segmentation/worker.py`. The
+automatic CT path runs `total` without `--fast`, gates `tissue_types` on a
+complete L3 mask, and gates head-specific `cerebral_bleed` and
+`brain_structures` tasks on complete skull and brain masks.
 - metrics jobs under `heimdallr/metrics/jobs/`.
 - analysis helpers under `heimdallr/metrics/analysis/`.
 - head CT segmentation and normalization helpers under `heimdallr/metrics/head/`.

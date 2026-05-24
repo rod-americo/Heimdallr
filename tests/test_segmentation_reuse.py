@@ -7,14 +7,25 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import nibabel as nib
+import numpy as np
+
 from heimdallr.segmentation.worker import (
+    PipelineLogger,
     _record_segmentation_pipeline_state,
     WorkerShutdownRequestedError,
+    run_segmentation_pipeline,
     resolve_segmentation_plan,
     segment_case,
     should_reuse_existing_segmentation,
 )
 from heimdallr.shared import store
+
+
+def write_nifti(path: Path, data: np.ndarray, spacing=(1.0, 1.0, 1.0)) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    affine = np.diag([spacing[0], spacing[1], spacing[2], 1.0])
+    nib.save(nib.Nifti1Image(data.astype(np.float32), affine), str(path))
 
 
 class TestSegmentationReuse(unittest.TestCase):
@@ -245,6 +256,114 @@ class TestSegmentationReuse(unittest.TestCase):
                     "native",
                     requested_metrics_modules=["head_complete_qc"],
                 )
+
+    def test_run_segmentation_pipeline_strips_fast_and_skips_tissue_without_complete_l3(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            case_output = Path(tmpdir) / "CaseGate"
+            artifacts_dir = case_output / "artifacts"
+            log_dir = case_output / "logs"
+            nifti_path = case_output / "derived" / "CaseGate.nii.gz"
+            write_nifti(nifti_path, np.zeros((10, 10, 10), dtype=np.float32))
+            calls: list[tuple[str, list[str]]] = []
+
+            def fake_run_task(task_name, _input_file, output_folder, extra_args=None, log_file=None):
+                calls.append((task_name, list(extra_args or [])))
+                if task_name == "total":
+                    l3 = np.zeros((10, 10, 10), dtype=np.float32)
+                    l3[3:7, 3:7, 0:4] = 1.0
+                    write_nifti(Path(output_folder) / "vertebrae_L3.nii.gz", l3)
+                else:
+                    Path(output_folder, "mask.nii.gz").write_bytes(gzip.compress(b"ok"))
+
+            with (
+                patch(
+                    "heimdallr.segmentation.worker.resolve_segmentation_plan",
+                    return_value=(
+                        "ct_native_segmentation_only",
+                        [
+                            {
+                                "name": "total",
+                                "output_dir": "artifacts/total",
+                                "extra_args": ["--fast", "--device", "gpu"],
+                            },
+                            {
+                                "name": "tissue_types",
+                                "output_dir": "artifacts/tissue_types",
+                                "extra_args": ["--device", "gpu"],
+                            },
+                        ],
+                    ),
+                ),
+                patch("heimdallr.segmentation.worker.run_task", side_effect=fake_run_task),
+            ):
+                info = run_segmentation_pipeline(
+                    case_id="CaseGate",
+                    modality="CT",
+                    selected_phase="native",
+                    nifti_path=nifti_path,
+                    case_output=case_output,
+                    artifacts_dir=artifacts_dir,
+                    log_dir=log_dir,
+                    logger=PipelineLogger(None),
+                )
+
+        self.assertEqual(calls, [("total", ["--device", "gpu"])])
+        self.assertEqual([task["name"] for task in info["tasks"]], ["total"])
+        self.assertEqual(info["skipped_tasks"][0]["name"], "tissue_types")
+        self.assertEqual(info["skipped_tasks"][0]["gatekeeper"], "l3_complete")
+
+    def test_run_segmentation_pipeline_runs_head_tasks_after_complete_head_gate(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            case_output = Path(tmpdir) / "CaseHeadGate"
+            artifacts_dir = case_output / "artifacts"
+            log_dir = case_output / "logs"
+            nifti_path = case_output / "derived" / "CaseHeadGate.nii.gz"
+            write_nifti(nifti_path, np.zeros((10, 10, 10), dtype=np.float32))
+            calls: list[str] = []
+
+            def fake_run_task(task_name, _input_file, output_folder, extra_args=None, log_file=None):
+                calls.append(task_name)
+                if task_name == "total":
+                    skull = np.zeros((10, 10, 10), dtype=np.float32)
+                    brain = np.zeros((10, 10, 10), dtype=np.float32)
+                    skull[2:8, 2:8, 2:8] = 1.0
+                    brain[3:7, 3:7, 3:7] = 1.0
+                    write_nifti(Path(output_folder) / "skull.nii.gz", skull)
+                    write_nifti(Path(output_folder) / "brain.nii.gz", brain)
+                else:
+                    Path(output_folder, "mask.nii.gz").write_bytes(gzip.compress(b"ok"))
+
+            with (
+                patch(
+                    "heimdallr.segmentation.worker.resolve_segmentation_plan",
+                    return_value=(
+                        "ct_native_segmentation_only",
+                        [
+                            {"name": "total", "output_dir": "artifacts/total"},
+                            {"name": "cerebral_bleed", "output_dir": "artifacts/cerebral_bleed"},
+                            {"name": "brain_structures", "output_dir": "artifacts/brain_structures"},
+                        ],
+                    ),
+                ),
+                patch("heimdallr.segmentation.worker.run_task", side_effect=fake_run_task),
+            ):
+                info = run_segmentation_pipeline(
+                    case_id="CaseHeadGate",
+                    modality="CT",
+                    selected_phase="native",
+                    nifti_path=nifti_path,
+                    case_output=case_output,
+                    artifacts_dir=artifacts_dir,
+                    log_dir=log_dir,
+                    logger=PipelineLogger(None),
+                )
+
+        self.assertEqual(calls, ["total", "cerebral_bleed", "brain_structures"])
+        self.assertTrue(info["gatekeepers"]["head_complete"]["complete"])
+        self.assertEqual(
+            [task["name"] for task in info["tasks"]],
+            ["total", "cerebral_bleed", "brain_structures"],
+        )
 
     def test_record_segmentation_pipeline_state_closes_failed_stage(self):
         with tempfile.TemporaryDirectory() as tmpdir:

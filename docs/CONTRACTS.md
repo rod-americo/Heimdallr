@@ -33,7 +33,7 @@ Heimdallr transforms incoming radiological imaging studies into traceable runtim
 | Source DICOM series | `source/dicom/series/<series-stem>/` | DICOM files grouped by series | Preserves the scanned study instances after ZIP extraction for reprocessing and audit until the case workspace is purged. |
 | Canonical NIfTI | `derived/<case_id>.nii.gz` | NIfTI | Produced or materialized by segmentation for the selected series. |
 | Segmentation artifacts | `artifacts/<task>/` | files | TotalSegmentator task outputs according to active profile. |
-| Head normalization artifact | `artifacts/metrics/head_complete_qc/normalized_axial_head_ct.nii.gz` | NIfTI | Produced by the opt-in complete-head metrics profile after head segmentation QC. |
+| Head normalization artifact | `artifacts/metrics/head_complete_qc/normalized_axial_head_ct.nii.gz` | NIfTI | Produced by `head_complete_qc` only after the automatic complete-head gate passes. |
 | Head RAS 2 mm artifact | `artifacts/metrics/head_complete_qc/normalized_ras_head_ct_2mm.nii.gz` | NIfTI | Canonical RAS isotropic 2 mm volume. Anatomical orbitomeatal and midline alignment is reported as `landmarks_required` until validated landmarks are available. |
 | Head brain-geometry 2 mm artifact | `artifacts/metrics/head_complete_qc/normalized_brain_geometry_head_ct_2mm.nii.gz` | NIfTI | Volume resampled so the `total/brain.nii.gz` mask PCA axes define the output plane. It uses `brain_structures/septum_pellucidum.nii.gz` as an in-plane midline guide when available, preserves source in-plane spacing by default, and uses 1 mm slice spacing. Does not require the orbitomeatal line. |
 | Head brain-geometry CT DICOM series | `artifacts/metrics/head_complete_qc/brain_geometry_ct_2mm_dicom/` | DICOM CT series | Derived axial CT series from the brain-geometry volume, encoded as JPEG-LS Lossless while preserving source in-plane pixel spacing, using 1 mm spacing between images, and tagging 2 mm nominal slice thickness. Slices are exported in spatial order so DICOM viewers detect a constant stack interval; the brain-center slice is tagged in `ImageComments` without changing stack order. The output field of view is cropped from `total/skull.nii.gz` with a configurable margin so the head opens at a practical display scale. |
@@ -150,14 +150,16 @@ They must not contain secrets, PHI, PACS credentials, callback tokens, or case
 paths.
 - `config/metrics_pipeline.example.json` must be updated when adding a new
 production metrics module.
-- The opt-in complete-head workflow defines `Head = skull + brain` and treats
-the head as complete only when both masks are present, non-empty, geometry
-matched, and not touching scan bounds. It also requires the `cerebral_bleed`
-and `brain_structures` TotalSegmentator tasks before downstream head modules
-consume the normalized axial NIfTI artifact. The machine-readable bleed
-notification field is
+- The automatic CT segmentation workflow runs `total` without `--fast` for
+eligible CT cases. It runs `tissue_types` only when `total/vertebrae_L3.nii.gz`
+is present, geometry-compatible, non-empty, and complete along the scan axis.
+The complete-head workflow defines `Head = skull + brain` and treats the head as
+complete only when both masks are present, non-empty, geometry matched, and not
+touching scan bounds. Only then does the automatic workflow run the
+`cerebral_bleed` and `brain_structures` TotalSegmentator tasks. The
+machine-readable bleed notification field is
 `measurement.cerebral_bleed.has_cerebral_bleed` and mirrors
-`measurement.cerebral_bleed.notification_bool`.
+`measurement.cerebral_bleed.notification_bool` when bleed segmentation has run.
 - Complete-head geometric normalization includes
 `normalized_brain_geometry_head_ct_2mm.nii.gz`, which uses the `total/brain`
 mask to define a reproducible output plane. This is the preferred head geometry

@@ -55,7 +55,7 @@
         },
         {
           "name": "head_complete_qc",
-          "enabled": false,
+          "enabled": true,
           "requires_segmentation_tasks": [
             "total",
             "cerebral_bleed",

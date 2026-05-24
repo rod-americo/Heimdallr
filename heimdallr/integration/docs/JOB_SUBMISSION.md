@@ -172,15 +172,18 @@ union of those requirements. For example, a request that only includes
 opt-in behavior; hosts must enable it in their local metrics profile before
 external jobs can request it.
 
-The tracked example profile also includes disabled opt-in `head_complete_qc`.
-For complete-head studies, pair the metrics profile `ct_head_complete_metrics`
-with segmentation profile `ct_head_complete_segmentation`. The job requires
-`total`, `cerebral_bleed`, and `brain_structures`, validates `Head = skull +
-brain` without scan-bound truncation, and writes a normalized axial head CT
-NIfTI artifact for downstream deterministic head modules. It can also emit
-brain-geometry normalized CT DICOM, translated brain-structure volume and
-overlay artifacts, and a conditional 5 mm normalized cerebral-bleed overlay
-series with adjacent context slabs when the bleed mask is positive.
+The tracked default profile enables `head_complete_qc` behind automatic
+gatekeepers. The segmentation worker always runs `total` without `--fast` for
+eligible CT cases. It runs `tissue_types` only when the L3 mask from `total` is
+complete, and runs `cerebral_bleed` plus `brain_structures` only when the skull
+and brain masks from `total` define a complete head. `head_complete_qc` writes
+only a result JSON when the complete-head gate fails. When the gate passes, it
+can emit brain-geometry normalized CT DICOM, translated brain-structure volume
+and overlay artifacts, and a conditional 5 mm normalized cerebral-bleed overlay
+series with adjacent context slabs when the bleed mask is positive. The
+API-facing bleed signal is
+`metrics.head_complete_qc.measurement.cerebral_bleed.has_cerebral_bleed`, with
+the same value mirrored in `notification_bool`.
 
 Example:
 

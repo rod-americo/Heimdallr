@@ -56,13 +56,17 @@ expect in the final package.
 
 If `requested_metrics_modules` is provided, Heimdallr constrains the case to that subset of metrics jobs and automatically includes declared dependencies from the active metrics profile. When metrics jobs declare `requires_segmentation_tasks`, segmentation is also constrained to the required TotalSegmentator tasks.
 
-The tracked metrics example includes an opt-in `head_complete_qc` job and a
-`ct_head_complete_metrics` profile. That workflow requires segmentation tasks
-`total`, `cerebral_bleed`, and `brain_structures`, validates `Head = skull +
-brain` without scan-bound truncation, writes a normalized axial head CT NIfTI
+The automatic CT pipeline runs `total` without `--fast` for eligible CT cases.
+It runs `tissue_types` only when the `total/vertebrae_L3.nii.gz` mask is present,
+geometry-compatible, non-empty, and complete along the scan axis. It runs
+`cerebral_bleed` and `brain_structures` only when the `total/skull.nii.gz` and
+`total/brain.nii.gz` masks are present, geometry-compatible, non-empty, and do
+not touch scan bounds. The `head_complete_qc` job is enabled in the tracked
+default metrics profile, but it emits only a result JSON when the complete-head
+gate fails. When the gate passes, it writes a normalized axial head CT NIfTI
 artifact, writes a canonical RAS 2 mm NIfTI artifact, writes a 1 mm
-slice-spacing brain-mask geometry NIfTI artifact whose output plane is defined by
-`total/brain.nii.gz` and whose in-plane midline is guided by
+slice-spacing brain-mask geometry NIfTI artifact whose output plane is defined
+by `total/brain.nii.gz` and whose in-plane midline is guided by
 `brain_structures/septum_pellucidum.nii.gz` when available, emits a derived
 axial CT DICOM series from that geometry volume using JPEG-LS Lossless while
 preserving source in-plane pixel spacing, advancing 1 mm between images, and
@@ -75,9 +79,11 @@ head opens at a practical display scale,
 emits translated Secondary Capture DICOM artifacts for brain-structure volumes
 and overlays, with the `brain_structures` overlay rendered on the
 brain-geometry normalized CT grid without a text panel and with the overlay
-color map included in the volume-table artifact, and exposes
-`measurement.cerebral_bleed.has_cerebral_bleed` plus
-`measurement.cerebral_bleed.notification_bool` for downstream notification logic.
+color map included in the volume-table artifact. The only additional API-facing
+head signal is the boolean
+`measurement.cerebral_bleed.has_cerebral_bleed`, mirrored as
+`measurement.cerebral_bleed.notification_bool` for downstream notification logic
+when cerebral-bleed segmentation has run.
 The bleed overlay series is emitted only when the bleed mask has positive
 voxels; it is rendered on the brain-geometry normalized CT grid as 5 mm slabs
 with adjacent context slabs, no text panel, and a red transparent contour over
