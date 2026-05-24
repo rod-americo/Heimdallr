@@ -267,3 +267,93 @@ msgstr "Heimdallr Rastreamento de Fratura Vertebral"
 
 msgid "vertebral_fracture.overlay.derivation_description"
 msgstr "Rastreamento sagital toracolombar de fratura vertebral com painéis burned-in ({vertebrae})"
+
+msgid "head.volume_table.title"
+msgstr "Volumes de Estruturas Cerebrais"
+
+msgid "head.volume_table.structure"
+msgstr "Estrutura"
+
+msgid "head.volume_table.color"
+msgstr "Cor"
+
+msgid "head.volume_table.volume_cm3"
+msgstr "Volume (cm³)"
+
+msgid "head.volume_table.series_description"
+msgstr "Heimdallr Volumes de Estruturas Cerebrais"
+
+msgid "head.volume_table.derivation_description"
+msgstr "Tabela burned-in com volumes da segmentação cerebral e de estruturas cerebrais"
+
+msgid "head.volume.brain_total"
+msgstr "Encéfalo total"
+
+msgid "head.structures_overlay.title"
+msgstr "Estruturas cerebrais 3 mm"
+
+msgid "head.structures_overlay.more"
+msgstr "Estruturas adicionais exibidas por overlay colorido"
+
+msgid "head.structures_overlay.series_description"
+msgstr "Heimdallr Overlay de Estruturas Cerebrais 3 mm"
+
+msgid "head.structures_overlay.derivation_description"
+msgstr "Série axial burned-in de 3 mm com overlays de estruturas cerebrais do TotalSegmentator"
+
+msgid "head.bleed_overlay.title"
+msgstr "Candidato a sangramento cerebral"
+
+msgid "head.bleed_overlay.series_description"
+msgstr "Heimdallr Overlay de Sangramento Cerebral 5 mm"
+
+msgid "head.bleed_overlay.derivation_description"
+msgstr "Série axial normalizada burned-in de 5 mm restrita aos cortes positivos da máscara de sangramento cerebral e cortes adjacentes"
+
+msgid "head.structures.brainstem"
+msgstr "Tronco encefálico"
+
+msgid "head.structures.subarachnoid_space"
+msgstr "Espaço subaracnóideo"
+
+msgid "head.structures.venous_sinuses"
+msgstr "Seios venosos"
+
+msgid "head.structures.septum_pellucidum"
+msgstr "Septo pelúcido"
+
+msgid "head.structures.cerebellum"
+msgstr "Cerebelo"
+
+msgid "head.structures.caudate_nucleus"
+msgstr "Núcleo caudado"
+
+msgid "head.structures.lentiform_nucleus"
+msgstr "Núcleo lentiforme"
+
+msgid "head.structures.insular_cortex"
+msgstr "Córtex insular"
+
+msgid "head.structures.internal_capsule"
+msgstr "Cápsula interna"
+
+msgid "head.structures.ventricle"
+msgstr "Ventrículo"
+
+msgid "head.structures.central_sulcus"
+msgstr "Sulco central"
+
+msgid "head.structures.frontal_lobe"
+msgstr "Lobo frontal"
+
+msgid "head.structures.parietal_lobe"
+msgstr "Lobo parietal"
+
+msgid "head.structures.occipital_lobe"
+msgstr "Lobo occipital"
+
+msgid "head.structures.temporal_lobe"
+msgstr "Lobo temporal"
+
+msgid "head.structures.thalamus"
+msgstr "Tálamo"

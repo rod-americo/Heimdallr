@@ -31,6 +31,7 @@ from heimdallr.metrics.jobs._brain_volumetry_overlay_text import (  # noqa: E402
     resolve_artifact_locale as resolve_brain_locale,
     series_description as brain_series_description,
 )
+from heimdallr.shared.i18n import translate  # noqa: E402
 
 
 class TestArtifactI18n(unittest.TestCase):
@@ -267,6 +268,24 @@ class TestArtifactI18n(unittest.TestCase):
         )
 
         self.assertEqual(lines, ["Volumetria cerebral:", "Encéfalo: 1.325 cm³"])
+
+    def test_head_complete_artifact_strings_are_translated(self):
+        self.assertEqual(
+            translate("head.volume_table.title", locale="en_US"),
+            "Brain Structure Volumes",
+        )
+        self.assertEqual(
+            translate("head.volume_table.title", locale="pt_BR"),
+            "Volumes de Estruturas Cerebrais",
+        )
+        self.assertEqual(
+            translate("head.structures.brainstem", locale="en_US"),
+            "Brainstem",
+        )
+        self.assertEqual(
+            translate("head.structures.brainstem", locale="pt_BR"),
+            "Tronco encefálico",
+        )
 
 
 if __name__ == "__main__":

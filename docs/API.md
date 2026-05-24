@@ -56,6 +56,33 @@ expect in the final package.
 
 If `requested_metrics_modules` is provided, Heimdallr constrains the case to that subset of metrics jobs and automatically includes declared dependencies from the active metrics profile. When metrics jobs declare `requires_segmentation_tasks`, segmentation is also constrained to the required TotalSegmentator tasks.
 
+The tracked metrics example includes an opt-in `head_complete_qc` job and a
+`ct_head_complete_metrics` profile. That workflow requires segmentation tasks
+`total`, `cerebral_bleed`, and `brain_structures`, validates `Head = skull +
+brain` without scan-bound truncation, writes a normalized axial head CT NIfTI
+artifact, writes a canonical RAS 2 mm NIfTI artifact, writes a 1 mm
+slice-spacing brain-mask geometry NIfTI artifact whose output plane is defined by
+`total/brain.nii.gz` and whose in-plane midline is guided by
+`brain_structures/septum_pellucidum.nii.gz` when available, emits a derived
+axial CT DICOM series from that geometry volume using JPEG-LS Lossless while
+preserving source in-plane pixel spacing, advancing 1 mm between images, and
+tagging 2 mm nominal slice thickness.
+Slices are exported in spatial order so DICOM viewers detect a constant stack
+interval; the brain-center slice is tagged in `ImageComments` without changing
+stack order. The output field
+of view is cropped from `total/skull.nii.gz` with a configurable margin so the
+head opens at a practical display scale,
+emits translated Secondary Capture DICOM artifacts for brain-structure volumes
+and overlays, with the `brain_structures` overlay rendered on the
+brain-geometry normalized CT grid without a text panel and with the overlay
+color map included in the volume-table artifact, and exposes
+`measurement.cerebral_bleed.has_cerebral_bleed` plus
+`measurement.cerebral_bleed.notification_bool` for downstream notification logic.
+The bleed overlay series is emitted only when the bleed mask has positive
+voxels; it is rendered on the brain-geometry normalized CT grid as 5 mm slabs
+with adjacent context slabs, no text panel, and a red transparent contour over
+positive mask regions.
+
 If `series_selection_policy` is provided, Heimdallr deep-merges that object over
 the active `config/series_selection.json` profile for the submitted job. The
 selected series audit in `metadata/id.json` records `PolicySource` and
@@ -64,7 +91,8 @@ selected series audit in `metadata/id.json` records `PolicySource` and
 If `artifact_dicom_policy` is provided, Heimdallr applies it to metric jobs for
 that submitted job only. Supported `secondary_capture_transfer_syntax` values
 are `original`, `deflated`, `jpeg_ls_lossless`, `jpeg_2000_lossless`, and
-`rle_lossless`.
+`rle_lossless`. The repository default for generated Secondary Capture
+artifacts is `jpeg_ls_lossless`.
 
 Example:
 

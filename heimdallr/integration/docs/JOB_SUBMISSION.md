@@ -120,7 +120,8 @@ Secondary Capture transfer syntax is configurable in the metrics profile for
 intake/direct pipeline runs and per `/jobs` submission through
 `artifact_dicom_policy.secondary_capture_transfer_syntax`. Supported values are
 `original`, `deflated`, `jpeg_ls_lossless`, `jpeg_2000_lossless`, and
-`rle_lossless`. The default remains `original` unless configured otherwise.
+`rle_lossless`. The repository default is `jpeg_ls_lossless` unless a metrics
+job or submission explicitly overrides it.
 
 Compression experiment on a `parenchymal_organ_volumetry` Secondary Capture
 series with 512 x 512 RGB slices showed the following approximate per-slice
@@ -170,6 +171,16 @@ union of those requirements. For example, a request that only includes
 `brain_volumetry` job is present in the tracked example profile as disabled
 opt-in behavior; hosts must enable it in their local metrics profile before
 external jobs can request it.
+
+The tracked example profile also includes disabled opt-in `head_complete_qc`.
+For complete-head studies, pair the metrics profile `ct_head_complete_metrics`
+with segmentation profile `ct_head_complete_segmentation`. The job requires
+`total`, `cerebral_bleed`, and `brain_structures`, validates `Head = skull +
+brain` without scan-bound truncation, and writes a normalized axial head CT
+NIfTI artifact for downstream deterministic head modules. It can also emit
+brain-geometry normalized CT DICOM, translated brain-structure volume and
+overlay artifacts, and a conditional 5 mm normalized cerebral-bleed overlay
+series with adjacent context slabs when the bleed mask is positive.
 
 Example:
 

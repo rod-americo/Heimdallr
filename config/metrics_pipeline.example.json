@@ -30,7 +30,7 @@
           ],
           "generate_overlay": true,
           "emit_secondary_capture_dicom": true,
-          "secondary_capture_transfer_syntax": "original",
+          "secondary_capture_transfer_syntax": "jpeg_ls_lossless",
           "secondary_capture_max_dimension": 1024
         },
         {
@@ -41,7 +41,7 @@
           ],
           "generate_overlay": true,
           "emit_secondary_capture_dicom": true,
-          "secondary_capture_transfer_syntax": "original"
+          "secondary_capture_transfer_syntax": "jpeg_ls_lossless"
         },
         {
           "name": "brain_volumetry",
@@ -51,7 +51,35 @@
           ],
           "generate_overlay": true,
           "emit_secondary_capture_dicom": true,
-          "secondary_capture_transfer_syntax": "original"
+          "secondary_capture_transfer_syntax": "jpeg_ls_lossless"
+        },
+        {
+          "name": "head_complete_qc",
+          "enabled": false,
+          "requires_segmentation_tasks": [
+            "total",
+            "cerebral_bleed",
+            "brain_structures"
+          ],
+          "target_plane": "axial",
+          "target_in_plane_spacing_mm": [
+            1.0,
+            1.0
+          ],
+          "target_slice_thickness_mm": 5.0,
+          "write_normalized_nifti": true,
+          "emit_secondary_capture_dicom": true,
+          "secondary_capture_transfer_syntax": "jpeg_ls_lossless",
+          "overlay_slice_thickness_mm": 3.0,
+          "bleed_overlay_slice_thickness_mm": 5.0,
+          "anatomic_normalized_spacing_mm": 2.0,
+          "write_anatomic_normalized_nifti": true,
+          "brain_geometry_normalized_in_plane_spacing_mm": null,
+          "brain_geometry_normalized_spacing_mm": 1.0,
+          "brain_geometry_slice_thickness_mm": 2.0,
+          "brain_geometry_crop_margin_mm": 25.0,
+          "write_brain_geometry_normalized_nifti": true,
+          "emit_brain_geometry_dicom_series": true
         },
         {
           "name": "bone_health_l1_hu",
@@ -61,7 +89,7 @@
           ],
           "generate_overlay": true,
           "strict_qc": false,
-          "secondary_capture_transfer_syntax": "original"
+          "secondary_capture_transfer_syntax": "jpeg_ls_lossless"
         },
         {
           "name": "vat_sat_ratio",
@@ -72,8 +100,50 @@
           ],
           "generate_overlay": true,
           "emit_secondary_capture_dicom": true,
-          "secondary_capture_transfer_syntax": "original",
+          "secondary_capture_transfer_syntax": "jpeg_ls_lossless",
           "secondary_capture_max_dimension": 1024
+        }
+      ]
+    },
+    "ct_head_complete_metrics": {
+      "required": {
+        "modality": "CT",
+        "selected_phase": [
+          "native",
+          "unknown"
+        ]
+      },
+      "execution": {
+        "max_parallel_jobs": 1,
+        "instruction_dicom_kind": "secondary_capture"
+      },
+      "jobs": [
+        {
+          "name": "head_complete_qc",
+          "enabled": true,
+          "requires_segmentation_tasks": [
+            "total",
+            "cerebral_bleed",
+            "brain_structures"
+          ],
+          "target_plane": "axial",
+          "target_in_plane_spacing_mm": [
+            1.0,
+            1.0
+          ],
+          "target_slice_thickness_mm": 5.0,
+          "write_normalized_nifti": true,
+          "emit_secondary_capture_dicom": true,
+          "secondary_capture_transfer_syntax": "jpeg_ls_lossless",
+          "overlay_slice_thickness_mm": 3.0,
+          "anatomic_normalized_spacing_mm": 2.0,
+          "write_anatomic_normalized_nifti": true,
+          "brain_geometry_normalized_in_plane_spacing_mm": null,
+          "brain_geometry_normalized_spacing_mm": 1.0,
+          "brain_geometry_slice_thickness_mm": 2.0,
+          "brain_geometry_crop_margin_mm": 25.0,
+          "write_brain_geometry_normalized_nifti": true,
+          "emit_brain_geometry_dicom_series": true
         }
       ]
     }

@@ -267,3 +267,93 @@ msgstr "Heimdallr Vertebral Fracture Screen"
 
 msgid "vertebral_fracture.overlay.derivation_description"
 msgstr "Sagittal thoracolumbar vertebral fracture screen with burned-in panels ({vertebrae})"
+
+msgid "head.volume_table.title"
+msgstr "Brain Structure Volumes"
+
+msgid "head.volume_table.structure"
+msgstr "Structure"
+
+msgid "head.volume_table.color"
+msgstr "Color"
+
+msgid "head.volume_table.volume_cm3"
+msgstr "Volume (cm³)"
+
+msgid "head.volume_table.series_description"
+msgstr "Heimdallr Brain Structure Volumes"
+
+msgid "head.volume_table.derivation_description"
+msgstr "Burned-in table with brain and brain-structure segmentation volumes"
+
+msgid "head.volume.brain_total"
+msgstr "Brain total"
+
+msgid "head.structures_overlay.title"
+msgstr "Brain structures 3 mm"
+
+msgid "head.structures_overlay.more"
+msgstr "Additional structures shown by color overlay"
+
+msgid "head.structures_overlay.series_description"
+msgstr "Heimdallr Brain Structures Overlay 3 mm"
+
+msgid "head.structures_overlay.derivation_description"
+msgstr "3 mm axial burned-in series with TotalSegmentator brain-structure overlays"
+
+msgid "head.bleed_overlay.title"
+msgstr "Cerebral bleed candidate"
+
+msgid "head.bleed_overlay.series_description"
+msgstr "Heimdallr Cerebral Bleed Overlay 5 mm"
+
+msgid "head.bleed_overlay.derivation_description"
+msgstr "5 mm normalized axial burned-in series restricted to positive cerebral-bleed mask slabs plus adjacent slabs"
+
+msgid "head.structures.brainstem"
+msgstr "Brainstem"
+
+msgid "head.structures.subarachnoid_space"
+msgstr "Subarachnoid space"
+
+msgid "head.structures.venous_sinuses"
+msgstr "Venous sinuses"
+
+msgid "head.structures.septum_pellucidum"
+msgstr "Septum pellucidum"
+
+msgid "head.structures.cerebellum"
+msgstr "Cerebellum"
+
+msgid "head.structures.caudate_nucleus"
+msgstr "Caudate nucleus"
+
+msgid "head.structures.lentiform_nucleus"
+msgstr "Lentiform nucleus"
+
+msgid "head.structures.insular_cortex"
+msgstr "Insular cortex"
+
+msgid "head.structures.internal_capsule"
+msgstr "Internal capsule"
+
+msgid "head.structures.ventricle"
+msgstr "Ventricle"
+
+msgid "head.structures.central_sulcus"
+msgstr "Central sulcus"
+
+msgid "head.structures.frontal_lobe"
+msgstr "Frontal lobe"
+
+msgid "head.structures.parietal_lobe"
+msgstr "Parietal lobe"
+
+msgid "head.structures.occipital_lobe"
+msgstr "Occipital lobe"
+
+msgid "head.structures.temporal_lobe"
+msgstr "Temporal lobe"
+
+msgid "head.structures.thalamus"
+msgstr "Thalamus"

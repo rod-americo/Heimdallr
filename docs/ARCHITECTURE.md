@@ -51,7 +51,7 @@ External outputs:
 
 Critical dependencies:
 
-- Python 3.12 single `.venv`.
+- Python 3.14 single `.venv`.
 - `dcm2niix` and optional `dcmcjpeg` binaries.
 - `python-gdcm`/`dicom2nifti` fallback path.
 - TotalSegmentator runtime, license when task requires it, and CPU/GPU capacity.
@@ -123,6 +123,7 @@ then uses measured DICOM coverage and z-spacing when available to prefer
 maximum coverage before thinner reconstructions.
 - metrics jobs under `heimdallr/metrics/jobs/`.
 - analysis helpers under `heimdallr/metrics/analysis/`.
+- head CT segmentation and normalization helpers under `heimdallr/metrics/head/`.
 - patient-name presentation helpers under `heimdallr/shared/patient_names.py`.
 
 Future extraction should be behavior-driven and tested, not directory-first.
@@ -212,6 +213,7 @@ Configuration sources:
   - `config/presentation.json`
   - `config/space_manager.json`
   - `config/resource_monitor.json`
+  - `config/host_stack/*.json`
 
 `.env` files and `python-dotenv` are not part of the architecture.
 
