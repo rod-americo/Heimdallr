@@ -17,7 +17,7 @@ class TestPreparePatientNames(unittest.TestCase):
 
         clinical_name = generate_clinical_name(normalized, "20230331", "9256422")
 
-        self.assertEqual(clinical_name, "JacintaGC_20230331_9256422")
+        self.assertEqual(clinical_name, "9256422_JacintaGC")
 
 
 if __name__ == "__main__":

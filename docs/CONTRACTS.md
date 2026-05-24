@@ -45,7 +45,7 @@ Heimdallr transforms incoming radiological imaging studies into traceable runtim
 | Concept | Canonical field | Notes |
 | --- | --- | --- |
 | DICOM study | `StudyInstanceUID` | Primary DICOM grouping key; also primary key in `dicom_metadata`. |
-| Heimdallr case | `case_id` / `ClinicalName` | Filesystem-safe operational identifier generated during prepare. Do not assume it equals accession or study UID. |
+| Heimdallr case | `case_id` / `ClinicalName` | Filesystem-safe operational identifier generated during prepare. New cases use `AccessionNumber_NameInitials`; historical cases may use older naming. Do not assume it equals study UID. |
 | External submitted job | `job_id` | Generated for `/jobs` submissions and used by integration delivery. |
 | External caller case | `client_case_id` | Caller-owned identifier echoed back in final delivery. |
 | Series selected for segmentation | `SeriesInstanceUID` plus slice count and geometry summary | Used for selection audit and reuse decisions. Geometry fields may include measured `CoverageMm`, `ZSpacingMm`, `SliceThicknessMm`, and selection thresholds when available. |

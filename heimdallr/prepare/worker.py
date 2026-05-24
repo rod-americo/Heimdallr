@@ -317,8 +317,8 @@ def build_reference_dicom_context(ds):
 
 def generate_clinical_name(patient_name, study_date_str, accession_number):
     """
-    Generates ClinicalFileName: [FirstName][Initials]_[YYYYMMDD]_[AccessionNumber]
-    Example: RodrigoACS_20260131_5531196
+    Generates ClinicalFileName: [AccessionNumber]_[FirstName][Initials].
+    Example: 5531196_RodrigoACS
     """
     if not patient_name or patient_name == "Unknown": return "Unknown"
     
@@ -340,17 +340,13 @@ def generate_clinical_name(patient_name, study_date_str, accession_number):
     # Initials: First char of each remaining part
     final_initials = "".join([p[0] for p in kept_rest])
     
-    # Date
-    if not study_date_str or len(study_date_str) < 8:
-        study_date_str = "00000000"
-
     # Accession
     acc = str(accession_number).strip()
     if not acc: acc = "000000"
     # Remove non-alphanumeric from accession just to be safe
     acc = re.sub(r'[^a-zA-Z0-9]', '', acc)
         
-    return f"{final_first}{final_initials}_{study_date_str}_{acc}"
+    return f"{acc}_{final_first}{final_initials}"
 
 def init_and_insert_db(metadata):
     """
