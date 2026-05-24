@@ -99,6 +99,40 @@ def persist_series_file(temp_path: Path, destination_path: Path) -> Path:
     shutil.move(str(temp_path), str(destination_path))
     return destination_path
 
+
+def persist_source_dicom_series(series_map: dict, destination_root: Path) -> dict[str, dict]:
+    """Persist scanned DICOM instances grouped by series in the case workspace."""
+    if destination_root.exists():
+        shutil.rmtree(destination_root)
+    destination_root.mkdir(parents=True, exist_ok=True)
+
+    persisted: dict[str, dict] = {}
+    for uid, series_data in sorted(
+        series_map.items(),
+        key=lambda item: (
+            str(item[1].get("SeriesNumber", "")),
+            str(item[0]),
+        ),
+    ):
+        storage_stem = series_storage_stem(
+            series_data.get("Modality", ""),
+            series_data.get("SeriesNumber", "0"),
+            series_data.get("SeriesDescriptionOriginal", ""),
+            uid,
+        )
+        series_dir = destination_root / storage_stem
+        series_dir.mkdir(parents=True, exist_ok=True)
+        copied = 0
+        for index, source_path in enumerate(series_data.get("files", []), start=1):
+            destination = series_dir / f"instance_{index:06d}.dcm"
+            shutil.copy2(source_path, destination)
+            copied += 1
+        persisted[uid] = {
+            "path": series_dir,
+            "count": copied,
+        }
+    return persisted
+
 def clean_filename(s):
     s = str(s).strip()
     return re.sub(r'[^a-zA-Z0-9_-]', '', s)
@@ -716,6 +750,15 @@ def split_series_by_image_count(series_map, min_images):
         eligible[uid] = series_data
     return eligible, discarded
 
+
+def _attach_source_dicom_info(series_info: dict, persisted_source_series: dict, uid: str, case_id: str) -> dict:
+    source_info = persisted_source_series.get(uid) or {}
+    source_path = source_info.get("path")
+    if source_path:
+        series_info["SourceDicomSeriesPath"] = str(source_path.relative_to(study_dir(case_id)))
+        series_info["SourceDicomInstanceCount"] = int(source_info.get("count") or 0)
+    return series_info
+
 def process_ct_series_concurrency(uid, s_data, case_output_dir, temp_dir):
     """
     Helper function to process a single CT series in a thread.
@@ -1074,7 +1117,8 @@ def process_zip(zip_path):
             print("Error: No valid DICOM series found.")
             # sys.exit(1) # Don't exit, let's see what happens
 
-        series_map, discarded_series = split_series_by_image_count(series_map, min_series_images)
+        detected_series_map = series_map
+        series_map, discarded_series = split_series_by_image_count(detected_series_map, min_series_images)
         stage_timings["scan_dicoms_seconds"] = round(time.perf_counter() - scan_started, 3)
         prepare_stats["min_series_images"] = min_series_images
         prepare_stats["total_series_detected"] = len(series_map) + len(discarded_series)
@@ -1158,6 +1202,18 @@ def process_zip(zip_path):
         if derived_series_dir.exists():
             shutil.rmtree(derived_series_dir)
         derived_series_dir.mkdir(parents=True, exist_ok=True)
+
+        source_dicom_series_dir = study_source_dir(case_id) / "dicom" / "series"
+        persist_source_started = time.perf_counter()
+        persisted_source_series = persist_source_dicom_series(detected_series_map, source_dicom_series_dir)
+        stage_timings["persist_source_dicoms_seconds"] = round(time.perf_counter() - persist_source_started, 3)
+        prepare_stats["source_dicom_series_preserved"] = len(persisted_source_series)
+        prepare_stats["source_dicom_instances_preserved"] = sum(
+            int(item.get("count") or 0) for item in persisted_source_series.values()
+        )
+        for discarded in discarded_series:
+            discarded_uid = str(discarded.get("SeriesInstanceUID", "") or "")
+            _attach_source_dicom_info(discarded, persisted_source_series, discarded_uid, case_id)
         
         id_data = {
             "PatientName": global_meta["PatientName"],
@@ -1277,6 +1333,7 @@ def process_zip(zip_path):
                     "ConvertMethod": conversion["method"],
                     "DerivedNiftiPath": str(nii_path.relative_to(derived_dir)),
                 }
+                _attach_source_dicom_info(series_info, persisted_source_series, candidate["uid"], case_id)
                 series_info.update(compute_series_geometry_summary(s_data))
                 available_series.append(series_info)
                 candidate["path"] = nii_path
@@ -1330,7 +1387,7 @@ def process_zip(zip_path):
                             phase_data = json.load(phase_file)
                     except Exception:
                         phase_data = {}
-                available_series.append({
+                series_info = {
                     "SeriesInstanceUID": candidate["uid"],
                     "SeriesNumber": candidate["series_number"],
                     "Modality": candidate["modality"],
@@ -1344,7 +1401,9 @@ def process_zip(zip_path):
                     "DerivedNiftiPath": str(candidate["path"].relative_to(derived_dir)),
                     "PhaseJsonPath": str(phase_json_path.relative_to(derived_dir)) if phase_json_path and phase_json_path.exists() else None,
                     **candidate.get("geometry_summary", {}),
-                })
+                }
+                _attach_source_dicom_info(series_info, persisted_source_series, candidate["uid"], case_id)
+                available_series.append(series_info)
             print(f"  Preserved CT series: {len(candidates)}")
             
             # --- Update full metadata from a representative CT instance ---

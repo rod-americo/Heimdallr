@@ -274,3 +274,44 @@ authentication is not implemented.
 - Let feeders query `database/dicom.db` directly over SSH.
 - Encode capacity decisions into `/jobs` admission without first exposing a
 read-only operational signal.
+
+---
+
+### 2026-05-24 - Preserve prepared source DICOM series in case workspaces
+
+**Context**
+
+The upload ZIP is a transport artifact. For later reprocessing, model
+comparison, or auditing series selection, the useful persisted input is the
+scanned DICOM series set that prepare already materializes before conversion.
+Keeping only the canonical NIfTI is sufficient to reproduce the selected volume,
+but not enough to revisit series choice, phase, reconstruction kernel, or DICOM
+metadata.
+
+**Decision**
+
+During prepare, persist scanned DICOM instances grouped by series under
+`runtime/studies/<case_id>/source/dicom/series/`. Keep deleting the upload ZIP
+after successful prepare. Let `space_manager` reclaim the complete case
+workspace, including source DICOM, derived NIfTI, segmentation, metrics, and
+logs, when disk usage crosses the host-local threshold.
+
+**Impact**
+
+- Later operators can reprocess from the original prepared DICOM series without
+needing the transport ZIP.
+- `AvailableSeries` and `DiscardedSeries` can point to the retained source
+DICOM series for audit.
+- Runtime storage per case increases until the case workspace is purged.
+
+**Tradeoff**
+
+- Disk pressure will rise faster on busy hosts.
+- The existing threshold-based `space_manager` remains the retention boundary,
+so this is not indefinite archival.
+
+**Alternatives rejected**
+
+- Keep only the canonical NIfTI.
+- Retain the original upload ZIP as the reprocessing artifact.
+- Add a separate long-term archive outside the case workspace in this change.

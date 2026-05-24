@@ -98,6 +98,8 @@ Runtime state:
 - DICOM intake staging: `runtime/intake/dicom/`
 - queue filesystem state: `runtime/queue/`
 - study outputs: `runtime/studies/<case_id>/`
+- prepared source DICOM series:
+  `runtime/studies/<case_id>/source/dicom/series/<series-stem>/`
 - SQLite database: `database/dicom.db`
 - static dashboard assets: `static/`
 
@@ -279,6 +281,11 @@ Primary state:
 - `runtime/studies/<case_id>/`
 - host-local config files under `config/`
 
+Prepared case workspaces include source DICOM instances grouped by series under
+`source/dicom/series/`, derived NIfTI files, segmentation masks, metrics,
+generated artifacts, logs, and metadata. The upload ZIP is deleted after prepare
+and is not the retained reprocessing source.
+
 Backup example:
 
 ```bash sqlite3 database/dicom.db ".backup 'database/dicom_backup_$(date +%Y%m%d_%H%M%S).db'"
@@ -294,8 +301,9 @@ sqlite3 database/dicom.db "PRAGMA integrity_check;"
 Safe cleanup candidates:
 
 - old failed upload ZIPs after investigation
-- generated runtime artifacts only when `space_manager` policy or an operator
-decision says they are no longer needed
+- generated runtime artifacts and prepared source DICOM series only when
+`space_manager` policy or an operator decision says the whole case workspace is
+no longer needed
 - local caches outside tracked source
 
 Never remove without explicit intent:

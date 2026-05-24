@@ -75,6 +75,37 @@ class TestPrepareSpoolOrder(unittest.TestCase):
         self.assertEqual(summary["GeometryConfidence"], "estimated")
         self.assertIn("missing_image_position_patient", summary["GeometryWarnings"])
 
+    def test_persist_source_dicom_series_groups_instances_by_series(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            source_a = root / "input_a"
+            source_b = root / "input_b"
+            source_a.mkdir()
+            source_b.mkdir()
+            first = source_a / "image"
+            second = source_b / "image"
+            first.write_bytes(b"first")
+            second.write_bytes(b"second")
+            destination = root / "study" / "source" / "dicom" / "series"
+
+            persisted = worker.persist_source_dicom_series(
+                {
+                    "1.2.3": {
+                        "SeriesNumber": "4",
+                        "Modality": "CT",
+                        "SeriesDescriptionOriginal": "Body 2.0",
+                        "files": [first, second],
+                    }
+                },
+                destination,
+            )
+
+            series_dir = persisted["1.2.3"]["path"]
+            self.assertEqual(persisted["1.2.3"]["count"], 2)
+            self.assertEqual((series_dir / "instance_000001.dcm").read_bytes(), b"first")
+            self.assertEqual((series_dir / "instance_000002.dcm").read_bytes(), b"second")
+            self.assertTrue(str(series_dir).startswith(str(destination)))
+
     def test_iter_claimable_uploads_prioritizes_from_prepare_then_external_in_fifo(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             upload_root = Path(tmpdir)

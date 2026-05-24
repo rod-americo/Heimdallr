@@ -84,7 +84,7 @@ Each resident service has its own module entrypoint:
 handoff, duplicate handoff metadata.
 - `heimdallr/prepare/worker.py`: upload spool claiming, DICOM scan, series
 geometry summary, conversion, metadata persistence, `id.json` creation,
-dispatch enqueue, segmentation enqueue.
+source DICOM series preservation, dispatch enqueue, segmentation enqueue.
 - `heimdallr/segmentation/worker.py`: queue claiming, coverage/thickness-aware
 selected-series reuse, TotalSegmentator tasks, canonical NIfTI materialization,
 metrics enqueue.
@@ -131,9 +131,11 @@ Future extraction should be behavior-driven and tested, not directory-first.
 
 1. A study arrives through DICOM C-STORE, `/upload`, or `/jobs`.
 2. Intake or the control plane writes a ZIP into the upload spool.
-3. `prepare` claims a stable ZIP, extracts it, scans DICOM metadata, records
+3. `prepare` claims a stable ZIP, extracts it, scans DICOM metadata, persists
+the scanned instances grouped by DICOM series inside the case workspace, records
 candidate-series geometry, converts DICOM to NIfTI, writes study metadata, and
-enqueues segmentation.
+enqueues segmentation. The upload ZIP remains a spool transport artifact and is
+deleted after successful prepare.
 4. `segmentation` claims the case, resolves the active segmentation profile,
 deep-merges any external per-job series-selection policy, selects the target
 series, narrows TotalSegmentator tasks when an external submission requested
@@ -179,6 +181,8 @@ facing.
 `database/schema.sql`.
 - runtime state: `runtime/` (ignored by Git).
 - case workspace: `runtime/studies/<case_id>/`.
+- source DICOM series for a prepared case:
+  `runtime/studies/<case_id>/source/dicom/series/<series-stem>/`.
 - upload spool: `runtime/intake/uploads/`.
 - queue filesystem paths: `runtime/queue/pending/`, `runtime/queue/active/`,
 `runtime/queue/failed/`.
