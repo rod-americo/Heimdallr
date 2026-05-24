@@ -159,6 +159,32 @@ class TestPrepareSpoolOrder(unittest.TestCase):
                 [f"{legacy_ready.name}{CLAIM_SUFFIX}"],
             )
 
+    def test_pipeline_upload_zip_detection_only_matches_upload_spool(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            runtime = Path(tmpdir)
+            upload_root = runtime / "uploads"
+            from_prepare_dir = upload_root / "from_prepare"
+            external_dir = upload_root / "external"
+            test_dataset_dir = runtime / "test_datasets" / "abdomen_complete"
+            nested_external_dir = external_dir / "nested"
+            for path in (upload_root, from_prepare_dir, external_dir, test_dataset_dir, nested_external_dir):
+                path.mkdir(parents=True)
+
+            from_prepare_zip = from_prepare_dir / "study_a.zip"
+            external_claimed_zip = external_dir / f"study_b.zip{CLAIM_SUFFIX}"
+            legacy_zip = upload_root / "study_c.zip"
+            test_dataset_zip = test_dataset_dir / "study_d.zip"
+            nested_external_zip = nested_external_dir / "study_e.zip"
+
+            with patch.object(worker.settings, "UPLOAD_DIR", upload_root):
+                with patch.object(worker.settings, "UPLOAD_FROM_PREPARE_DIR", from_prepare_dir):
+                    with patch.object(worker.settings, "UPLOAD_EXTERNAL_DIR", external_dir):
+                        self.assertTrue(worker._is_pipeline_upload_zip(from_prepare_zip))
+                        self.assertTrue(worker._is_pipeline_upload_zip(external_claimed_zip))
+                        self.assertTrue(worker._is_pipeline_upload_zip(legacy_zip))
+                        self.assertFalse(worker._is_pipeline_upload_zip(test_dataset_zip))
+                        self.assertFalse(worker._is_pipeline_upload_zip(nested_external_zip))
+
     def test_process_spooled_zip_marks_manifest_error_on_failure(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             runtime = Path(tmpdir)

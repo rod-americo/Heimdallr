@@ -361,6 +361,34 @@ TOTALSEG_GET_PHASE_BIN = os.getenv(
     "HEIMDALLR_TOTALSEG_GET_PHASE_BIN",
     str(TOTALSEG_BIN_DIR / "totalseg_get_phase"),
 )
+
+
+def _default_totalseg_get_phase_device() -> str | None:
+    """Choose a conservative phase-detector device when the host does not."""
+    if platform.system().lower() == "darwin":
+        return "cpu"
+    return None
+
+
+TOTALSEG_GET_PHASE_DEVICE = os.getenv(
+    "HEIMDALLR_TOTALSEG_GET_PHASE_DEVICE",
+    _default_totalseg_get_phase_device() or "",
+).strip()
+TOTALSEG_GET_PHASE_TIMEOUT_SECONDS = int(
+    os.getenv("HEIMDALLR_TOTALSEG_GET_PHASE_TIMEOUT_SECONDS", "120")
+)
+TOTALSEG_GET_PHASE_THREAD_LIMIT = int(
+    os.getenv(
+        "HEIMDALLR_TOTALSEG_GET_PHASE_THREAD_LIMIT",
+        "1" if platform.system().lower() == "darwin" else "0",
+    )
+)
+TOTALSEG_GET_PHASE_MAX_PARALLEL = int(
+    os.getenv(
+        "HEIMDALLR_TOTALSEG_GET_PHASE_MAX_PARALLEL",
+        "2" if platform.system().lower() == "darwin" else "0",
+    )
+)
 TOTALSEGMENTATOR_BIN = os.getenv(
     "HEIMDALLR_TOTALSEGMENTATOR_BIN",
     str(TOTALSEG_BIN_DIR / "TotalSegmentator"),

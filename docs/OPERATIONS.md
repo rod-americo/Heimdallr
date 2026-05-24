@@ -90,6 +90,10 @@ Critical environment variables:
 - `HEIMDALLR_RESOURCE_MONITOR_CONFIG`
 - `HEIMDALLR_DCM2NIIX_BIN`
 - `HEIMDALLR_DCMCJPEG_BIN`
+- `HEIMDALLR_TOTALSEG_GET_PHASE_DEVICE`
+- `HEIMDALLR_TOTALSEG_GET_PHASE_TIMEOUT_SECONDS`
+- `HEIMDALLR_TOTALSEG_GET_PHASE_THREAD_LIMIT`
+- `HEIMDALLR_TOTALSEG_GET_PHASE_MAX_PARALLEL`
 - `TOTALSEGMENTATOR_LICENSE`
 
 Runtime state:
@@ -120,6 +124,7 @@ Ignored host-local config:
 - `config/presentation.json`
 - `config/space_manager.json`
 - `config/resource_monitor.json`
+- `config/host_stack/*.json`
 
 When `resource_monitor` samples services installed as user-scoped systemd units, prefix the unit name with `user:` in `config/resource_monitor.json`, for example `user:heimdallr-segmentation.service`. Unprefixed names are read from the system systemd manager.
 
@@ -157,6 +162,29 @@ for host-local fixtures:
 ```bash
 runtime/test_datasets/
 ```
+
+Manual prepare runs against ZIP files outside the upload spool preserve the
+input archive after processing. ZIPs claimed from
+`runtime/intake/uploads/from_prepare/`, `runtime/intake/uploads/external/`, or
+the legacy `runtime/intake/uploads/` root remain pipeline transport artifacts
+and are deleted after successful prepare.
+
+`prepare` runs `totalseg_get_phase` once per converted CT series. Set
+`HEIMDALLR_TOTALSEG_GET_PHASE_DEVICE` explicitly per host:
+
+- `thor`: `gpu`
+- Linux CPU hosts: `cpu`
+- local macOS/MPS host: `cpu`
+
+Do not use `mps` for `totalseg_get_phase` on the local macOS stack until that
+upstream path is validated; it has crashed in local testing. On macOS, keep
+`HEIMDALLR_TOTALSEG_GET_PHASE_THREAD_LIMIT=1` so the CPU path does not overrun
+PyTorch/nnU-Net worker threads. Use
+`HEIMDALLR_TOTALSEG_GET_PHASE_MAX_PARALLEL=2` on the local Apple Silicon stack
+to use multiple CPU cores through independent phase-detector subprocesses
+rather than larger per-process thread pools. When unset, Heimdallr defaults the
+phase device to `cpu` on macOS, applies thread limit `1`, and allows two
+concurrent phase subprocesses.
 
 On `thor`, the current local smoke fixture is:
 

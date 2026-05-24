@@ -73,6 +73,93 @@ class TestPrepareConversion(unittest.TestCase):
             self.assertTrue(output.exists())
             import_mock.assert_called_once_with("dicom2nifti")
 
+    def test_totalseg_phase_uses_configured_device_and_timeout(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            temp_dir = Path(tmpdir)
+            source = temp_dir / "series.nii.gz"
+            output = temp_dir / "series.phase.json"
+            source.write_bytes(b"nifti")
+            output.write_text('{"phase": "native"}')
+
+            with patch.object(worker.settings, "TOTALSEG_GET_PHASE_DEVICE", "mps"):
+                with patch.object(worker.settings, "TOTALSEG_GET_PHASE_TIMEOUT_SECONDS", 17):
+                    with patch.object(worker.settings, "TOTALSEG_GET_PHASE_THREAD_LIMIT", 1):
+                        with patch.object(
+                            worker.subprocess,
+                            "run",
+                            return_value=subprocess.CompletedProcess(
+                                args=["totalseg_get_phase"],
+                                returncode=0,
+                                stdout=None,
+                                stderr="",
+                            ),
+                        ) as run_mock:
+                            result = worker.run_totalseg_phase(source, output)
+
+            self.assertEqual(result["phase"], "native")
+            _, kwargs = run_mock.call_args
+            self.assertEqual(kwargs["timeout"], 17)
+            self.assertIn("--device", run_mock.call_args.args[0])
+            self.assertIn("mps", run_mock.call_args.args[0])
+            self.assertNotIn("OMP_NUM_THREADS", kwargs["env"])
+
+    def test_totalseg_phase_limits_threads_for_cpu_device(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            temp_dir = Path(tmpdir)
+            source = temp_dir / "series.nii.gz"
+            output = temp_dir / "series.phase.json"
+            source.write_bytes(b"nifti")
+            output.write_text('{"phase": "native"}')
+
+            with patch.object(worker.settings, "TOTALSEG_GET_PHASE_DEVICE", "cpu"):
+                with patch.object(worker.settings, "TOTALSEG_GET_PHASE_TIMEOUT_SECONDS", 17):
+                    with patch.object(worker.settings, "TOTALSEG_GET_PHASE_THREAD_LIMIT", 1):
+                        with patch.object(
+                            worker.subprocess,
+                            "run",
+                            return_value=subprocess.CompletedProcess(
+                                args=["totalseg_get_phase"],
+                                returncode=0,
+                                stdout=None,
+                                stderr="",
+                            ),
+                        ) as run_mock:
+                            result = worker.run_totalseg_phase(source, output)
+
+            self.assertEqual(result["phase"], "native")
+            _, kwargs = run_mock.call_args
+            self.assertEqual(kwargs["timeout"], 17)
+            self.assertIn("--device", run_mock.call_args.args[0])
+            self.assertIn("cpu", run_mock.call_args.args[0])
+            self.assertEqual(kwargs["env"]["OMP_NUM_THREADS"], "1")
+            self.assertEqual(kwargs["env"]["MKL_NUM_THREADS"], "1")
+            self.assertEqual(kwargs["env"]["OPENBLAS_NUM_THREADS"], "1")
+            self.assertEqual(kwargs["env"]["VECLIB_MAXIMUM_THREADS"], "1")
+            self.assertEqual(kwargs["env"]["NUMEXPR_NUM_THREADS"], "1")
+
+    def test_totalseg_phase_timeout_returns_unknown_without_blocking_prepare(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            temp_dir = Path(tmpdir)
+            source = temp_dir / "series.nii.gz"
+            output = temp_dir / "series.phase.json"
+            source.write_bytes(b"nifti")
+
+            with patch.object(worker.settings, "TOTALSEG_GET_PHASE_TIMEOUT_SECONDS", 1):
+                with patch.object(
+                    worker.subprocess,
+                    "run",
+                    side_effect=subprocess.TimeoutExpired(["totalseg_get_phase"], 1),
+                ):
+                    with patch("builtins.print") as print_mock:
+                        result = worker.run_totalseg_phase(source, output)
+
+            self.assertIsNone(result)
+            rendered = " ".join(
+                " ".join(str(arg) for arg in call.args)
+                for call in print_mock.call_args_list
+            )
+            self.assertIn("Phase detection timed out", rendered)
+
 
 if __name__ == "__main__":
     unittest.main()

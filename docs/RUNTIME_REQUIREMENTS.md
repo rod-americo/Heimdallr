@@ -140,6 +140,13 @@ scope
 - Do not update pins from a working host venv without confirming code impact.
 - CUDA-related packages are Linux x86_64 specific and are guarded by environment
 markers in `requirements.txt`.
+- Keep `totalseg_get_phase` device and thread policy explicit per host. The
+  local macOS stack should use `HEIMDALLR_TOTALSEG_GET_PHASE_DEVICE=cpu` with
+  `HEIMDALLR_TOTALSEG_GET_PHASE_THREAD_LIMIT=1` and
+  `HEIMDALLR_TOTALSEG_GET_PHASE_MAX_PARALLEL=2`; `mps` crashed during local
+  phase-detector validation, while CPU completed when worker thread counts were
+  bounded. On Apple Silicon, prefer parallel one-thread subprocesses over larger
+  per-process thread pools. CUDA hosts such as `thor` should use `gpu`.
 - TUI support requires `textual==8.1.1` in the selected venv.
 - Default presentation locale is `en_US`; use `pt_BR` only through an explicit
 host-local override or targeted i18n tests.

@@ -25,6 +25,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import zipfile
 from pathlib import Path
@@ -71,6 +72,9 @@ TOTALSEG_GET_PHASE_BIN = settings.TOTALSEG_GET_PHASE_BIN
 INTAKE_MANIFEST_NAME = "_heimdallr_intake.json"
 LOCAL_TZ = ZoneInfo(settings.TIMEZONE)
 JPEG_LOSSLESS_TRANSFER_SYNTAXES = {str(JPEGLossless), str(JPEGLosslessSV1)}
+_TOTALSEG_PHASE_SEMAPHORE = threading.BoundedSemaphore(
+    max(1, int(getattr(settings, "TOTALSEG_GET_PHASE_MAX_PARALLEL", 0) or 1))
+)
 
 path_entries = [str(settings.TOTALSEG_BIN_DIR), str(Path(sys.executable).parent)]
 os.environ["PATH"] = os.pathsep.join(path_entries + [os.environ["PATH"]])
@@ -412,6 +416,39 @@ def _read_study_json_if_matching(path: Path, study_uid: str) -> dict:
     if str(payload.get("StudyInstanceUID", "") or "") != str(study_uid or ""):
         return {}
     return payload
+
+
+def _pipeline_upload_dirs() -> tuple[Path, ...]:
+    dirs = []
+    for value in (
+        getattr(settings, "UPLOAD_FROM_PREPARE_DIR", None),
+        getattr(settings, "UPLOAD_EXTERNAL_DIR", None),
+        getattr(settings, "UPLOAD_DIR", None),
+    ):
+        if value is None:
+            continue
+        path = Path(value)
+        if path not in dirs:
+            dirs.append(path)
+    return tuple(dirs)
+
+
+def _is_pipeline_upload_zip(zip_path: Path) -> bool:
+    """Return true only for ZIPs claimed from Heimdallr's upload spool."""
+    base_path = unclaim_path(Path(zip_path))
+    try:
+        base_parent = base_path.resolve(strict=False).parent
+    except Exception:
+        base_parent = base_path.absolute().parent
+
+    for upload_dir in _pipeline_upload_dirs():
+        try:
+            if base_parent == Path(upload_dir).resolve(strict=False):
+                return True
+        except Exception:
+            if base_parent == Path(upload_dir).absolute():
+                return True
+    return False
 
 
 def _delete_spooled_zip(zip_path: Path) -> None:
@@ -827,6 +864,24 @@ def process_ct_series_concurrency(uid, s_data, case_output_dir, temp_dir):
         print(f"  [Error] Failed to process series {s_data.get('SeriesNumber')}: {e}")
         return None
 
+
+def _totalseg_phase_subprocess_env() -> dict[str, str]:
+    env = os.environ.copy()
+    device = str(settings.TOTALSEG_GET_PHASE_DEVICE or "").strip().lower()
+    thread_limit = int(getattr(settings, "TOTALSEG_GET_PHASE_THREAD_LIMIT", 0) or 0)
+    if device == "cpu" and thread_limit > 0:
+        limit = str(thread_limit)
+        for name in (
+            "OMP_NUM_THREADS",
+            "MKL_NUM_THREADS",
+            "OPENBLAS_NUM_THREADS",
+            "VECLIB_MAXIMUM_THREADS",
+            "NUMEXPR_NUM_THREADS",
+        ):
+            env[name] = limit
+    return env
+
+
 def run_totalseg_phase(input_nifti, output_json):
     """Runs totalseg_get_phase to detect CT contrast phase."""
     try:
@@ -836,10 +891,26 @@ def run_totalseg_phase(input_nifti, output_json):
             "-o", str(output_json),
             "-q"
         ]
-        result = subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+        if settings.TOTALSEG_GET_PHASE_DEVICE:
+            cmd.extend(["--device", settings.TOTALSEG_GET_PHASE_DEVICE])
+        with _TOTALSEG_PHASE_SEMAPHORE:
+            result = subprocess.run(
+                cmd,
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=settings.TOTALSEG_GET_PHASE_TIMEOUT_SECONDS,
+                env=_totalseg_phase_subprocess_env(),
+            )
         if output_json.exists():
             with open(output_json, 'r') as f:
                 return json.load(f)
+    except subprocess.TimeoutExpired:
+        print(
+            f"  Warning: Phase detection timed out for {input_nifti.name} "
+            f"after {settings.TOTALSEG_GET_PHASE_TIMEOUT_SECONDS}s"
+        )
     except subprocess.CalledProcessError as e:
         stderr = (e.stderr or "").strip()
         if stderr:
@@ -1175,7 +1246,10 @@ def process_zip(zip_path):
                     f"[Prepare] Duplicate manifest suppressed for {case_id}; "
                     "existing prepared study already available"
                 )
-                _delete_spooled_zip(zip_path)
+                if _is_pipeline_upload_zip(zip_path):
+                    _delete_spooled_zip(zip_path)
+                else:
+                    print(f"  Preserved non-spool input ZIP: {zip_path}")
                 return
             conn = db_connect()
             try:
@@ -1556,7 +1630,10 @@ def process_zip(zip_path):
              raise PrepareError("No series were successfully converted.")
 
     # Clean up input ZIP
-    _delete_spooled_zip(zip_path)
+    if _is_pipeline_upload_zip(zip_path):
+        _delete_spooled_zip(zip_path)
+    else:
+        print(f"  Preserved non-spool input ZIP: {zip_path}")
 
 
 def process_spooled_zip(zip_path: Path) -> bool:

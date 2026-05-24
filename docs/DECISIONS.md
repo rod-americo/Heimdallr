@@ -315,3 +315,48 @@ so this is not indefinite archival.
 - Keep only the canonical NIfTI.
 - Retain the original upload ZIP as the reprocessing artifact.
 - Add a separate long-term archive outside the case workspace in this change.
+
+
+---
+
+### 2026-05-24 - Make CT phase-detector device policy explicit
+
+**Context**
+
+`totalseg_get_phase` defaults to `gpu`, then falls back inside TotalSegmentator
+when CUDA is unavailable. On the local macOS/MPS host, the `mps` phase path
+crashed and the implicit CPU fallback could stall under default PyTorch/nnU-Net
+threading. The same detector completed successfully on `thor` with CUDA and on
+local macOS CPU when CPU thread pools were bounded.
+
+**Decision**
+
+Keep `totalseg_get_phase` device selection explicit through
+`HEIMDALLR_TOTALSEG_GET_PHASE_DEVICE`. Heimdallr defaults the phase detector to
+`cpu` on macOS when the host does not set a value, and applies
+`HEIMDALLR_TOTALSEG_GET_PHASE_THREAD_LIMIT=1` by default for that CPU subprocess.
+On Apple Silicon, Heimdallr uses bounded process-level parallelism through
+`HEIMDALLR_TOTALSEG_GET_PHASE_MAX_PARALLEL=2` instead of increasing the internal
+thread pools of each phase-detector process. CUDA hosts should set the device to
+`gpu`; Linux CPU hosts should set it to `cpu`.
+
+**Impact**
+
+- Avoids relying on the upstream `gpu` default for hosts without CUDA.
+- Keeps local macOS prepare runs from hanging in the phase detector.
+- Lets multi-phase CT studies use multiple CPU cores through independent
+  one-thread detector subprocesses.
+- Preserves fast CUDA behavior on `thor` when the host environment selects
+  `gpu`.
+
+**Tradeoff**
+
+- Host supervision must carry one more explicit TotalSegmentator setting for
+  predictable performance.
+- macOS phase detection runs on CPU even when MPS is available until the MPS path
+  is validated upstream or in a controlled local smoke.
+
+**Alternatives rejected**
+
+- Keep relying on `totalseg_get_phase` default device fallback.
+- Use `mps` for phase detection on macOS after a local segfault.
