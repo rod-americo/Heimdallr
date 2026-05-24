@@ -11,6 +11,7 @@ import numpy as np
 from pydicom.dataset import FileDataset, FileMetaDataset
 from pydicom.uid import (
     CTImageStorage,
+    DeflatedExplicitVRLittleEndian,
     ExplicitVRLittleEndian,
     JPEGLSLossless,
     PYDICOM_IMPLEMENTATION_UID,
@@ -21,6 +22,7 @@ from heimdallr.metrics.jobs._dicom_secondary_capture import (
     _copy_text_attr,
     metadata_value,
     parse_optional_float,
+    resolve_secondary_capture_transfer_syntax,
     resolve_study_uid,
 )
 from heimdallr.shared import settings
@@ -140,6 +142,7 @@ def create_derived_ct_series_from_nifti(
     source_series_date, source_series_time = _source_series_datetime(case_metadata)
     output_paths: list[Path] = []
     slice_count = int(data.shape[2])
+    transfer_syntax_uid = resolve_secondary_capture_transfer_syntax(transfer_syntax)
     preferred_slice_index = None
     if preferred_display_world_ras is not None:
         preferred_world = np.asarray(
@@ -220,7 +223,10 @@ def create_derived_ct_series_from_nifti(
         ds.WindowCenter = "40"
         ds.WindowWidth = "80"
         ds.PixelData = pixel.tobytes()
-        ds.compress(transfer_syntax)
+        if transfer_syntax_uid == DeflatedExplicitVRLittleEndian:
+            ds.file_meta.TransferSyntaxUID = DeflatedExplicitVRLittleEndian
+        elif transfer_syntax_uid != ExplicitVRLittleEndian:
+            ds.compress(transfer_syntax_uid)
         ds.save_as(str(output_path), write_like_original=False)
         output_paths.append(output_path)
 

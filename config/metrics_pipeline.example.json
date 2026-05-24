@@ -5,7 +5,7 @@
     "parallel_execution": "Profiles may set execution.max_parallel_jobs. Jobs may declare needs to wait for prerequisite job names while still allowing independent jobs to run in parallel.",
     "segmentation_requirements": "Jobs should declare requires_segmentation_tasks so external requested_metrics_modules can avoid unnecessary TotalSegmentator tasks.",
     "experimental_jobs": "Experimental metrics modules should live under heimdallr.metrics.jobs.tests or heimdallr.metrics.analysis and be enabled only via explicit jobs[].module overrides in host-local config.",
-    "secondary_capture_transfer_syntax": "Jobs that emit Secondary Capture DICOM may set secondary_capture_transfer_syntax to original, deflated, jpeg_ls_lossless, jpeg_2000_lossless, or rle_lossless."
+    "secondary_capture_transfer_syntax": "Jobs that emit Secondary Capture DICOM may set secondary_capture_transfer_syntax to original, deflated, jpeg_ls_lossless, jpeg_2000_lossless, or rle_lossless. Head derived CT DICOM may set derived_ct_transfer_syntax with the same values."
   },
   "default_profile": "ct_native_basic_metrics",
   "profiles": {
@@ -78,6 +78,7 @@
           "brain_geometry_normalized_in_plane_spacing_mm": null,
           "brain_geometry_normalized_spacing_mm": 1.0,
           "brain_geometry_slice_thickness_mm": 2.0,
+          "derived_ct_transfer_syntax": "jpeg_ls_lossless",
           "brain_geometry_crop_margin_mm": 25.0,
           "write_brain_geometry_normalized_nifti": true,
           "emit_brain_geometry_dicom_series": true
@@ -142,6 +143,7 @@
           "brain_geometry_normalized_in_plane_spacing_mm": null,
           "brain_geometry_normalized_spacing_mm": 1.0,
           "brain_geometry_slice_thickness_mm": 2.0,
+          "derived_ct_transfer_syntax": "jpeg_ls_lossless",
           "brain_geometry_crop_margin_mm": 25.0,
           "write_brain_geometry_normalized_nifti": true,
           "emit_brain_geometry_dicom_series": true

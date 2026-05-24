@@ -4,6 +4,7 @@
   "retry_backoff_seconds": 10,
   "connect_timeout_seconds": 15,
   "dimse_timeout_seconds": 30,
+  "worker_count": 10,
   "destinations": [
     {
       "name": "return_to_sender",

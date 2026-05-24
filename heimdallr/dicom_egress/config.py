@@ -8,6 +8,8 @@ from typing import Any
 
 from heimdallr.shared import settings
 
+DEFAULT_DICOM_EGRESS_WORKER_COUNT = 10
+
 
 def load_dicom_egress_config() -> dict[str, Any]:
     path = Path(settings.DICOM_EGRESS_CONFIG_PATH)
@@ -41,6 +43,10 @@ def dicom_egress_connect_timeout_seconds(config: dict[str, Any]) -> int:
 
 def dicom_egress_dimse_timeout_seconds(config: dict[str, Any]) -> int:
     return int(config.get("dimse_timeout_seconds", 30))
+
+
+def dicom_egress_worker_count(config: dict[str, Any]) -> int:
+    return max(1, int(config.get("worker_count", DEFAULT_DICOM_EGRESS_WORKER_COUNT)))
 
 
 def _destination_accepts_artifact(destination: dict[str, Any], artifact_type: str) -> bool:

@@ -4,10 +4,11 @@
 from __future__ import annotations
 
 import copy
+import concurrent.futures
 import shutil
 import subprocess
 import tempfile
-import time
+import threading
 from pathlib import Path
 
 import pydicom
@@ -20,6 +21,7 @@ from heimdallr.dicom_egress.config import (
     dicom_egress_local_ae_title,
     dicom_egress_retry_attempts,
     dicom_egress_retry_backoff_seconds,
+    dicom_egress_worker_count,
     load_dicom_egress_config,
 )
 from heimdallr.shared import settings, store
@@ -138,7 +140,13 @@ def _prepare_dataset_for_peer(
         return ds
 
     if not accepted_transfer_syntax.is_compressed:
-        return ds
+        prepared = copy.deepcopy(ds)
+        if current_transfer_syntax.is_compressed:
+            prepared.decompress(generate_instance_uid=False)
+        prepared.file_meta.TransferSyntaxUID = accepted_transfer_syntax
+        prepared.is_little_endian = accepted_transfer_syntax.is_little_endian
+        prepared.is_implicit_VR = accepted_transfer_syntax.is_implicit_VR
+        return prepared
 
     prepared = copy.deepcopy(ds)
     try:
@@ -230,71 +238,94 @@ def send_dicom_export(
         )
 
 
-def main() -> int:
-    print("Starting DICOM egress queue monitoring...")
-    ensure_dicom_egress_queue_table()
+def process_dicom_egress_queue_item(queue_item, *, worker_name: str = "worker") -> None:
+    (
+        queue_id,
+        case_id,
+        _study_uid,
+        artifact_path,
+        _artifact_type,
+        destination_name,
+        destination_host,
+        destination_port,
+        destination_called_aet,
+        attempts_before_claim,
+    ) = queue_item
 
+    print(
+        f"[DICOM Egress:{worker_name}] Claimed {case_id}: {artifact_path} -> "
+        f"{destination_name} ({destination_called_aet}@{destination_host}:{destination_port})"
+    )
     try:
-        while True:
-            try:
-                queue_item = claim_next_pending_dicom_egress_queue_item()
-                if not queue_item:
-                    time.sleep(settings.DICOM_EGRESS_SCAN_INTERVAL)
-                    continue
+        send_dicom_export(
+            case_id=case_id,
+            artifact_path=artifact_path,
+            destination_host=destination_host,
+            destination_port=int(destination_port),
+            destination_called_aet=destination_called_aet,
+        )
+        mark_dicom_egress_queue_item_done(queue_id)
+        print(
+            f"[DICOM Egress:{worker_name}] ✓ {case_id} -> {destination_name} "
+            f"({destination_called_aet}@{destination_host}:{destination_port})"
+        )
+    except Exception as exc:
+        config = load_dicom_egress_config()
+        retry_attempts = dicom_egress_retry_attempts(config)
+        retry_backoff_seconds = dicom_egress_retry_backoff_seconds(config)
+        claimed_attempt = int(attempts_before_claim) + 1
+        if claimed_attempt < max(retry_attempts, 1):
+            retry_dicom_egress_queue_item(
+                queue_id,
+                str(exc),
+                backoff_seconds=retry_backoff_seconds,
+            )
+            print(
+                f"[DICOM Egress:{worker_name}] Retry {claimed_attempt}/{retry_attempts} for "
+                f"{case_id} -> {destination_name}: {exc}"
+            )
+        else:
+            mark_dicom_egress_queue_item_error(queue_id, str(exc))
+            print(f"[DICOM Egress:{worker_name}] Error for {case_id} -> {destination_name}: {exc}")
 
-                (
-                    queue_id,
-                    case_id,
-                    _study_uid,
-                    artifact_path,
-                    _artifact_type,
-                    destination_name,
-                    destination_host,
-                    destination_port,
-                    destination_called_aet,
-                    attempts_before_claim,
-                ) = queue_item
 
-                print(
-                    f"[DICOM Egress] Claimed {case_id}: {artifact_path} -> "
-                    f"{destination_name} ({destination_called_aet}@{destination_host}:{destination_port})"
-                )
-                try:
-                    send_dicom_export(
-                        case_id=case_id,
-                        artifact_path=artifact_path,
-                        destination_host=destination_host,
-                        destination_port=int(destination_port),
-                        destination_called_aet=destination_called_aet,
-                    )
-                    mark_dicom_egress_queue_item_done(queue_id)
-                    print(
-                        f"[DICOM Egress] ✓ {case_id} -> {destination_name} "
-                        f"({destination_called_aet}@{destination_host}:{destination_port})"
-                    )
-                except Exception as exc:
-                    config = load_dicom_egress_config()
-                    retry_attempts = dicom_egress_retry_attempts(config)
-                    retry_backoff_seconds = dicom_egress_retry_backoff_seconds(config)
-                    claimed_attempt = int(attempts_before_claim) + 1
-                    if claimed_attempt < max(retry_attempts, 1):
-                        retry_dicom_egress_queue_item(
-                            queue_id,
-                            str(exc),
-                            backoff_seconds=retry_backoff_seconds,
-                        )
-                        print(
-                            f"[DICOM Egress] Retry {claimed_attempt}/{retry_attempts} for "
-                            f"{case_id} -> {destination_name}: {exc}"
-                        )
-                    else:
-                        mark_dicom_egress_queue_item_error(queue_id, str(exc))
-                        print(
-                            f"[DICOM Egress] Error for {case_id} -> {destination_name}: {exc}"
-                        )
-            except Exception as exc:
-                print(f"Error in DICOM egress main loop: {exc}")
-                time.sleep(settings.DICOM_EGRESS_SCAN_INTERVAL)
-    except KeyboardInterrupt:
-        print("\nStopping DICOM egress monitoring...")
-        return 0
+def run_dicom_egress_worker(worker_index: int, stop_event: threading.Event) -> None:
+    worker_name = f"worker-{worker_index}"
+    while not stop_event.is_set():
+        try:
+            queue_item = claim_next_pending_dicom_egress_queue_item()
+            if not queue_item:
+                stop_event.wait(settings.DICOM_EGRESS_SCAN_INTERVAL)
+                continue
+
+            process_dicom_egress_queue_item(queue_item, worker_name=worker_name)
+        except Exception as exc:
+            print(f"[DICOM Egress:{worker_name}] Main loop error: {exc}")
+            stop_event.wait(settings.DICOM_EGRESS_SCAN_INTERVAL)
+
+
+def main() -> int:
+    config = load_dicom_egress_config()
+    worker_count = dicom_egress_worker_count(config)
+    print(f"Starting DICOM egress queue monitoring with {worker_count} workers...")
+    ensure_dicom_egress_queue_table()
+    stop_event = threading.Event()
+
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=worker_count,
+        thread_name_prefix="dicom-egress",
+    ) as executor:
+        futures = [
+            executor.submit(run_dicom_egress_worker, worker_index, stop_event)
+            for worker_index in range(1, worker_count + 1)
+        ]
+        try:
+            while not stop_event.wait(1.0):
+                for future in futures:
+                    if future.done():
+                        stop_event.set()
+                        future.result()
+        except KeyboardInterrupt:
+            stop_event.set()
+            print("\nStopping DICOM egress monitoring...")
+            return 0

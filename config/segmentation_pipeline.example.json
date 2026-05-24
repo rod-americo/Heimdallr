@@ -17,6 +17,7 @@
           "enabled": true,
           "output_dir": "artifacts/total",
           "extra_args": [
+            "--fast",
             "--device",
             "cpu",
             "--nr_thr_resamp",

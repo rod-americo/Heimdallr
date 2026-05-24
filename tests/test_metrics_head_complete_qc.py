@@ -149,6 +149,7 @@ class TestHeadCompleteQcJob(unittest.TestCase):
                                 "target_plane": "axial",
                                 "target_in_plane_spacing_mm": [1.0, 1.0],
                                 "target_slice_thickness_mm": 5.0,
+                                "derived_ct_transfer_syntax": "jpeg_ls_lossless",
                             }
                         ),
                     ],
@@ -255,7 +256,7 @@ class TestHeadCompleteQcJob(unittest.TestCase):
             self.assertEqual(geometry_ds.file_meta.TransferSyntaxUID, JPEGLSLossless)
             self.assertNotIn("cerebral_bleed_overlay_series_dir", result["artifacts"])
 
-    def test_job_marks_truncated_skull_as_incomplete(self):
+    def test_job_allows_truncated_skull_when_brain_is_complete(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             case_id = "CaseHeadTruncated_20260524_001"
@@ -282,22 +283,35 @@ class TestHeadCompleteQcJob(unittest.TestCase):
                 with patch.object(
                     sys,
                     "argv",
-                    ["head_complete_qc", "--case-id", case_id, "--job-config-json", "{}"],
+                    [
+                        "head_complete_qc",
+                        "--case-id",
+                        case_id,
+                        "--job-config-json",
+                        json.dumps(
+                            {
+                                "emit_secondary_capture_dicom": False,
+                                "emit_brain_geometry_dicom_series": False,
+                            }
+                        ),
+                    ],
                 ):
                     self.assertEqual(head_complete_qc.main(), 0)
 
             result_path = case_dir / "artifacts" / "metrics" / "head_complete_qc" / "result.json"
             result = json.loads(result_path.read_text(encoding="utf-8"))
 
-            self.assertEqual(
-                result["measurement"]["job_status"],
-                "incomplete_head_segmentation",
-            )
-            self.assertFalse(result["measurement"]["head_complete_without_truncation"])
+            self.assertTrue(result["measurement"]["head_complete_without_truncation"])
+            self.assertTrue(result["measurement"]["brain_complete_without_truncation"])
             self.assertIn(
                 "x_min",
                 result["measurement"]["head_components"]["masks"]["skull"]["touched_bounds"],
             )
+            self.assertEqual(
+                result["measurement"]["head_components"]["masks"]["brain"]["status"],
+                "complete",
+            )
+            self.assertIn("normalization_brain_geometry_2mm", result["measurement"])
 
     def test_job_exports_positive_bleed_overlay_and_notification_bool(self):
         with tempfile.TemporaryDirectory() as tmp:

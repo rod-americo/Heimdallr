@@ -33,10 +33,10 @@ Heimdallr transforms incoming radiological imaging studies into traceable runtim
 | Source DICOM series | `source/dicom/series/<series-stem>/` | DICOM files grouped by series | Preserves the scanned study instances after ZIP extraction for reprocessing and audit until the case workspace is purged. |
 | Canonical NIfTI | `derived/<case_id>.nii.gz` | NIfTI | Produced or materialized by segmentation for the selected series. |
 | Segmentation artifacts | `artifacts/<task>/` | files | TotalSegmentator task outputs according to active profile. |
-| Head normalization artifact | `artifacts/metrics/head_complete_qc/normalized_axial_head_ct.nii.gz` | NIfTI | Produced by `head_complete_qc` only after the automatic complete-head gate passes. |
+| Head normalization artifact | `artifacts/metrics/head_complete_qc/normalized_axial_head_ct.nii.gz` | NIfTI | Produced by `head_complete_qc` after the automatic brain-mask gate passes. The required mask is `total/brain.nii.gz`; `total/skull.nii.gz` is optional diagnostic/crop context and may be truncated. |
 | Head RAS 2 mm artifact | `artifacts/metrics/head_complete_qc/normalized_ras_head_ct_2mm.nii.gz` | NIfTI | Canonical RAS isotropic 2 mm volume. Anatomical orbitomeatal and midline alignment is reported as `landmarks_required` until validated landmarks are available. |
 | Head brain-geometry 2 mm artifact | `artifacts/metrics/head_complete_qc/normalized_brain_geometry_head_ct_2mm.nii.gz` | NIfTI | Volume resampled so the `total/brain.nii.gz` mask PCA axes define the output plane. It uses `brain_structures/septum_pellucidum.nii.gz` as an in-plane midline guide when available, preserves source in-plane spacing by default, and uses 1 mm slice spacing. Does not require the orbitomeatal line. |
-| Head brain-geometry CT DICOM series | `artifacts/metrics/head_complete_qc/brain_geometry_ct_2mm_dicom/` | DICOM CT series | Derived axial CT series from the brain-geometry volume, encoded as JPEG-LS Lossless while preserving source in-plane pixel spacing, using 1 mm spacing between images, and tagging 2 mm nominal slice thickness. `SeriesDate` and `SeriesTime` are preserved from the original selected source series when available, while `ContentDate`, `ContentTime`, and instance creation time describe artifact generation. Slices are exported in spatial order so DICOM viewers detect a constant stack interval; the brain-center slice is tagged in `ImageComments` without changing stack order. The output field of view is cropped from `total/skull.nii.gz` with a configurable margin so the head opens at a practical display scale. |
+| Head brain-geometry CT DICOM series | `artifacts/metrics/head_complete_qc/brain_geometry_ct_2mm_dicom/` | DICOM CT series | Derived axial CT series from the brain-geometry volume, encoded with the job's `derived_ct_transfer_syntax` while preserving source in-plane pixel spacing, using 1 mm spacing between images, and tagging 2 mm nominal slice thickness. `SeriesDate` and `SeriesTime` are preserved from the original selected source series when available, while `ContentDate`, `ContentTime`, and instance creation time describe artifact generation. Slices are exported in spatial order so DICOM viewers detect a constant stack interval; the brain-center slice is tagged in `ImageComments` without changing stack order. The output field of view uses `total/skull.nii.gz` with a configurable margin when available, otherwise it falls back to `total/brain.nii.gz`. Skull truncation is reported but does not block export. |
 | Head volume table DICOM | `artifacts/metrics/head_complete_qc/volume_table_dicom/volume_table_0001.dcm` | DICOM Secondary Capture | Translated table containing total brain volume from `total/brain.nii.gz`, individual `brain_structures` volumes, and the color map used by the brain-structure overlay. |
 | Head brain-structure overlay DICOM series | `artifacts/metrics/head_complete_qc/brain_structures_dicom/` | DICOM Secondary Capture series | Burned-in 3 mm slab overlays for available `brain_structures` masks. The CT base image is the brain-geometry normalized volume, and masks are nearest-neighbor resampled onto that same grid before rendering. No text panel is burned into the overlay images. |
 | Head bleed overlay DICOM series | `artifacts/metrics/head_complete_qc/cerebral_bleed_dicom/` | DICOM Secondary Capture series | Conditional burned-in 5 mm slab overlays for positive bleed-mask slabs plus adjacent slabs. The CT base image is the brain-geometry normalized volume, and the bleed mask is nearest-neighbor resampled onto that same grid before rendering. No text panel is burned into the overlay images; positive mask regions are marked with a red transparent contour. Emitted only when bleed is present. |
@@ -142,6 +142,8 @@ Inbound DICOM defaults:
 - supported storage contexts from `pynetdicom`
 
 Outbound DICOM destinations are host-local and defined in `config/dicom_egress.json`.
+The same file controls DICOM egress queue concurrency with `worker_count`; the
+default is 10 workers.
 
 ## 7. Invariants
 
@@ -152,13 +154,15 @@ They must not contain secrets, PHI, PACS credentials, callback tokens, or case
 paths.
 - `config/metrics_pipeline.example.json` must be updated when adding a new
 production metrics module.
-- The automatic CT segmentation workflow runs `total` without `--fast` for
-eligible CT cases. It runs `tissue_types` only when `total/vertebrae_L3.nii.gz`
-is present, geometry-compatible, non-empty, and complete along the scan axis.
-The complete-head workflow defines `Head = skull + brain` and treats the head as
-complete only when both masks are present, non-empty, geometry matched, and not
-touching scan bounds. Only then does the automatic workflow run the
-`cerebral_bleed` and `brain_structures` TotalSegmentator tasks. The
+- The automatic CT segmentation workflow passes each task's configured
+`extra_args` through to TotalSegmentator, including `total`. It runs
+`tissue_types` only when `total/vertebrae_L3.nii.gz` is present,
+geometry-compatible, non-empty, and complete along the scan axis. The
+complete-head workflow treats `total/brain.nii.gz` as the required gate mask and
+requires it to be present, non-empty, geometry matched, and not touching scan
+bounds. `total/skull.nii.gz` is optional crop and diagnostic context; skull
+truncation is reported but does not block `cerebral_bleed` or
+`brain_structures` TotalSegmentator tasks. The
 machine-readable bleed notification field is
 `measurement.cerebral_bleed.has_cerebral_bleed` and mirrors
 `measurement.cerebral_bleed.notification_bool` when bleed segmentation has run.
@@ -192,13 +196,17 @@ remains legible after DICOM import.
 lossless options are original uncompressed, Deflated Explicit VR Little Endian,
 JPEG-LS lossless, JPEG 2000 lossless, and RLE lossless. The repository default
 is JPEG-LS lossless.
+- Head derived CT DICOM uses `derived_ct_transfer_syntax` with the same option
+vocabulary. DICOM egress negotiates the peer's accepted presentation context and
+transcodes only for transfer when the peer does not accept the artifact's stored
+transfer syntax.
 - Compression validation on 512 x 512 RGB parenchymal volumetry overlays found
 approximate per-slice sizes of ~787 KB uncompressed, ~82-113 KB Deflated,
 ~114-164 KB JPEG-LS, ~173-219 KB JPEG 2000, and ~187-264 KB RLE. These are
 operational measurements, not contractual file-size guarantees.
-- Prefer JPEG-LS lossless for OsiriX-facing compressed Secondary Capture
-delivery. Deflated remains available as a supported contract value, but it has
-shown less reliable OsiriX handling in operational validation.
+- Prefer JPEG-LS lossless for OsiriX-facing artifact storage. Deflated remains
+available as a supported contract value, but it has shown less reliable OsiriX
+handling in operational validation.
 - Derived Secondary Capture artifacts should preserve source patient and study
 identity tags from the reference DICOM while assigning new derived series and
 instance UIDs.

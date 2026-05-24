@@ -1128,10 +1128,6 @@ def _task_record(task: dict) -> dict:
     }
 
 
-def _total_extra_args(extra_args: list) -> list:
-    return [str(arg) for arg in extra_args if str(arg) != "--fast"]
-
-
 def _clear_task_output(case_output: Path, task: dict) -> None:
     output_dir = _task_output_path(case_output, task)
     if output_dir.exists():
@@ -1227,10 +1223,11 @@ def _head_gatekeeper(total_dir: Path, reference_image_path: Path) -> dict:
             "error": str(exc),
         }
 
-    complete = bool(head_components.get("complete") and head_union.get("complete"))
+    brain_status = head_components.get("masks", {}).get("brain", {})
+    complete = bool(brain_status.get("complete"))
     return {
         "complete": complete,
-        "reason": "complete_head" if complete else "incomplete_head",
+        "reason": "complete_brain" if complete else "incomplete_brain",
         "head_components": head_components,
         "head_union": head_union,
     }
@@ -1304,9 +1301,7 @@ def run_segmentation_pipeline(
                 )
                 continue
 
-        extra_args = list(task.get("extra_args", []))
-        if task_name == "total":
-            extra_args = _total_extra_args(extra_args)
+        extra_args = [str(arg) for arg in task.get("extra_args", [])]
         output_dir = _task_output_path(case_output, task)
         if output_dir.exists():
             shutil.rmtree(output_dir)

@@ -55,6 +55,13 @@ cp config/resource_monitor.example.json config/resource_monitor.json
 ```
 
 Run each command in its own process supervisor unit or terminal.
+
+`heimdallr.dicom_egress` starts a configurable worker pool for outbound C-STORE
+delivery. Set `worker_count` in `config/dicom_egress.json` to control concurrent
+queue items; the default is 10. Generated DICOM artifacts should prefer
+JPEG-LS Lossless compression for storage. During C-STORE delivery, egress
+negotiates the peer's accepted presentation context and transcodes only for
+transfer when needed.
 The optional dashboard TUI is:
 
 ```bash
@@ -240,9 +247,18 @@ Then restart the segmentation worker so it reloads
 `config/segmentation_pipeline.json`. The concrete `config/segmentation_pipeline.json`
 file is host-local and must not be committed.
 
-The tracked automatic CT examples now run `total` without `--fast`, gate
-`tissue_types` on a complete L3 mask, and gate `cerebral_bleed` plus
-`brain_structures` on a complete skull-plus-brain head mask from `total`.
+The segmentation worker passes each task's configured `extra_args` through to
+TotalSegmentator, including `total`. Use host-local segmentation profiles for
+host-specific accelerator choices:
+
+- `thor`: `total` with `--device gpu`, without `--fast`.
+- local macOS/Odin: `total` with `--fast --device mps`.
+- CPU POC: `total` with `--fast --device cpu`.
+
+The tracked automatic CT examples gate `tissue_types` on a complete L3 mask and
+gate `cerebral_bleed` plus `brain_structures` on a complete `total/brain.nii.gz`
+mask. The `total/skull.nii.gz` mask is optional crop and diagnostic context;
+skull truncation is reported but does not block the head workflow.
 For dedicated complete-head CT validation, hosts can still use profiles derived
 from the tracked examples:
 
@@ -251,12 +267,12 @@ from the tracked examples:
 
 That dedicated path runs TotalSegmentator `total` for the `skull` and `brain`
 ROI subset plus `cerebral_bleed` and `brain_structures`, then runs
-`head_complete_qc` to validate `Head = skull + brain` without scan-bound
-truncation and produce the normalized axial head CT NIfTI artifact, canonical
-RAS 2 mm NIfTI artifact,
+`head_complete_qc` to validate the `brain` mask without scan-bound truncation
+and produce the normalized axial head CT NIfTI artifact, canonical RAS 2 mm
+NIfTI artifact,
 brain-mask geometry 1 mm slice-spacing NIfTI artifact, derived axial CT DICOM
-series encoded as JPEG-LS Lossless while preserving source in-plane pixel
-spacing, advancing 1 mm between images, and tagging 2 mm nominal slice
+series encoded with the job's `derived_ct_transfer_syntax` while preserving
+source in-plane pixel spacing, advancing 1 mm between images, and tagging 2 mm nominal slice
 thickness. The derived CT stack is exported in spatial order so viewers detect a
 constant slice interval, with the brain-center slice tagged but not reordered.
 It also emits translated

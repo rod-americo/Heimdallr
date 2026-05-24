@@ -4,8 +4,16 @@ import unittest
 from unittest.mock import patch
 
 from pydicom.dataset import Dataset, FileMetaDataset
-from pydicom.uid import EncapsulatedPDFStorage, ExplicitVRLittleEndian, JPEGLosslessSV1, SecondaryCaptureImageStorage
+from pydicom.uid import (
+    EncapsulatedPDFStorage,
+    ExplicitVRLittleEndian,
+    ImplicitVRLittleEndian,
+    JPEGLSLossless,
+    JPEGLosslessSV1,
+    SecondaryCaptureImageStorage,
+)
 
+from heimdallr.dicom_egress.config import dicom_egress_worker_count
 from heimdallr.dicom_egress import worker
 from heimdallr.metrics.jobs._dicom_encapsulated_pdf import create_encapsulated_pdf_dicom
 from heimdallr.shared import store
@@ -30,12 +38,38 @@ def _build_secondary_capture_dataset() -> Dataset:
 
 
 class TestDicomEgressWorker(unittest.TestCase):
+    def test_dicom_egress_worker_count_defaults_to_ten(self):
+        self.assertEqual(dicom_egress_worker_count({}), 10)
+
+    def test_dicom_egress_worker_count_clamps_to_one(self):
+        self.assertEqual(dicom_egress_worker_count({"worker_count": 0}), 1)
+
     def test_prepare_dataset_for_peer_keeps_uncompressed_dataset_when_peer_accepts_uncompressed(self):
         ds = _build_secondary_capture_dataset()
 
         prepared = worker._prepare_dataset_for_peer(ds, ExplicitVRLittleEndian)
 
         self.assertIs(prepared, ds)
+
+    def test_prepare_dataset_for_peer_decompresses_when_peer_accepts_uncompressed(self):
+        ds = _build_secondary_capture_dataset()
+        ds.file_meta.TransferSyntaxUID = JPEGLSLossless
+
+        with patch.object(Dataset, "decompress", autospec=True) as decompress:
+            prepared = worker._prepare_dataset_for_peer(ds, ExplicitVRLittleEndian)
+
+        self.assertIsNot(prepared, ds)
+        decompress.assert_called_once_with(prepared, generate_instance_uid=False)
+        self.assertEqual(prepared.file_meta.TransferSyntaxUID, ExplicitVRLittleEndian)
+
+    def test_prepare_dataset_for_peer_rewrites_uncompressed_transfer_syntax(self):
+        ds = _build_secondary_capture_dataset()
+
+        prepared = worker._prepare_dataset_for_peer(ds, ImplicitVRLittleEndian)
+
+        self.assertIsNot(prepared, ds)
+        self.assertEqual(prepared.file_meta.TransferSyntaxUID, ImplicitVRLittleEndian)
+        self.assertTrue(prepared.is_implicit_VR)
 
     def test_prepare_dataset_for_peer_compresses_when_peer_only_accepts_compressed(self):
         ds = _build_secondary_capture_dataset()

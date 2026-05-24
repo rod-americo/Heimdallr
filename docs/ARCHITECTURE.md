@@ -90,7 +90,7 @@ selected-series reuse, TotalSegmentator tasks, canonical NIfTI materialization,
 metrics enqueue.
 - `heimdallr/metrics/worker.py`: metrics profile loading, job dependency graph,
 deterministic job execution, artifacts, DICOM egress enqueue, final delivery enqueue.
-- `heimdallr/dicom_egress/worker.py`: outbound C-STORE retry worker.
+- `heimdallr/dicom_egress/worker.py`: outbound C-STORE retry worker pool.
 - `heimdallr/integration/dispatch/worker.py`: outbound JSON event retry
 worker.
 - `heimdallr/integration/delivery/worker.py`: final package callback retry
@@ -122,9 +122,11 @@ worker helpers. CT selection preserves the existing phase and rejection rules,
 then uses measured DICOM coverage and z-spacing when available to prefer
 maximum coverage before thinner reconstructions.
 - segmentation task gatekeepers in `heimdallr/segmentation/worker.py`. The
-automatic CT path runs `total` without `--fast`, gates `tissue_types` on a
-complete L3 mask, and gates head-specific `cerebral_bleed` and
-`brain_structures` tasks on complete skull and brain masks.
+automatic CT path passes each task's configured `extra_args` to
+TotalSegmentator, gates `tissue_types` on a complete L3 mask, and gates
+head-specific `cerebral_bleed` and `brain_structures` tasks on a complete
+brain mask. The skull mask is optional crop and diagnostic context and may be
+truncated.
 - metrics jobs under `heimdallr/metrics/jobs/`.
 - analysis helpers under `heimdallr/metrics/analysis/`.
 - head CT segmentation and normalization helpers under `heimdallr/metrics/head/`.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate complete head segmentation and normalize head CT geometry."""
+"""Validate brain segmentation and normalize head CT geometry."""
 
 from __future__ import annotations
 
@@ -603,7 +603,8 @@ def main() -> int:
             reference_shape=reference_shape,
         )
         head_union = _head_union_status(total_dir, head_components, spacing_xyz, reference_shape)
-        head_complete = bool(head_components["complete"] and head_union["complete"])
+        brain_status = head_components["masks"].get("brain", {})
+        head_complete = bool(brain_status.get("complete"))
         if not head_complete:
             payload = {
                 "metric_key": metric_key,
@@ -621,9 +622,11 @@ def main() -> int:
                     },
                     "source_shape": [int(value) for value in reference_shape],
                     "head_definition": {
-                        "components": list(HEAD_COMPONENT_MASKS),
-                        "rule": "head is complete when skull and brain masks are present, non-empty, and do not touch scan bounds",
+                        "components": ["brain"],
+                        "optional_components": ["skull"],
+                        "rule": "head QC passes when the brain mask is present, non-empty, and does not touch scan bounds; skull is informational and may be truncated",
                     },
+                    "brain_complete_without_truncation": False,
                     "head_components": head_components,
                     "head_union": head_union,
                     "cerebral_bleed": {
@@ -735,6 +738,7 @@ def main() -> int:
                     series_number=GEOMETRY_CT_SERIES_NUMBER,
                     preferred_display_world_ras=preferred_display_world_ras,
                     slice_thickness_mm=float(job_config.get("brain_geometry_slice_thickness_mm", 2.0)),
+                    transfer_syntax=job_config.get("derived_ct_transfer_syntax", "jpeg_ls_lossless"),
                 )
                 artifacts["brain_geometry_ct_2mm_series_dir"] = _relpath(case_dir, geometry_dicom_dir)
                 for dicom_path in geometry_dicom_paths:
@@ -881,9 +885,11 @@ def main() -> int:
                 },
                 "source_shape": [int(value) for value in reference_shape],
                 "head_definition": {
-                    "components": list(HEAD_COMPONENT_MASKS),
-                    "rule": "head is complete when skull and brain masks are present, non-empty, and do not touch scan bounds",
+                    "components": ["brain"],
+                    "optional_components": ["skull"],
+                    "rule": "head QC passes when the brain mask is present, non-empty, and does not touch scan bounds; skull is informational and may be truncated",
                 },
+                "brain_complete_without_truncation": head_complete,
                 "head_components": head_components,
                 "head_union": head_union,
                 "cerebral_bleed": {

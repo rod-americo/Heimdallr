@@ -61,21 +61,24 @@ the active metrics profile, and still includes enabled jobs marked
 segmentation is also constrained to the union of requested, dependency, and
 automatic job task requirements.
 
-The automatic CT pipeline runs `total` without `--fast` for eligible CT cases.
-It runs `tissue_types` only when the `total/vertebrae_L3.nii.gz` mask is present,
+The automatic CT pipeline passes the active segmentation profile's
+`extra_args` to each TotalSegmentator task, including `total`. It runs
+`tissue_types` only when the `total/vertebrae_L3.nii.gz` mask is present,
 geometry-compatible, non-empty, and complete along the scan axis. It runs
-`cerebral_bleed` and `brain_structures` only when the `total/skull.nii.gz` and
-`total/brain.nii.gz` masks are present, geometry-compatible, non-empty, and do
-not touch scan bounds. The `head_complete_qc` job is enabled in the tracked
-default metrics profile, but it emits only a result JSON when the complete-head
-gate fails. When the gate passes, it writes a normalized axial head CT NIfTI
+`cerebral_bleed` and `brain_structures` only when the `total/brain.nii.gz` mask
+is present, geometry-compatible, non-empty, and does not touch scan bounds.
+`total/skull.nii.gz` is retained as optional crop and diagnostic context; skull
+truncation does not block head QC or DICOM export when the brain mask is
+complete. The `head_complete_qc` job is enabled in the tracked default metrics
+profile, but it emits only a result JSON when the brain gate fails. When the
+gate passes, it writes a normalized axial head CT NIfTI
 artifact, writes a canonical RAS 2 mm NIfTI artifact, writes a 1 mm
 slice-spacing brain-mask geometry NIfTI artifact whose output plane is defined
 by `total/brain.nii.gz` and whose in-plane midline is guided by
 `brain_structures/septum_pellucidum.nii.gz` when available, emits a derived
-axial CT DICOM series from that geometry volume using JPEG-LS Lossless while
-preserving source in-plane pixel spacing, advancing 1 mm between images, and
-tagging 2 mm nominal slice thickness.
+axial CT DICOM series from that geometry volume using the configured
+`derived_ct_transfer_syntax` while preserving source in-plane pixel spacing,
+advancing 1 mm between images, and tagging 2 mm nominal slice thickness.
 Slices are exported in spatial order so DICOM viewers detect a constant stack
 interval; the brain-center slice is tagged in `ImageComments` without changing
 stack order. The output field
@@ -102,8 +105,10 @@ selected series audit in `metadata/id.json` records `PolicySource` and
 If `artifact_dicom_policy` is provided, Heimdallr applies it to metric jobs for
 that submitted job only. Supported `secondary_capture_transfer_syntax` values
 are `original`, `deflated`, `jpeg_ls_lossless`, `jpeg_2000_lossless`, and
-`rle_lossless`. The repository default for generated Secondary Capture
-artifacts is `jpeg_ls_lossless`.
+`rle_lossless`. Head CT jobs also support `derived_ct_transfer_syntax` with the
+same values for generated derived CT series. The repository default for
+generated DICOM artifacts is `jpeg_ls_lossless`; DICOM egress negotiates the
+peer's accepted presentation context and transcodes only for transfer.
 
 Example:
 
@@ -122,8 +127,10 @@ The options map to these DICOM transfer syntaxes:
 | `rle_lossless` | RLE Lossless | lossless |
 
 Use `jpeg_ls_lossless` as the preferred compressed option for OsiriX-facing
-overlay delivery. `deflated` remains supported, but observed OsiriX behavior can
-be less reliable with Deflated Explicit VR Little Endian.
+artifact storage. DICOM egress negotiates the target listener's accepted
+presentation context and transcodes only for transfer when needed. `deflated`
+remains supported, but observed OsiriX behavior can be less reliable with
+Deflated Explicit VR Little Endian.
 
 `GET /ops/queues` returns non-identifying operational capacity for external
 feeders: queue status counts, oldest pending timestamps, segmentation

@@ -136,8 +136,11 @@ sizes:
 | `rle_lossless` | ~187-264 KB | RLE Lossless |
 
 Use `jpeg_ls_lossless` as the preferred compressed option for OsiriX-facing
-overlay delivery. `deflated` remains supported, but operational validation found
-less reliable OsiriX handling for Deflated Explicit VR Little Endian.
+artifact storage. DICOM egress negotiates the target listener's accepted
+presentation context and transcodes only for transfer when the peer does not
+accept the artifact's stored transfer syntax. `deflated` remains supported, but
+operational validation found less reliable OsiriX handling for Deflated Explicit
+VR Little Endian.
 
 All tested compressed variants were pixel-identical when read back with the
 runtime DICOM stack. Treat these sizes as representative for overlay-like
@@ -170,21 +173,24 @@ TotalSegmentator tasks to the union of those requirements. For example, a
 request that only includes `bone_health_l1_hu` can run `total` without
 `tissue_types`, while automatic head gatekeeping can still add
 `cerebral_bleed` and `brain_structures` to the plan and skip them at runtime
-unless `total/skull.nii.gz` plus `total/brain.nii.gz` define a complete head.
+unless `total/brain.nii.gz` is complete. `total/skull.nii.gz` is optional crop
+and diagnostic context and may be truncated.
 The
 `brain_volumetry` job is present in the tracked example profile as disabled
 opt-in behavior; hosts must enable it in their local metrics profile before
 external jobs can request it.
 
 The tracked default profile enables `head_complete_qc` behind automatic
-gatekeepers. The segmentation worker always runs `total` without `--fast` for
-eligible CT cases. It runs `tissue_types` only when the L3 mask from `total` is
-complete, and runs `cerebral_bleed` plus `brain_structures` only when the skull
-and brain masks from `total` define a complete head. `head_complete_qc` writes
-only a result JSON when the complete-head gate fails. When the gate passes, it
-can emit brain-geometry normalized CT DICOM, translated brain-structure volume
-and overlay artifacts, and a conditional 5 mm normalized cerebral-bleed overlay
-series with adjacent context slabs when the bleed mask is positive. The
+gatekeepers. The segmentation worker passes each task's configured `extra_args`
+through to TotalSegmentator, including `total`. It runs `tissue_types` only when
+the L3 mask from `total` is complete, and runs `cerebral_bleed` plus
+`brain_structures` only when the brain mask from `total` is complete. Skull
+truncation is reported but does not block the head workflow.
+`head_complete_qc` writes only a result JSON when the brain gate fails. When the
+gate passes, it can emit brain-geometry
+normalized CT DICOM, translated brain-structure volume and overlay artifacts,
+and a conditional 5 mm normalized cerebral-bleed overlay series with adjacent
+context slabs when the bleed mask is positive. The
 API-facing bleed signal is
 `metrics.head_complete_qc.measurement.cerebral_bleed.has_cerebral_bleed`, with
 the same value mirrored in `notification_bool`.

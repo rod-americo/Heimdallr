@@ -307,7 +307,7 @@ class TestSegmentationReuse(unittest.TestCase):
                     requested_metrics_modules=["head_complete_qc"],
                 )
 
-    def test_run_segmentation_pipeline_strips_fast_and_skips_tissue_without_complete_l3(self):
+    def test_run_segmentation_pipeline_preserves_total_args_and_skips_tissue_without_complete_l3(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             case_output = Path(tmpdir) / "CaseGate"
             artifacts_dir = case_output / "artifacts"
@@ -357,12 +357,12 @@ class TestSegmentationReuse(unittest.TestCase):
                     logger=PipelineLogger(None),
                 )
 
-        self.assertEqual(calls, [("total", ["--device", "gpu"])])
+        self.assertEqual(calls, [("total", ["--fast", "--device", "gpu"])])
         self.assertEqual([task["name"] for task in info["tasks"]], ["total"])
         self.assertEqual(info["skipped_tasks"][0]["name"], "tissue_types")
         self.assertEqual(info["skipped_tasks"][0]["gatekeeper"], "l3_complete")
 
-    def test_run_segmentation_pipeline_runs_head_tasks_after_complete_head_gate(self):
+    def test_run_segmentation_pipeline_runs_head_tasks_after_complete_brain_gate(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             case_output = Path(tmpdir) / "CaseHeadGate"
             artifacts_dir = case_output / "artifacts"
@@ -376,7 +376,7 @@ class TestSegmentationReuse(unittest.TestCase):
                 if task_name == "total":
                     skull = np.zeros((10, 10, 10), dtype=np.float32)
                     brain = np.zeros((10, 10, 10), dtype=np.float32)
-                    skull[2:8, 2:8, 2:8] = 1.0
+                    skull[0:8, 2:8, 2:8] = 1.0
                     brain[3:7, 3:7, 3:7] = 1.0
                     write_nifti(Path(output_folder) / "skull.nii.gz", skull)
                     write_nifti(Path(output_folder) / "brain.nii.gz", brain)
@@ -410,6 +410,7 @@ class TestSegmentationReuse(unittest.TestCase):
 
         self.assertEqual(calls, ["total", "cerebral_bleed", "brain_structures"])
         self.assertTrue(info["gatekeepers"]["head_complete"]["complete"])
+        self.assertEqual(info["gatekeepers"]["head_complete"]["reason"], "complete_brain")
         self.assertEqual(
             [task["name"] for task in info["tasks"]],
             ["total", "cerebral_bleed", "brain_structures"],
