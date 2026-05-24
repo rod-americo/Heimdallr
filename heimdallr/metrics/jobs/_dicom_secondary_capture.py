@@ -24,7 +24,7 @@ from pydicom.uid import (
 from heimdallr.shared import settings
 
 DEFAULT_SECONDARY_CAPTURE_MAX_DIMENSION = 512
-DEFAULT_SECONDARY_CAPTURE_TRANSFER_SYNTAX = "explicit_vr_little_endian"
+DEFAULT_SECONDARY_CAPTURE_TRANSFER_SYNTAX = "jpeg_ls_lossless"
 SECONDARY_CAPTURE_TRANSFER_SYNTAXES = {
     "explicit_vr_little_endian": ExplicitVRLittleEndian,
     "original": ExplicitVRLittleEndian,
@@ -39,6 +39,7 @@ SECONDARY_CAPTURE_TRANSFER_SYNTAXES = {
     str(RLELossless): RLELossless,
     "jpeg_ls_lossless": JPEGLSLossless,
     "jpegls_lossless": JPEGLSLossless,
+    "jpeglslossless": JPEGLSLossless,
     "jpegls": JPEGLSLossless,
     str(JPEGLSLossless): JPEGLSLossless,
     "jpeg2000_lossless": JPEG2000Lossless,

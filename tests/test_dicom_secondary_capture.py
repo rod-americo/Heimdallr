@@ -4,7 +4,7 @@ from pathlib import Path
 
 import numpy as np
 import pydicom
-from pydicom.uid import DeflatedExplicitVRLittleEndian
+from pydicom.uid import DeflatedExplicitVRLittleEndian, JPEGLSLossless
 
 from heimdallr.metrics.jobs._dicom_secondary_capture import (
     create_secondary_capture_from_rgb,
@@ -49,6 +49,7 @@ class TestDicomSecondaryCapture(unittest.TestCase):
 
         self.assertEqual(str(ds.PatientName), "SILVA^JOAO")
         self.assertEqual(ds.PatientID, "123")
+        self.assertEqual(ds.file_meta.TransferSyntaxUID, JPEGLSLossless)
 
     def test_secondary_capture_preserves_reference_study_and_patient_tags(self):
         rgb = np.zeros((8, 8, 3), dtype=np.uint8)
@@ -153,6 +154,7 @@ class TestDicomSecondaryCapture(unittest.TestCase):
                 series_number=9001,
                 instance_number=1,
                 derivation_description="Test artifact",
+                transfer_syntax="original",
             )
             create_secondary_capture_from_rgb(
                 rgb,
@@ -177,6 +179,7 @@ class TestDicomSecondaryCapture(unittest.TestCase):
             "original",
             "deflated_explicit_vr_little_endian",
             "jpeg_ls_lossless",
+            "JPEGLSLossless",
             "jpeg2000_lossless",
             "rle_lossless",
         ]:
