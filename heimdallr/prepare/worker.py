@@ -58,6 +58,7 @@ from heimdallr.shared.paths import (
     study_metadata_dir,
     study_metadata_json,
     study_results_json,
+    study_source_dir,
 )
 from heimdallr.shared.spool import CLAIM_SUFFIX, claim_path, unclaim_path
 from heimdallr.shared.study_manifest import build_study_manifest_digest
