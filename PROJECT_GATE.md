@@ -24,7 +24,7 @@ outputs, but it should not own DICOM intake, segmentation workers, PACS egress, 
 overrides ignored by Git, and `HEIMDALLR_*` environment variables injected by the host.
 - logging: Resident workers currently use line-buffered service output and
 per-case logs; structured logging is a known improvement area rather than a solved platform guarantee.
-- runtime: A single Python 3.12 `.venv`, host supervision, mutable `runtime/`
+- runtime: A single Python 3.14 `.venv`, host supervision, mutable `runtime/`
 paths, bundled helper binaries under `bin/`, and SQLite state under `database/dicom.db`.
 - contracts: DICOM studies, ZIP study payloads, `metadata/id.json`,
 `metadata/resultados.json`, SQLite queue rows, generated artifacts, HTTP upload/job APIs, outbound webhook events, and DICOM C-STORE deliveries.
@@ -42,7 +42,7 @@ generated NIfTI files, local SQLite databases, host secrets, callback tokens, mo
 
 ## 5. What is the expected maintenance cost?
 
-- primary host or environment: A supervised Python 3.12 host with filesystem
+- primary host or environment: A supervised Python 3.14 host with filesystem
 access, SQLite write access, DICOM networking, conversion binaries, and enough CPU/GPU capacity for segmentation.
 - most fragile external dependency: TotalSegmentator runtime readiness,
 licensing, compute capacity, and DICOM peer compatibility are the highest operational dependencies.

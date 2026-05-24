@@ -1,19 +1,19 @@
 # Heimdallr
 
-![Release](https://img.shields.io/badge/release-v0.2.1-blue) [![CI](https://github.com/rod-americo/Heimdallr/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rod-americo/Heimdallr/actions/workflows/ci.yml) ![Python](https://img.shields.io/badge/python-3.12-blue) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE.md) ![DICOM](https://img.shields.io/badge/DICOM-C--STORE-informational) ![TotalSegmentator](https://img.shields.io/badge/segmentation-TotalSegmentator-informational)
+![Release](https://img.shields.io/badge/release-v0.2.1-blue) [![CI](https://github.com/rod-americo/Heimdallr/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rod-americo/Heimdallr/actions/workflows/ci.yml) ![Python](https://img.shields.io/badge/python-3.14-blue) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE.md) ![DICOM](https://img.shields.io/badge/DICOM-C--STORE-informational) ![TotalSegmentator](https://img.shields.io/badge/segmentation-TotalSegmentator-informational)
 
 Heimdallr is open-source infrastructure for radiological image operations. It receives DICOM studies and API submissions, prepares selected series for deterministic processing, converts DICOM to NIfTI, orchestrates TotalSegmentator-backed segmentation, computes quantitative metrics, tracks queue state in SQLite, and delivers generated artifacts through operational dashboards, DICOM egress, outbound HTTP events, and final API callbacks.
 
 The name references Heimdall, the vigilant Norse guardian, reflecting this stack's role as an operational watch layer for imaging intake, queues, segmentation, metrics, and artifact delivery.
 
-The stack runs as multiple Python 3.12 entrypoints over one maintained package, `heimdallr/`. Host-specific configuration is created from versioned `config/*.example.json` files and kept local. Mutable study artifacts live under `runtime/`, while queue and case state are persisted in `database/dicom.db`.
+The stack runs as multiple Python 3.14 entrypoints over one maintained package, `heimdallr/`. Host-specific configuration is created from versioned `config/*.example.json` files and kept local. Mutable study artifacts live under `runtime/`, while queue and case state are persisted in `database/dicom.db`.
 
 Heimdallr owns the imaging infrastructure layer. Clinical report drafting, LLM/NLP workflows, prompt engineering, and proprietary intelligence belong in Asha or another explicit consumer. Generated outputs are deterministic infrastructure artifacts for qualified review, not autonomous clinical decisions.
 
 ## Current State
 
 - phase: `structural baseline established / validation-oriented operations`
-- runtime principal: Python `>=3.12,<3.13`, single `.venv`
+- runtime principal: Python `>=3.14,<3.15`, single `.venv`
 - primary entrypoints:
   - `python -m heimdallr.control_plane`
   - `python -m heimdallr.intake`
@@ -33,7 +33,7 @@ Heimdallr owns the imaging infrastructure layer. Clinical report drafting, LLM/N
   - `dcm2niix` for conversion
   - TotalSegmentator for segmentation tasks
   - SQLite filesystem access for queue and case state
-  - host supervision (`systemd`, `launchd`, `skuld`, containers, or equivalent)
+  - host supervision (`systemd`, `launchd`, `skuld`, or equivalent)
 
 ## System Overview
 
@@ -91,7 +91,7 @@ External integration code is canonical under `heimdallr/integration/`:
 ### 2. Prepare environment
 
 ```bash
-python3.12 -m venv .venv
+python3.14 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install -r requirements.txt
@@ -139,7 +139,7 @@ or inject `TOTALSEGMENTATOR_LICENSE` through host supervision.
 .venv/bin/python -m heimdallr.resource_monitor
 ```
 
-Run each resident service under its own terminal, supervisor unit, or container.
+Run each resident service under its own terminal or supervisor unit.
 The TUI is optional:
 
 ```bash
@@ -163,12 +163,6 @@ Configuration is centralized in `heimdallr/shared/settings.py` plus JSON files u
 | `TOTALSEGMENTATOR_LICENSE` | env | task-dependent | host secret | injected by supervisor |
 
 See [`docs/OPERATIONS.md`](docs/OPERATIONS.md) for the full runtime and restart model.
-
-## API Container Scope
-
-The experimental API container stack is documented in [`docs/CONTAINER_API.md`](docs/CONTAINER_API.md). It includes the control plane, prepare, segmentation, metrics, and integration delivery services. It intentionally excludes DICOM C-STORE intake, DICOM egress, and integration dispatch.
-
-Build and GPU validation should be done on `thor`, where Docker and the POC GPU environment are available. The image is Python 3.12-based and can bake TotalSegmentator weights for the requested task set; by default it bakes `total_fast`, matching the current Thor POC `total --fast` profile.
 
 ## Contracts and Boundaries
 
@@ -230,7 +224,6 @@ for timing large Thor segmentation runs.
 | Architecture | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
 | Contracts | [`docs/CONTRACTS.md`](docs/CONTRACTS.md) |
 | Operations | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) |
-| API container stack | [`docs/CONTAINER_API.md`](docs/CONTAINER_API.md) |
 | Runtime requirements | [`docs/RUNTIME_REQUIREMENTS.md`](docs/RUNTIME_REQUIREMENTS.md) |
 | Decisions | [`docs/DECISIONS.md`](docs/DECISIONS.md) |
 | API contracts | [`docs/API.md`](docs/API.md) |

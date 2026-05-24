@@ -10,7 +10,7 @@ Heimdallr is operated as multiple independent Python services that share a singl
 
 | Environment | Purpose | Runtime | Notes |
 | --- | --- | --- | --- |
-| `local` | development and focused tests | Python 3.12 `.venv` | May run only one service or tests at a time. |
+| `local` | development and focused tests | Python 3.14 `.venv` | May run only one service or tests at a time. |
 | `thor` | POC code-test host | `~/Heimdallr/.venv` | Keep Git state equal to local before comparing tests. |
 | `validation` | controlled non-PHI or approved clinical validation | supervised Python `.venv` | Requires DICOM peer config, TotalSegmentator readiness, and documented run notes. |
 | `production-like` | operational host under maintainer control | supervised Python `.venv` | Requires backup, restart policy, network controls, and smoke evidence. |
@@ -20,7 +20,7 @@ Heimdallr is operated as multiple independent Python services that share a singl
 ### Local Boot
 
 ```bash
-python3.12 -m venv .venv
+python3.14 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install -r requirements.txt
@@ -54,18 +54,12 @@ cp config/resource_monitor.example.json config/resource_monitor.json
 .venv/bin/python -m heimdallr.resource_monitor
 ```
 
-Run each command in its own process supervisor unit, terminal, or container.
+Run each command in its own process supervisor unit or terminal.
 The optional dashboard TUI is:
 
 ```bash
 .venv/bin/python -m heimdallr.tui
 ```
-
-### API Container Stack
-
-The API-scoped container stack is documented separately in `docs/CONTAINER_API.md`. That stack includes control plane, prepare, segmentation, metrics, and integration delivery. It intentionally excludes DICOM C-STORE intake, DICOM egress, and integration dispatch.
-
-Build the image on `thor` for the current POC because the image build can bake TotalSegmentator weights and the host has the GPU runtime used for validation.
 
 ## 4. Operational Configuration
 
@@ -144,6 +138,7 @@ Additional checks by change type:
 
 - Python syntax: `.venv/bin/python -m compileall heimdallr scripts tests`
 - Unit tests: `.venv/bin/python -m unittest discover -s tests`
+- Host stack guardrail: `.venv/bin/python scripts/check_host_stack_manifest.py`
 - Control plane smoke: `curl -fsS http://localhost:8001/docs >/dev/null`
 - Queue capacity smoke: `curl -fsS http://localhost:8001/ops/queues`
 - DICOM listener smoke: send a known non-PHI DICOM sample with a DCMTK tool such
@@ -201,6 +196,20 @@ It was generated from a local Prometheus ZIP using:
 
 The helper performs metadata anonymization, rewrites DICOM UIDs, replaces direct patient identifiers with `HEIMDALLR-SMOKE-001` / `Heimdallr^Smoke`, and writes safe archive member names. It does not OCR-scrub burned-in pixel text; do not publish the output or commit it to the repository.
 
+When a smoke dataset needs pixel-level burned-in text screening, run OCR with a
+local `tesseract` binary and write the report under ignored runtime storage:
+
+```bash
+.venv/bin/python scripts/verify_dicom_burned_in_text.py \
+  runtime/test_datasets/head_complete/head_complete_001_anonymized.zip \
+  --report runtime/test_datasets/head_complete/head_complete_001_ocr_report.json
+```
+
+By default the OCR report stores hashes and lengths, not recognized text, to
+avoid re-exposing possible identifiers. Use `--include-text` only for local
+manual investigation in ignored paths. OCR can miss small, rotated, or
+low-contrast text and should complement manual review rather than replace it.
+
 ### Thor POC Validation
 
 Before using `thor`, ensure local and host Git states match:
@@ -231,8 +240,68 @@ Then restart the segmentation worker so it reloads
 `config/segmentation_pipeline.json`. The concrete `config/segmentation_pipeline.json`
 file is host-local and must not be committed.
 
+For complete-head CT validation, use host-local profiles derived from the
+tracked examples:
+
+- `HEIMDALLR_SEGMENTATION_PIPELINE_PROFILE=ct_head_complete_segmentation`
+- `HEIMDALLR_METRICS_PIPELINE_PROFILE=ct_head_complete_metrics`
+
+That path runs TotalSegmentator `total` for the `skull` and `brain` ROI subset
+plus `cerebral_bleed` and `brain_structures`, then runs `head_complete_qc` to
+validate `Head = skull + brain` without scan-bound truncation and produce the
+normalized axial head CT NIfTI artifact, canonical RAS 2 mm NIfTI artifact,
+brain-mask geometry 1 mm slice-spacing NIfTI artifact, derived axial CT DICOM
+series encoded as JPEG-LS Lossless while preserving source in-plane pixel
+spacing, advancing 1 mm between images, and tagging 2 mm nominal slice
+thickness. The derived CT stack is exported in spatial order so viewers detect a
+constant slice interval, with the brain-center slice tagged but not reordered.
+It also emits translated
+brain-structure volume-table DICOM, and 3 mm burned-in overlay series for
+`brain_structures` rendered on the brain-geometry normalized CT grid without a
+text panel. The volume table includes the overlay color map. The
+brain-mask geometry artifact uses `total/brain.nii.gz`
+to define the output plane, uses `brain_structures/septum_pellucidum.nii.gz`
+as an in-plane midline guide when available, and does not require the
+orbitomeatal line. When the
+cerebral-bleed mask is positive, the job also emits a 5 mm burned-in bleed
+overlay series on the brain-geometry normalized CT grid containing positive
+slabs plus adjacent slabs, without a text panel, using a red transparent
+contour for the positive mask, and sets
+`measurement.cerebral_bleed.has_cerebral_bleed=true`.
+`brain_structures` is a licensed TotalSegmentator task in 2.13.0, so the
+segmentation worker needs a valid license before this profile is used. Restart
+segmentation and metrics workers after changing either profile.
+
 Do not mutate `thor` host config, runtime state, or the POC venv unless the
 task explicitly calls for host-side changes.
+
+### Host Stack Guardrails
+
+Keep one ignored manifest per known host under `config/host_stack/`:
+
+- `odin.json`: local macOS MPS host; `mps` preferred, `cpu` allowed as fallback.
+- `thor.json`: CUDA POC host; `gpu` required for segmentation tasks.
+- `ms-heimdallr.json`: CPU POC host; only `cpu` is allowed.
+
+Before changing host-local segmentation or metrics profiles, run:
+
+```bash
+.venv/bin/python scripts/check_host_stack_manifest.py
+```
+
+For stored manifests that describe another host from the current machine, use
+manifest-only validation:
+
+```bash
+.venv/bin/python scripts/check_host_stack_manifest.py \
+  --manifest config/host_stack/thor.json \
+  --skip-hostname-check \
+  --manifest-only
+```
+
+The guardrail fails when the active segmentation profile uses a device outside
+the host policy, when segmentation concurrency exceeds the host limit, or when
+metrics parallelism exceeds the host limit.
 
 ## 6. Logs and Diagnosis
 
@@ -244,7 +313,7 @@ Current logging:
   them
 - SQLite queue and status fields
 - resource monitor samples in SQLite
-- supervisor logs from `systemd`, `launchd`, `skuld`, containers, or terminals
+- supervisor logs from `systemd`, `launchd`, `skuld`, or terminals
 
 Common diagnostic commands:
 
@@ -362,6 +431,8 @@ TotalSegmentator binary/license, conversion binaries.
 | `scripts/check_project_gate.py` | Validate repository gate completeness. |
 | `scripts/project_doctor.py` | Validate structural documentation coherence. |
 | `scripts/check_runtime_requirements.py` | Compare active Python environment against `requirements.txt`. |
+| `scripts/check_host_stack_manifest.py` | Validate host-local accelerator and worker guardrails. |
+| `scripts/verify_dicom_burned_in_text.py` | OCR-screen local DICOM smoke datasets for burned-in text. |
 | `scripts/install_git_hooks.sh` | Opt-in local pre-commit hook installation. |
 | `scripts/retroactive_recalculate_metrics.py` | Regenerate metrics for existing cases. |
 | `scripts/consolidate_metrics_csv.py` | Export metrics database to CSV. |
@@ -375,7 +446,6 @@ TotalSegmentator binary/license, conversion binaries.
 
 - Architecture: `docs/ARCHITECTURE.md`
 - Contracts: `docs/CONTRACTS.md`
-- API container stack: `docs/CONTAINER_API.md`
 - Runtime requirements: `docs/RUNTIME_REQUIREMENTS.md`
 - API: `docs/API.md`
 - Database: `database/README.md`

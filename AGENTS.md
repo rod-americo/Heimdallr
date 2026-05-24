@@ -21,8 +21,6 @@ When touching persistence, queues, metrics profiles, or host-local config templa
 
 - `database/README.md`
 - `database/schema.sql`
-- `docs/CONTAINER_API.md` when changing API container scope, Dockerfiles, or
-compose services
 - `config/*.example.json`
 - `config/series_selection.json`
 - `config/intake_pipeline.json`
@@ -78,7 +76,7 @@ Do not create production code as loose top-level files. New runtime behavior bel
 - Never create `.env` files.
 - Never add `python-dotenv`.
 - Secrets and host-specific values must be injected by the host supervisor,
-container runtime, or environment.
+runtime supervisor, or environment.
 - Version examples such as `config/*.example.json`.
 - Keep host-local operational files ignored, including:
   - `config/segmentation_pipeline.json`
@@ -89,13 +87,15 @@ container runtime, or environment.
   - `config/presentation.json`
   - `config/space_manager.json`
   - `config/resource_monitor.json`
+  - `config/host_stack/*.json`
 - `config/metrics_pipeline.json` is host-local. When adding a production
 metrics module, update `config/metrics_pipeline.example.json` in the same change.
 - Default presentation locale for this project is `en_US`. Keep `pt_BR` as a
 supported locale, not as the default.
 - Mutable data belongs in `runtime/` or `database/*.db`, both ignored by Git.
-- Container build contexts must not include `runtime/`, database files,
-host-local config JSON, PHI-bearing datasets, or local virtual environments.
+- Operational bundles or transfer artifacts must not include `runtime/`,
+database files, host-local config JSON, PHI-bearing datasets, or local virtual
+environments.
 
 ## 5. Documentation Rules
 

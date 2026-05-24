@@ -316,6 +316,116 @@ so this is not indefinite archival.
 - Retain the original upload ZIP as the reprocessing artifact.
 - Add a separate long-term archive outside the case workspace in this change.
 
+---
+
+### 2026-05-24 - Migrate the runtime contract to Python 3.14
+
+**Context**
+
+macOS MPS validation now needs a Python runtime that aligns with current local
+tooling and available PyTorch wheels, while Heimdallr still needs one canonical
+dependency contract for local development, CI, and the `thor` validation host.
+The previous Python 3.12 baseline is no longer the target for new runtime
+rebuilds.
+
+**Decision**
+
+Set the project runtime contract to Python `>=3.14,<3.15`, update CI and
+operator bootstrap commands to Python 3.14, and pin PyTorch-family dependencies
+to Python 3.14-compatible releases in `requirements.txt`.
+
+**Impact**
+
+- Local and host venvs must be rebuilt before runtime parity claims are made.
+- CI compiles against Python 3.14.
+- `thor` remains the CUDA POC host, but its current Python 3.12 baseline is
+historical until a Python 3.14 venv is provisioned and audited.
+
+**Tradeoff**
+
+- Existing Python 3.12 venvs can still be useful for comparison, but they are no
+longer authoritative for dependency drift or TotalSegmentator smoke.
+- Some heavyweight dependencies may require newer wheels than the former pins.
+
+**Alternatives rejected**
+
+- Keep Python 3.12 as the canonical runtime and run macOS MPS experiments in an
+untracked side environment.
+- Support a broad Python version range without validating dependency parity.
+
+---
+
+### 2026-05-24 - Remove the experimental API container stack
+
+**Context**
+
+The checked-in Dockerfile, compose file, ignore file, and container-specific
+documentation were created for an experiment. Heimdallr's maintained runtime
+model is a set of host-supervised Python services sharing one venv, SQLite
+database, runtime filesystem, and host-local JSON configuration.
+
+**Decision**
+
+Remove the experimental Docker assets and container-specific documentation from
+the repository. Keep operational guidance centered on Python entrypoints and
+host supervisors.
+
+**Impact**
+
+- The repository no longer advertises or maintains a Docker/compose API stack.
+- Runtime setup, restart policy, and validation docs describe the canonical
+host-supervised model only.
+- Future container support would require a new explicit decision and matching
+runtime validation.
+
+**Tradeoff**
+
+- Operators who built local experiments from the removed files must keep those
+outside this repository or reintroduce them through a reviewed architecture
+decision.
+
+**Alternatives rejected**
+
+- Keep stale Docker files as unsupported examples.
+- Convert the whole service stack to containers as part of this change.
+
+---
+
+### 2026-05-24 - Keep per-host stack manifests as ignored guardrails
+
+**Context**
+
+Heimdallr now runs across hosts with different accelerator and concurrency
+profiles: `thor` is the CUDA POC host, `odin` is the local macOS MPS host, and
+`ms-heimdallr` is a conservative CPU POC host. Reusing one host-local
+segmentation or metrics profile across those machines can silently switch
+TotalSegmentator to the wrong device or overrun a smaller host.
+
+**Decision**
+
+Keep concrete host stack manifests under ignored `config/host_stack/*.json`
+files, and provide a versioned validator that checks accelerator policy,
+TotalSegmentator `--device` flags, segmentation concurrency, and metrics worker
+limits against the active host-local pipeline JSON.
+
+**Impact**
+
+- The repository records the guardrail mechanism without versioning concrete
+machine manifests.
+- Operators can validate the current host before restarting segmentation or
+metrics workers.
+- Stored manifests for other hosts can be sanity-checked without comparing them
+to the current machine.
+
+**Tradeoff**
+
+- The guardrail depends on operators keeping the local manifest current when a
+host is rebuilt, renamed, or given new accelerator capacity.
+
+**Alternatives rejected**
+
+- Encode host-specific worker/device choices directly in tracked examples.
+- Trust profile filenames alone to imply CPU, MPS, or CUDA behavior.
 
 ---
 

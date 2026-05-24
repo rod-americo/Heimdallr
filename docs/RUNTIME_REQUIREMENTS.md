@@ -12,10 +12,12 @@ The canonical dependency file is:
 The Python version contract is declared in `pyproject.toml`:
 
 ```text
->=3.12,<3.13
+>=3.14,<3.15
 ```
 
-Use Python 3.12 for runtime rebuilds. Do not treat a locally working Python 3.13 or 3.14 environment as the supported target unless `pyproject.toml`, tests, and host operations are deliberately updated.
+Use Python 3.14 for runtime rebuilds. This line intentionally tracks the macOS
+MPS-capable development target while preserving Linux CUDA validation on `thor`
+through the same `requirements.txt` pins where platform wheels are available.
 
 ## 2. POC Host Baseline
 
@@ -30,10 +32,15 @@ The current in-repository POC venv on `thor` is:
 /home/rodrigo/Heimdallr/.venv
 ```
 
-Observed baseline:
+Previous observed baseline before the Python 3.14 migration:
 
 ```text python: 3.12.3 pip: 24.0 pip check: No broken requirements found. requirements audit: matches requirements.txt gpu: NVIDIA GeForce RTX 3090 torch cuda: available in ~/Heimdallr/.venv
 ```
+
+After this migration, `thor` must be rebuilt or replaced with a Python 3.14
+venv before it is used as an authoritative runtime parity host. Local tests may
+still pass in a partial Python 3.14 environment, but TotalSegmentator smoke
+requires `torch`, `TotalSegmentator`, and the full pinned dependency set.
 
 Historical drift observed in the older external POC venv
 `/home/rodrigo/venvs/totalsegmentator`:
@@ -41,7 +48,7 @@ Historical drift observed in the older external POC venv
 | Item | Observed state | Operational interpretation |
 | --- | --- | --- |
 | `textual==8.1.1` | missing from POC venv | Affects `heimdallr.tui`; core pipeline tests may still pass without exercising TUI runtime. |
-| `xgboost==2.1.4` | `3.1.3` installed | The POC venv is newer than the pinned requirement; do not copy this drift into `requirements.txt` without testing affected metrics. |
+| `xgboost==2.1.4` | `3.1.3` installed | The older POC venv was newer than the pinned requirement; do not copy this drift into `requirements.txt` without testing affected metrics. |
 | `python-dotenv==1.0.1` | installed as extra | Do not add this to `requirements.txt`; `.env` loading remains outside Heimdallr architecture. |
 
 Use `~/Heimdallr/.venv` for new code tests unless the user explicitly asks to
@@ -106,7 +113,34 @@ The command exits non-zero when required packages are missing or pinned versions
 do not match. Extra packages are reported only when they are operationally
 important or when `--show-extras` is passed.
 
-## 5. Rebuild Procedure
+## 5. Host Stack Guardrail
+
+Host-specific accelerator and worker assumptions live in ignored manifests under
+`config/host_stack/*.json`. Use them to keep CPU, MPS, and CUDA hosts from
+accidentally sharing unsafe segmentation device flags or worker counts.
+
+Current host:
+
+```bash
+.venv/bin/python scripts/check_host_stack_manifest.py
+```
+
+Stored manifest for a different host:
+
+```bash
+.venv/bin/python scripts/check_host_stack_manifest.py \
+  --manifest config/host_stack/thor.json \
+  --skip-hostname-check \
+  --manifest-only
+```
+
+Optional runtime accelerator check:
+
+```bash
+.venv/bin/python scripts/check_host_stack_manifest.py --check-accelerator-runtime
+```
+
+## 6. Rebuild Procedure
 
 Do not alter the POC host venv unless the user explicitly asks for a rebuild.
 The current project venv path on `thor` is `~/Heimdallr/.venv`.
@@ -117,7 +151,7 @@ path rather than overwriting the known working one.
 Example new environment:
 
 ```bash
-python3.12 -m venv /home/rodrigo/venvs/heimdallr-YYYYMMDD
+python3.14 -m venv /home/rodrigo/venvs/heimdallr-YYYYMMDD
 source /home/rodrigo/venvs/heimdallr-YYYYMMDD/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r ~/Heimdallr/requirements.txt
@@ -133,13 +167,16 @@ Only promote the new venv after:
 - TotalSegmentator task smoke is verified when segmentation behavior is in
 scope
 
-## 6. Requirements Review Notes
+## 7. Requirements Review Notes
 
 - Keep `requirements.txt` as the rebuild source of truth.
 - Do not add `python-dotenv`.
 - Do not update pins from a working host venv without confirming code impact.
 - CUDA-related packages are Linux x86_64 specific and are guarded by environment
 markers in `requirements.txt`.
+- PyTorch-family pins must stay Python 3.14-compatible. On macOS, confirm MPS
+readiness with `python -c "import torch; print(torch.backends.mps.is_available())"`
+before using MPS for segmentation experiments.
 - Keep `totalseg_get_phase` device and thread policy explicit per host. The
   local macOS stack should use `HEIMDALLR_TOTALSEG_GET_PHASE_DEVICE=cpu` with
   `HEIMDALLR_TOTALSEG_GET_PHASE_THREAD_LIMIT=1` and
