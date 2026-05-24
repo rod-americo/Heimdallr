@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -81,6 +82,15 @@ def _relpath(case_dir: Path, path: Path | None) -> str | None:
         return str(path.relative_to(case_dir))
     except ValueError:
         return str(path)
+
+
+def _clear_metric_outputs(metric_dir: Path) -> None:
+    metric_dir.mkdir(parents=True, exist_ok=True)
+    for child in metric_dir.iterdir():
+        if child.is_dir():
+            shutil.rmtree(child)
+        else:
+            child.unlink()
 
 
 def _load_mask(mask_path: Path) -> np.ndarray:
@@ -564,6 +574,7 @@ def main() -> int:
 
     try:
         case_dir, metric_dir, result_path = metric_output_dir(args.case_id, metric_key)
+        _clear_metric_outputs(metric_dir)
         ct_path = resolve_canonical_nifti(args.case_id)
         total_dir = case_dir / "artifacts" / "total"
         cerebral_bleed_dir = case_dir / "artifacts" / "cerebral_bleed"
