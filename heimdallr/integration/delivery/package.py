@@ -158,7 +158,7 @@ def build_delivery_package(
     metrics_artifacts_root = study_artifacts_dir(case_id) / "metrics"
     instructions_root = metrics_artifacts_root / "instructions"
 
-    if requested.get("report_pdf", True) or requested.get("report_pdf_dicom", False):
+    if requested.get("report_pdf", False) or requested.get("report_pdf_dicom", False):
         report_path = build_case_report(case_root, locale=artifact_locale)
     if requested.get("report_pdf_dicom", False):
         report_dicom_path = _build_report_dicom(case_root, report_path, metadata, artifact_locale)
@@ -189,7 +189,7 @@ def build_delivery_package(
                 if not _is_under(path, instructions_root)
             ]
             builder.add_optional_files("overlays_dicom", overlay_dicom_paths)
-        if requested.get("report_pdf", True):
+        if requested.get("report_pdf", False):
             builder.add_output_file("report_pdf", report_path, "metadata/report.pdf")
         if requested.get("report_pdf_dicom", False):
             builder.add_output_file("report_pdf_dicom", report_dicom_path, f"metadata/{REPORT_DICOM_FILENAME}")

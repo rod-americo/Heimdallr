@@ -21,7 +21,7 @@ DEFAULT_REQUESTED_OUTPUTS = {
     "metrics_json": True,
     "overlays_png": True,
     "overlays_dicom": True,
-    "report_pdf": True,
+    "report_pdf": False,
     "report_pdf_dicom": False,
     "artifact_instructions_pdf": True,
     "artifact_instructions_dicom": True,
