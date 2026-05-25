@@ -470,3 +470,46 @@ thread pools of each phase-detector process. CUDA hosts should set the device to
 
 - Keep relying on `totalseg_get_phase` default device fallback.
 - Use `mps` for phase detection on macOS after a local segfault.
+
+---
+
+### 2026-05-25 - Keep the macOS desktop track in `desktop/`
+
+**Context**
+
+Heimdallr needs a local macOS distribution path that can present a menu bar app,
+guide OsiriX/Horos DICOM setup, manage segmentation profile configuration,
+supervise resident workers, and eventually package a private Python runtime.
+The first implementation needs close coordination with existing engine
+contracts, runtime paths, config examples, and worker entrypoints.
+
+**Decision**
+
+Create a `desktop/` track inside this repository for the initial Swift menu bar
+app, Go daemon, runtime manifests, and macOS packaging work. Keep the Python
+engine under `heimdallr/` as the authoritative implementation of DICOM intake,
+prepare, segmentation, metrics, queues, and DICOM egress. Maintain the detailed
+desktop execution plan in `docs/DESKTOP.md`.
+
+**Impact**
+
+- Desktop and engine contracts can evolve atomically during the proof of
+  concept.
+- Agents have a clear location for Swift, Go, packaging, and manifest work.
+- The monorepo now carries a platform wrapper track, but clinical pipeline
+  behavior remains owned by the existing `heimdallr/` modules.
+
+**Tradeoff**
+
+- The repository will include multiple toolchains when implementation starts.
+- CI and validation must avoid treating desktop packaging artifacts as core
+  engine runtime state.
+- A later split to a separate repository may still be appropriate if desktop
+  releases become independent.
+
+**Alternatives rejected**
+
+- Create a separate `heimdallr-desktop` repository immediately, which would add
+  coordination overhead before the engine/daemon/app contracts are stable.
+- Put Swift, Go, and packaging files as loose top-level directories without a
+  single desktop boundary.

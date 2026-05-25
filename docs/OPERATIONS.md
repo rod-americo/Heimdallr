@@ -14,6 +14,7 @@ Heimdallr is operated as multiple independent Python services that share a singl
 | `thor` | POC code-test host | `~/Heimdallr/.venv` | Keep Git state equal to local before comparing tests. |
 | `validation` | controlled non-PHI or approved clinical validation | supervised Python `.venv` | Requires DICOM peer config, TotalSegmentator readiness, and documented run notes. |
 | `production-like` | operational host under maintainer control | supervised Python `.venv` | Requires backup, restart policy, network controls, and smoke evidence. |
+| `desktop-poc` | planned local macOS desktop proof of concept | Swift app + Go daemon + managed Python runtime | Not notarized initially; must keep mutable state under Application Support. |
 
 ## 3. How to Run
 
@@ -107,6 +108,11 @@ Runtime state:
   `runtime/studies/<case_id>/source/dicom/series/<series-stem>/`
 - SQLite database: `database/dicom.db`
 - static dashboard assets: `static/`
+
+For the planned macOS desktop track, managed user state should live under
+`~/Library/Application Support/Heimdallr/` instead of the app bundle. The
+desktop track is documented in `docs/DESKTOP.md`; until code lands there, the
+canonical operation model remains the supervised Python worker model above.
 
 Tracked config:
 
@@ -471,6 +477,7 @@ TotalSegmentator binary/license, conversion binaries.
 
 - Architecture: `docs/ARCHITECTURE.md`
 - Contracts: `docs/CONTRACTS.md`
+- Desktop track: `docs/DESKTOP.md`
 - Runtime requirements: `docs/RUNTIME_REQUIREMENTS.md`
 - API: `docs/API.md`
 - Database: `database/README.md`

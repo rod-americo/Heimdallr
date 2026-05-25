@@ -58,6 +58,16 @@ Critical dependencies:
 - filesystem permissions for `runtime/` and `database/`.
 - DICOM peer behavior and network reachability.
 
+Desktop packaging track:
+
+- `desktop/` is the planned macOS wrapper track for a Swift menu bar app, a Go
+  daemon, runtime manifests, and macOS packaging assets.
+- The desktop track may install, configure, supervise, and diagnose the Python
+  engine, but it must not reimplement clinical pipeline behavior, queue
+  semantics, segmentation planning, metrics, or artifact generation.
+- The detailed desktop plan and multi-agent execution model are maintained in
+  `docs/DESKTOP.md`.
+
 ## 4. Main Modules
 
 ### 4.1 Composition Roots and Interfaces

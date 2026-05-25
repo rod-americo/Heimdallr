@@ -64,6 +64,7 @@ Heimdallr/
 ├── config/                     # Versioned JSON defaults and host-local examples
 ├── database/                   # SQLite schema and database documentation
 ├── docs/                       # Architecture, contracts, operations, decisions, API
+├── desktop/                    # Planned macOS menu bar app, Go daemon, and packaging track
 ├── scripts/                    # Operational and retroactive maintenance utilities
 ├── static/                     # Dashboard frontend and branding assets
 ├── tests/                      # unittest-based coverage for core workers/jobs
@@ -224,6 +225,7 @@ for timing large Thor segmentation runs.
 | Architecture | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
 | Contracts | [`docs/CONTRACTS.md`](docs/CONTRACTS.md) |
 | Operations | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) |
+| Desktop track | [`docs/DESKTOP.md`](docs/DESKTOP.md) |
 | Runtime requirements | [`docs/RUNTIME_REQUIREMENTS.md`](docs/RUNTIME_REQUIREMENTS.md) |
 | Decisions | [`docs/DECISIONS.md`](docs/DECISIONS.md) |
 | API contracts | [`docs/API.md`](docs/API.md) |

@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "engine": {
+    "name": "heimdallr",
+    "version": "0.2.1",
+    "source": {
+      "type": "local_checkout",
+      "path": "/path/to/Heimdallr"
+    }
+  },
+  "python": {
+    "requires": ">=3.14,<3.15",
+    "runtime_layout": "managed_venv"
+  },
+  "managed_paths": {
+    "application_support": "~/Library/Application Support/Heimdallr",
+    "engine_dir": "engine/{version}",
+    "python_dir": "python",
+    "config_dir": "config",
+    "runtime_dir": "runtime",
+    "database_dir": "database",
+    "logs_dir": "logs",
+    "models_dir": "models",
+    "cache_dir": "cache"
+  },
+  "entrypoints": [
+    "heimdallr.control_plane",
+    "heimdallr.intake",
+    "heimdallr.prepare",
+    "heimdallr.segmentation",
+    "heimdallr.metrics",
+    "heimdallr.dicom_egress",
+    "heimdallr.space_manager",
+    "heimdallr.resource_monitor"
+  ],
+  "dicom_defaults": {
+    "ae_title": "HEIMDALLR",
+    "port": 11114,
+    "preferred_osirix_transfer_syntax": "jpeg_ls_lossless"
+  },
+  "notarization": {
+    "required_for_poc": false
+  }
+}

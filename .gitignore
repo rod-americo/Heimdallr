@@ -63,3 +63,25 @@ config/resource_monitor.json
 config/segmentation_pipeline.json
 config/space_manager.json
 config/host_stack/*.json
+
+# Desktop local build and runtime artifacts
+desktop/**/.build/
+desktop/**/.swiftpm/
+desktop/**/DerivedData/
+desktop/**/build/
+desktop/**/dist/
+desktop/**/release/
+desktop/**/*.app/
+desktop/**/*.dmg
+desktop/**/*.pkg
+desktop/**/*.xcarchive/
+desktop/**/*.xcresult/
+desktop/**/coverage.out
+desktop/**/bin/
+desktop/**/runtime/
+desktop/**/database/
+desktop/**/logs/
+desktop/**/models/
+desktop/**/cache/
+desktop/**/certs/
+desktop/**/profiles/
