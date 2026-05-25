@@ -68,9 +68,11 @@ geometry-compatible, non-empty, and complete along the scan axis. It runs
 `cerebral_bleed` and `brain_structures` only when the `total/brain.nii.gz` mask
 is present, geometry-compatible, non-empty, and does not touch scan bounds.
 `total/skull.nii.gz` is retained as optional crop and diagnostic context; skull
-truncation does not block head QC or DICOM export when the brain mask is
-complete. The `head_complete_qc` job is enabled in the tracked default metrics
-profile, but it emits only a result JSON when the brain gate fails. When the
+truncation does not block head QC or DICOM export when the brain mask and
+required head tasks are complete. The `head_complete_qc` job is enabled in the
+tracked default metrics profile, but it emits only a result JSON when the brain
+gate fails or when required `cerebral_bleed` / `brain_structures` outputs are
+missing, incompatible, empty where required, or truncated. When the complete-head
 gate passes, it writes a normalized axial head CT NIfTI
 artifact, writes a canonical RAS 2 mm NIfTI artifact, writes a 1 mm
 slice-spacing brain-mask geometry NIfTI artifact whose output plane is defined

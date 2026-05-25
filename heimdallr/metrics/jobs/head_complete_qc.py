@@ -721,39 +721,7 @@ def main() -> int:
             print(json.dumps(payload, indent=2))
             return 0
 
-        normalization_spec = parse_normalization_spec(job_config)
-        normalization = normalize_nifti_to_axial(ct_path, normalized_path, normalization_spec)
-        normalization = _rewrite_normalized_relpath(case_dir, normalization)
-        normalization_2mm = normalize_nifti_to_ras_isotropic(
-            ct_path,
-            normalized_2mm_path,
-            voxel_size_mm=float(job_config.get("anatomic_normalized_spacing_mm", 2.0)),
-            write_normalized_nifti=bool(job_config.get("write_anatomic_normalized_nifti", True)),
-        )
-        normalization_2mm = _rewrite_normalized_relpath(case_dir, normalization_2mm)
         brain_mask_path = total_dir / "brain.nii.gz"
-        brain_geometry_in_plane_spacing = job_config.get("brain_geometry_normalized_in_plane_spacing_mm")
-        if brain_geometry_in_plane_spacing is not None:
-            brain_geometry_in_plane_spacing = (
-                float(brain_geometry_in_plane_spacing[0]),
-                float(brain_geometry_in_plane_spacing[1]),
-            )
-        normalization_brain_geometry_2mm = normalize_nifti_to_brain_mask_geometry_isotropic(
-            ct_path,
-            brain_mask_path,
-            normalized_brain_geometry_path,
-            brain_structures_dir=brain_structures_dir,
-            crop_mask_path=total_dir / "skull.nii.gz",
-            crop_margin_mm=float(job_config.get("brain_geometry_crop_margin_mm", 25.0)),
-            voxel_size_mm=float(job_config.get("brain_geometry_normalized_spacing_mm", 1.0)),
-            in_plane_spacing_mm=brain_geometry_in_plane_spacing,
-            write_normalized_nifti=bool(job_config.get("write_brain_geometry_normalized_nifti", True)),
-        )
-        normalization_brain_geometry_2mm = _rewrite_normalized_relpath(
-            case_dir,
-            normalization_brain_geometry_2mm,
-        )
-
         bleed_status = _bleed_mask_status(
             cerebral_bleed_dir / f"{BLEED_MASK_NAME}.nii.gz",
             spacing_xyz,
@@ -797,6 +765,83 @@ def main() -> int:
             head_complete
             and bleed_status.get("task_complete")
             and brain_structures["complete"]
+        )
+        if not required_segmentation_complete:
+            payload = {
+                "metric_key": metric_key,
+                "status": "done",
+                "case_id": args.case_id,
+                "inputs": payload["inputs"],
+                "measurement": {
+                    "job_status": "incomplete_head_segmentation",
+                    "head_complete_without_truncation": head_complete,
+                    "required_segmentation_complete": False,
+                    "source_spacing_mm": {
+                        "x": spacing_xyz[0],
+                        "y": spacing_xyz[1],
+                        "z": spacing_xyz[2],
+                    },
+                    "source_shape": [int(value) for value in reference_shape],
+                    "head_definition": {
+                        "components": ["brain"],
+                        "optional_components": ["skull"],
+                        "rule": "head QC passes when the brain mask is present, non-empty, and does not touch scan bounds; skull is informational and may be truncated",
+                    },
+                    "brain_complete_without_truncation": head_complete,
+                    "head_components": head_components,
+                    "head_union": head_union,
+                    "cerebral_bleed": {
+                        "mask_name": BLEED_MASK_NAME,
+                        "mask": bleed_status,
+                        "segmented_hemorrhage_volume_cm3": bleed_status.get("volume_cm3"),
+                        "segmented_hemorrhage_present": bool(
+                            bleed_status.get("segmented_hemorrhage_present")
+                        ),
+                        "raw_has_cerebral_bleed": raw_has_cerebral_bleed,
+                        "anatomic_support_qc": bleed_support_qc,
+                        "has_cerebral_bleed": has_cerebral_bleed,
+                        "notification_bool": has_cerebral_bleed,
+                        "overlay_exported_slabs": [],
+                    },
+                    "brain_structures": brain_structures,
+                },
+                "artifacts": {"result_json": _relpath(case_dir, result_path)},
+                "dicom_exports": [],
+            }
+            write_payload(result_path, payload)
+            print(json.dumps(payload, indent=2))
+            return 0
+
+        normalization_spec = parse_normalization_spec(job_config)
+        normalization = normalize_nifti_to_axial(ct_path, normalized_path, normalization_spec)
+        normalization = _rewrite_normalized_relpath(case_dir, normalization)
+        normalization_2mm = normalize_nifti_to_ras_isotropic(
+            ct_path,
+            normalized_2mm_path,
+            voxel_size_mm=float(job_config.get("anatomic_normalized_spacing_mm", 2.0)),
+            write_normalized_nifti=bool(job_config.get("write_anatomic_normalized_nifti", True)),
+        )
+        normalization_2mm = _rewrite_normalized_relpath(case_dir, normalization_2mm)
+        brain_geometry_in_plane_spacing = job_config.get("brain_geometry_normalized_in_plane_spacing_mm")
+        if brain_geometry_in_plane_spacing is not None:
+            brain_geometry_in_plane_spacing = (
+                float(brain_geometry_in_plane_spacing[0]),
+                float(brain_geometry_in_plane_spacing[1]),
+            )
+        normalization_brain_geometry_2mm = normalize_nifti_to_brain_mask_geometry_isotropic(
+            ct_path,
+            brain_mask_path,
+            normalized_brain_geometry_path,
+            brain_structures_dir=brain_structures_dir,
+            crop_mask_path=total_dir / "skull.nii.gz",
+            crop_margin_mm=float(job_config.get("brain_geometry_crop_margin_mm", 25.0)),
+            voxel_size_mm=float(job_config.get("brain_geometry_normalized_spacing_mm", 1.0)),
+            in_plane_spacing_mm=brain_geometry_in_plane_spacing,
+            write_normalized_nifti=bool(job_config.get("write_brain_geometry_normalized_nifti", True)),
+        )
+        normalization_brain_geometry_2mm = _rewrite_normalized_relpath(
+            case_dir,
+            normalization_brain_geometry_2mm,
         )
         artifacts = {
             "result_json": _relpath(case_dir, result_path),

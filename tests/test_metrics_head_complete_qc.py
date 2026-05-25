@@ -264,6 +264,8 @@ class TestHeadCompleteQcJob(unittest.TestCase):
             (case_dir / "metadata").mkdir(parents=True)
             (case_dir / "derived").mkdir(parents=True)
             (case_dir / "artifacts" / "total").mkdir(parents=True)
+            (case_dir / "artifacts" / "cerebral_bleed").mkdir(parents=True)
+            (case_dir / "artifacts" / "brain_structures").mkdir(parents=True)
             (case_dir / "metadata" / "id.json").write_text(
                 json.dumps({"CaseID": case_id, "Modality": "CT"}),
                 encoding="utf-8",
@@ -273,11 +275,26 @@ class TestHeadCompleteQcJob(unittest.TestCase):
             ct = np.zeros(shape, dtype=np.float32)
             skull = np.zeros(shape, dtype=np.float32)
             brain = np.zeros(shape, dtype=np.float32)
+            bleed = np.zeros(shape, dtype=np.float32)
             skull[0:8, 2:8, 1:7] = 1.0
             brain[3:7, 3:7, 2:6] = 1.0
             write_nifti(case_dir / "derived" / f"{case_id}.nii.gz", ct)
             write_nifti(case_dir / "artifacts" / "total" / "skull.nii.gz", skull)
             write_nifti(case_dir / "artifacts" / "total" / "brain.nii.gz", brain)
+            write_nifti(
+                case_dir / "artifacts" / "cerebral_bleed" / "intracerebral_hemorrhage.nii.gz",
+                bleed,
+            )
+            for idx, mask_name in enumerate(BRAIN_STRUCTURE_MASKS):
+                structure = np.zeros(shape, dtype=np.float32)
+                x = 3 + (idx % 2)
+                y = 3 + ((idx // 2) % 2)
+                z = 2 + (idx % 2)
+                structure[x : x + 2, y : y + 2, z : z + 2] = 1.0
+                write_nifti(
+                    case_dir / "artifacts" / "brain_structures" / f"{mask_name}.nii.gz",
+                    structure,
+                )
 
             with patch.object(settings, "STUDIES_DIR", tmp_path):
                 with patch.object(
@@ -312,6 +329,80 @@ class TestHeadCompleteQcJob(unittest.TestCase):
                 "complete",
             )
             self.assertIn("normalization_brain_geometry_2mm", result["measurement"])
+
+    def test_job_suppresses_artifacts_when_brain_structures_are_incomplete(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            case_id = "CaseHeadIncompleteStructures_20260525_001"
+            case_dir = tmp_path / case_id
+            (case_dir / "metadata").mkdir(parents=True)
+            (case_dir / "derived").mkdir(parents=True)
+            (case_dir / "artifacts" / "total").mkdir(parents=True)
+            (case_dir / "artifacts" / "cerebral_bleed").mkdir(parents=True)
+            (case_dir / "artifacts" / "brain_structures").mkdir(parents=True)
+            (case_dir / "metadata" / "id.json").write_text(
+                json.dumps({"CaseID": case_id, "Modality": "CT"}),
+                encoding="utf-8",
+            )
+
+            shape = (12, 12, 8)
+            ct = np.zeros(shape, dtype=np.float32)
+            skull = np.zeros(shape, dtype=np.float32)
+            brain = np.zeros(shape, dtype=np.float32)
+            bleed = np.zeros(shape, dtype=np.float32)
+            skull[1:11, 1:11, 1:7] = 1.0
+            brain[3:9, 3:9, 2:6] = 1.0
+            write_nifti(case_dir / "derived" / f"{case_id}.nii.gz", ct)
+            write_nifti(case_dir / "artifacts" / "total" / "skull.nii.gz", skull)
+            write_nifti(case_dir / "artifacts" / "total" / "brain.nii.gz", brain)
+            write_nifti(
+                case_dir / "artifacts" / "cerebral_bleed" / "intracerebral_hemorrhage.nii.gz",
+                bleed,
+            )
+            for idx, mask_name in enumerate(BRAIN_STRUCTURE_MASKS):
+                structure = np.zeros(shape, dtype=np.float32)
+                if idx == 0:
+                    structure[3:6, 3:6, 0:3] = 1.0
+                else:
+                    structure[4:6, 4:6, 3:5] = 1.0
+                write_nifti(
+                    case_dir / "artifacts" / "brain_structures" / f"{mask_name}.nii.gz",
+                    structure,
+                )
+
+            with patch.object(settings, "STUDIES_DIR", tmp_path):
+                with patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "head_complete_qc",
+                        "--case-id",
+                        case_id,
+                        "--job-config-json",
+                        json.dumps(
+                            {
+                                "emit_secondary_capture_dicom": True,
+                                "emit_brain_geometry_dicom_series": True,
+                            }
+                        ),
+                    ],
+                ):
+                    self.assertEqual(head_complete_qc.main(), 0)
+
+            result_path = case_dir / "artifacts" / "metrics" / "head_complete_qc" / "result.json"
+            result = json.loads(result_path.read_text(encoding="utf-8"))
+
+            self.assertEqual(result["measurement"]["job_status"], "incomplete_head_segmentation")
+            self.assertTrue(result["measurement"]["brain_complete_without_truncation"])
+            self.assertFalse(result["measurement"]["required_segmentation_complete"])
+            self.assertFalse(result["measurement"]["brain_structures"]["complete"])
+            self.assertIn("brainstem", result["measurement"]["brain_structures"]["incomplete"])
+            self.assertEqual(result["artifacts"], {"result_json": "artifacts/metrics/head_complete_qc/result.json"})
+            self.assertEqual(result["dicom_exports"], [])
+            self.assertNotIn("normalization_brain_geometry_2mm", result["measurement"])
+            metric_dir = case_dir / "artifacts" / "metrics" / "head_complete_qc"
+            self.assertFalse((metric_dir / "brain_geometry_ct_2mm_dicom").exists())
+            self.assertFalse((metric_dir / "brain_structures_dicom").exists())
 
     def test_job_exports_positive_bleed_overlay_and_notification_bool(self):
         with tempfile.TemporaryDirectory() as tmp:
