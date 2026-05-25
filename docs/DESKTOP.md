@@ -98,6 +98,18 @@ Non-responsibilities:
 - parsing clinical DICOM content beyond display-safe configuration checks;
 - generating clinical artifacts.
 
+Menu bar icon contract:
+
+- use the black SVG source at
+  `docs/branding/vectors/heimdallr_icon_variant_01_black.svg`;
+- render `MenuBarIcon.imageset` as a black transparent template image at
+  `18 x 18`, `36 x 36`, and `54 x 54` canvases;
+- render the SVG mark inside those canvases at `16 x 16`, `32 x 32`, and
+  `48 x 48` respectively so it has menu bar padding;
+- use `NSStatusItem.squareLength`, `image.isTemplate = true`, and an image size
+  of `18 x 18` in Swift;
+- do not redraw the mark manually in Swift or CoreGraphics.
+
 ### Go Daemon
 
 Responsibilities:
