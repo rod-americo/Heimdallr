@@ -4,11 +4,132 @@
     "job_addition": "To add a new job, create the module under heimdallr/metrics/jobs/ and declare it in jobs[]. Use jobs[].module only for non-conventional names inside heimdallr.metrics.jobs.",
     "parallel_execution": "Profiles may set execution.max_parallel_jobs. Jobs may declare needs to wait for prerequisite job names while still allowing independent jobs to run in parallel.",
     "segmentation_requirements": "Jobs should declare requires_segmentation_tasks so external requested_metrics_modules can avoid unnecessary TotalSegmentator tasks.",
+    "inventory_requirements": "Automatic CT jobs should declare requires_inventory so the metrics worker only runs jobs compatible with the total segmentation inventory.",
     "experimental_jobs": "Experimental metrics modules should live under heimdallr.metrics.jobs.tests or heimdallr.metrics.analysis and be enabled only via explicit jobs[].module overrides in host-local config.",
     "secondary_capture_transfer_syntax": "Jobs that emit Secondary Capture DICOM may set secondary_capture_transfer_syntax to original, deflated, jpeg_ls_lossless, jpeg_2000_lossless, or rle_lossless. Head derived CT DICOM may set derived_ct_transfer_syntax with the same values."
   },
-  "default_profile": "ct_native_basic_metrics",
+  "default_profile": "ct_automatic_metrics",
   "profiles": {
+    "ct_automatic_metrics": {
+      "planning": {
+        "mode": "automatic_ct"
+      },
+      "required": {
+        "modality": "CT",
+        "selected_phase": [
+          "native",
+          "unknown"
+        ]
+      },
+      "execution": {
+        "max_parallel_jobs": 4,
+        "instruction_dicom_kind": "secondary_capture"
+      },
+      "jobs": [
+        {
+          "name": "l3_muscle_area",
+          "enabled": true,
+          "requires_segmentation_tasks": [
+            "total",
+            "tissue_types"
+          ],
+          "requires_inventory": [
+            "vertebrae_L3.complete"
+          ],
+          "generate_overlay": true,
+          "emit_secondary_capture_dicom": true,
+          "secondary_capture_transfer_syntax": "jpeg_ls_lossless",
+          "secondary_capture_max_dimension": 1024
+        },
+        {
+          "name": "parenchymal_organ_volumetry",
+          "enabled": true,
+          "requires_segmentation_tasks": [
+            "total"
+          ],
+          "requires_inventory": [
+            "parenchymal_organs.any_present"
+          ],
+          "generate_overlay": true,
+          "emit_secondary_capture_dicom": true,
+          "secondary_capture_transfer_syntax": "jpeg_ls_lossless"
+        },
+        {
+          "name": "brain_volumetry",
+          "enabled": false,
+          "requires_segmentation_tasks": [
+            "total"
+          ],
+          "requires_inventory": [
+            "brain.complete"
+          ],
+          "generate_overlay": true,
+          "emit_secondary_capture_dicom": true,
+          "secondary_capture_transfer_syntax": "jpeg_ls_lossless"
+        },
+        {
+          "name": "head_complete_qc",
+          "enabled": true,
+          "automatic": true,
+          "requires_segmentation_tasks": [
+            "total",
+            "cerebral_bleed",
+            "brain_structures"
+          ],
+          "requires_inventory": [
+            "brain.complete"
+          ],
+          "target_plane": "axial",
+          "target_in_plane_spacing_mm": [
+            1.0,
+            1.0
+          ],
+          "target_slice_thickness_mm": 5.0,
+          "write_normalized_nifti": true,
+          "emit_secondary_capture_dicom": true,
+          "secondary_capture_transfer_syntax": "jpeg_ls_lossless",
+          "overlay_slice_thickness_mm": 3.0,
+          "bleed_overlay_slice_thickness_mm": 5.0,
+          "anatomic_normalized_spacing_mm": 2.0,
+          "write_anatomic_normalized_nifti": true,
+          "brain_geometry_normalized_in_plane_spacing_mm": null,
+          "brain_geometry_normalized_spacing_mm": 1.0,
+          "brain_geometry_slice_thickness_mm": 2.0,
+          "derived_ct_transfer_syntax": "jpeg_ls_lossless",
+          "brain_geometry_crop_margin_mm": 25.0,
+          "write_brain_geometry_normalized_nifti": true,
+          "emit_brain_geometry_dicom_series": true
+        },
+        {
+          "name": "bone_health_l1_hu",
+          "enabled": true,
+          "requires_segmentation_tasks": [
+            "total"
+          ],
+          "requires_inventory": [
+            "vertebrae_L3.complete"
+          ],
+          "generate_overlay": true,
+          "strict_qc": false,
+          "secondary_capture_transfer_syntax": "jpeg_ls_lossless"
+        },
+        {
+          "name": "vat_sat_ratio",
+          "enabled": true,
+          "requires_segmentation_tasks": [
+            "total",
+            "tissue_types"
+          ],
+          "requires_inventory": [
+            "vertebrae_L3.complete"
+          ],
+          "generate_overlay": true,
+          "emit_secondary_capture_dicom": true,
+          "secondary_capture_transfer_syntax": "jpeg_ls_lossless",
+          "secondary_capture_max_dimension": 1024
+        }
+      ]
+    },
     "ct_native_basic_metrics": {
       "required": {
         "modality": "CT",
@@ -52,36 +173,6 @@
           "generate_overlay": true,
           "emit_secondary_capture_dicom": true,
           "secondary_capture_transfer_syntax": "jpeg_ls_lossless"
-        },
-        {
-          "name": "head_complete_qc",
-          "enabled": true,
-          "automatic": true,
-          "requires_segmentation_tasks": [
-            "total",
-            "cerebral_bleed",
-            "brain_structures"
-          ],
-          "target_plane": "axial",
-          "target_in_plane_spacing_mm": [
-            1.0,
-            1.0
-          ],
-          "target_slice_thickness_mm": 5.0,
-          "write_normalized_nifti": true,
-          "emit_secondary_capture_dicom": true,
-          "secondary_capture_transfer_syntax": "jpeg_ls_lossless",
-          "overlay_slice_thickness_mm": 3.0,
-          "bleed_overlay_slice_thickness_mm": 5.0,
-          "anatomic_normalized_spacing_mm": 2.0,
-          "write_anatomic_normalized_nifti": true,
-          "brain_geometry_normalized_in_plane_spacing_mm": null,
-          "brain_geometry_normalized_spacing_mm": 1.0,
-          "brain_geometry_slice_thickness_mm": 2.0,
-          "derived_ct_transfer_syntax": "jpeg_ls_lossless",
-          "brain_geometry_crop_margin_mm": 25.0,
-          "write_brain_geometry_normalized_nifti": true,
-          "emit_brain_geometry_dicom_series": true
         },
         {
           "name": "bone_health_l1_hu",

@@ -169,23 +169,23 @@ automatically.
 
 When the active metrics profile declares `requires_segmentation_tasks` for the
 requested, dependency, or automatic jobs, the segmentation worker limits
-TotalSegmentator tasks to the union of those requirements. For example, a
-request that only includes `bone_health_l1_hu` can run `total` without
-`tissue_types`, while automatic head gatekeeping can still add
-`cerebral_bleed` and `brain_structures` to the plan and skip them at runtime
-unless `total/brain.nii.gz` is complete. `total/skull.nii.gz` is optional crop
-and diagnostic context and may be truncated.
+TotalSegmentator tasks to the union of those requirements. In automatic CT
+profiles, `total` runs first and writes `artifacts/segmentation_inventory.json`;
+configured `requires_inventory` values then decide which requested, dependency,
+or automatic jobs are compatible with the case. For example, L3-dependent jobs
+require complete L3, organ volumetry requires at least one present parenchymal
+organ mask, and head tasks require complete brain. `total/skull.nii.gz` is
+optional crop and diagnostic context and may be truncated.
 The
 `brain_volumetry` job is present in the tracked example profile as disabled
 opt-in behavior; hosts must enable it in their local metrics profile before
 external jobs can request it.
 
-The tracked default profile enables `head_complete_qc` behind automatic
-gatekeepers. The segmentation worker passes each task's configured `extra_args`
-through to TotalSegmentator, including `total`. It runs `tissue_types` only when
-the L3 mask from `total` is complete, and runs `cerebral_bleed` plus
-`brain_structures` only when the brain mask from `total` is complete. Skull
-truncation is reported but does not block the head workflow.
+The tracked default profiles are `ct_automatic_segmentation` and
+`ct_automatic_metrics`. The segmentation worker passes each task's configured
+`extra_args` through to TotalSegmentator, including `total`, then uses the
+segmentation inventory to select compatible submodules. Skull truncation is
+reported but does not block the head workflow.
 `head_complete_qc` writes only a result JSON when the brain gate fails. When the
 gate passes, it can emit brain-geometry
 normalized CT DICOM, translated brain-structure volume and overlay artifacts,

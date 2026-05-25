@@ -94,7 +94,9 @@ Optional fields:
 - `requested_metrics_modules` as JSON array or CSV string for requested metrics
 jobs from the active profile. Declared metrics dependencies and enabled
 `automatic=true` jobs are included, and declared `requires_segmentation_tasks`
-values can narrow the segmentation task set before metrics run.
+values can narrow the segmentation task set before metrics run. Automatic CT
+profiles then filter the compatible job set with the `total` segmentation
+inventory.
 - `artifact_locale` as an optional presentation locale for generated
 presentation artifacts when supported, including localized burned-in overlays
 and case-report DICOM metadata.
@@ -155,13 +157,17 @@ paths.
 - `config/metrics_pipeline.example.json` must be updated when adding a new
 production metrics module.
 - The automatic CT segmentation workflow passes each task's configured
-`extra_args` through to TotalSegmentator, including `total`. It runs
-`tissue_types` only when `total/vertebrae_L3.nii.gz` is present,
-geometry-compatible, non-empty, and complete along the scan axis. The
-complete-head workflow treats `total/brain.nii.gz` as the required gate mask and
-requires it to be present, non-empty, geometry matched, and not touching scan
-bounds. `total/skull.nii.gz` is optional crop and diagnostic context; skull
-truncation is reported but does not block `cerebral_bleed` or
+`extra_args` through to TotalSegmentator, including `total`. It writes
+`artifacts/segmentation_inventory.json` after `total` and uses configured
+`requires_inventory` requirements to select compatible metrics and downstream
+segmentation tasks. It runs `tissue_types` only when `total/vertebrae_L3.nii.gz`
+is present, geometry-compatible, non-empty, and complete along the scan axis.
+Organ volumetry is compatible when at least one configured parenchymal organ
+mask is present. The complete-head workflow treats `total/brain.nii.gz` as the
+required gate mask and requires it to be present, non-empty, geometry matched,
+and not touching scan bounds. `total/skull.nii.gz` is optional crop and
+diagnostic context; skull truncation is reported but does not block
+`cerebral_bleed` or
 `brain_structures` TotalSegmentator tasks. The
 machine-readable bleed notification field is
 `measurement.cerebral_bleed.has_cerebral_bleed` and mirrors

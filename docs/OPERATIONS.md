@@ -255,10 +255,15 @@ host-specific accelerator choices:
 - local macOS/Odin: `total` with `--fast --device mps`.
 - CPU POC: `total` with `--fast --device cpu`.
 
-The tracked automatic CT examples gate `tissue_types` on a complete L3 mask and
-gate `cerebral_bleed` plus `brain_structures` on a complete `total/brain.nii.gz`
-mask. The `total/skull.nii.gz` mask is optional crop and diagnostic context;
-skull truncation is reported but does not block the head workflow.
+The tracked automatic CT examples use `ct_automatic_segmentation` and
+`ct_automatic_metrics` by default. The segmentation worker runs `total` first,
+writes `artifacts/segmentation_inventory.json`, and uses that inventory to
+select compatible metrics and any additional segmentation tasks. L3-dependent
+body jobs require a complete L3 mask, organ volumetry requires at least one
+present parenchymal organ mask, and `cerebral_bleed` plus `brain_structures`
+require a complete `total/brain.nii.gz` mask. The `total/skull.nii.gz` mask is
+optional crop and diagnostic context; skull truncation is reported but does not
+block the head workflow.
 For dedicated complete-head CT validation, hosts can still use profiles derived
 from the tracked examples:
 

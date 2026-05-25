@@ -26,12 +26,12 @@ def write_nifti(path: Path, data: np.ndarray, spacing=(1.0, 1.0, 1.0)) -> None:
 
 
 class TestHeadCompleteQcJob(unittest.TestCase):
-    def test_example_profiles_define_opt_in_head_workflow(self):
+    def test_example_profiles_define_automatic_and_manual_head_workflows(self):
         metrics_config_path = ROOT / "config" / "metrics_pipeline.example.json"
         config = json.loads(metrics_config_path.read_text(encoding="utf-8"))
-        basic_jobs = {
+        automatic_jobs = {
             job["name"]: job
-            for job in config["profiles"]["ct_native_basic_metrics"]["jobs"]
+            for job in config["profiles"]["ct_automatic_metrics"]["jobs"]
         }
         head_jobs = {
             job["name"]: job
@@ -39,8 +39,10 @@ class TestHeadCompleteQcJob(unittest.TestCase):
         }
         head_profile = config["profiles"]["ct_head_complete_metrics"]
 
-        self.assertTrue(basic_jobs["head_complete_qc"]["enabled"])
-        self.assertTrue(basic_jobs["head_complete_qc"]["automatic"])
+        self.assertEqual(config["default_profile"], "ct_automatic_metrics")
+        self.assertTrue(automatic_jobs["head_complete_qc"]["enabled"])
+        self.assertTrue(automatic_jobs["head_complete_qc"]["automatic"])
+        self.assertEqual(automatic_jobs["head_complete_qc"]["requires_inventory"], ["brain.complete"])
         self.assertTrue(head_jobs["head_complete_qc"]["enabled"])
         self.assertEqual(head_profile["required"]["selected_phase"], ["native", "unknown"])
         self.assertEqual(

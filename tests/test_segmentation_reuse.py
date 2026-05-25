@@ -20,6 +20,7 @@ from heimdallr.segmentation.worker import (
     should_reuse_existing_segmentation,
 )
 from heimdallr.shared import store
+from heimdallr.shared.segmentation_inventory import build_segmentation_inventory
 
 
 def write_nifti(path: Path, data: np.ndarray, spacing=(1.0, 1.0, 1.0)) -> None:
@@ -29,6 +30,30 @@ def write_nifti(path: Path, data: np.ndarray, spacing=(1.0, 1.0, 1.0)) -> None:
 
 
 class TestSegmentationReuse(unittest.TestCase):
+    def test_build_segmentation_inventory_uses_brain_l3_and_organ_presence(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            nifti_path = root / "image.nii.gz"
+            total_dir = root / "artifacts" / "total"
+            write_nifti(nifti_path, np.zeros((10, 10, 10), dtype=np.float32))
+
+            brain = np.zeros((10, 10, 10), dtype=np.float32)
+            brain[3:7, 3:7, 3:7] = 1.0
+            l3 = np.zeros((10, 10, 10), dtype=np.float32)
+            l3[3:7, 3:7, 3:7] = 1.0
+            liver = np.zeros((10, 10, 10), dtype=np.float32)
+            liver[1:8, 1:8, 0:4] = 1.0
+            write_nifti(total_dir / "brain.nii.gz", brain)
+            write_nifti(total_dir / "vertebrae_L3.nii.gz", l3)
+            write_nifti(total_dir / "liver.nii.gz", liver)
+
+            inventory = build_segmentation_inventory(total_dir, nifti_path)
+
+        self.assertTrue(inventory["brain"]["complete"])
+        self.assertTrue(inventory["vertebrae_L3"]["complete"])
+        self.assertEqual(inventory["parenchymal_organs"]["present"], ["liver"])
+        self.assertTrue(inventory["parenchymal_organs"]["any_present"])
+
     def test_segment_case_propagates_worker_shutdown_for_queue_retry(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             base = Path(tmpdir)
@@ -415,6 +440,93 @@ class TestSegmentationReuse(unittest.TestCase):
             [task["name"] for task in info["tasks"]],
             ["total", "cerebral_bleed", "brain_structures"],
         )
+
+    def test_run_automatic_ct_pipeline_uses_inventory_to_select_tasks(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            case_output = Path(tmpdir) / "CaseAutomatic"
+            artifacts_dir = case_output / "artifacts"
+            log_dir = case_output / "logs"
+            nifti_path = case_output / "derived" / "CaseAutomatic.nii.gz"
+            write_nifti(nifti_path, np.zeros((10, 10, 10), dtype=np.float32))
+            calls: list[str] = []
+
+            def fake_run_task(task_name, _input_file, output_folder, extra_args=None, log_file=None):
+                calls.append(task_name)
+                if task_name == "total":
+                    l3 = np.zeros((10, 10, 10), dtype=np.float32)
+                    liver = np.zeros((10, 10, 10), dtype=np.float32)
+                    l3[3:7, 3:7, 3:7] = 1.0
+                    liver[1:8, 1:8, 0:4] = 1.0
+                    write_nifti(Path(output_folder) / "vertebrae_L3.nii.gz", l3)
+                    write_nifti(Path(output_folder) / "liver.nii.gz", liver)
+                else:
+                    Path(output_folder, "mask.nii.gz").write_bytes(gzip.compress(b"ok"))
+
+            metrics_profile = {
+                "jobs": [
+                    {
+                        "name": "l3_muscle_area",
+                        "requires_segmentation_tasks": ["total", "tissue_types"],
+                        "requires_inventory": ["vertebrae_L3.complete"],
+                    },
+                    {
+                        "name": "head_complete_qc",
+                        "automatic": True,
+                        "requires_segmentation_tasks": [
+                            "total",
+                            "cerebral_bleed",
+                            "brain_structures",
+                        ],
+                        "requires_inventory": ["brain.complete"],
+                    },
+                    {
+                        "name": "parenchymal_organ_volumetry",
+                        "requires_segmentation_tasks": ["total"],
+                        "requires_inventory": ["parenchymal_organs.any_present"],
+                    },
+                ],
+            }
+
+            with (
+                patch(
+                    "heimdallr.segmentation.worker.resolve_segmentation_plan",
+                    return_value=(
+                        "ct_automatic_segmentation",
+                        [
+                            {"name": "total", "output_dir": "artifacts/total"},
+                            {"name": "tissue_types", "output_dir": "artifacts/tissue_types"},
+                            {"name": "cerebral_bleed", "output_dir": "artifacts/cerebral_bleed"},
+                            {"name": "brain_structures", "output_dir": "artifacts/brain_structures"},
+                        ],
+                    ),
+                ),
+                patch(
+                    "heimdallr.segmentation.worker.load_metrics_pipeline_profile_for_segmentation",
+                    return_value=("ct_automatic_metrics", metrics_profile),
+                ),
+                patch("heimdallr.segmentation.worker.run_task", side_effect=fake_run_task),
+            ):
+                info = run_segmentation_pipeline(
+                    case_id="CaseAutomatic",
+                    modality="CT",
+                    selected_phase="native",
+                    nifti_path=nifti_path,
+                    case_output=case_output,
+                    artifacts_dir=artifacts_dir,
+                    log_dir=log_dir,
+                    logger=PipelineLogger(None),
+                )
+
+            self.assertEqual(calls, ["total", "tissue_types"])
+            self.assertEqual(
+                info["automatic_ct_plan"]["selected_jobs"],
+                ["l3_muscle_area", "parenchymal_organ_volumetry"],
+            )
+            self.assertEqual(
+                [task["name"] for task in info["skipped_tasks"]],
+                ["cerebral_bleed", "brain_structures"],
+            )
+            self.assertTrue((artifacts_dir / "segmentation_inventory.json").exists())
 
     def test_record_segmentation_pipeline_state_closes_failed_stage(self):
         with tempfile.TemporaryDirectory() as tmpdir:

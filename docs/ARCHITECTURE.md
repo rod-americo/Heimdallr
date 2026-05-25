@@ -123,8 +123,11 @@ then uses measured DICOM coverage and z-spacing when available to prefer
 maximum coverage before thinner reconstructions.
 - segmentation task gatekeepers in `heimdallr/segmentation/worker.py`. The
 automatic CT path passes each task's configured `extra_args` to
-TotalSegmentator, gates `tissue_types` on a complete L3 mask, and gates
-head-specific `cerebral_bleed` and `brain_structures` tasks on a complete
+TotalSegmentator, runs `total` first, writes a segmentation inventory from the
+`total` masks, and uses that inventory to choose compatible downstream metrics
+and required segmentation tasks. The inventory gates L3-dependent body jobs on
+a complete L3 mask, organ volumetry on at least one present parenchymal organ,
+and head-specific `cerebral_bleed` plus `brain_structures` tasks on a complete
 brain mask. The skull mask is optional crop and diagnostic context and may be
 truncated.
 - metrics jobs under `heimdallr/metrics/jobs/`.

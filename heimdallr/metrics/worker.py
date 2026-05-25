@@ -25,7 +25,14 @@ from heimdallr.integration.delivery import enqueue_case_delivery, enqueue_case_f
 from heimdallr.metrics.jobs._dicom_encapsulated_pdf import create_encapsulated_pdf_dicom
 from heimdallr.dicom_egress.config import build_egress_queue_items
 from heimdallr.shared import settings, store
+from heimdallr.shared.automatic_ct import (
+    automatic_ct_planning_enabled,
+    filter_jobs_by_inventory,
+    normalize_job_needs,
+    resolve_requested_metrics_jobs,
+)
 from heimdallr.shared.paths import study_dir, study_id_json, study_logs_dir, study_results_json
+from heimdallr.shared.segmentation_inventory import load_segmentation_inventory
 from heimdallr.shared.sqlite import connect as db_connect
 
 settings.configure_service_stdio()
@@ -694,23 +701,7 @@ def _normalize_dicom_exports(payload: dict) -> list[dict]:
 
 
 def _normalize_job_needs(job: dict) -> list[str]:
-    raw_needs = job.get("needs", [])
-    if raw_needs in (None, ""):
-        return []
-    if not isinstance(raw_needs, list):
-        raise RuntimeError(f"Metrics job '{job.get('name', '<unknown>')}' needs must be a list")
-
-    normalized: list[str] = []
-    seen: set[str] = set()
-    for item in raw_needs:
-        need = str(item or "").strip()
-        if not need:
-            continue
-        if need in seen:
-            continue
-        normalized.append(need)
-        seen.add(need)
-    return normalized
+    return normalize_job_needs(job)
 
 
 def _is_automatic_metrics_job(job: dict) -> bool:
@@ -718,43 +709,7 @@ def _is_automatic_metrics_job(job: dict) -> bool:
 
 
 def _resolve_enabled_jobs(profile: dict, requested_job_names: list[str] | None = None) -> list[dict]:
-    jobs = [dict(job) for job in profile.get("jobs", []) if job.get("enabled", True)]
-    seen_names: set[str] = set()
-    for job in jobs:
-        name = str(job.get("name", "") or "").strip()
-        if not name:
-            raise RuntimeError("Metrics job is missing a name")
-        if name in seen_names:
-            raise RuntimeError(f"Metrics profile contains duplicate job '{name}'")
-        seen_names.add(name)
-        job["name"] = name
-        job["needs"] = _normalize_job_needs(job)
-    if not requested_job_names:
-        return jobs
-
-    jobs_by_name = {job["name"]: job for job in jobs}
-    unknown = [name for name in requested_job_names if name not in jobs_by_name]
-    if unknown:
-        raise RuntimeError(f"Requested metrics job(s) not found in profile: {', '.join(unknown)}")
-
-    resolved_names: list[str] = []
-    seen_resolved: set[str] = set()
-
-    def include_job(name: str) -> None:
-        if name in seen_resolved:
-            return
-        for need in jobs_by_name[name]["needs"]:
-            include_job(need)
-        resolved_names.append(name)
-        seen_resolved.add(name)
-
-    for name in requested_job_names:
-        include_job(name)
-    for name, job in jobs_by_name.items():
-        if _is_automatic_metrics_job(job):
-            include_job(name)
-
-    return [jobs_by_name[name] for name in resolved_names]
+    return resolve_requested_metrics_jobs(profile, requested_job_names=requested_job_names)
 
 
 def _validate_job_dependency_graph(jobs: list[dict]) -> None:
@@ -944,8 +899,43 @@ def segment_case_metrics(case_input: Path) -> bool:
             ),
             artifact_dicom_policy,
         )
+        skipped_jobs: list[dict] = []
+        inventory_summary: dict | None = None
+        if automatic_ct_planning_enabled(profile):
+            inventory = load_segmentation_inventory(study_dir(case_id))
+            jobs, skipped_jobs = filter_jobs_by_inventory(jobs, inventory)
+            if inventory is not None:
+                inventory_summary = {
+                    "brain_complete": bool(inventory.get("brain", {}).get("complete")),
+                    "l3_complete": bool(inventory.get("vertebrae_L3", {}).get("complete")),
+                    "parenchymal_organs_present": list(
+                        inventory.get("parenchymal_organs", {}).get("present", [])
+                    ),
+                }
         if not jobs:
             logger.log(f"[Metrics] No enabled jobs for profile {profile_name}")
+            end_dt = datetime.datetime.now(LOCAL_TZ)
+            pipeline = metadata.get("Pipeline", {})
+            pipeline["metrics_end_time"] = end_dt.isoformat()
+            pipeline["metrics_status"] = "done"
+            pipeline.pop("metrics_error", None)
+            pipeline["metrics_profile"] = profile_name
+            pipeline["metrics_pipeline"] = {
+                "profile": profile_name,
+                "requested_jobs": requested_job_names,
+                "artifact_locale": artifact_locale,
+                "artifact_dicom_policy": artifact_dicom_policy,
+                "max_parallel_jobs": _resolve_max_parallel_jobs(profile),
+                "instruction_dicom_kind": _resolve_instruction_dicom_kind(profile),
+                "segmentation_inventory": inventory_summary,
+                "jobs": [],
+                "skipped_jobs": skipped_jobs,
+                "instruction_pdf": None,
+                "instruction_dicom": None,
+                "dicom_egress_items_enqueued": 0,
+            }
+            metadata["Pipeline"] = pipeline
+            _write_case_metadata(case_id, metadata)
             logger.close()
             return True
         _validate_job_dependency_graph(jobs)
@@ -963,6 +953,11 @@ def segment_case_metrics(case_input: Path) -> bool:
             logger.log(
                 "[Metrics] Artifact DICOM policy: "
                 f"{json.dumps(artifact_dicom_policy, sort_keys=True)}"
+            )
+        if skipped_jobs:
+            logger.log(
+                "[Metrics] Inventory skipped jobs: "
+                + ", ".join(job["name"] for job in skipped_jobs)
             )
         logger.log(f"[Metrics] Jobs: {', '.join(job['name'] for job in jobs)}")
         logger.log(f"[Metrics] Max parallel jobs: {max_parallel_jobs}")
@@ -1022,7 +1017,9 @@ def segment_case_metrics(case_input: Path) -> bool:
             "artifact_dicom_policy": artifact_dicom_policy,
             "max_parallel_jobs": max_parallel_jobs,
             "instruction_dicom_kind": instruction_dicom_kind,
+            "segmentation_inventory": inventory_summary,
             "jobs": completed_jobs,
+            "skipped_jobs": skipped_jobs,
             "instruction_pdf": instruction_pdf,
             "instruction_dicom": instruction_dicom,
             "dicom_egress_items_enqueued": enqueued_dicom_exports,

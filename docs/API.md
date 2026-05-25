@@ -59,14 +59,17 @@ that subset of metrics jobs, automatically includes declared dependencies from
 the active metrics profile, and still includes enabled jobs marked
 `automatic=true`. When metrics jobs declare `requires_segmentation_tasks`,
 segmentation is also constrained to the union of requested, dependency, and
-automatic job task requirements.
+automatic job task requirements. In automatic CT profiles, the final compatible
+job set is additionally filtered by the segmentation inventory produced after
+the `total` task.
 
 The automatic CT pipeline passes the active segmentation profile's
-`extra_args` to each TotalSegmentator task, including `total`. It runs
-`tissue_types` only when the `total/vertebrae_L3.nii.gz` mask is present,
-geometry-compatible, non-empty, and complete along the scan axis. It runs
-`cerebral_bleed` and `brain_structures` only when the `total/brain.nii.gz` mask
-is present, geometry-compatible, non-empty, and does not touch scan bounds.
+`extra_args` to each TotalSegmentator task, including `total`. It writes
+`artifacts/segmentation_inventory.json`, enables L3-dependent metrics only when
+`total/vertebrae_L3.nii.gz` is complete, enables organ volumetry when at least
+one parenchymal organ mask is present, and runs `cerebral_bleed` plus
+`brain_structures` only when the `total/brain.nii.gz` mask is present,
+geometry-compatible, non-empty, and does not touch scan bounds.
 `total/skull.nii.gz` is retained as optional crop and diagnostic context; skull
 truncation does not block head QC or DICOM export when the brain mask and
 required head tasks are complete. The `head_complete_qc` job is enabled in the

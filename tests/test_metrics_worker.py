@@ -21,21 +21,64 @@ from heimdallr.metrics.worker import (
     _validate_job_dependency_graph,
     segment_case_metrics,
 )
+from heimdallr.shared.automatic_ct import filter_jobs_by_inventory
 
 
 class TestMetricsWorker(unittest.TestCase):
     def test_example_profile_limits_secondary_capture_1024_to_validated_jobs(self):
         config_path = Path(__file__).resolve().parents[1] / "config" / "metrics_pipeline.example.json"
         config = json.loads(config_path.read_text(encoding="utf-8"))
-        jobs = {
-            job["name"]: job
-            for job in config["profiles"]["ct_native_basic_metrics"]["jobs"]
-        }
+        jobs = {job["name"]: job for job in config["profiles"]["ct_automatic_metrics"]["jobs"]}
 
         self.assertEqual(jobs["l3_muscle_area"]["secondary_capture_max_dimension"], 1024)
         self.assertEqual(jobs["vat_sat_ratio"]["secondary_capture_max_dimension"], 1024)
         self.assertNotIn("secondary_capture_max_dimension", jobs["parenchymal_organ_volumetry"])
         self.assertNotIn("secondary_capture_max_dimension", jobs["brain_volumetry"])
+
+    def test_automatic_ct_profile_declares_inventory_requirements(self):
+        config_path = Path(__file__).resolve().parents[1] / "config" / "metrics_pipeline.example.json"
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(config["default_profile"], "ct_automatic_metrics")
+        profile = config["profiles"]["ct_automatic_metrics"]
+        jobs = {job["name"]: job for job in profile["jobs"]}
+
+        self.assertEqual(profile["planning"]["mode"], "automatic_ct")
+        self.assertEqual(jobs["head_complete_qc"]["requires_inventory"], ["brain.complete"])
+        self.assertEqual(jobs["l3_muscle_area"]["requires_inventory"], ["vertebrae_L3.complete"])
+        self.assertEqual(jobs["vat_sat_ratio"]["requires_inventory"], ["vertebrae_L3.complete"])
+        self.assertEqual(
+            jobs["parenchymal_organ_volumetry"]["requires_inventory"],
+            ["parenchymal_organs.any_present"],
+        )
+
+    def test_filter_jobs_by_inventory_selects_compatible_ct_jobs(self):
+        jobs = _resolve_enabled_jobs(
+            {
+                "jobs": [
+                    {"name": "l3_muscle_area", "requires_inventory": ["vertebrae_L3.complete"]},
+                    {"name": "vat_sat_ratio", "requires_inventory": ["vertebrae_L3.complete"]},
+                    {"name": "head_complete_qc", "requires_inventory": ["brain.complete"]},
+                    {
+                        "name": "parenchymal_organ_volumetry",
+                        "requires_inventory": ["parenchymal_organs.any_present"],
+                    },
+                ]
+            }
+        )
+        inventory = {
+            "brain": {"complete": False},
+            "vertebrae_L3": {"complete": True},
+            "parenchymal_organs": {"any_present": True},
+        }
+
+        selected, skipped = filter_jobs_by_inventory(jobs, inventory)
+
+        self.assertEqual(
+            [job["name"] for job in selected],
+            ["l3_muscle_area", "vat_sat_ratio", "parenchymal_organ_volumetry"],
+        )
+        self.assertEqual([job["name"] for job in skipped], ["head_complete_qc"])
 
     def test_record_metrics_pipeline_state_closes_failed_stage(self):
         with tempfile.TemporaryDirectory() as tmpdir:

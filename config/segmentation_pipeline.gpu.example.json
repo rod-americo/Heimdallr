@@ -1,9 +1,79 @@
 {
-  "default_profile": "ct_native_segmentation_only",
+  "default_profile": "ct_automatic_segmentation",
   "execution": {
     "max_parallel_cases": 1
   },
   "profiles": {
+    "ct_automatic_segmentation": {
+      "planning": {
+        "mode": "automatic_ct"
+      },
+      "required": {
+        "modality": "CT",
+        "selected_phase": [
+          "native",
+          "unknown"
+        ]
+      },
+      "tasks": [
+        {
+          "name": "total",
+          "enabled": true,
+          "output_dir": "artifacts/total",
+          "extra_args": [
+            "--device",
+            "gpu",
+            "--nr_thr_resamp",
+            "14",
+            "--nr_thr_saving",
+            "14"
+          ],
+          "license_required": false
+        },
+        {
+          "name": "tissue_types",
+          "enabled": true,
+          "output_dir": "artifacts/tissue_types",
+          "extra_args": [
+            "--device",
+            "gpu",
+            "--nr_thr_resamp",
+            "14",
+            "--nr_thr_saving",
+            "14"
+          ],
+          "license_required": true
+        },
+        {
+          "name": "cerebral_bleed",
+          "enabled": true,
+          "output_dir": "artifacts/cerebral_bleed",
+          "extra_args": [
+            "--device",
+            "gpu",
+            "--nr_thr_resamp",
+            "14",
+            "--nr_thr_saving",
+            "14"
+          ],
+          "license_required": false
+        },
+        {
+          "name": "brain_structures",
+          "enabled": true,
+          "output_dir": "artifacts/brain_structures",
+          "extra_args": [
+            "--device",
+            "gpu",
+            "--nr_thr_resamp",
+            "14",
+            "--nr_thr_saving",
+            "14"
+          ],
+          "license_required": true
+        }
+      ]
+    },
     "ct_native_segmentation_only": {
       "required": {
         "modality": "CT",

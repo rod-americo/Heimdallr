@@ -51,6 +51,17 @@ from heimdallr.shared.paths import (
     study_logs_dir,
     study_metadata_dir,
 )
+from heimdallr.shared.automatic_ct import (
+    automatic_ct_planning_enabled,
+    filter_jobs_by_inventory,
+    required_segmentation_tasks_for_jobs,
+    resolve_requested_metrics_jobs,
+)
+from heimdallr.shared.segmentation_inventory import (
+    build_segmentation_inventory,
+    mask_inventory_status,
+    write_segmentation_inventory,
+)
 from heimdallr.shared.segmentation_coverage import classify_segmentation_coverage
 from heimdallr.shared.segmentation_coverage import mask_complete as mask_complete_along_z
 from heimdallr.shared.sqlite import connect as db_connect
@@ -1135,52 +1146,7 @@ def _clear_task_output(case_output: Path, task: dict) -> None:
 
 
 def _load_mask_status(mask_path: Path, reference_image_path: Path) -> dict:
-    try:
-        reference_image = nib.load(str(reference_image_path))
-        reference_shape = tuple(int(value) for value in reference_image.shape[:3])
-        spacing_xyz = tuple(float(value) for value in reference_image.header.get_zooms()[:3])
-    except Exception as exc:
-        return {
-            "complete": False,
-            "reason": "reference_read_error",
-            "error": str(exc),
-        }
-
-    if not mask_path.exists():
-        return {
-            "complete": False,
-            "reason": "missing_mask",
-            "mask": str(mask_path),
-        }
-
-    try:
-        mask_image = nib.load(str(mask_path))
-        mask = np.asarray(mask_image.get_fdata(), dtype=np.float32) > 0
-    except Exception as exc:
-        return {
-            "complete": False,
-            "reason": "mask_read_error",
-            "mask": str(mask_path),
-            "error": str(exc),
-        }
-
-    if tuple(mask.shape) != reference_shape:
-        return {
-            "complete": False,
-            "reason": "geometry_mismatch",
-            "mask": str(mask_path),
-            "shape": [int(value) for value in mask.shape],
-            "reference_shape": [int(value) for value in reference_shape],
-        }
-
-    status = compute_mask_status(mask, spacing_xyz)
-    complete = bool(status.get("present") and mask_complete_along_z(mask))
-    return {
-        "complete": complete,
-        "reason": "complete" if complete else "incomplete_or_empty_mask",
-        "mask": str(mask_path),
-        "status": status,
-    }
+    return mask_inventory_status(mask_path, reference_image_path)
 
 
 def _head_union_status(total_dir: Path, head_components: dict, spacing_xyz: tuple[float, float, float]) -> dict:
@@ -1233,6 +1199,41 @@ def _head_gatekeeper(total_dir: Path, reference_image_path: Path) -> dict:
     }
 
 
+def _segmentation_profile_uses_automatic_ct(profile_name: str) -> bool:
+    if str(profile_name or "").startswith("ct_automatic_"):
+        return True
+    try:
+        active_profile_name, profile = load_segmentation_pipeline_profile()
+    except Exception:
+        return False
+    if active_profile_name != profile_name:
+        return False
+    return automatic_ct_planning_enabled(profile)
+
+
+def _automatic_ct_required_task_names(
+    *,
+    inventory: dict,
+    requested_metrics_modules: list[str] | None,
+) -> tuple[set[str] | None, dict]:
+    metrics_profile_name, metrics_profile = load_metrics_pipeline_profile_for_segmentation()
+    requested_jobs = resolve_requested_metrics_jobs(
+        metrics_profile,
+        requested_job_names=requested_metrics_modules,
+    )
+    selected_jobs, skipped_jobs = filter_jobs_by_inventory(requested_jobs, inventory)
+    required_task_names = required_segmentation_tasks_for_jobs(selected_jobs)
+    if required_task_names is not None:
+        required_task_names.add("total")
+    return required_task_names, {
+        "mode": "automatic_ct",
+        "metrics_profile": metrics_profile_name,
+        "selected_jobs": [job["name"] for job in selected_jobs],
+        "skipped_jobs": skipped_jobs,
+        "required_segmentation_tasks": sorted(required_task_names) if required_task_names else None,
+    }
+
+
 def run_segmentation_pipeline(
     case_id,
     modality,
@@ -1251,6 +1252,7 @@ def run_segmentation_pipeline(
         requested_metrics_modules=requested_metrics_modules,
     )
     ordered_tasks = sorted(tasks, key=lambda task: 0 if _task_name(task) == "total" else 1)
+    automatic_ct = _segmentation_profile_uses_automatic_ct(profile_name)
 
     logger.print(f"[Segmentation] Profile: {profile_name}")
     logger.print(f"[Segmentation] Selected phase: {_normalize_phase(selected_phase)}")
@@ -1262,9 +1264,33 @@ def run_segmentation_pipeline(
     executed_tasks: list[dict] = []
     skipped_tasks: list[dict] = []
     head_gate: dict | None = None
+    inventory: dict | None = None
+    inventory_path: Path | None = None
+    automatic_plan: dict | None = None
+    automatic_required_task_names: set[str] | None = None
+    automatic_plan_resolved = False
+
+    if automatic_ct and not any(_task_name(task) == "total" for task in ordered_tasks):
+        raise RuntimeError(f"Automatic CT segmentation profile '{profile_name}' must enable the total task")
 
     for task in ordered_tasks:
         task_name = _task_name(task)
+        if (
+            automatic_ct
+            and task_name != "total"
+            and automatic_plan_resolved
+            and automatic_required_task_names is not None
+            and task_name not in automatic_required_task_names
+        ):
+            _clear_task_output(case_output, task)
+            skipped_tasks.append(
+                {
+                    **_task_record(task),
+                    "reason": "not_required_by_automatic_ct_plan",
+                }
+            )
+            continue
+
         if task_name == "tissue_types":
             l3_gate = gatekeepers.get("l3_complete")
             if l3_gate is None:
@@ -1319,13 +1345,44 @@ def run_segmentation_pipeline(
         executed["extra_args"] = extra_args
         executed_tasks.append(_task_record(executed))
 
-    return {
+        if automatic_ct and task_name == "total":
+            inventory = build_segmentation_inventory(artifacts_dir / "total", nifti_path)
+            inventory_path = write_segmentation_inventory(artifacts_dir, inventory)
+            automatic_required_task_names, automatic_plan = _automatic_ct_required_task_names(
+                inventory=inventory,
+                requested_metrics_modules=requested_metrics_modules,
+            )
+            automatic_plan_resolved = True
+            logger.print(
+                "[Segmentation] Automatic CT jobs: "
+                + (
+                    ", ".join(automatic_plan["selected_jobs"])
+                    if automatic_plan.get("selected_jobs")
+                    else "none"
+                )
+            )
+
+    payload = {
         "profile": profile_name,
         "requested_metrics_modules": list(requested_metrics_modules or []),
         "tasks": executed_tasks,
         "skipped_tasks": skipped_tasks,
         "gatekeepers": gatekeepers,
     }
+    if inventory is not None:
+        payload["segmentation_inventory"] = {
+            "path": str(inventory_path.relative_to(case_output)) if inventory_path else None,
+            "summary": {
+                "brain_complete": bool(inventory.get("brain", {}).get("complete")),
+                "l3_complete": bool(inventory.get("vertebrae_L3", {}).get("complete")),
+                "parenchymal_organs_present": list(
+                    inventory.get("parenchymal_organs", {}).get("present", [])
+                ),
+            },
+        }
+    if automatic_plan is not None:
+        payload["automatic_ct_plan"] = automatic_plan
+    return payload
 
 
 def _segmentation_outputs_exist(case_output: Path, tasks: list[dict]) -> bool:
