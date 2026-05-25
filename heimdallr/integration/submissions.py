@@ -23,7 +23,7 @@ DEFAULT_REQUESTED_OUTPUTS = {
     "overlays_dicom": True,
     "report_pdf": False,
     "report_pdf_dicom": False,
-    "artifact_instructions_pdf": True,
+    "artifact_instructions_pdf": False,
     "artifact_instructions_dicom": True,
     "artifacts_tree": True,
 }

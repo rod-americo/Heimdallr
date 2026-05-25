@@ -258,7 +258,7 @@ Example callback manifest:
     "overlays_dicom": true,
     "report_pdf": false,
     "report_pdf_dicom": false,
-    "artifact_instructions_pdf": true,
+    "artifact_instructions_pdf": false,
     "artifact_instructions_dicom": true,
     "artifacts_tree": false
   },

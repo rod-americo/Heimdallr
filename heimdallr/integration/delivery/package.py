@@ -193,7 +193,7 @@ def build_delivery_package(
             builder.add_output_file("report_pdf", report_path, "metadata/report.pdf")
         if requested.get("report_pdf_dicom", False):
             builder.add_output_file("report_pdf_dicom", report_dicom_path, f"metadata/{REPORT_DICOM_FILENAME}")
-        if requested.get("artifact_instructions_pdf", True):
+        if requested.get("artifact_instructions_pdf", False):
             builder.add_output_file(
                 "artifact_instructions_pdf",
                 instructions_root / "artifact_instructions.pdf",
