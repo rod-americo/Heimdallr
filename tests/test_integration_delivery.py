@@ -453,6 +453,55 @@ class TestIntegrationDeliveryPackageAndWorker(unittest.TestCase):
             self.assertNotIn("overlays_dicom", manifest["delivered_outputs"])
             self.assertNotIn("artifact_instructions_dicom", manifest["delivered_outputs"])
 
+    def test_artifacts_tree_excludes_instruction_documents(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            case_root = Path(tmpdir) / "runtime" / "studies" / "CaseNoInstructions"
+            (case_root / "metadata").mkdir(parents=True, exist_ok=True)
+            (case_root / "artifacts" / "metrics" / "bone_health_l1_hu").mkdir(parents=True, exist_ok=True)
+            (case_root / "artifacts" / "metrics" / "instructions" / "dicom_sc").mkdir(parents=True, exist_ok=True)
+            (case_root / "metadata" / "id.json").write_text(
+                json.dumps({"StudyInstanceUID": "1.2.3", "ExternalDelivery": {}}),
+                encoding="utf-8",
+            )
+            (case_root / "metadata" / "metadata.json").write_text("{}", encoding="utf-8")
+            (case_root / "metadata" / "resultados.json").write_text('{"metrics":{}}', encoding="utf-8")
+            (case_root / "artifacts" / "metrics" / "bone_health_l1_hu" / "result.json").write_text(
+                "{}",
+                encoding="utf-8",
+            )
+            (case_root / "artifacts" / "metrics" / "bone_health_l1_hu" / "overlay_sc.dcm").write_bytes(b"dicom")
+            (case_root / "artifacts" / "metrics" / "instructions" / "artifact_instructions.pdf").write_bytes(b"%PDF")
+            (case_root / "artifacts" / "metrics" / "instructions" / "dicom_sc" / "page_01.dcm").write_bytes(b"DICM")
+
+            with (
+                patch("heimdallr.integration.delivery.package.study_dir", return_value=case_root),
+                patch("heimdallr.integration.delivery.package.study_id_json", return_value=case_root / "metadata" / "id.json"),
+                patch("heimdallr.integration.delivery.package.study_metadata_json", return_value=case_root / "metadata" / "metadata.json"),
+                patch("heimdallr.integration.delivery.package.study_results_json", return_value=case_root / "metadata" / "resultados.json"),
+                patch("heimdallr.integration.delivery.package.study_artifacts_dir", return_value=case_root / "artifacts"),
+            ):
+                manifest, package_path = delivery_package.build_delivery_package(
+                    case_id="CaseNoInstructions",
+                    job_id="job-4",
+                    client_case_id="external-999",
+                    source_system=None,
+                    requested_outputs={
+                        "id_json": True,
+                        "artifacts_tree": True,
+                    },
+                )
+
+            import zipfile
+
+            with zipfile.ZipFile(package_path, "r") as zip_handle:
+                names = set(zip_handle.namelist())
+            self.assertIn("artifacts/metrics/bone_health_l1_hu/result.json", names)
+            self.assertIn("artifacts/metrics/bone_health_l1_hu/overlay_sc.dcm", names)
+            self.assertNotIn("artifacts/metrics/instructions/artifact_instructions.pdf", names)
+            self.assertNotIn("artifacts/metrics/instructions/dicom_sc/page_01.dcm", names)
+            self.assertNotIn("artifact_instructions_dicom", manifest["delivered_outputs"])
+            self.assertNotIn("artifact_instructions_pdf", manifest["delivered_outputs"])
+
     def test_deliver_case_package_posts_multipart(self):
         response = Mock(status_code=202, text="")
         with tempfile.TemporaryDirectory() as tmpdir:

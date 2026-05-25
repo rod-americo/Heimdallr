@@ -24,7 +24,7 @@ DEFAULT_REQUESTED_OUTPUTS = {
     "report_pdf": False,
     "report_pdf_dicom": False,
     "artifact_instructions_pdf": False,
-    "artifact_instructions_dicom": True,
+    "artifact_instructions_dicom": False,
     "artifacts_tree": True,
 }
 

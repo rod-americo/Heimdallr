@@ -198,15 +198,17 @@ def build_delivery_package(
                 "artifact_instructions_pdf",
                 instructions_root / "artifact_instructions.pdf",
             )
-        if requested.get("artifact_instructions_dicom", True):
+        if requested.get("artifact_instructions_dicom", False):
             builder.add_optional_files(
                 "artifact_instructions_dicom",
                 _iter_metric_files(instructions_root, ".dcm"),
             )
 
-        if requested.get("artifacts_tree", True) and metrics_artifacts_root.exists():
+        if requested.get("artifacts_tree", False) and metrics_artifacts_root.exists():
             for path in sorted(metrics_artifacts_root.rglob("*")):
                 if not path.is_file():
+                    continue
+                if _is_under(path, instructions_root):
                     continue
                 builder.add_output_file("artifacts_tree", path)
 

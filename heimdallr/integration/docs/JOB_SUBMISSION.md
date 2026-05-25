@@ -46,7 +46,7 @@ curl -X POST "http://localhost:8001/jobs" \
   -F "client_case_id=external-123" \
   -F "source_system=partner_a" \
   -F "callback_url=http://receiver.local/heimdallr/callback" \
-  -F 'requested_outputs={"metrics_json":true,"overlays_dicom":true,"artifact_instructions_dicom":true,"artifacts_tree":false}' \
+  -F 'requested_outputs={"metrics_json":true,"overlays_dicom":true,"artifacts_tree":false}' \
   -F 'requested_metrics_modules=["l3_muscle_area","bone_health_l1_hu"]' \
   -F 'artifact_locale=pt_BR' \
   -F 'artifact_dicom_policy={"secondary_capture_transfer_syntax":"jpeg_ls_lossless"}' \
@@ -259,7 +259,7 @@ Example callback manifest:
     "report_pdf": false,
     "report_pdf_dicom": false,
     "artifact_instructions_pdf": false,
-    "artifact_instructions_dicom": true,
+    "artifact_instructions_dicom": false,
     "artifacts_tree": false
   },
   "delivered_outputs": {
@@ -271,9 +271,6 @@ Example callback manifest:
     ],
     "overlays_dicom": [
       "artifacts/metrics/l3_muscle_area/overlay_sc.dcm"
-    ],
-    "artifact_instructions_dicom": [
-      "artifacts/metrics/instructions/dicom_sc/page_01.dcm"
     ]
   },
   "missing_outputs": [],
