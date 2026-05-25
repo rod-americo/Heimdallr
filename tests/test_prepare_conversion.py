@@ -80,28 +80,31 @@ class TestPrepareConversion(unittest.TestCase):
             output = temp_dir / "series.phase.json"
             source.write_bytes(b"nifti")
             output.write_text('{"phase": "native"}')
+            fake_process = SimpleNamespace(
+                pid=12345,
+                returncode=0,
+                communicate=lambda timeout: (None, ""),
+            )
 
             with patch.object(worker.settings, "TOTALSEG_GET_PHASE_DEVICE", "mps"):
                 with patch.object(worker.settings, "TOTALSEG_GET_PHASE_TIMEOUT_SECONDS", 17):
                     with patch.object(worker.settings, "TOTALSEG_GET_PHASE_THREAD_LIMIT", 1):
                         with patch.object(
                             worker.subprocess,
-                            "run",
-                            return_value=subprocess.CompletedProcess(
-                                args=["totalseg_get_phase"],
-                                returncode=0,
-                                stdout=None,
-                                stderr="",
-                            ),
-                        ) as run_mock:
-                            result = worker.run_totalseg_phase(source, output)
+                            "Popen",
+                            return_value=fake_process,
+                        ) as popen_mock:
+                            with patch.object(worker, "_terminate_phase_process_group") as terminate_mock:
+                                result = worker.run_totalseg_phase(source, output)
 
             self.assertEqual(result["phase"], "native")
-            _, kwargs = run_mock.call_args
-            self.assertEqual(kwargs["timeout"], 17)
-            self.assertIn("--device", run_mock.call_args.args[0])
-            self.assertIn("mps", run_mock.call_args.args[0])
+            cmd = popen_mock.call_args.args[0]
+            _, kwargs = popen_mock.call_args
+            self.assertIn("--device", cmd)
+            self.assertIn("mps", cmd)
+            self.assertTrue(kwargs["start_new_session"])
             self.assertNotIn("OMP_NUM_THREADS", kwargs["env"])
+            terminate_mock.assert_called_with(12345)
 
     def test_totalseg_phase_limits_threads_for_cpu_device(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -110,27 +113,28 @@ class TestPrepareConversion(unittest.TestCase):
             output = temp_dir / "series.phase.json"
             source.write_bytes(b"nifti")
             output.write_text('{"phase": "native"}')
+            fake_process = SimpleNamespace(
+                pid=12345,
+                returncode=0,
+                communicate=lambda timeout: (None, ""),
+            )
 
             with patch.object(worker.settings, "TOTALSEG_GET_PHASE_DEVICE", "cpu"):
                 with patch.object(worker.settings, "TOTALSEG_GET_PHASE_TIMEOUT_SECONDS", 17):
                     with patch.object(worker.settings, "TOTALSEG_GET_PHASE_THREAD_LIMIT", 1):
                         with patch.object(
                             worker.subprocess,
-                            "run",
-                            return_value=subprocess.CompletedProcess(
-                                args=["totalseg_get_phase"],
-                                returncode=0,
-                                stdout=None,
-                                stderr="",
-                            ),
-                        ) as run_mock:
-                            result = worker.run_totalseg_phase(source, output)
+                            "Popen",
+                            return_value=fake_process,
+                        ) as popen_mock:
+                            with patch.object(worker, "_terminate_phase_process_group"):
+                                result = worker.run_totalseg_phase(source, output)
 
             self.assertEqual(result["phase"], "native")
-            _, kwargs = run_mock.call_args
-            self.assertEqual(kwargs["timeout"], 17)
-            self.assertIn("--device", run_mock.call_args.args[0])
-            self.assertIn("cpu", run_mock.call_args.args[0])
+            cmd = popen_mock.call_args.args[0]
+            _, kwargs = popen_mock.call_args
+            self.assertIn("--device", cmd)
+            self.assertIn("cpu", cmd)
             self.assertEqual(kwargs["env"]["OMP_NUM_THREADS"], "1")
             self.assertEqual(kwargs["env"]["MKL_NUM_THREADS"], "1")
             self.assertEqual(kwargs["env"]["OPENBLAS_NUM_THREADS"], "1")
@@ -143,17 +147,26 @@ class TestPrepareConversion(unittest.TestCase):
             source = temp_dir / "series.nii.gz"
             output = temp_dir / "series.phase.json"
             source.write_bytes(b"nifti")
+            fake_process = SimpleNamespace(
+                pid=12345,
+                communicate=lambda timeout: (_ for _ in ()).throw(
+                    subprocess.TimeoutExpired(["totalseg_get_phase"], timeout)
+                ),
+                wait=lambda timeout: None,
+            )
 
             with patch.object(worker.settings, "TOTALSEG_GET_PHASE_TIMEOUT_SECONDS", 1):
                 with patch.object(
                     worker.subprocess,
-                    "run",
-                    side_effect=subprocess.TimeoutExpired(["totalseg_get_phase"], 1),
+                    "Popen",
+                    return_value=fake_process,
                 ):
-                    with patch("builtins.print") as print_mock:
-                        result = worker.run_totalseg_phase(source, output)
+                    with patch.object(worker, "_terminate_phase_process_group") as terminate_mock:
+                        with patch("builtins.print") as print_mock:
+                            result = worker.run_totalseg_phase(source, output)
 
             self.assertIsNone(result)
+            terminate_mock.assert_called_with(12345)
             rendered = " ".join(
                 " ".join(str(arg) for arg in call.args)
                 for call in print_mock.call_args_list

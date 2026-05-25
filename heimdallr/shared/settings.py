@@ -386,7 +386,7 @@ TOTALSEG_GET_PHASE_THREAD_LIMIT = int(
 TOTALSEG_GET_PHASE_MAX_PARALLEL = int(
     os.getenv(
         "HEIMDALLR_TOTALSEG_GET_PHASE_MAX_PARALLEL",
-        "2" if platform.system().lower() == "darwin" else "0",
+        "1" if platform.system().lower() == "darwin" else "0",
     )
 )
 TOTALSEGMENTATOR_BIN = os.getenv(

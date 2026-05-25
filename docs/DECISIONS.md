@@ -446,9 +446,10 @@ Keep `totalseg_get_phase` device selection explicit through
 `cpu` on macOS when the host does not set a value, and applies
 `HEIMDALLR_TOTALSEG_GET_PHASE_THREAD_LIMIT=1` by default for that CPU subprocess.
 On Apple Silicon, Heimdallr uses bounded process-level parallelism through
-`HEIMDALLR_TOTALSEG_GET_PHASE_MAX_PARALLEL=2` instead of increasing the internal
-thread pools of each phase-detector process. CUDA hosts should set the device to
-`gpu`; Linux CPU hosts should set it to `cpu`.
+`HEIMDALLR_TOTALSEG_GET_PHASE_MAX_PARALLEL=1` because concurrent
+phase-detector subprocesses can still fan out into multiple PyTorch/nnU-Net
+children even when internal CPU thread pools are bounded. CUDA hosts should set
+the device to `gpu`; Linux CPU hosts should set it to `cpu`.
 
 **Impact**
 

@@ -22,6 +22,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -884,6 +885,66 @@ def _totalseg_phase_subprocess_env() -> dict[str, str]:
     return env
 
 
+def _terminate_phase_process_group(pgid: int, *, kill_after_seconds: float = 2.0) -> None:
+    try:
+        os.killpg(pgid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    except Exception:
+        return
+
+    deadline = time.monotonic() + max(kill_after_seconds, 0.1)
+    while time.monotonic() < deadline:
+        try:
+            os.killpg(pgid, 0)
+        except ProcessLookupError:
+            return
+        time.sleep(0.05)
+
+    try:
+        os.killpg(pgid, signal.SIGKILL)
+    except ProcessLookupError:
+        return
+    except Exception:
+        return
+
+
+def _run_totalseg_phase_subprocess(cmd: list[str]) -> subprocess.CompletedProcess[str]:
+    process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+        env=_totalseg_phase_subprocess_env(),
+    )
+    pgid = process.pid
+    try:
+        _, stderr = process.communicate(timeout=settings.TOTALSEG_GET_PHASE_TIMEOUT_SECONDS)
+        if process.returncode != 0:
+            raise subprocess.CalledProcessError(
+                process.returncode,
+                cmd,
+                output=None,
+                stderr=stderr,
+            )
+        return subprocess.CompletedProcess(
+            args=cmd,
+            returncode=process.returncode,
+            stdout=None,
+            stderr=stderr,
+        )
+    except subprocess.TimeoutExpired as exc:
+        _terminate_phase_process_group(pgid)
+        try:
+            process.wait(timeout=1)
+        except Exception:
+            pass
+        raise subprocess.TimeoutExpired(cmd, settings.TOTALSEG_GET_PHASE_TIMEOUT_SECONDS) from exc
+    finally:
+        _terminate_phase_process_group(pgid)
+
+
 def run_totalseg_phase(input_nifti, output_json):
     """Runs totalseg_get_phase to detect CT contrast phase."""
     try:
@@ -896,15 +957,7 @@ def run_totalseg_phase(input_nifti, output_json):
         if settings.TOTALSEG_GET_PHASE_DEVICE:
             cmd.extend(["--device", settings.TOTALSEG_GET_PHASE_DEVICE])
         with _TOTALSEG_PHASE_SEMAPHORE:
-            result = subprocess.run(
-                cmd,
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE,
-                text=True,
-                timeout=settings.TOTALSEG_GET_PHASE_TIMEOUT_SECONDS,
-                env=_totalseg_phase_subprocess_env(),
-            )
+            result = _run_totalseg_phase_subprocess(cmd)
         if output_json.exists():
             with open(output_json, 'r') as f:
                 return json.load(f)

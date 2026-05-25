@@ -188,11 +188,11 @@ Do not use `mps` for `totalseg_get_phase` on the local macOS stack until that
 upstream path is validated; it has crashed in local testing. On macOS, keep
 `HEIMDALLR_TOTALSEG_GET_PHASE_THREAD_LIMIT=1` so the CPU path does not overrun
 PyTorch/nnU-Net worker threads. Use
-`HEIMDALLR_TOTALSEG_GET_PHASE_MAX_PARALLEL=2` on the local Apple Silicon stack
-to use multiple CPU cores through independent phase-detector subprocesses
-rather than larger per-process thread pools. When unset, Heimdallr defaults the
-phase device to `cpu` on macOS, applies thread limit `1`, and allows two
-concurrent phase subprocesses.
+`HEIMDALLR_TOTALSEG_GET_PHASE_MAX_PARALLEL=1` on the local Apple Silicon stack
+because concurrent phase-detector subprocesses can still fan out into multiple
+PyTorch/nnU-Net child processes even when CPU thread pools are bounded. When
+unset, Heimdallr defaults the phase device to `cpu` on macOS, applies thread
+limit `1`, and runs one phase subprocess at a time.
 
 On `thor`, the current local smoke fixture is:
 
