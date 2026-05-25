@@ -165,7 +165,11 @@ truncation is reported but does not block `cerebral_bleed` or
 `brain_structures` TotalSegmentator tasks. The
 machine-readable bleed notification field is
 `measurement.cerebral_bleed.has_cerebral_bleed` and mirrors
-`measurement.cerebral_bleed.notification_bool` when bleed segmentation has run.
+`measurement.cerebral_bleed.notification_bool` when bleed segmentation has run
+and `measurement.cerebral_bleed.anatomic_support_qc` has not rejected the raw
+bleed mask for extending outside the `total/skull.nii.gz` plus
+`total/brain.nii.gz` support mask. The raw TotalSegmentator signal remains
+available as `measurement.cerebral_bleed.raw_has_cerebral_bleed`.
 - Complete-head geometric normalization includes
 `normalized_brain_geometry_head_ct_2mm.nii.gz`, which uses the `total/brain`
 mask to define a reproducible output plane. This is the preferred head geometry

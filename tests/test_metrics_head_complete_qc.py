@@ -406,6 +406,96 @@ class TestHeadCompleteQcJob(unittest.TestCase):
             bleed_ds = pydicom.dcmread(str(bleed_dicoms[0]), stop_before_pixels=True)
             self.assertEqual(bleed_ds.SeriesDescription, "Heimdallr Cerebral Bleed Overlay 5 mm")
 
+    def test_job_rejects_bleed_signal_outside_skull_support(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            case_id = "CaseHeadBleedOutsideSkull_20260524_001"
+            case_dir = tmp_path / case_id
+            (case_dir / "metadata").mkdir(parents=True)
+            (case_dir / "derived").mkdir(parents=True)
+            (case_dir / "artifacts" / "total").mkdir(parents=True)
+            (case_dir / "artifacts" / "cerebral_bleed").mkdir(parents=True)
+            (case_dir / "artifacts" / "brain_structures").mkdir(parents=True)
+            (case_dir / "metadata" / "id.json").write_text(
+                json.dumps(
+                    {
+                        "CaseID": case_id,
+                        "Modality": "CT",
+                        "StudyInstanceUID": "1.2.826.0.1.3680043.8.498.2002",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            shape = (18, 18, 14)
+            ct = np.zeros(shape, dtype=np.float32)
+            skull = np.zeros(shape, dtype=np.float32)
+            brain = np.zeros(shape, dtype=np.float32)
+            bleed = np.zeros(shape, dtype=np.float32)
+            skull[2:16, 2:16, 2:12] = 1.0
+            skull[4:14, 4:14, 4:10] = 0.0
+            brain[5:13, 5:13, 4:10] = 1.0
+            bleed[0:1, 0:1, 0:1] = 1.0
+            ct[skull.astype(bool)] = 700.0
+            ct[brain.astype(bool)] = 35.0
+
+            write_nifti(case_dir / "derived" / f"{case_id}.nii.gz", ct, spacing=(0.6, 0.6, 1.25))
+            write_nifti(case_dir / "artifacts" / "total" / "skull.nii.gz", skull, spacing=(0.6, 0.6, 1.25))
+            write_nifti(case_dir / "artifacts" / "total" / "brain.nii.gz", brain, spacing=(0.6, 0.6, 1.25))
+            write_nifti(
+                case_dir / "artifacts" / "cerebral_bleed" / "intracerebral_hemorrhage.nii.gz",
+                bleed,
+                spacing=(0.6, 0.6, 1.25),
+            )
+            for idx, mask_name in enumerate(BRAIN_STRUCTURE_MASKS):
+                structure = np.zeros(shape, dtype=np.float32)
+                x = 5 + (idx % 4)
+                y = 5 + ((idx // 4) % 4)
+                z = 4 + (idx % 5)
+                structure[x : x + 2, y : y + 2, z : z + 2] = 1.0
+                write_nifti(
+                    case_dir / "artifacts" / "brain_structures" / f"{mask_name}.nii.gz",
+                    structure,
+                    spacing=(0.6, 0.6, 1.25),
+                )
+
+            with patch.object(settings, "STUDIES_DIR", tmp_path):
+                with patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "head_complete_qc",
+                        "--case-id",
+                        case_id,
+                        "--job-config-json",
+                        json.dumps(
+                            {
+                                "target_plane": "axial",
+                                "target_in_plane_spacing_mm": [1.0, 1.0],
+                                "target_slice_thickness_mm": 5.0,
+                            }
+                        ),
+                    ],
+                ):
+                    self.assertEqual(head_complete_qc.main(), 0)
+
+            result_path = case_dir / "artifacts" / "metrics" / "head_complete_qc" / "result.json"
+            result = json.loads(result_path.read_text(encoding="utf-8"))
+            bleed_measurement = result["measurement"]["cerebral_bleed"]
+
+            self.assertTrue(bleed_measurement["raw_has_cerebral_bleed"])
+            self.assertFalse(bleed_measurement["has_cerebral_bleed"])
+            self.assertFalse(bleed_measurement["notification_bool"])
+            self.assertEqual(
+                bleed_measurement["anatomic_support_qc"]["status"],
+                "rejected_outside_skull_support",
+            )
+            self.assertGreater(
+                bleed_measurement["anatomic_support_qc"]["outside_support_voxel_count"],
+                0,
+            )
+            self.assertNotIn("cerebral_bleed_overlay_series_dir", result["artifacts"])
+
 
 if __name__ == "__main__":
     unittest.main()

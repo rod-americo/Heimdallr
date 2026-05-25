@@ -91,7 +91,11 @@ color map included in the volume-table artifact. The only additional API-facing
 head signal is the boolean
 `measurement.cerebral_bleed.has_cerebral_bleed`, mirrored as
 `measurement.cerebral_bleed.notification_bool` for downstream notification logic
-when cerebral-bleed segmentation has run.
+when cerebral-bleed segmentation has run. The raw segmentation signal is exposed
+as `measurement.cerebral_bleed.raw_has_cerebral_bleed`; notification is
+suppressed when `measurement.cerebral_bleed.anatomic_support_qc` rejects
+positive bleed voxels outside the `total/skull.nii.gz` plus
+`total/brain.nii.gz` support mask.
 The bleed overlay series is emitted only when the bleed mask has positive
 voxels; it is rendered on the brain-geometry normalized CT grid as 5 mm slabs
 with adjacent context slabs, no text panel, and a red transparent contour over

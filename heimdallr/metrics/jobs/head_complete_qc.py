@@ -549,6 +549,73 @@ def _head_union_status(
     return compute_mask_status(union, spacing_xyz)
 
 
+def _load_support_mask(mask_path: Path, reference_shape: tuple[int, int, int]) -> np.ndarray | None:
+    if not mask_path.exists():
+        return None
+    try:
+        mask = _load_mask(mask_path)
+    except Exception:
+        return None
+    if tuple(mask.shape) != tuple(reference_shape):
+        return None
+    return np.asarray(mask, dtype=bool)
+
+
+def _bleed_anatomic_support_qc(
+    bleed_mask: np.ndarray | None,
+    *,
+    total_dir: Path,
+    reference_shape: tuple[int, int, int],
+    dilation_iterations: int = 2,
+) -> dict[str, Any]:
+    if bleed_mask is None or not np.asarray(bleed_mask, dtype=bool).any():
+        return {
+            "status": "not_applicable",
+            "passed": True,
+            "outside_support_voxel_count": 0,
+            "outside_support_fraction": 0.0,
+            "source_masks": [],
+        }
+
+    source_masks: list[str] = []
+    support = np.zeros(reference_shape, dtype=bool)
+    for mask_name in ("skull", "brain"):
+        mask = _load_support_mask(total_dir / f"{mask_name}.nii.gz", reference_shape)
+        if mask is None:
+            continue
+        support |= mask
+        source_masks.append(mask_name)
+
+    bleed = np.asarray(bleed_mask, dtype=bool)
+    voxel_count = int(np.count_nonzero(bleed))
+    if not source_masks:
+        return {
+            "status": "support_unavailable",
+            "passed": False,
+            "outside_support_voxel_count": voxel_count,
+            "outside_support_fraction": 1.0,
+            "source_masks": [],
+            "reason": "No skull or brain support mask was available for bleed QC.",
+        }
+
+    support = binary_dilation(support, iterations=max(0, int(dilation_iterations)))
+    outside_support = bleed & ~support
+    outside_count = int(np.count_nonzero(outside_support))
+    outside_fraction = float(outside_count / voxel_count) if voxel_count else 0.0
+    passed = outside_count == 0
+    return {
+        "status": "passed" if passed else "rejected_outside_skull_support",
+        "passed": passed,
+        "outside_support_voxel_count": outside_count,
+        "outside_support_fraction": round(outside_fraction, 6),
+        "source_masks": source_masks,
+        "dilation_iterations": int(dilation_iterations),
+        "reason": None
+        if passed
+        else "Cerebral bleed mask has positive voxels outside the skull/brain anatomic support.",
+    }
+
+
 def _rewrite_normalized_relpath(case_dir: Path, normalization: dict[str, Any]) -> dict[str, Any]:
     normalized_path = normalization.get("normalized_nifti")
     if normalized_path:
@@ -711,7 +778,14 @@ def main() -> int:
                     structure_masks[mask_name] = mask
         bleed_mask_path = cerebral_bleed_dir / f"{BLEED_MASK_NAME}.nii.gz"
         bleed_mask = _load_mask(bleed_mask_path) if bleed_mask_path.exists() else None
-        has_cerebral_bleed = bool(bleed_mask is not None and np.count_nonzero(bleed_mask) > 0)
+        raw_has_cerebral_bleed = bool(bleed_mask is not None and np.count_nonzero(bleed_mask) > 0)
+        bleed_support_qc = _bleed_anatomic_support_qc(
+            bleed_mask,
+            total_dir=total_dir,
+            reference_shape=reference_shape,
+            dilation_iterations=int(job_config.get("bleed_support_qc_dilation_iterations", 2)),
+        )
+        has_cerebral_bleed = bool(raw_has_cerebral_bleed and bleed_support_qc.get("passed"))
         volume_rows = _volume_rows(
             brain_mask=brain_mask,
             structure_masks=structure_masks,
@@ -910,6 +984,8 @@ def main() -> int:
                     "segmented_hemorrhage_present": bool(
                         bleed_status.get("segmented_hemorrhage_present")
                     ),
+                    "raw_has_cerebral_bleed": raw_has_cerebral_bleed,
+                    "anatomic_support_qc": bleed_support_qc,
                     "has_cerebral_bleed": has_cerebral_bleed,
                     "notification_bool": has_cerebral_bleed,
                     "overlay_exported_slabs": bleed_exported_slabs,
