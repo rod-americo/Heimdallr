@@ -323,7 +323,7 @@ def build_snapshot(
 
     processed_cases = sum(1 for case in cases if case.stage_key == "processed")
     failed_cases = sum(1 for case in cases if case.stage_key == "failed")
-    backlog_cases = sum(1 for case in cases if case.stage_key in {"queued", "prepared", "segmentation", "metrics"})
+    backlog_cases = sum(1 for case in cases if case.stage_key in {"prepare", "queued", "prepared", "segmentation", "metrics"})
 
     return DashboardSnapshot(
         generated_at=generated_at,
@@ -487,6 +487,7 @@ def _build_prepare_stage(
     now: datetime,
 ) -> StageMetrics:
     prepared = [case for case in cases if case.stage_key in {"prepared", "queued", "segmentation", "processed"}]
+    active_prepare = [case for case in cases if case.stage_key == "prepare"]
     queued = [case for case in cases if case.stage_key == "prepared"]
     oldest = _oldest_case_age_seconds(queued, now)
     state = "flow"
@@ -505,7 +506,7 @@ def _build_prepare_stage(
         label=service_label("prepare"),
         state=state,
         queued=len(queued),
-        active=len(claimed_uploads),
+        active=len(claimed_uploads) + len(active_prepare),
         completed=len(prepared),
         failed=0,
         oldest_age_seconds=oldest,
@@ -701,6 +702,8 @@ def _derive_stage_key(case: dict[str, Any]) -> str:
         return "ineligible"
     if segmentation_queue_status == "error" or metrics_queue_status == "error" or case["failed_file"] or case["has_error_log"]:
         return "failed"
+    if case["path"] is not None and not case.get("prepare_elapsed"):
+        return "prepare"
     if case["path"] is not None:
         return "prepared"
     return "intake"
@@ -732,6 +735,8 @@ def _derive_case_signal(case: dict[str, Any], stage_key: str) -> str:
         return tui("snapshot.case.signal.segmentation_metrics")
     if stage_key == "queued":
         return tui("snapshot.case.signal.waiting_slot")
+    if stage_key == "prepare":
+        return tui("snapshot.case.signal.prepare_running")
     if stage_key == "prepared":
         return tui("snapshot.case.signal.series_ready", count=case["selected_series"])
     return tui("snapshot.case.signal.awaiting_metadata")

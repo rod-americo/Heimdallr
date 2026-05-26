@@ -112,6 +112,47 @@ class TestSimpleQueueTui(unittest.TestCase):
         self.assertEqual([case.case_id for case in _processed_cases(current)], ["ProcessedNew", "ProcessedOld"])
         self.assertEqual([case.case_id for case in _backlog_cases(current)], ["QueuedNew", "QueuedOld"])
 
+    def test_ineligible_cases_do_not_appear_in_backlog(self):
+        current = DashboardSnapshot(
+            generated_at=datetime(2026, 5, 25, 12, 0, tzinfo=LOCAL_TZ),
+            services=[],
+            stages=[],
+            cases=[
+                case_overview("QueuedCase", stage_key="queued", queue_status_key="pending"),
+                case_overview("IneligibleCase", stage_key="ineligible"),
+            ],
+            alerts=[],
+            total_cases=2,
+            processed_cases=0,
+            backlog_cases=1,
+            failed_cases=0,
+            avg_prepare_seconds=None,
+            avg_segmentation_seconds=None,
+            avg_metrics_seconds=None,
+        )
+
+        self.assertEqual([case.case_id for case in _backlog_cases(current)], ["QueuedCase"])
+
+    def test_prepare_cases_appear_in_backlog(self):
+        current = DashboardSnapshot(
+            generated_at=datetime(2026, 5, 25, 12, 0, tzinfo=LOCAL_TZ),
+            services=[],
+            stages=[],
+            cases=[
+                case_overview("PrepareCase", stage_key="prepare"),
+            ],
+            alerts=[],
+            total_cases=1,
+            processed_cases=0,
+            backlog_cases=1,
+            failed_cases=0,
+            avg_prepare_seconds=None,
+            avg_segmentation_seconds=None,
+            avg_metrics_seconds=None,
+        )
+
+        self.assertEqual([case.case_id for case in _backlog_cases(current)], ["PrepareCase"])
+
     def test_render_uses_accessions_without_patient_names(self):
         app = SimpleQueueTui(limit=10)
         current = snapshot()

@@ -60,6 +60,46 @@ class TestTuiSnapshot(unittest.TestCase):
 
         self.assertEqual(stage, "ineligible")
 
+    def test_derive_stage_key_marks_workspace_without_prepare_elapsed_as_prepare(self):
+        stage = _derive_stage_key(
+            {
+                "segmentation_queue_status": "",
+                "metrics_queue_status": "",
+                "metrics_started": False,
+                "metrics_finished": False,
+                "has_results": False,
+                "failed_file": False,
+                "has_error_log": False,
+                "active_file": False,
+                "pending_file": False,
+                "path": object(),
+                "segmentation_status": "",
+                "prepare_elapsed": "",
+            }
+        )
+
+        self.assertEqual(stage, "prepare")
+
+    def test_derive_stage_key_marks_workspace_with_prepare_elapsed_as_prepared(self):
+        stage = _derive_stage_key(
+            {
+                "segmentation_queue_status": "",
+                "metrics_queue_status": "",
+                "metrics_started": False,
+                "metrics_finished": False,
+                "has_results": False,
+                "failed_file": False,
+                "has_error_log": False,
+                "active_file": False,
+                "pending_file": False,
+                "path": object(),
+                "segmentation_status": "",
+                "prepare_elapsed": "0:00:10",
+            }
+        )
+
+        self.assertEqual(stage, "prepared")
+
     def test_build_snapshot_marks_reused_segmentation_in_signal_and_elapsed(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)

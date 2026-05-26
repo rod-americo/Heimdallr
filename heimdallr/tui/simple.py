@@ -23,7 +23,7 @@ from heimdallr.tui.i18n import queue_status_label, stage_label, tui
 from heimdallr.tui.snapshot import CaseOverview, DashboardSnapshot, build_snapshot
 
 
-BACKLOG_STAGES = {"queued", "prepared", "segmentation", "metrics", "ineligible"}
+BACKLOG_STAGES = {"prepare", "queued", "prepared", "segmentation", "metrics"}
 ACTIVE_QUEUE_STATUSES = {"pending", "claimed"}
 COMMAND_NAMES = {"x": "cancel", "p": "priority"}
 
@@ -372,7 +372,7 @@ def _key_digit(key: str, character: str) -> str | None:
 
 
 def _is_active_case(case: CaseOverview) -> bool:
-    return case.queue_status_key == "claimed" or case.stage_key in {"segmentation", "metrics"}
+    return case.queue_status_key == "claimed" or case.stage_key in {"prepare", "segmentation", "metrics"}
 
 
 def _is_queued_case(case: CaseOverview) -> bool:
@@ -385,6 +385,7 @@ def _case_accession(case: CaseOverview) -> str:
 
 def _stage_text(case: CaseOverview) -> Text:
     style = {
+        "prepare": "bold khaki1",
         "prepared": "khaki1",
         "queued": "khaki1",
         "segmentation": "bold bright_cyan",

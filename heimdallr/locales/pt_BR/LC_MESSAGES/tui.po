@@ -360,6 +360,9 @@ msgstr "erro"
 msgid "case.stage.intake"
 msgstr "Intake"
 
+msgid "case.stage.prepare"
+msgstr "Preparo"
+
 msgid "case.stage.prepared"
 msgstr "Preparado"
 
@@ -539,6 +542,9 @@ msgstr "série inelegível para o perfil"
 
 msgid "snapshot.case.signal.waiting_slot"
 msgstr "aguardando slot de segmentação"
+
+msgid "snapshot.case.signal.prepare_running"
+msgstr "preparo em andamento"
 
 msgid "snapshot.case.signal.series_ready"
 msgstr "{count} séries prontas"
