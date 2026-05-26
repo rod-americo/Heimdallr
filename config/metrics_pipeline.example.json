@@ -39,7 +39,10 @@
           "generate_overlay": true,
           "emit_secondary_capture_dicom": true,
           "secondary_capture_transfer_syntax": "jpeg_ls_lossless",
-          "secondary_capture_max_dimension": 1024
+          "secondary_capture_max_dimension": 1024,
+          "appendicular_muscle_exclusion_enabled": true,
+          "appendicular_muscle_exclusion_margin_mm": 35.0,
+          "appendicular_muscle_exclusion_max_removed_fraction": 0.45
         },
         {
           "name": "parenchymal_organ_volumetry",
@@ -126,7 +129,10 @@
           "generate_overlay": true,
           "emit_secondary_capture_dicom": true,
           "secondary_capture_transfer_syntax": "jpeg_ls_lossless",
-          "secondary_capture_max_dimension": 1024
+          "secondary_capture_max_dimension": 1024,
+          "appendicular_fat_exclusion_enabled": true,
+          "appendicular_fat_exclusion_margin_mm": 35.0,
+          "appendicular_fat_exclusion_max_removed_fraction": 0.45
         }
       ]
     },
@@ -152,7 +158,10 @@
           "generate_overlay": true,
           "emit_secondary_capture_dicom": true,
           "secondary_capture_transfer_syntax": "jpeg_ls_lossless",
-          "secondary_capture_max_dimension": 1024
+          "secondary_capture_max_dimension": 1024,
+          "appendicular_muscle_exclusion_enabled": true,
+          "appendicular_muscle_exclusion_margin_mm": 35.0,
+          "appendicular_muscle_exclusion_max_removed_fraction": 0.45
         },
         {
           "name": "parenchymal_organ_volumetry",
@@ -194,7 +203,10 @@
           "generate_overlay": true,
           "emit_secondary_capture_dicom": true,
           "secondary_capture_transfer_syntax": "jpeg_ls_lossless",
-          "secondary_capture_max_dimension": 1024
+          "secondary_capture_max_dimension": 1024,
+          "appendicular_fat_exclusion_enabled": true,
+          "appendicular_fat_exclusion_margin_mm": 35.0,
+          "appendicular_fat_exclusion_max_removed_fraction": 0.45
         }
       ]
     },

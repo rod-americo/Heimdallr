@@ -59,10 +59,16 @@ class TestVatSatRatioJob(unittest.TestCase):
             l1[8:14, 5:15, 2:5] = 1.0
             sat = np.zeros_like(ct, dtype=np.float32)
             vat = np.zeros_like(ct, dtype=np.float32)
+            humerus = np.zeros_like(ct, dtype=np.float32)
             sat[3:18, 2:18, 8] = 1.0
+            sat[0:2, 0:2, 8] = 1.0
             vat[7:14, 6:14, 8] = 1.0
+            vat[0:2, 4:6, 8] = 1.0
+            humerus[0:1, 0:1, 8] = 1.0
+            humerus[0:1, 4:5, 8] = 1.0
             write_nifti(case_dir / "artifacts" / "total" / "vertebrae_L3.nii.gz", l3)
             write_nifti(case_dir / "artifacts" / "total" / "vertebrae_L1.nii.gz", l1)
+            write_nifti(case_dir / "artifacts" / "total" / "humerus_left.nii.gz", humerus)
             write_nifti(case_dir / "artifacts" / "tissue_types" / "subcutaneous_fat.nii.gz", sat)
             write_nifti(case_dir / "artifacts" / "tissue_types" / "torso_fat.nii.gz", vat)
 
@@ -75,7 +81,7 @@ class TestVatSatRatioJob(unittest.TestCase):
                         "--case-id",
                         case_id,
                         "--job-config-json",
-                        '{"emit_secondary_capture_dicom": true, "secondary_capture_max_dimension": 1024}',
+                        '{"emit_secondary_capture_dicom": true, "secondary_capture_max_dimension": 1024, "appendicular_fat_exclusion_margin_mm": 1.5, "locale": "en_US"}',
                     ],
                 ):
                     self.assertEqual(vat_sat_ratio.main(), 0)
@@ -86,6 +92,16 @@ class TestVatSatRatioJob(unittest.TestCase):
             self.assertEqual(result["measurement"]["anatomic_level_used"], "L3")
             self.assertGreater(result["measurement"]["visceral_fat_area_cm2"], 0)
             self.assertGreater(result["measurement"]["subcutaneous_fat_area_cm2"], 0)
+            self.assertGreater(
+                result["measurement"]["raw_subcutaneous_fat_pixels"],
+                result["measurement"]["subcutaneous_fat_pixels"],
+            )
+            self.assertGreater(
+                result["measurement"]["raw_visceral_fat_pixels"],
+                result["measurement"]["visceral_fat_pixels"],
+            )
+            self.assertTrue(result["measurement"]["appendicular_fat_filter"]["subcutaneous_fat"]["applied"])
+            self.assertTrue(result["measurement"]["appendicular_fat_filter"]["visceral_fat"]["applied"])
             self.assertIn("overlay_png", result["artifacts"])
             self.assertIn("overlay_sc_dcm", result["artifacts"])
             self.assertEqual(

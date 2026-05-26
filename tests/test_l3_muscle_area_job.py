@@ -1,7 +1,14 @@
 import unittest
+import json
+import sys
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
 
+import nibabel as nib
 import numpy as np
 
+from heimdallr.metrics.jobs import l3_muscle_area
 from heimdallr.metrics.jobs.l3_muscle_area import (
     MetricSkip,
     _overlay_display_directions,
@@ -13,6 +20,13 @@ from heimdallr.metrics.jobs.l3_muscle_area import (
     sagittal_plane_from_mask,
     sagittal_slab_from_mask,
 )
+from heimdallr.shared import settings
+
+
+def write_nifti(path: Path, data: np.ndarray, spacing=(1.0, 1.0, 1.0)) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    affine = np.diag([spacing[0], spacing[1], spacing[2], 1.0])
+    nib.save(nib.Nifti1Image(data.astype(np.float32), affine), str(path))
 
 
 class TestL3MuscleAreaJob(unittest.TestCase):
@@ -131,6 +145,65 @@ class TestL3MuscleAreaJob(unittest.TestCase):
         self.assertEqual(stats["voxel_count"], 3)
         self.assertEqual(stats["mean_hu"], 33.33)
         self.assertEqual(stats["std_hu"], 12.47)
+
+    def test_l3_muscle_area_excludes_appendicular_muscle_component(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            case_id = "CaseL3_20260526_001"
+            case_dir = tmp_path / case_id
+            (case_dir / "metadata").mkdir(parents=True)
+            (case_dir / "derived").mkdir(parents=True)
+            (case_dir / "artifacts" / "total").mkdir(parents=True)
+            (case_dir / "artifacts" / "tissue_types").mkdir(parents=True)
+
+            (case_dir / "metadata" / "id.json").write_text(
+                json.dumps(
+                    {
+                        "CaseID": case_id,
+                        "Modality": "CT",
+                        "StudyInstanceUID": "1.2.3.4.6",
+                        "PatientSize": 1.70,
+                        "PatientWeight": 80,
+                        "Pipeline": {"series_selection": {"SelectedPhase": "native"}},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            ct = np.full((24, 20, 16), 50.0, dtype=np.float32)
+            l3 = np.zeros_like(ct, dtype=np.float32)
+            muscle = np.zeros_like(ct, dtype=np.float32)
+            humerus = np.zeros_like(ct, dtype=np.float32)
+            l3[8:14, 5:15, 6:10] = 1.0
+            muscle[9:13, 8:12, 8] = 1.0
+            muscle[1:4, 2:5, 8] = 1.0
+            humerus[2:3, 3:4, 8] = 1.0
+
+            write_nifti(case_dir / "derived" / f"{case_id}.nii.gz", ct, spacing=(1.0, 1.0, 2.5))
+            write_nifti(case_dir / "artifacts" / "total" / "vertebrae_L3.nii.gz", l3)
+            write_nifti(case_dir / "artifacts" / "total" / "humerus_left.nii.gz", humerus)
+            write_nifti(case_dir / "artifacts" / "tissue_types" / "skeletal_muscle.nii.gz", muscle)
+
+            with patch.object(settings, "STUDIES_DIR", tmp_path):
+                with patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "l3_muscle_area",
+                        "--case-id",
+                        case_id,
+                        "--job-config-json",
+                        '{"emit_secondary_capture_dicom": false, "appendicular_muscle_exclusion_margin_mm": 2.0}',
+                    ],
+                ):
+                    self.assertEqual(l3_muscle_area.main(), 0)
+
+            result = json.loads((case_dir / "artifacts" / "metrics" / "l3_muscle_area" / "result.json").read_text(encoding="utf-8"))
+            measurement = result["measurement"]
+            self.assertEqual(result["status"], "done")
+            self.assertGreater(measurement["raw_muscle_pixels"], measurement["muscle_pixels"])
+            self.assertEqual(measurement["excluded_appendicular_muscle_pixels"], 9)
+            self.assertTrue(measurement["appendicular_muscle_filter"]["applied"])
 
     def test_render_overlay_rgb_returns_combined_axial_and_sagittal_image(self):
         image = np.linspace(-200.0, 250.0, num=24 * 20 * 16, dtype=np.float32).reshape((24, 20, 16))

@@ -70,6 +70,9 @@ The automatic CT pipeline passes the active segmentation profile's
 one parenchymal organ mask is present, and runs `cerebral_bleed` plus
 `brain_structures` only when the `total/brain.nii.gz` mask is present,
 geometry-compatible, non-empty, and does not touch scan bounds.
+For L3 muscle area and VAT/SAT, the L3 tissue masks are cleaned by removing
+components that touch dilated upper-appendicular `total` masks when available,
+and the raw and cleaned pixel/area values are preserved in the metric JSON.
 `total/skull.nii.gz` is retained as optional crop and diagnostic context; skull
 truncation does not block head QC or DICOM export when the brain mask and
 required head tasks are complete. The `head_complete_qc` job is enabled in the

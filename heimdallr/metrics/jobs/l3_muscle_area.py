@@ -27,6 +27,10 @@ from heimdallr.metrics.jobs._dicom_secondary_capture import (
     parse_optional_float,
     secondary_capture_options_from_job_config,
 )
+from heimdallr.metrics.jobs._appendicular_exclusion import (
+    load_upper_appendicular_mask_slice,
+    remove_appendicular_tissue_components,
+)
 from heimdallr.metrics.jobs._l3_overlay_text import (
     build_overlay_panel_titles,
     build_overlay_text,
@@ -495,12 +499,28 @@ def main() -> int:
 
         spacing_x, spacing_y, spacing_z = (float(value) for value in muscle_img.header.get_zooms()[:3])
         pixel_area_mm2 = spacing_x * spacing_y
-        muscle_pixels = int(np.count_nonzero(muscle_slice))
+        appendicular_slice, appendicular_audit = load_upper_appendicular_mask_slice(
+            artifacts_dir,
+            reference_shape=ct_data.shape,
+            slice_idx=slice_idx,
+        )
+        clean_muscle_slice, appendicular_filter = remove_appendicular_tissue_components(
+            muscle_slice,
+            appendicular_slice,
+            spacing_mm=(spacing_x, spacing_y),
+            tissue_label="skeletal_muscle",
+            margin_mm=float(job_config.get("appendicular_muscle_exclusion_margin_mm", 35.0)),
+            max_removed_fraction=float(job_config.get("appendicular_muscle_exclusion_max_removed_fraction", 0.45)),
+            enabled=bool(job_config.get("appendicular_muscle_exclusion_enabled", True)),
+        )
+        appendicular_filter["total_mask_audit"] = appendicular_audit
+        raw_muscle_pixels = int(np.count_nonzero(muscle_slice))
+        muscle_pixels = int(np.count_nonzero(clean_muscle_slice))
         muscle_area_cm2 = (muscle_pixels * pixel_area_mm2) / 100.0
         if suppress_density:
             muscle_density_stats = {"voxel_count": muscle_pixels, "mean_hu": None, "std_hu": None}
         else:
-            muscle_density_stats = calculate_mask_hu_statistics(ct_slice, muscle_slice)
+            muscle_density_stats = calculate_mask_hu_statistics(ct_slice, clean_muscle_slice)
         height_m = parse_optional_float(case_metadata.get("Height"))
         weight_kg = parse_optional_float(
             case_metadata.get("Weight") or case_metadata.get("PatientWeight")
@@ -543,7 +563,11 @@ def main() -> int:
                 ct_data,
                 ct_img.affine,
                 l3_mask,
-                muscle_mask,
+                np.where(
+                    np.arange(muscle_mask.shape[2])[None, None, :] == slice_idx,
+                    clean_muscle_slice[:, :, None],
+                    muscle_mask,
+                ),
                 slice_idx,
                 title,
                 summary_lines,
@@ -586,14 +610,18 @@ def main() -> int:
                 "total_slices": total_slices,
                 "l3_slice_count": int(len(l3_slice_indices)),
                 "muscle_pixels": muscle_pixels,
+                "raw_muscle_pixels": raw_muscle_pixels,
+                "excluded_appendicular_muscle_pixels": int(appendicular_filter["excluded_pixels"]),
                 "pixel_spacing_mm": {
                     "x": spacing_x,
                     "y": spacing_y,
                 },
                 "pixel_area_mm2": pixel_area_mm2,
                 "skeletal_muscle_area_cm2": muscle_area_cm2,
+                "raw_skeletal_muscle_area_cm2": (raw_muscle_pixels * pixel_area_mm2) / 100.0,
                 "skeletal_muscle_density_hu_mean": muscle_density_stats["mean_hu"],
                 "skeletal_muscle_density_hu_std": muscle_density_stats["std_hu"],
+                "appendicular_muscle_filter": appendicular_filter,
                 "height_m": height_m,
                 "weight_kg": weight_kg,
                 "bmi_kg_m2": bmi_kg_m2,

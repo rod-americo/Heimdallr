@@ -203,6 +203,11 @@ reason and per-organ status for audit.
 reported as an organ volume or attenuation measurement by
 `parenchymal_organ_volumetry`; its measurement role is only to make the L1 mask
 visible in the generated 5 mm Secondary Capture series.
+- L3 muscle area and VAT/SAT measurements use the `tissue_types` masks on the
+selected L3 slice, then exclude tissue components that touch dilated upper
+appendicular `total` masks (`humerus`, `scapula`, `clavicula`) when those masks
+are available. Result JSON preserves raw pixel/area values, cleaned values, and
+an exclusion audit for traceability.
 - Generated Secondary Capture overlays should use a bounded matrix size. The
 shared helper defaults the largest image dimension to 512 pixels; the validated
 `l3_muscle_area` and `vat_sat_ratio` jobs set 1024 pixels in the tracked metrics

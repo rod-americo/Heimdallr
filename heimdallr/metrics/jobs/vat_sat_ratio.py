@@ -26,6 +26,10 @@ from heimdallr.metrics.jobs._dicom_secondary_capture import (
     parse_optional_float,
     secondary_capture_options_from_job_config,
 )
+from heimdallr.metrics.jobs._appendicular_exclusion import (
+    load_upper_appendicular_mask_slice,
+    remove_appendicular_tissue_components,
+)
 from heimdallr.metrics.jobs._vat_sat_overlay_text import (
     build_overlay_text,
     derivation_description,
@@ -340,8 +344,38 @@ def main() -> int:
         sat_slice = sat_mask[:, :, slice_idx]
         vat_slice = vat_mask[:, :, slice_idx]
         pixel_spacing = (float(spacing_mm[0]), float(spacing_mm[1]))
-        sat_area = _slice_area_cm2(sat_slice, pixel_spacing)
-        vat_area = _slice_area_cm2(vat_slice, pixel_spacing)
+        appendicular_slice, appendicular_audit = load_upper_appendicular_mask_slice(
+            artifacts_dir,
+            reference_shape=image_data.shape,
+            slice_idx=slice_idx,
+        )
+        fat_filter_enabled = bool(job_config.get("appendicular_fat_exclusion_enabled", True))
+        fat_filter_margin_mm = float(job_config.get("appendicular_fat_exclusion_margin_mm", 35.0))
+        fat_filter_max_removed_fraction = float(job_config.get("appendicular_fat_exclusion_max_removed_fraction", 0.45))
+        clean_sat_slice, sat_appendicular_filter = remove_appendicular_tissue_components(
+            sat_slice,
+            appendicular_slice,
+            spacing_mm=pixel_spacing,
+            tissue_label="subcutaneous_fat",
+            margin_mm=fat_filter_margin_mm,
+            max_removed_fraction=fat_filter_max_removed_fraction,
+            enabled=fat_filter_enabled,
+        )
+        clean_vat_slice, vat_appendicular_filter = remove_appendicular_tissue_components(
+            vat_slice,
+            appendicular_slice,
+            spacing_mm=pixel_spacing,
+            tissue_label="torso_fat",
+            margin_mm=fat_filter_margin_mm,
+            max_removed_fraction=fat_filter_max_removed_fraction,
+            enabled=fat_filter_enabled,
+        )
+        sat_appendicular_filter["total_mask_audit"] = appendicular_audit
+        vat_appendicular_filter["total_mask_audit"] = appendicular_audit
+        raw_sat_area = _slice_area_cm2(sat_slice, pixel_spacing)
+        raw_vat_area = _slice_area_cm2(vat_slice, pixel_spacing)
+        sat_area = _slice_area_cm2(clean_sat_slice, pixel_spacing)
+        vat_area = _slice_area_cm2(clean_vat_slice, pixel_spacing)
         ratio = round(vat_area / sat_area, 4) if sat_area > 0 else None
         total_slices = int(image_data.shape[2])
         probable_viewer_slice = int(total_slices - slice_idx)
@@ -371,8 +405,16 @@ def main() -> int:
                 image_data=image_data,
                 ct_affine=ct_img.affine,
                 l3_mask=l3_mask,
-                sat_mask=sat_mask,
-                vat_mask=vat_mask,
+                sat_mask=np.where(
+                    np.arange(sat_mask.shape[2])[None, None, :] == slice_idx,
+                    clean_sat_slice[:, :, None],
+                    sat_mask,
+                ),
+                vat_mask=np.where(
+                    np.arange(vat_mask.shape[2])[None, None, :] == slice_idx,
+                    clean_vat_slice[:, :, None],
+                    vat_mask,
+                ),
                 slice_idx=slice_idx,
                 title=title,
                 panel_titles=panel_titles,
@@ -424,12 +466,22 @@ def main() -> int:
                 "level_slice_count": int(len(slice_indices)),
                 "pixel_spacing_mm": {"x": pixel_spacing[0], "y": pixel_spacing[1]},
                 "source_mask_names": {"visceral_fat": "torso_fat", "subcutaneous_fat": "subcutaneous_fat"},
-                "visceral_fat_pixels": int(np.count_nonzero(vat_slice)),
-                "subcutaneous_fat_pixels": int(np.count_nonzero(sat_slice)),
+                "visceral_fat_pixels": int(np.count_nonzero(clean_vat_slice)),
+                "subcutaneous_fat_pixels": int(np.count_nonzero(clean_sat_slice)),
+                "raw_visceral_fat_pixels": int(np.count_nonzero(vat_slice)),
+                "raw_subcutaneous_fat_pixels": int(np.count_nonzero(sat_slice)),
+                "excluded_appendicular_visceral_fat_pixels": int(vat_appendicular_filter["excluded_pixels"]),
+                "excluded_appendicular_subcutaneous_fat_pixels": int(sat_appendicular_filter["excluded_pixels"]),
                 "pixel_area_mm2": round(float(pixel_spacing[0] * pixel_spacing[1]), 6),
                 "visceral_fat_area_cm2": vat_area,
                 "subcutaneous_fat_area_cm2": sat_area,
+                "raw_visceral_fat_area_cm2": raw_vat_area,
+                "raw_subcutaneous_fat_area_cm2": raw_sat_area,
                 "vat_sat_area_ratio": ratio,
+                "appendicular_fat_filter": {
+                    "visceral_fat": vat_appendicular_filter,
+                    "subcutaneous_fat": sat_appendicular_filter,
+                },
                 "selected_phase": selected_phase,
                 "density_suppressed_due_to_contrast": bool(selected_phase and selected_phase != "native"),
                 "patient_height_m": parse_optional_float(case_metadata.get("Height") or case_metadata.get("PatientSize")),
