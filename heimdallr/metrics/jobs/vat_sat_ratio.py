@@ -348,6 +348,8 @@ def main() -> int:
             artifacts_dir,
             reference_shape=image_data.shape,
             slice_idx=slice_idx,
+            spacing_z_mm=float(spacing_mm[2]),
+            slice_half_window_mm=float(job_config.get("appendicular_fat_exclusion_projection_half_window_mm", 80.0)),
         )
         fat_filter_enabled = bool(job_config.get("appendicular_fat_exclusion_enabled", True))
         fat_filter_margin_mm = float(job_config.get("appendicular_fat_exclusion_margin_mm", 35.0))

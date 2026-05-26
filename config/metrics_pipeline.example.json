@@ -42,6 +42,7 @@
           "secondary_capture_max_dimension": 1024,
           "appendicular_muscle_exclusion_enabled": true,
           "appendicular_muscle_exclusion_margin_mm": 35.0,
+          "appendicular_muscle_exclusion_projection_half_window_mm": 80.0,
           "appendicular_muscle_exclusion_max_removed_fraction": 0.45
         },
         {
@@ -132,6 +133,7 @@
           "secondary_capture_max_dimension": 1024,
           "appendicular_fat_exclusion_enabled": true,
           "appendicular_fat_exclusion_margin_mm": 35.0,
+          "appendicular_fat_exclusion_projection_half_window_mm": 80.0,
           "appendicular_fat_exclusion_max_removed_fraction": 0.45
         }
       ]
@@ -161,6 +163,7 @@
           "secondary_capture_max_dimension": 1024,
           "appendicular_muscle_exclusion_enabled": true,
           "appendicular_muscle_exclusion_margin_mm": 35.0,
+          "appendicular_muscle_exclusion_projection_half_window_mm": 80.0,
           "appendicular_muscle_exclusion_max_removed_fraction": 0.45
         },
         {
@@ -206,6 +209,7 @@
           "secondary_capture_max_dimension": 1024,
           "appendicular_fat_exclusion_enabled": true,
           "appendicular_fat_exclusion_margin_mm": 35.0,
+          "appendicular_fat_exclusion_projection_half_window_mm": 80.0,
           "appendicular_fat_exclusion_max_removed_fraction": 0.45
         }
       ]

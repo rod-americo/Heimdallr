@@ -503,6 +503,8 @@ def main() -> int:
             artifacts_dir,
             reference_shape=ct_data.shape,
             slice_idx=slice_idx,
+            spacing_z_mm=spacing_z,
+            slice_half_window_mm=float(job_config.get("appendicular_muscle_exclusion_projection_half_window_mm", 80.0)),
         )
         clean_muscle_slice, appendicular_filter = remove_appendicular_tissue_components(
             muscle_slice,

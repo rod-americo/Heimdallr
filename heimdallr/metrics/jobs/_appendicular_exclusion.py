@@ -37,13 +37,22 @@ def load_upper_appendicular_mask_slice(
     *,
     reference_shape: tuple[int, ...],
     slice_idx: int,
+    spacing_z_mm: float | None = None,
+    slice_half_window_mm: float = 80.0,
     mask_names: tuple[str, ...] = UPPER_APPENDICULAR_TOTAL_MASKS,
 ) -> tuple[np.ndarray, dict[str, Any]]:
-    """Load upper appendicular TotalSegmentator masks on one axial slice."""
+    """Load upper appendicular TotalSegmentator masks projected near one axial slice."""
     exclusion_slice = np.zeros(reference_shape[:2], dtype=bool)
     loaded_masks: list[str] = []
     skipped_masks: dict[str, str] = {}
     total_dir = artifacts_dir / "total"
+    spacing_z = float(spacing_z_mm) if spacing_z_mm else None
+    if spacing_z and spacing_z > 0 and slice_half_window_mm > 0:
+        half_window_slices = int(np.ceil(float(slice_half_window_mm) / spacing_z))
+    else:
+        half_window_slices = 0
+    slice_start = max(0, int(slice_idx) - half_window_slices)
+    slice_end = min(int(reference_shape[2]), int(slice_idx) + half_window_slices + 1)
 
     for mask_name in mask_names:
         mask_path = total_dir / f"{mask_name}.nii.gz"
@@ -54,13 +63,20 @@ def load_upper_appendicular_mask_slice(
         if mask_data.shape != reference_shape:
             skipped_masks[mask_name] = "shape_mismatch"
             continue
-        exclusion_slice |= mask_data[:, :, slice_idx]
+        exclusion_slice |= np.any(mask_data[:, :, slice_start:slice_end], axis=2)
         loaded_masks.append(mask_name)
 
     audit: dict[str, Any] = {
         "source_masks": loaded_masks,
         "skipped_masks": skipped_masks,
         "source_mask_pixels": int(np.count_nonzero(exclusion_slice)),
+        "projection": {
+            "center_slice_index": int(slice_idx),
+            "slice_start": int(slice_start),
+            "slice_end_exclusive": int(slice_end),
+            "half_window_mm": float(slice_half_window_mm),
+            "spacing_z_mm": spacing_z,
+        },
     }
     return exclusion_slice, audit
 
