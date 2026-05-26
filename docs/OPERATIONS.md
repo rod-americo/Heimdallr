@@ -71,6 +71,20 @@ The optional dashboard TUI is:
 .venv/bin/python -m heimdallr.tui
 ```
 
+A simpler queue-first TUI, styled after the WebRISAhead operational console, is:
+
+```bash
+.venv/bin/python -m heimdallr.tui.simple
+```
+
+The compact queue TUI lists the 20 most recent studies in the upper queue table
+with stable visible indexes (`01`, `02`, ...). Press `q` to exit, `r` to refresh,
+`pNN` to prioritize a visible queued study as the next pending queue item, or
+`xNN` to cancel one and remove it from the active pipeline queues, for example
+`p10` or `x04`. In the processed table, `Pipeline` is the sum of active prepare,
+segmentation, and metrics elapsed times; `Duration` is the end-to-end elapsed
+time when recorded by the pipeline.
+
 ## 4. Operational Configuration
 
 Configuration is centralized in `heimdallr/shared/settings.py` and JSON files under `config/`.
@@ -136,6 +150,18 @@ Ignored host-local config:
 - `config/host_stack/*.json`
 
 When `resource_monitor` samples services installed as user-scoped systemd units, prefix the unit name with `user:` in `config/resource_monitor.json`, for example `user:heimdallr-segmentation.service`. Unprefixed names are read from the system systemd manager.
+
+`config/space_manager.json` controls runtime study retention. The resident
+worker scans `runtime/studies` every `scan_interval_seconds` and deletes the
+oldest purge-eligible study directories until all enabled limits are satisfied:
+
+- `usage_threshold_percent`: maximum filesystem usage percentage; set `0` to disable.
+- `minimum_free_gb`: minimum free space to preserve; set `0` to disable.
+- `max_resident_studies`: maximum resident study directories; set `0` to disable.
+- `max_case_age_days`: maximum study directory age by mtime; set `0` to disable.
+
+Active queue items in segmentation, metrics, or DICOM egress remain protected
+from purge while their queue status is `pending` or `claimed`.
 
 Project presentation default:
 

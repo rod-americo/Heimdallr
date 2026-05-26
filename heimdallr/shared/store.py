@@ -79,6 +79,16 @@ _STUDY_HANDOFF_COLUMNS = {
 }
 
 _SUPPRESSED_HANDOFF_STATUSES = frozenset({"pending_prepare", "preparing", "prepared"})
+PIPELINE_CANCEL_MESSAGE = "Canceled from simple TUI"
+_PIPELINE_CANCEL_QUEUE_TABLES = frozenset(
+    {
+        "segmentation_queue",
+        "metrics_queue",
+        "dicom_egress_queue",
+        "integration_dispatch_queue",
+        "integration_delivery_queue",
+    }
+)
 
 LOCAL_TZ = ZoneInfo(settings.TIMEZONE)
 
@@ -1710,6 +1720,7 @@ def mark_segmentation_queue_item_done(conn: sqlite3.Connection, queue_id: int) -
             claim_heartbeat_at = NULL,
             error = NULL
         WHERE id = ?
+          AND status = 'claimed'
         """,
         (finished_at, queue_id),
     )
@@ -1726,6 +1737,7 @@ def mark_metrics_queue_item_done(conn: sqlite3.Connection, queue_id: int) -> Non
             claim_heartbeat_at = NULL,
             error = NULL
         WHERE id = ?
+          AND status = 'claimed'
         """,
         (finished_at, queue_id),
     )
@@ -1742,6 +1754,7 @@ def mark_dicom_egress_queue_item_done(conn: sqlite3.Connection, queue_id: int) -
             next_attempt_at = NULL,
             error = NULL
         WHERE id = ?
+          AND status = 'claimed'
         """,
         (finished_at, queue_id),
     )
@@ -1764,6 +1777,7 @@ def mark_integration_dispatch_queue_item_done(
             response_status = ?,
             error = NULL
         WHERE id = ?
+          AND status = 'claimed'
         """,
         (finished_at, int(response_status) if response_status is not None else None, queue_id),
     )
@@ -1786,6 +1800,7 @@ def mark_integration_delivery_queue_item_done(
             response_status = ?,
             error = NULL
         WHERE id = ?
+          AND status = 'claimed'
         """,
         (finished_at, int(response_status) if response_status is not None else None, queue_id),
     )
@@ -2015,6 +2030,190 @@ def mark_integration_delivery_queue_item_error(
         ),
     )
     conn.commit()
+
+
+def mark_case_pipeline_canceled(conn: sqlite3.Connection, case_id: str) -> int:
+    ensure_schema(conn)
+    finished_at = _now_local_timestamp()
+    updates = 0
+    cursor = conn.cursor()
+    cursor.execute("BEGIN IMMEDIATE")
+    for table in ("segmentation_queue", "metrics_queue"):
+        cursor.execute(
+            f"""
+            UPDATE {table}
+            SET status = 'error',
+                claimed_at = NULL,
+                claim_heartbeat_at = NULL,
+                finished_at = ?,
+                error = ?
+            WHERE case_id = ?
+              AND status IN ('pending', 'claimed')
+            """,
+            (finished_at, PIPELINE_CANCEL_MESSAGE, str(case_id)),
+        )
+        updates += cursor.rowcount
+    for table in ("dicom_egress_queue", "integration_dispatch_queue", "integration_delivery_queue"):
+        cursor.execute(
+            f"""
+            UPDATE {table}
+            SET status = 'error',
+                claimed_at = NULL,
+                finished_at = ?,
+                next_attempt_at = NULL,
+                error = ?
+            WHERE case_id = ?
+              AND status IN ('pending', 'claimed')
+            """,
+            (finished_at, PIPELINE_CANCEL_MESSAGE, str(case_id)),
+        )
+        updates += cursor.rowcount
+    existing_queue_row = cursor.execute(
+        """
+        SELECT 1
+        FROM segmentation_queue
+        WHERE case_id = ?
+        UNION
+        SELECT 1
+        FROM metrics_queue
+        WHERE case_id = ?
+        LIMIT 1
+        """,
+        (str(case_id), str(case_id)),
+    ).fetchone()
+    if updates == 0 and existing_queue_row is None:
+        cursor.execute(
+            """
+            INSERT INTO segmentation_queue (
+                case_id,
+                input_path,
+                status,
+                created_at,
+                finished_at,
+                error
+            )
+            VALUES (?, ?, 'error', ?, ?, ?)
+            ON CONFLICT(case_id) DO UPDATE SET
+                status = 'error',
+                claimed_at = NULL,
+                claim_heartbeat_at = NULL,
+                finished_at = excluded.finished_at,
+                error = excluded.error
+            """,
+            (
+                str(case_id),
+                str(settings.STUDIES_DIR / str(case_id)),
+                finished_at,
+                finished_at,
+                PIPELINE_CANCEL_MESSAGE,
+            ),
+        )
+        updates += cursor.rowcount
+    conn.commit()
+    return int(updates)
+
+
+def is_queue_item_canceled(conn: sqlite3.Connection, table_name: str, queue_id: int) -> bool:
+    if table_name not in _PIPELINE_CANCEL_QUEUE_TABLES:
+        raise ValueError(f"Unsupported queue table: {table_name}")
+    ensure_schema(conn)
+    row = conn.execute(
+        f"SELECT status, error FROM {table_name} WHERE id = ?",
+        (int(queue_id),),
+    ).fetchone()
+    return bool(row and row["status"] == "error" and row["error"] == PIPELINE_CANCEL_MESSAGE)
+
+
+def prioritize_case_pipeline(conn: sqlite3.Connection, case_id: str) -> int:
+    ensure_schema(conn)
+    updates = 0
+    cursor = conn.cursor()
+    cursor.execute("BEGIN IMMEDIATE")
+    for table in ("segmentation_queue", "metrics_queue"):
+        row = cursor.execute(
+            f"""
+            SELECT id
+            FROM {table}
+            WHERE case_id = ?
+              AND status = 'pending'
+            """,
+            (str(case_id),),
+        ).fetchone()
+        if row is None:
+            continue
+        oldest = cursor.execute(
+            f"""
+            SELECT MIN(created_at)
+            FROM {table}
+            WHERE status = 'pending'
+              AND created_at IS NOT NULL
+            """
+        ).fetchone()[0]
+        priority_created_at = "1970-01-01 00:00:00"
+        if oldest:
+            oldest_dt = _parse_local_timestamp(oldest)
+            if oldest_dt is not None:
+                priority_created_at = (oldest_dt - timedelta(seconds=1)).strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute(
+            f"""
+            UPDATE {table}
+            SET created_at = ?
+            WHERE id = ?
+              AND status = 'pending'
+            """,
+            (priority_created_at, int(row["id"])),
+        )
+        updates += cursor.rowcount
+    existing_queue_row = cursor.execute(
+        """
+        SELECT 1
+        FROM segmentation_queue
+        WHERE case_id = ?
+        UNION
+        SELECT 1
+        FROM metrics_queue
+        WHERE case_id = ?
+        LIMIT 1
+        """,
+        (str(case_id), str(case_id)),
+    ).fetchone()
+    if updates == 0 and existing_queue_row is None:
+        oldest = cursor.execute(
+            """
+            SELECT MIN(created_at)
+            FROM segmentation_queue
+            WHERE status = 'pending'
+              AND created_at IS NOT NULL
+            """
+        ).fetchone()[0]
+        priority_created_at = "1970-01-01 00:00:00"
+        if oldest:
+            oldest_dt = _parse_local_timestamp(oldest)
+            if oldest_dt is not None:
+                priority_created_at = (oldest_dt - timedelta(seconds=1)).strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute(
+            """
+            INSERT INTO segmentation_queue (case_id, input_path, status, created_at, attempts)
+            VALUES (?, ?, 'pending', ?, 0)
+            ON CONFLICT(case_id) DO UPDATE SET
+                input_path = excluded.input_path,
+                status = 'pending',
+                created_at = excluded.created_at,
+                claimed_at = NULL,
+                claim_heartbeat_at = NULL,
+                finished_at = NULL,
+                error = NULL,
+                attempts = 0
+            """,
+            (
+                str(case_id),
+                str(settings.STUDIES_DIR / str(case_id)),
+                priority_created_at,
+            ),
+        )
+        updates += cursor.rowcount
+    conn.commit()
+    return int(updates)
 
 
 def update_full_dicom_metadata(conn: sqlite3.Connection, study_uid: str, full_meta: dict[str, Any]) -> None:

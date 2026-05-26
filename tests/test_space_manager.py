@@ -112,6 +112,98 @@ class TestSpaceManager(unittest.TestCase):
             )
             conn.close()
 
+    def test_reclaim_space_once_honors_minimum_free_space(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            studies_dir = Path(tmpdir) / "studies"
+            studies_dir.mkdir(parents=True, exist_ok=True)
+            old_case = studies_dir / "CaseOld"
+            new_case = studies_dir / "CaseNew"
+            old_case.mkdir()
+            new_case.mkdir()
+            os.utime(old_case, (1, 1))
+            os.utime(new_case, (2, 2))
+            db_path = Path(tmpdir) / "dicom.db"
+
+            snapshots = iter(
+                [
+                    worker.DiskSnapshot(100, 70, 30),
+                    worker.DiskSnapshot(100, 70, 30),
+                    worker.DiskSnapshot(100, 50, 50),
+                    worker.DiskSnapshot(100, 50, 50),
+                ]
+            )
+
+            with (
+                patch.object(worker.settings, "STUDIES_DIR", studies_dir),
+                patch("heimdallr.space_manager.worker.db_connect", side_effect=lambda: _connect_row_db(db_path)),
+                patch("heimdallr.space_manager.worker._disk_snapshot", side_effect=lambda _path: next(snapshots)),
+            ):
+                deletions = worker.reclaim_space_once(
+                    studies_dir=studies_dir,
+                    threshold_percent=0.0,
+                    minimum_free_gb=40 / 1024 / 1024 / 1024,
+                )
+
+            self.assertEqual([item["case_id"] for item in deletions], ["CaseOld"])
+            self.assertFalse(old_case.exists())
+            self.assertTrue(new_case.exists())
+
+    def test_reclaim_space_once_honors_max_resident_studies(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            studies_dir = Path(tmpdir) / "studies"
+            studies_dir.mkdir(parents=True, exist_ok=True)
+            cases = [studies_dir / f"Case{index}" for index in range(3)]
+            for index, case_dir in enumerate(cases, start=1):
+                case_dir.mkdir()
+                os.utime(case_dir, (index, index))
+            db_path = Path(tmpdir) / "dicom.db"
+
+            with (
+                patch.object(worker.settings, "STUDIES_DIR", studies_dir),
+                patch("heimdallr.space_manager.worker.db_connect", side_effect=lambda: _connect_row_db(db_path)),
+                patch("heimdallr.space_manager.worker._disk_snapshot", return_value=worker.DiskSnapshot(100, 10, 90)),
+            ):
+                deletions = worker.reclaim_space_once(
+                    studies_dir=studies_dir,
+                    threshold_percent=0.0,
+                    max_resident_studies=2,
+                )
+
+            self.assertEqual([item["case_id"] for item in deletions], ["Case0"])
+            self.assertFalse(cases[0].exists())
+            self.assertTrue(cases[1].exists())
+            self.assertTrue(cases[2].exists())
+
+    def test_reclaim_space_once_honors_max_case_age_days(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            studies_dir = Path(tmpdir) / "studies"
+            studies_dir.mkdir(parents=True, exist_ok=True)
+            old_case = studies_dir / "CaseOld"
+            new_case = studies_dir / "CaseNew"
+            old_case.mkdir()
+            new_case.mkdir()
+            old_mtime = 1_000_000
+            new_mtime = 2_000_000
+            os.utime(old_case, (old_mtime, old_mtime))
+            os.utime(new_case, (new_mtime, new_mtime))
+            db_path = Path(tmpdir) / "dicom.db"
+
+            with (
+                patch.object(worker.settings, "STUDIES_DIR", studies_dir),
+                patch("heimdallr.space_manager.worker.db_connect", side_effect=lambda: _connect_row_db(db_path)),
+                patch("heimdallr.space_manager.worker._disk_snapshot", return_value=worker.DiskSnapshot(100, 10, 90)),
+                patch("heimdallr.space_manager.worker.time.time", return_value=new_mtime),
+            ):
+                deletions = worker.reclaim_space_once(
+                    studies_dir=studies_dir,
+                    threshold_percent=0.0,
+                    max_case_age_days=5,
+                )
+
+            self.assertEqual([item["case_id"] for item in deletions], ["CaseOld"])
+            self.assertFalse(old_case.exists())
+            self.assertTrue(new_case.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

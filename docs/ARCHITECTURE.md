@@ -105,8 +105,9 @@ deterministic job execution, artifacts, DICOM egress enqueue, final delivery enq
 worker.
 - `heimdallr/integration/delivery/worker.py`: final package callback retry
 worker.
-- `heimdallr/space_manager/worker.py`: disk threshold monitor and completed
-study purge.
+- `heimdallr/space_manager/worker.py`: runtime studies retention monitor for
+disk usage, free space, resident study count, case age, and completed study
+purge.
 - `heimdallr/resource_monitor/worker.py`: process and case memory telemetry
 sampler.
 

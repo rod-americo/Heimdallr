@@ -21,6 +21,123 @@ msgstr "Heimdallr TUI"
 msgid "app.subtitle"
 msgstr "Intake · Preparo · Segmentação · Métricas"
 
+msgid "simple.title"
+msgstr "Heimdallr Queue TUI"
+
+msgid "simple.subtitle"
+msgstr "fila de casos"
+
+msgid "simple.updated_at"
+msgstr "atualizado"
+
+msgid "simple.summary.active"
+msgstr "Ativos"
+
+msgid "simple.summary.queue"
+msgstr "Fila"
+
+msgid "simple.summary.processed"
+msgstr "Processados"
+
+msgid "simple.summary.failures"
+msgstr "Falhas"
+
+msgid "simple.summary.total"
+msgstr "Total"
+
+msgid "simple.panel.backlog"
+msgstr "A processar"
+
+msgid "simple.panel.processed"
+msgstr "Processados recentes"
+
+msgid "simple.panel.signals"
+msgstr "Sinais"
+
+msgid "simple.table.status"
+msgstr "Status"
+
+msgid "simple.table.total"
+msgstr "Total"
+
+msgid "simple.table.duration"
+msgstr "Duração"
+
+msgid "simple.table.finished"
+msgstr "Fim"
+
+msgid "simple.table.pipeline"
+msgstr "Pipeline"
+
+msgid "simple.table.slot"
+msgstr "Nº"
+
+msgid "simple.table.prepare_short"
+msgstr "Prep."
+
+msgid "simple.table.segment_short"
+msgstr "Seg."
+
+msgid "simple.status.ok"
+msgstr "OK"
+
+msgid "simple.empty.backlog"
+msgstr "sem pendências"
+
+msgid "simple.empty.queue"
+msgstr "fila vazia"
+
+msgid "simple.empty.processed"
+msgstr "sem processados"
+
+msgid "simple.empty.failures"
+msgstr "sem falhas recentes"
+
+msgid "simple.shortcuts"
+msgstr "Atalhos"
+
+msgid "simple.shortcut.quit"
+msgstr "sair"
+
+msgid "simple.shortcut.refresh"
+msgstr "atualizar"
+
+msgid "simple.shortcut.priority"
+msgstr "priorizar; p10 passa o estudo 10 para o próximo"
+
+msgid "simple.shortcut.cancel"
+msgstr "cancelar estudo; x04 cancela o estudo 04"
+
+msgid "simple.command.cleared"
+msgstr "Comando limpo."
+
+msgid "simple.command.cancel_waiting"
+msgstr "Digite o número depois de x para cancelar, exemplo: x04 ou x1 + Enter."
+
+msgid "simple.command.cancel_cleared"
+msgstr "Cancelamento limpo."
+
+msgid "simple.command.cancel_invalid"
+msgstr "Estudo {slot} não está visível na lista superior."
+
+msgid "simple.command.cancel_done"
+msgstr "Estudo {slot} ({accession}) retirado do pipeline; {count} item(ns) de fila cancelado(s)."
+
+msgid "simple.command.cancel_noop"
+msgstr "Estudo {slot} ({accession}) não tinha item pendente ou em execução para cancelar."
+
+msgid "simple.command.priority_waiting"
+msgstr "Digite o número depois de p para priorizar, exemplo: p10 ou p1 + Enter."
+
+msgid "simple.command.priority_invalid"
+msgstr "Estudo {slot} não está visível na lista superior."
+
+msgid "simple.command.priority_done"
+msgstr "Estudo {slot} ({accession}) priorizado; {count} fila(s) ajustada(s)."
+
+msgid "simple.command.priority_noop"
+msgstr "Estudo {slot} ({accession}) não tinha fila pendente para priorizar."
+
 msgid "app.table.patient"
 msgstr "Paciente"
 

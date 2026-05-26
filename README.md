@@ -53,7 +53,7 @@ Heimdallr owns the imaging infrastructure layer. Clinical report drafting, LLM/N
 | `heimdallr.integration.delivery` | operational if configured | Sends terminal `case.completed` or `case.failed` API callbacks for external submissions. |
 | `heimdallr.control_plane` | operational | FastAPI dashboard, `/upload` ingress, `/jobs` submission API, patient/results API, PDF export. Built-in auth is not present. |
 | `heimdallr.tui` | operational support tool | Reads SQLite/process state for live operations. |
-| `heimdallr.space_manager` | operational guardrail | Purges completed study artifacts when configured disk thresholds are exceeded. |
+| `heimdallr.space_manager` | operational guardrail | Purges completed study artifacts when configured disk, count, or age retention limits are exceeded. |
 | `heimdallr.resource_monitor` | operational telemetry | Samples service and case memory state into SQLite. |
 
 ## Repository Layout
@@ -146,6 +146,19 @@ The TUI is optional:
 ```bash
 .venv/bin/python -m heimdallr.tui
 ```
+
+For a compact case queue view:
+
+```bash
+.venv/bin/python -m heimdallr.tui.simple
+```
+
+The compact queue TUI shows the 20 most recent studies in the upper queue list,
+numbered `01`, `02`, and so on. Press `q` to exit, `r` to refresh, `pNN` to
+prioritize a visible queued study, or `xNN` to cancel one, for example `p10` or
+`x04`. In the processed table, `Pipeline` is the sum of active prepare,
+segmentation, and metrics elapsed times; `Duration` is the end-to-end elapsed
+time when recorded by the pipeline.
 
 ## Configuration
 

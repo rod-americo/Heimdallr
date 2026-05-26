@@ -10,6 +10,7 @@ requires-python = ">=3.14,<3.15"
 
 [project.scripts]
 heimdallr-tui = "heimdallr.tui.__main__:main"
+heimdallr-queue-tui = "heimdallr.tui.simple:main"
 
 [tool.setuptools]
 include-package-data = true

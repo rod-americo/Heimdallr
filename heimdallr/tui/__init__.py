@@ -1,6 +1,6 @@
-"""Textual dashboard for Heimdallr operational monitoring."""
+"""TUI dashboards for Heimdallr operational monitoring."""
 
-__all__ = ["HeimdallrDashboardApp"]
+__all__ = ["HeimdallrDashboardApp", "SimpleQueueTui"]
 
 
 def __getattr__(name: str):
@@ -8,4 +8,8 @@ def __getattr__(name: str):
         from .app import HeimdallrDashboardApp
 
         return HeimdallrDashboardApp
+    if name == "SimpleQueueTui":
+        from .simple import SimpleQueueTui
+
+        return SimpleQueueTui
     raise AttributeError(name)

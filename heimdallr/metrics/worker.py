@@ -146,6 +146,14 @@ def mark_metrics_queue_item_done(queue_id: int) -> None:
         conn.close()
 
 
+def is_metrics_queue_item_canceled(queue_id: int) -> bool:
+    conn = db_connect()
+    try:
+        return store.is_queue_item_canceled(conn, "metrics_queue", queue_id)
+    finally:
+        conn.close()
+
+
 def mark_metrics_queue_item_error(queue_id: int, error_message) -> None:
     conn = db_connect()
     try:
@@ -878,7 +886,7 @@ def _enqueue_case_dicom_exports(
     return enqueued
 
 
-def segment_case_metrics(case_input: Path) -> bool:
+def segment_case_metrics(case_input: Path, queue_id: int | None = None) -> bool:
     case_id = case_input.name
     log_dir = study_logs_dir(case_id)
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -993,16 +1001,21 @@ def segment_case_metrics(case_input: Path) -> bool:
                 f"(kind={instruction_dicom['kind']})"
             )
 
-        try:
-            enqueued_dicom_exports = _enqueue_case_dicom_exports(
-                case_id,
-                metadata,
-                dicom_exports,
-                logger,
-            )
-        except Exception as exc:
+        canceled = queue_id is not None and is_metrics_queue_item_canceled(queue_id)
+        if canceled:
             enqueued_dicom_exports = 0
-            logger.log(f"[Metrics] Warning: failed to enqueue DICOM egress items: {exc}")
+            logger.log("[Metrics] Skipping DICOM egress enqueue because the queue item was canceled")
+        else:
+            try:
+                enqueued_dicom_exports = _enqueue_case_dicom_exports(
+                    case_id,
+                    metadata,
+                    dicom_exports,
+                    logger,
+                )
+            except Exception as exc:
+                enqueued_dicom_exports = 0
+                logger.log(f"[Metrics] Warning: failed to enqueue DICOM egress items: {exc}")
 
         end_dt = datetime.datetime.now(LOCAL_TZ)
         pipeline = metadata.get("Pipeline", {})
@@ -1038,7 +1051,9 @@ def segment_case_metrics(case_input: Path) -> bool:
             finally:
                 conn.close()
         external_delivery = metadata.get("ExternalDelivery", {})
-        if isinstance(external_delivery, dict):
+        if canceled:
+            logger.log("[Metrics] Skipping final package delivery because the queue item was canceled")
+        elif isinstance(external_delivery, dict):
             try:
                 if enqueue_case_delivery(
                     case_id=case_id,
@@ -1152,7 +1167,7 @@ def main() -> int:
 def _segment_case_metrics_with_heartbeat(case_input: Path, queue_id: int) -> bool:
     stop_event, heartbeat_thread = _start_claim_heartbeat(queue_id, case_label=case_input.name)
     try:
-        return segment_case_metrics(case_input)
+        return segment_case_metrics(case_input, queue_id=queue_id)
     finally:
         stop_event.set()
         heartbeat_thread.join(timeout=5)

@@ -1,5 +1,8 @@
 {
-  "_comment": "Host-local storage reclamation policy for runtime/studies. The daemon polls the filesystem and deletes the oldest case directories when usage reaches the configured threshold.",
+  "_comment": "Host-local storage reclamation policy for runtime/studies. The daemon polls the filesystem and deletes the oldest eligible case directories until all enabled limits are satisfied. Set optional numeric limits to 0 to disable them.",
   "scan_interval_seconds": 60,
-  "usage_threshold_percent": 80
+  "usage_threshold_percent": 80,
+  "minimum_free_gb": 0,
+  "max_resident_studies": 0,
+  "max_case_age_days": 0
 }

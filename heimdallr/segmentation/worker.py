@@ -291,6 +291,14 @@ def mark_segmentation_queue_item_done(queue_id):
     conn.close()
 
 
+def is_segmentation_queue_item_canceled(queue_id: int) -> bool:
+    conn = db_connect()
+    try:
+        return store.is_queue_item_canceled(conn, "segmentation_queue", queue_id)
+    finally:
+        conn.close()
+
+
 def mark_segmentation_queue_item_error(queue_id, error_message):
     """Mark queue item as error with a truncated message."""
     conn = db_connect()
@@ -1661,7 +1669,7 @@ def claim_input_file(input_path):
     return segmentation_path
 
 
-def segment_case(case_input):
+def segment_case(case_input, queue_id: int | None = None):
     """
     Process a single patient case through the complete pipeline.
     
@@ -1966,11 +1974,14 @@ def segment_case(case_input):
         except Exception:
             pass
 
-        try:
-            enqueue_case_for_metrics(case_id, study_dir(case_id))
-            logger.print("[Metrics] Enqueued for metrics stage")
-        except Exception as e:
-            logger.print(f"[Metrics] Warning: failed to enqueue metrics stage: {e}")
+        if queue_id is not None and is_segmentation_queue_item_canceled(queue_id):
+            logger.print("[Metrics] Skipping metrics enqueue because the queue item was canceled")
+        else:
+            try:
+                enqueue_case_for_metrics(case_id, study_dir(case_id))
+                logger.print("[Metrics] Enqueued for metrics stage")
+            except Exception as e:
+                logger.print(f"[Metrics] Warning: failed to enqueue metrics stage: {e}")
 
         logger.close()
         return True
@@ -2170,7 +2181,7 @@ def main():
 def _segment_case_with_heartbeat(case_input: Path, queue_id: int) -> bool:
     stop_event, heartbeat_thread = _start_claim_heartbeat(queue_id, case_label=case_input.name)
     try:
-        return segment_case(case_input)
+        return segment_case(case_input, queue_id=queue_id)
     finally:
         stop_event.set()
         heartbeat_thread.join(timeout=5)

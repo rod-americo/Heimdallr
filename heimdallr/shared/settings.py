@@ -251,6 +251,24 @@ SPACE_MANAGER_USAGE_THRESHOLD_PERCENT = _config_float(
     ("usage_threshold_percent",),
     80.0,
 )
+SPACE_MANAGER_MINIMUM_FREE_GB = _config_float(
+    "HEIMDALLR_SPACE_MANAGER_MINIMUM_FREE_GB",
+    SPACE_MANAGER_CONFIG,
+    ("minimum_free_gb",),
+    0.0,
+)
+SPACE_MANAGER_MAX_RESIDENT_STUDIES = _config_int(
+    "HEIMDALLR_SPACE_MANAGER_MAX_RESIDENT_STUDIES",
+    SPACE_MANAGER_CONFIG,
+    ("max_resident_studies",),
+    0,
+)
+SPACE_MANAGER_MAX_CASE_AGE_DAYS = _config_float(
+    "HEIMDALLR_SPACE_MANAGER_MAX_CASE_AGE_DAYS",
+    SPACE_MANAGER_CONFIG,
+    ("max_case_age_days",),
+    0.0,
+)
 SERIES_SELECTION_CONFIG_PATH = Path(
     os.getenv(
         "HEIMDALLR_SERIES_SELECTION_CONFIG",
