@@ -113,7 +113,8 @@ class TestParenchymalOrganVolumetryJob(unittest.TestCase):
                             '{"generate_overlay": true, '
                             '"emit_secondary_capture_dicom": true, '
                             '"secondary_capture_max_dimension": 64, '
-                            '"secondary_capture_transfer_syntax": "jpeg_ls_lossless"}'
+                            '"secondary_capture_transfer_syntax": "jpeg_ls_lossless", '
+                            '"locale": "en_US"}'
                         ),
                     ],
                 ):
@@ -199,6 +200,68 @@ class TestParenchymalOrganVolumetryJob(unittest.TestCase):
             self.assertFalse((metric_dir / "dicom").exists())
             self.assertIsNone(result["measurement"]["organs"]["liver"]["volume_cm3"])
             self.assertTrue(result["measurement"]["organs"]["liver"]["truncated_at_scan_bounds"])
+
+    def test_job_writes_l1_overlay_without_organ_volume(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            case_id = "CaseParenchyma_L1Overlay_20260404_001"
+            case_dir = tmp_path / case_id
+            (case_dir / "metadata").mkdir(parents=True)
+            (case_dir / "derived").mkdir(parents=True)
+            (case_dir / "artifacts" / "total").mkdir(parents=True)
+
+            id_payload = {
+                "CaseID": case_id,
+                "Modality": "CT",
+                "StudyInstanceUID": "1.2.826.0.1.3680043.8.498.4",
+                "PatientName": "Test^Patient",
+                "PatientID": "P004",
+                "Pipeline": {"series_selection": {"SelectedPhase": "native"}},
+            }
+            (case_dir / "metadata" / "id.json").write_text(json.dumps(id_payload), encoding="utf-8")
+            (case_dir / "metadata" / "metadata.json").write_text(json.dumps(id_payload), encoding="utf-8")
+            (case_dir / "metadata" / "resultados.json").write_text("{}", encoding="utf-8")
+
+            shape = (12, 12, 8)
+            ct = np.zeros(shape, dtype=np.float32)
+            ct[4:8, 4:8, 2:6] = 300.0
+            write_nifti(case_dir / "derived" / f"{case_id}.nii.gz", ct, spacing=(1.0, 1.0, 1.0))
+
+            l1 = np.zeros(shape, dtype=np.float32)
+            l1[4:8, 4:8, 2:6] = 1.0
+            write_nifti(case_dir / "artifacts" / "total" / "vertebrae_L1.nii.gz", l1)
+
+            with patch.object(settings, "STUDIES_DIR", tmp_path):
+                with patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "parenchymal_organ_volumetry",
+                        "--case-id",
+                        case_id,
+                        "--job-config-json",
+                        (
+                            '{"generate_overlay": true, '
+                            '"emit_secondary_capture_dicom": true, '
+                            '"secondary_capture_max_dimension": 64}'
+                        ),
+                    ],
+                ):
+                    self.assertEqual(parenchymal_organ_volumetry.main(), 0)
+
+            result_path = case_dir / "artifacts" / "metrics" / "parenchymal_organ_volumetry" / "result.json"
+            result = json.loads(result_path.read_text(encoding="utf-8"))
+
+            self.assertEqual(result["status"], "done")
+            self.assertEqual(result["measurement"]["job_status"], "overlay_only")
+            self.assertEqual(result["measurement"]["organs"]["liver"]["analysis_status"], "missing")
+            l1_measurement = result["measurement"]["overlay_only_masks"]["vertebra_l1"]
+            self.assertTrue(l1_measurement["complete"])
+            self.assertTrue(l1_measurement["included_in_overlay"])
+            self.assertEqual(l1_measurement["measurement_role"], "overlay_only")
+            self.assertGreater(result["measurement"]["exported_slice_count"], 0)
+            self.assertEqual(len(result["dicom_exports"]), result["measurement"]["exported_slice_count"])
+            self.assertIn("overlay_series_dir", result["artifacts"])
 
     def test_job_suppresses_hu_outputs_for_contrast_series(self):
         with tempfile.TemporaryDirectory() as tmp:

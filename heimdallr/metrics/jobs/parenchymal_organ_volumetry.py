@@ -51,6 +51,9 @@ ORGAN_DEFINITIONS = [
     ("kidney_right", "Right kidney", "kidney_right.nii.gz", (91, 214, 114)),
     ("kidney_left", "Left kidney", "kidney_left.nii.gz", (255, 214, 64)),
 ]
+OVERLAY_ONLY_DEFINITIONS = [
+    ("vertebra_l1", "L1 vertebra", "vertebrae_L1.nii.gz", (255, 80, 80)),
+]
 
 
 def _load_overlay_font(size: int) -> ImageFont.ImageFont:
@@ -165,6 +168,55 @@ def _compute_mask_measurement(
         "hu_mean": hu_mean,
         "hu_std": hu_std,
         "estimated_pdff_percent": estimated_pdff_percent,
+    }
+
+
+def _compute_overlay_mask_measurement(
+    mask_key: str,
+    mask_label: str,
+    overlay_mask: np.ndarray | None,
+) -> dict[str, Any]:
+    if overlay_mask is None:
+        return {
+            "mask_key": mask_key,
+            "mask_label": mask_label,
+            "analysis_status": "missing",
+            "complete": False,
+            "voxel_count": 0,
+            "included_in_overlay": False,
+        }
+
+    mask_bool = np.asarray(overlay_mask, dtype=bool)
+    voxel_count = int(mask_bool.sum())
+    if voxel_count == 0:
+        return {
+            "mask_key": mask_key,
+            "mask_label": mask_label,
+            "analysis_status": "empty",
+            "complete": False,
+            "voxel_count": 0,
+            "included_in_overlay": False,
+        }
+
+    complete = mask_complete(mask_bool)
+    occupied_indices = np.where(mask_bool.sum(axis=(0, 1)) > 0)[0]
+    axial_slice_extent = None
+    if occupied_indices.size > 0:
+        axial_slice_extent = {
+            "start": int(occupied_indices[0]),
+            "end": int(occupied_indices[-1]),
+        }
+
+    return {
+        "mask_key": mask_key,
+        "mask_label": mask_label,
+        "analysis_status": "complete" if complete else "incomplete",
+        "complete": bool(complete),
+        "truncated_at_scan_bounds": not bool(complete),
+        "axial_slice_extent": axial_slice_extent,
+        "voxel_count": voxel_count,
+        "included_in_overlay": bool(complete),
+        "measurement_role": "overlay_only",
     }
 
 
@@ -324,11 +376,19 @@ def main() -> int:
         ct_path = resolve_canonical_nifti(args.case_id)
         total_dir = case_dir / "artifacts" / "total"
         organ_paths = {organ_key: total_dir / filename for organ_key, _label, filename, _color in ORGAN_DEFINITIONS}
+        overlay_only_paths = {
+            mask_key: total_dir / filename
+            for mask_key, _label, filename, _color in OVERLAY_ONLY_DEFINITIONS
+        }
         payload["inputs"] = {
             "canonical_nifti": str(ct_path.relative_to(case_dir)) if ct_path and ct_path.exists() else None,
             "organ_masks": {
                 organ_key: str(path.relative_to(case_dir)) if path.exists() else None
                 for organ_key, path in organ_paths.items()
+            },
+            "overlay_only_masks": {
+                mask_key: str(path.relative_to(case_dir)) if path.exists() else None
+                for mask_key, path in overlay_only_paths.items()
             },
             "target_slice_thickness_mm": TARGET_SLICE_THICKNESS_MM,
         }
@@ -352,7 +412,9 @@ def main() -> int:
         spacing_xyz = tuple(float(value) for value in ct_img.header.get_zooms()[:3])
         axial_source_codes = plane_source_axis_codes(ct_img.affine, "z")
         organ_masks: dict[str, np.ndarray | None] = {}
+        overlay_only_masks: dict[str, np.ndarray | None] = {}
         organ_measurements: dict[str, dict[str, Any]] = {}
+        overlay_only_measurements: dict[str, dict[str, Any]] = {}
 
         for organ_key, organ_label, _filename, _color in ORGAN_DEFINITIONS:
             mask_path = organ_paths[organ_key]
@@ -371,10 +433,33 @@ def main() -> int:
                 suppress_density=suppress_density,
             )
 
+        for mask_key, mask_label, _filename, _color in OVERLAY_ONLY_DEFINITIONS:
+            mask_path = overlay_only_paths[mask_key]
+            overlay_mask = None
+            if mask_path.exists():
+                _, loaded_mask = load_nifti_mask(mask_path)
+                if loaded_mask.shape == ct_data.shape:
+                    overlay_mask = loaded_mask
+            overlay_only_masks[mask_key] = overlay_mask
+            overlay_only_measurements[mask_key] = _compute_overlay_mask_measurement(
+                mask_key,
+                mask_label,
+                overlay_mask,
+            )
+
         available_masks = [mask for mask in organ_masks.values() if mask is not None and np.any(mask)]
-        if not available_masks:
+        complete_overlay_only_masks = [
+            mask_key
+            for mask_key, measurement in overlay_only_measurements.items()
+            if measurement.get("included_in_overlay") is True
+        ]
+        if not available_masks and not complete_overlay_only_masks:
             payload["status"] = "skipped"
-            payload["measurement"] = {"job_status": "missing_organs", "organs": organ_measurements}
+            payload["measurement"] = {
+                "job_status": "missing_organs",
+                "organs": organ_measurements,
+                "overlay_only_masks": overlay_only_measurements,
+            }
             payload["artifacts"] = {"result_json": str(result_path.relative_to(case_dir))}
             write_payload(result_path, payload)
             print(json.dumps(payload, indent=2))
@@ -385,13 +470,14 @@ def main() -> int:
             for organ_key, measurement in organ_measurements.items()
             if measurement.get("volume_cm3") is not None
         ]
-        if not publishable_organs:
+        if not publishable_organs and not complete_overlay_only_masks:
             payload["status"] = "skipped"
             payload["measurement"] = {
                 "job_status": "no_complete_organ_volume",
                 "selected_phase": selected_phase or None,
                 "density_suppressed_due_to_contrast": bool(suppress_density),
                 "organs": organ_measurements,
+                "overlay_only_masks": overlay_only_measurements,
             }
             payload["artifacts"] = {"result_json": str(result_path.relative_to(case_dir))}
             payload["dicom_exports"] = []
@@ -401,6 +487,10 @@ def main() -> int:
 
         union_mask = np.zeros(ct_data.shape, dtype=bool)
         for mask in organ_masks.values():
+            if mask is not None:
+                union_mask |= np.asarray(mask, dtype=bool)
+        for mask_key in complete_overlay_only_masks:
+            mask = overlay_only_masks[mask_key]
             if mask is not None:
                 union_mask |= np.asarray(mask, dtype=bool)
 
@@ -438,6 +528,15 @@ def main() -> int:
                 masks_for_slice = []
                 for organ_key, _organ_label, _filename, color in ORGAN_DEFINITIONS:
                     mask = organ_masks[organ_key]
+                    if mask is None:
+                        continue
+                    slice_mask = _mask_slab(mask, source_indices)
+                    if slice_mask.any():
+                        masks_for_slice.append((slice_mask, color))
+                for mask_key, _mask_label, _filename, color in OVERLAY_ONLY_DEFINITIONS:
+                    if mask_key not in complete_overlay_only_masks:
+                        continue
+                    mask = overlay_only_masks[mask_key]
                     if mask is None:
                         continue
                     slice_mask = _mask_slab(mask, source_indices)
@@ -482,7 +581,7 @@ def main() -> int:
             "case_id": args.case_id,
             "inputs": payload["inputs"],
             "measurement": {
-                "job_status": "complete",
+                "job_status": "complete" if publishable_organs else "overlay_only",
                 "target_slice_thickness_mm": TARGET_SLICE_THICKNESS_MM,
                 "source_spacing_mm": {
                     "x": spacing_xyz[0],
@@ -496,6 +595,7 @@ def main() -> int:
                 "exported_slice_count": len(dicom_exports),
                 "exported_slabs": export_slabs,
                 "organs": organ_measurements,
+                "overlay_only_masks": overlay_only_measurements,
             },
             "artifacts": artifacts,
             "dicom_exports": dicom_exports,

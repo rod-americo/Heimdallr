@@ -198,6 +198,11 @@ artifact and is deleted after successful prepare.
 - Volumetry artifacts should not be published when every candidate organ is
 missing, empty, or incomplete. The metrics result JSON should preserve the
 reason and per-organ status for audit.
+- The parenchymal-organ overlay series may include a complete
+`total/vertebrae_L1.nii.gz` mask as an overlay-only structure. L1 must not be
+reported as an organ volume or attenuation measurement by
+`parenchymal_organ_volumetry`; its measurement role is only to make the L1 mask
+visible in the generated 5 mm Secondary Capture series.
 - Generated Secondary Capture overlays should use a bounded matrix size. The
 shared helper defaults the largest image dimension to 512 pixels; the validated
 `l3_muscle_area` and `vat_sat_ratio` jobs set 1024 pixels in the tracked metrics
