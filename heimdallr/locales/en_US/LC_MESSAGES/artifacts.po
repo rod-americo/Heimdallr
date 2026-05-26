@@ -148,6 +148,15 @@ msgstr "SD: "
 msgid "bone_health.overlay.hu_std"
 msgstr "SD: {value} HU"
 
+msgid "bone_health.overlay.volumetric_title"
+msgstr "Volumetric attenuation:"
+
+msgid "bone_health.overlay.volumetric_total"
+msgstr "Total: {value} HU"
+
+msgid "bone_health.overlay.volumetric_erosion"
+msgstr "{erosion_mm}-mm erosion: {value} HU"
+
 msgid "bone_health.overlay.series_description"
 msgstr "Heimdallr L1 Bone Health Sagittal Overlay"
 

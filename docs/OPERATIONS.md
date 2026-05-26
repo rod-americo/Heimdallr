@@ -56,6 +56,8 @@ cp config/resource_monitor.example.json config/resource_monitor.json
 ```
 
 Run each command in its own process supervisor unit or terminal.
+Restart `heimdallr.metrics` after deploying metrics job or metrics overlay code
+changes so resident workers render new payload and DICOM artifact behavior.
 
 `heimdallr.dicom_egress` starts a configurable worker pool for outbound C-STORE
 delivery. Set `worker_count` in `config/dicom_egress.json` to control concurrent

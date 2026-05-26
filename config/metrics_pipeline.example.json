@@ -107,7 +107,7 @@
             "total"
           ],
           "requires_inventory": [
-            "vertebrae_L3.complete"
+            "vertebrae_L1.complete"
           ],
           "generate_overlay": true,
           "strict_qc": false,

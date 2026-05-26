@@ -26,12 +26,13 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 import numpy as np
-from scipy.ndimage import binary_erosion, center_of_mass, label as ndlabel
+from scipy.ndimage import binary_erosion, center_of_mass, distance_transform_edt, label as ndlabel
 
 __all__ = [
     "extract_study_technique_context",
     "calculate_mask_hu_statistics",
     "build_l1_trabecular_roi_mask",
+    "compute_l1_volumetric_attenuation_profile",
     "compute_l1_volumetric_metrics",
     "compute_l1_fracture_screen",
     "build_bone_health_qc_flags",
@@ -303,6 +304,56 @@ def calculate_mask_hu_statistics(ct: np.ndarray, mask: np.ndarray) -> dict[str, 
         "mean_hu": round(float(np.mean(voxels)), 2),
         "std_hu": round(float(np.std(voxels)), 2),
     }
+
+
+def _erode_mask_mm(
+    mask: np.ndarray,
+    *,
+    spacing_mm: Sequence[float] | None = None,
+    erosion_mm: float,
+) -> np.ndarray:
+    mask_bool = np.asarray(mask, dtype=bool)
+    if mask_bool.ndim != 3:
+        raise ValueError(f"Expected a 3D mask, got {mask_bool.ndim}D")
+    if erosion_mm <= 0.0 or not np.any(mask_bool):
+        return mask_bool.copy()
+
+    spacing = _normalize_spacing(spacing_mm, 3)
+    coords = np.argwhere(mask_bool)
+    mins = coords.min(axis=0)
+    maxs = coords.max(axis=0) + 1
+    cropped = mask_bool[mins[0]:maxs[0], mins[1]:maxs[1], mins[2]:maxs[2]]
+    padded = np.pad(cropped, 1, mode="constant", constant_values=False)
+    distance_mm = distance_transform_edt(padded, sampling=spacing)[1:-1, 1:-1, 1:-1]
+    eroded_cropped = np.asarray(distance_mm >= float(erosion_mm), dtype=bool)
+    eroded = np.zeros_like(mask_bool, dtype=bool)
+    eroded[mins[0]:maxs[0], mins[1]:maxs[1], mins[2]:maxs[2]] = eroded_cropped
+    return eroded
+
+
+def compute_l1_volumetric_attenuation_profile(
+    ct: np.ndarray,
+    mask: np.ndarray,
+    spacing_mm: Sequence[float] | None = None,
+    erosion_steps_mm: Sequence[int] = (0, 1, 2, 3, 4, 5),
+) -> list[dict[str, Any]]:
+    """Compute L1 volumetric HU means for the full mask and millimeter erosions."""
+
+    profile: list[dict[str, Any]] = []
+    for erosion_mm in erosion_steps_mm:
+        erosion_value = int(erosion_mm)
+        variant_mask = _erode_mask_mm(mask, spacing_mm=spacing_mm, erosion_mm=float(erosion_value))
+        stats = calculate_mask_hu_statistics(ct, variant_mask)
+        profile.append(
+            {
+                "label": "total" if erosion_value == 0 else f"erosion_{erosion_value}_mm",
+                "erosion_mm": erosion_value,
+                "mean_hu": stats["mean_hu"],
+                "std_hu": stats["std_hu"],
+                "voxel_count": int(stats["voxel_count"]),
+            }
+        )
+    return profile
 
 
 def _keep_largest_component_2d(mask_2d: np.ndarray) -> np.ndarray:
@@ -670,4 +721,3 @@ def build_opportunistic_osteoporosis_composite(
         "opportunistic_osteoporosis_composite_density_label": density_label,
         "opportunistic_osteoporosis_composite_reasons": reasons,
     }
-

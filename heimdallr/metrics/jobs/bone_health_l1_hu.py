@@ -46,6 +46,7 @@ from heimdallr.metrics.analysis.bone_health import (
     build_bone_health_qc_flags,
     calculate_mask_hu_statistics,
     classify_l1_hu,
+    compute_l1_volumetric_attenuation_profile,
     extract_study_technique_context,
 )
 from heimdallr.shared.paths import study_artifacts_dir
@@ -134,7 +135,10 @@ def _draw_summary_lines(ax, summary_lines: list[OverlayLine]) -> None:
         "edgecolor": "none",
     }
 
-    for index, line in enumerate(summary_lines):
+    main_lines = [line for line in summary_lines if line.get("box") != "volumetric"]
+    volumetric_lines = [line for line in summary_lines if line.get("box") == "volumetric"]
+
+    for index, line in enumerate(main_lines):
         line_y = y - (index * line_gap)
         ax.text(
             x,
@@ -146,6 +150,26 @@ def _draw_summary_lines(ax, summary_lines: list[OverlayLine]) -> None:
             fontsize=fontsize,
             color=line.get("color", "white"),
             bbox=bbox,
+        )
+
+    if volumetric_lines:
+        volumetric_y = y - (len(main_lines) * line_gap) - 0.02
+        ax.text(
+            x,
+            volumetric_y,
+            "\n".join(line.get("text", "") for line in volumetric_lines),
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            fontsize=8,
+            color="white",
+            linespacing=1.25,
+            bbox={
+                "boxstyle": "round,pad=0.32",
+                "facecolor": "black",
+                "alpha": 0.50,
+                "edgecolor": "none",
+            },
         )
 
 
@@ -240,6 +264,11 @@ def main() -> int:
         mask_plane = np.asarray(extract_plane(l1_mask, plane_axis, plane_index), dtype=bool)
         ct_plane = np.asarray(extract_plane(ct_data, plane_axis, plane_index), dtype=np.float32)
         slice_stats = calculate_mask_hu_statistics(ct_plane, roi_mask_2d)
+        volumetric_profile = compute_l1_volumetric_attenuation_profile(
+            ct_data,
+            l1_mask,
+            spacing_mm=spacing,
+        )
         qc = build_bone_health_qc_flags(
             context=technique_context,
             full_mask_voxel_count=int(np.count_nonzero(l1_mask)),
@@ -258,6 +287,7 @@ def main() -> int:
             title, summary_lines = build_overlay_text(
                 hu_mean=slice_stats["mean_hu"],
                 hu_std=slice_stats["std_hu"],
+                volumetric_profile=volumetric_profile,
                 locale=artifact_locale,
             )
             overlay_rgb = render_sagittal_overlay_rgb(
@@ -319,6 +349,8 @@ def main() -> int:
                 "l1_trabecular_hu_mean": slice_stats["mean_hu"],
                 "l1_trabecular_hu_std": slice_stats["std_hu"],
                 "l1_trabecular_voxel_count": int(slice_stats["voxel_count"]),
+                "l1_volumetric_attenuation_method": "3d_volume_attenuation_mean_with_mm_erosions",
+                "l1_volumetric_attenuation": volumetric_profile,
                 "classification": classification,
                 "technique_context": technique_context,
                 "qc": qc,

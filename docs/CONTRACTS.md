@@ -228,6 +228,10 @@ handling in operational validation.
 - Derived Secondary Capture artifacts should preserve source patient and study
 identity tags from the reference DICOM while assigning new derived series and
 instance UIDs.
+- The `bone_health_l1_hu` metric reports the primary sagittal L1 trabecular
+ROI mean as the classified value. Its overlay and result JSON may also include
+neutral volumetric L1 attenuation means for the total mask and 1-5 mm 3D mask
+erosions; these supplemental values do not carry color-band classification.
 - FastAPI upload acceptance is asynchronous and not proof that segmentation,
 metrics, or delivery succeeded.
 - Clinical review is required before outputs influence patient care.

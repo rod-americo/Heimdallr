@@ -13,6 +13,7 @@ from heimdallr.metrics.analysis.bone_health import (
     build_opportunistic_osteoporosis_composite,
     calculate_mask_hu_statistics,
     classify_l1_hu,
+    compute_l1_volumetric_attenuation_profile,
     compute_l1_fracture_screen,
     compute_l1_volumetric_metrics,
     extract_study_technique_context,
@@ -91,6 +92,20 @@ class TestBoneHealthHelpers(unittest.TestCase):
             volumetric["bone_health_l1_volumetric_trabecular_hu_mean"],
             volumetric["bone_health_l1_volumetric_full_hu_mean"],
         )
+
+    def test_compute_l1_volumetric_attenuation_profile_uses_mm_erosions(self):
+        ct = np.full((12, 12, 12), 80.0, dtype=np.float32)
+        mask = np.zeros_like(ct, dtype=bool)
+        mask[2:10, 2:10, 2:10] = True
+        ct[4:8, 4:8, 4:8] = 140.0
+
+        profile = compute_l1_volumetric_attenuation_profile(ct, mask, spacing_mm=(1.0, 1.0, 1.0))
+
+        self.assertEqual([item["erosion_mm"] for item in profile], [0, 1, 2, 3, 4, 5])
+        self.assertEqual(profile[0]["label"], "total")
+        self.assertEqual(profile[1]["label"], "erosion_1_mm")
+        self.assertGreater(profile[2]["mean_hu"], profile[0]["mean_hu"])
+        self.assertEqual(profile[5]["voxel_count"], 0)
 
     def test_fracture_screen_detects_height_asymmetry(self):
         mask = np.zeros((12, 12, 12), dtype=bool)
@@ -209,13 +224,34 @@ class TestBoneHealthHelpers(unittest.TestCase):
         title, summary_lines = build_overlay_text(
             hu_mean=125.0,
             hu_std=18.0,
+            volumetric_profile=[
+                {"erosion_mm": 0, "mean_hu": 122.0},
+                {"erosion_mm": 1, "mean_hu": 119.0},
+            ],
             locale="pt_BR",
         )
 
         self.assertEqual(title, "Atenuação trabecular em L1")
-        self.assertEqual(len(summary_lines), 1)
+        self.assertEqual(len(summary_lines), 4)
         self.assertEqual(summary_lines[0]["text"], "Média: 125 UH")
         self.assertEqual(summary_lines[0]["color"], "#ffd166")
+        self.assertEqual(summary_lines[1]["text"], "Atenuação volumétrica:")
+        self.assertEqual(summary_lines[1]["box"], "volumetric")
+        self.assertEqual(summary_lines[2]["text"], "Total: 122 UH")
+        self.assertEqual(summary_lines[2]["color"], "white")
+        self.assertEqual(summary_lines[3]["text"], "Erosão 1 mm: 119 UH")
+
+    def test_build_overlay_text_uses_english_erosion_modifier(self):
+        _, summary_lines = build_overlay_text(
+            hu_mean=125.0,
+            hu_std=18.0,
+            volumetric_profile=[
+                {"erosion_mm": 1, "mean_hu": 119.0},
+            ],
+            locale="en_US",
+        )
+
+        self.assertEqual(summary_lines[2]["text"], "1-mm erosion: 119 HU")
 
     def test_l1_hu_job_writes_png_overlay_artifact(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -266,6 +302,11 @@ class TestBoneHealthHelpers(unittest.TestCase):
             self.assertEqual(payload["status"], "done")
             self.assertIn("overlay_png", payload["artifacts"])
             self.assertIn("overlay_sc_dcm", payload["artifacts"])
+            self.assertEqual(payload["measurement"]["l1_volumetric_attenuation_method"], "3d_volume_attenuation_mean_with_mm_erosions")
+            self.assertEqual(
+                [item["erosion_mm"] for item in payload["measurement"]["l1_volumetric_attenuation"]],
+                [0, 1, 2, 3, 4, 5],
+            )
             self.assertTrue(overlay_path.exists())
             self.assertGreater(overlay_path.stat().st_size, 0)
 

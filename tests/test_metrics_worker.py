@@ -46,6 +46,7 @@ class TestMetricsWorker(unittest.TestCase):
         self.assertEqual(profile["planning"]["mode"], "automatic_ct")
         self.assertEqual(jobs["head_complete_qc"]["requires_inventory"], ["brain.complete"])
         self.assertEqual(jobs["l3_muscle_area"]["requires_inventory"], ["vertebrae_L3.complete"])
+        self.assertEqual(jobs["bone_health_l1_hu"]["requires_inventory"], ["vertebrae_L1.complete"])
         self.assertEqual(jobs["vat_sat_ratio"]["requires_inventory"], ["vertebrae_L3.complete"])
         self.assertEqual(
             jobs["parenchymal_organ_volumetry"]["requires_inventory"],
