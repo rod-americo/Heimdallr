@@ -78,8 +78,11 @@ preserved in the metric JSON.
 truncation does not block head QC or DICOM export when the brain mask and
 required head tasks are complete. The `head_complete_qc` job is enabled in the
 tracked default metrics profile, but it emits only a result JSON when the brain
-gate fails or when required `cerebral_bleed` / `brain_structures` outputs are
-missing, incompatible, empty where required, or truncated. When the complete-head
+gate fails or when required `cerebral_bleed` output is missing or incompatible.
+`brain_structures` QC is per structure: masks that are missing, incompatible,
+empty, or truncated are omitted from the volume table and overlay instead of
+blocking the whole head artifact package, and the result JSON records them under
+`measurement.omitted_brain_structures`. When the complete-head
 gate passes, it writes a normalized axial head CT NIfTI
 artifact, writes a canonical RAS 2 mm NIfTI artifact, writes a 1 mm
 slice-spacing brain-mask geometry NIfTI artifact whose output plane is defined

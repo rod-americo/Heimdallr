@@ -15,6 +15,43 @@ Each decision should include:
 
 ## Decisions
 
+### 2026-05-30 - Scope head structure QC per segmented structure
+
+**Context**
+
+Head CT artifacts can be clinically useful when the brain mask is complete even
+if one `brain_structures` mask is truncated at a scan boundary. The previous
+`head_complete_qc` behavior treated any incomplete brain-structure mask as a
+global failure and suppressed all derived head artifacts.
+
+**Decision**
+
+Keep `total/brain.nii.gz` as the complete-head gate, but evaluate
+`brain_structures` QC per mask. Missing, empty, geometry-incompatible, or
+truncated structure masks are omitted from the volume table and overlay, while
+complete structure masks still generate artifacts. The result JSON records the
+omitted masks in `measurement.omitted_brain_structures`.
+
+**Impact**
+
+Complete-brain head cases can deliver derived CT, volume-table, and
+brain-structure overlay artifacts even when a subset of segmented structures is
+not reliable. Downstream consumers can inspect the omitted-structure audit
+instead of inferring that all structures were measured.
+
+**Tradeoff**
+
+The artifact package may be partial for structures while the job succeeds. This
+requires consumers to read the omitted-structure audit before treating a missing
+structure as absent anatomy.
+
+**Alternatives rejected**
+
+- Continue suppressing all head artifacts when one brain-structure mask is
+  truncated.
+- Report volumes for truncated structures, which would make quantitative output
+  look more complete than the segmentation supports.
+
 ### 2026-05-01 - Preserve `heimdallr/` as the main package
 
 **Context**

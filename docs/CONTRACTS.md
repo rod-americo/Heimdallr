@@ -178,7 +178,11 @@ bleed mask for extending outside the `total/skull.nii.gz` plus
 available as `measurement.cerebral_bleed.raw_has_cerebral_bleed`. If required
 head segmentation outputs are incomplete, `head_complete_qc` writes only
 `result.json` with `measurement.job_status=incomplete_head_segmentation` and no
-derived NIfTI or DICOM artifact references.
+derived NIfTI or DICOM artifact references. `brain_structures` QC is
+per-structure: missing, empty, geometry-incompatible, or truncated structure
+masks are excluded from volume rows and overlays, recorded in
+`measurement.omitted_brain_structures`, and do not block derived head CT or
+overlays for the remaining complete structures.
 - Complete-head geometric normalization includes
 `normalized_brain_geometry_head_ct_2mm.nii.gz`, which uses the `total/brain`
 mask to define a reproducible output plane. This is the preferred head geometry

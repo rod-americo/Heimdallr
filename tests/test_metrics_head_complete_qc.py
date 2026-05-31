@@ -148,6 +148,7 @@ class TestHeadCompleteQcJob(unittest.TestCase):
                         "--job-config-json",
                         json.dumps(
                             {
+                                "locale": "en_US",
                                 "target_plane": "axial",
                                 "target_in_plane_spacing_mm": [1.0, 1.0],
                                 "target_slice_thickness_mm": 5.0,
@@ -332,7 +333,7 @@ class TestHeadCompleteQcJob(unittest.TestCase):
             )
             self.assertIn("normalization_brain_geometry_2mm", result["measurement"])
 
-    def test_job_suppresses_artifacts_when_brain_structures_are_incomplete(self):
+    def test_job_omits_incomplete_brain_structures_from_artifacts(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             case_id = "CaseHeadIncompleteStructures_20260525_001"
@@ -394,17 +395,29 @@ class TestHeadCompleteQcJob(unittest.TestCase):
             result_path = case_dir / "artifacts" / "metrics" / "head_complete_qc" / "result.json"
             result = json.loads(result_path.read_text(encoding="utf-8"))
 
-            self.assertEqual(result["measurement"]["job_status"], "incomplete_head_segmentation")
+            self.assertEqual(result["measurement"]["job_status"], "partial_brain_structures")
             self.assertTrue(result["measurement"]["brain_complete_without_truncation"])
-            self.assertFalse(result["measurement"]["required_segmentation_complete"])
+            self.assertTrue(result["measurement"]["required_segmentation_complete"])
             self.assertFalse(result["measurement"]["brain_structures"]["complete"])
             self.assertIn("brainstem", result["measurement"]["brain_structures"]["incomplete"])
-            self.assertEqual(result["artifacts"], {"result_json": "artifacts/metrics/head_complete_qc/result.json"})
-            self.assertEqual(result["dicom_exports"], [])
-            self.assertNotIn("normalization_brain_geometry_2mm", result["measurement"])
+            self.assertIn("normalization_brain_geometry_2mm", result["measurement"])
+            self.assertIn(
+                {"name": "brainstem", "status": "truncated", "touched_bounds": ["z_min"]},
+                result["measurement"]["omitted_brain_structures"],
+            )
+            self.assertNotIn("brainstem", result["measurement"]["usable_brain_structures"])
+            volume_keys = [
+                row["key"]
+                for row in result["measurement"]["brain_structure_volumes"]["rows"]
+            ]
+            self.assertIn("brain_total", volume_keys)
+            self.assertNotIn("brainstem", volume_keys)
+            self.assertIn("brain_geometry_ct_2mm_series_dir", result["artifacts"])
+            self.assertIn("brain_structures_overlay_series_dir", result["artifacts"])
+            self.assertGreater(len(result["dicom_exports"]), 0)
             metric_dir = case_dir / "artifacts" / "metrics" / "head_complete_qc"
-            self.assertFalse((metric_dir / "brain_geometry_ct_2mm_dicom").exists())
-            self.assertFalse((metric_dir / "brain_structures_dicom").exists())
+            self.assertTrue((metric_dir / "brain_geometry_ct_2mm_dicom").exists())
+            self.assertTrue((metric_dir / "brain_structures_dicom").exists())
 
     def test_job_exports_positive_bleed_overlay_and_notification_bool(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -471,6 +484,7 @@ class TestHeadCompleteQcJob(unittest.TestCase):
                         "--job-config-json",
                         json.dumps(
                             {
+                                "locale": "en_US",
                                 "target_plane": "axial",
                                 "target_in_plane_spacing_mm": [1.0, 1.0],
                                 "target_slice_thickness_mm": 5.0,

@@ -696,6 +696,7 @@ def normalize_nifti_to_brain_mask_geometry_isotropic(
     output_path: Path,
     *,
     brain_structures_dir: Path | None = None,
+    midline_guide_mask_names: tuple[str, ...] = MIDLINE_GUIDE_MASKS,
     crop_mask_path: Path | None = None,
     crop_margin_mm: float = 25.0,
     voxel_size_mm: float = 2.0,
@@ -746,7 +747,7 @@ def normalize_nifti_to_brain_mask_geometry_isotropic(
     guide_source = "brain_mask_symmetry"
     guide_points_used = 0
     if brain_structures_dir is not None:
-        for guide_name in MIDLINE_GUIDE_MASKS:
+        for guide_name in midline_guide_mask_names:
             guide_points = _optional_canonical_mask_world_points(
                 Path(brain_structures_dir) / f"{guide_name}.nii.gz"
             )

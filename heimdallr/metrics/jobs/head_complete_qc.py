@@ -54,6 +54,10 @@ WINDOW_MIN = 0.0
 WINDOW_MAX = 80.0
 OVERLAY_SLICE_THICKNESS_MM = 3.0
 BLEED_OVERLAY_SLICE_THICKNESS_MM = 5.0
+MIDLINE_GUIDE_STRUCTURE_MASKS = (
+    "septum_pellucidum",
+    "venous_sinuses",
+)
 STRUCTURE_COLORS = (
     (255, 99, 132),
     (54, 162, 235),
@@ -337,6 +341,37 @@ def _volume_rows(
             }
         )
     return rows
+
+
+def _usable_structure_mask_names(brain_structures: dict[str, Any]) -> list[str]:
+    masks = brain_structures.get("masks") if isinstance(brain_structures.get("masks"), dict) else {}
+    return [
+        mask_name
+        for mask_name in BRAIN_STRUCTURE_MASKS
+        if isinstance(masks.get(mask_name), dict) and masks[mask_name].get("complete")
+    ]
+
+
+def _usable_midline_guide_mask_names(usable_structure_names: list[str]) -> tuple[str, ...]:
+    usable = set(usable_structure_names)
+    return tuple(mask_name for mask_name in MIDLINE_GUIDE_STRUCTURE_MASKS if mask_name in usable)
+
+
+def _omitted_structure_masks(brain_structures: dict[str, Any]) -> list[dict[str, Any]]:
+    masks = brain_structures.get("masks") if isinstance(brain_structures.get("masks"), dict) else {}
+    omitted: list[dict[str, Any]] = []
+    for mask_name in BRAIN_STRUCTURE_MASKS:
+        status = masks.get(mask_name) if isinstance(masks.get(mask_name), dict) else {}
+        if status.get("complete"):
+            continue
+        omitted.append(
+            {
+                "name": mask_name,
+                "status": status.get("status") or "missing",
+                "touched_bounds": list(status.get("touched_bounds") or []),
+            }
+        )
+    return omitted
 
 
 def _render_volume_table(rows: list[dict[str, Any]], *, locale: str) -> np.ndarray:
@@ -733,9 +768,13 @@ def main() -> int:
             spacing_xyz,
             reference_shape=reference_shape,
         )
+        usable_structure_names = _usable_structure_mask_names(brain_structures)
+        omitted_structure_masks = _omitted_structure_masks(brain_structures)
         brain_mask = _load_mask(brain_mask_path) if brain_mask_path.exists() else None
         structure_masks: dict[str, np.ndarray] = {}
         for mask_name in BRAIN_STRUCTURE_MASKS:
+            if mask_name not in usable_structure_names:
+                continue
             mask_path = brain_structures_dir / f"{mask_name}.nii.gz"
             if mask_path.exists():
                 try:
@@ -761,11 +800,7 @@ def main() -> int:
             locale=artifact_locale,
         )
 
-        required_segmentation_complete = bool(
-            head_complete
-            and bleed_status.get("task_complete")
-            and brain_structures["complete"]
-        )
+        required_segmentation_complete = bool(head_complete and bleed_status.get("task_complete"))
         if not required_segmentation_complete:
             payload = {
                 "metric_key": metric_key,
@@ -804,6 +839,8 @@ def main() -> int:
                         "overlay_exported_slabs": [],
                     },
                     "brain_structures": brain_structures,
+                    "usable_brain_structures": usable_structure_names,
+                    "omitted_brain_structures": omitted_structure_masks,
                 },
                 "artifacts": {"result_json": _relpath(case_dir, result_path)},
                 "dicom_exports": [],
@@ -833,6 +870,7 @@ def main() -> int:
             brain_mask_path,
             normalized_brain_geometry_path,
             brain_structures_dir=brain_structures_dir,
+            midline_guide_mask_names=_usable_midline_guide_mask_names(usable_structure_names),
             crop_mask_path=total_dir / "skull.nii.gz",
             crop_margin_mm=float(job_config.get("brain_geometry_crop_margin_mm", 25.0)),
             voxel_size_mm=float(job_config.get("brain_geometry_normalized_spacing_mm", 1.0)),
@@ -1005,7 +1043,9 @@ def main() -> int:
             "case_id": args.case_id,
             "inputs": payload["inputs"],
             "measurement": {
-                "job_status": "complete" if required_segmentation_complete else "incomplete_head_segmentation",
+                "job_status": "complete"
+                if not omitted_structure_masks
+                else "partial_brain_structures",
                 "head_complete_without_truncation": head_complete,
                 "required_segmentation_complete": required_segmentation_complete,
                 "source_spacing_mm": {
@@ -1036,6 +1076,8 @@ def main() -> int:
                     "overlay_exported_slabs": bleed_exported_slabs,
                 },
                 "brain_structures": brain_structures,
+                "usable_brain_structures": usable_structure_names,
+                "omitted_brain_structures": omitted_structure_masks,
                 "brain_structure_volumes": {
                     "locale": artifact_locale,
                     "rows": volume_rows,

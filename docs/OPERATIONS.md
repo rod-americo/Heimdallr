@@ -317,10 +317,13 @@ constant slice interval, with the brain-center slice tagged but not reordered.
 It also emits translated
 brain-structure volume-table DICOM, and 3 mm burned-in overlay series for
 `brain_structures` rendered on the brain-geometry normalized CT grid without a
-text panel. The volume table includes the overlay color map. The
+text panel. QC for `brain_structures` is per mask: incomplete structures are
+omitted from the table and overlay, recorded in
+`measurement.omitted_brain_structures`, and do not suppress the whole head
+artifact package. The volume table includes the overlay color map. The
 brain-mask geometry artifact uses `total/brain.nii.gz`
-to define the output plane, uses `brain_structures/septum_pellucidum.nii.gz`
-as an in-plane midline guide when available, and does not require the
+to define the output plane, uses complete midline guide masks from
+`brain_structures` when available, and does not require the
 orbitomeatal line. When the
 cerebral-bleed mask is positive, the job also emits a 5 mm burned-in bleed
 overlay series on the brain-geometry normalized CT grid containing positive
