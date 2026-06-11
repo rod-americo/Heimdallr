@@ -70,6 +70,7 @@ class TestLungNodulesJob(unittest.TestCase):
             lung = np.zeros((12, 12, 8), dtype=np.float32)
             lung[2:10, 2:10, 0:4] = 1.0
             write_nifti(case_dir / "artifacts" / "total" / "lung_lower_lobe_right.nii.gz", lung)
+            write_nifti(case_dir / "artifacts" / "lung_nodules" / "lung.nii.gz", lung)
             write_nifti(case_dir / "artifacts" / "lung_nodules" / "lung_nodules.nii.gz", np.zeros_like(lung))
 
             exit_code = self._run_job(case_dir, {"secondary_capture_transfer_syntax": "original"})

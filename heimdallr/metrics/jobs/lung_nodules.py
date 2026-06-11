@@ -59,10 +59,11 @@ def _mask_voxel_volume_cm3(image: nib.Nifti1Image) -> float:
 def _iter_nodule_mask_paths(nodule_dir: Path) -> list[Path]:
     if not nodule_dir.exists():
         return []
+    accepted_names = {"lung_nodules.nii.gz", "lung_nodule.nii.gz", "pulmonary_nodules.nii.gz"}
     return sorted(
         path
         for path in nodule_dir.glob("*.nii.gz")
-        if path.is_file() and not path.name.startswith(".")
+        if path.is_file() and not path.name.startswith(".") and path.name in accepted_names
     )
 
 
