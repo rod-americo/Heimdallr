@@ -21,6 +21,13 @@ PARENCHYMAL_ORGAN_MASKS = (
     "kidney_left",
     "kidney_right",
 )
+LUNG_MASKS = (
+    "lung_upper_lobe_left",
+    "lung_upper_lobe_right",
+    "lung_middle_lobe_right",
+    "lung_lower_lobe_left",
+    "lung_lower_lobe_right",
+)
 HEAD_MASKS = ("skull", "brain")
 VERTEBRA_MASKS = ("vertebrae_L1", "vertebrae_L3")
 
@@ -96,7 +103,7 @@ def build_segmentation_inventory(total_dir: Path, reference_image_path: Path) ->
     }
 
     masks = inventory["masks"]
-    for mask_name in HEAD_MASKS + VERTEBRA_MASKS + PARENCHYMAL_ORGAN_MASKS:
+    for mask_name in HEAD_MASKS + VERTEBRA_MASKS + PARENCHYMAL_ORGAN_MASKS + LUNG_MASKS:
         masks[mask_name] = mask_inventory_status(total_dir / f"{mask_name}.nii.gz", reference_image_path)
 
     brain = masks.get("brain", {})
@@ -106,6 +113,9 @@ def build_segmentation_inventory(total_dir: Path, reference_image_path: Path) ->
     organ_statuses = {name: masks.get(name, {}) for name in PARENCHYMAL_ORGAN_MASKS}
     present_organs = [name for name, status in organ_statuses.items() if status.get("present")]
     complete_organs = [name for name, status in organ_statuses.items() if status.get("complete")]
+    lung_statuses = {name: masks.get(name, {}) for name in LUNG_MASKS}
+    present_lobes = [name for name, status in lung_statuses.items() if status.get("present")]
+    complete_lobes = [name for name, status in lung_statuses.items() if status.get("complete")]
 
     inventory["brain"] = {
         "present": bool(brain.get("present")),
@@ -135,6 +145,16 @@ def build_segmentation_inventory(total_dir: Path, reference_image_path: Path) ->
         "complete": complete_organs,
         "any_present": bool(present_organs),
         "any_complete": bool(complete_organs),
+    }
+    inventory["lungs"] = {
+        "mask_names": list(LUNG_MASKS),
+        "present": present_lobes,
+        "complete": complete_lobes,
+        "present_lobes": present_lobes,
+        "complete_lobes": complete_lobes,
+        "any_present": bool(present_lobes),
+        "any_complete": bool(complete_lobes),
+        "all_complete": len(complete_lobes) == len(LUNG_MASKS),
     }
 
     try:

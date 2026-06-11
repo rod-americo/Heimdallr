@@ -1386,6 +1386,8 @@ def run_segmentation_pipeline(
                 "parenchymal_organs_present": list(
                     inventory.get("parenchymal_organs", {}).get("present", [])
                 ),
+                "lungs_present": list(inventory.get("lungs", {}).get("present", [])),
+                "lungs_any_present": bool(inventory.get("lungs", {}).get("any_present")),
             },
         }
     if automatic_plan is not None:

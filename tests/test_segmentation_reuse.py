@@ -43,9 +43,12 @@ class TestSegmentationReuse(unittest.TestCase):
             l3[3:7, 3:7, 3:7] = 1.0
             liver = np.zeros((10, 10, 10), dtype=np.float32)
             liver[1:8, 1:8, 0:4] = 1.0
+            lung = np.zeros((10, 10, 10), dtype=np.float32)
+            lung[2:8, 2:8, 0:3] = 1.0
             write_nifti(total_dir / "brain.nii.gz", brain)
             write_nifti(total_dir / "vertebrae_L3.nii.gz", l3)
             write_nifti(total_dir / "liver.nii.gz", liver)
+            write_nifti(total_dir / "lung_lower_lobe_right.nii.gz", lung)
 
             inventory = build_segmentation_inventory(total_dir, nifti_path)
 
@@ -53,6 +56,9 @@ class TestSegmentationReuse(unittest.TestCase):
         self.assertTrue(inventory["vertebrae_L3"]["complete"])
         self.assertEqual(inventory["parenchymal_organs"]["present"], ["liver"])
         self.assertTrue(inventory["parenchymal_organs"]["any_present"])
+        self.assertEqual(inventory["lungs"]["present_lobes"], ["lung_lower_lobe_right"])
+        self.assertEqual(inventory["lungs"]["complete_lobes"], [])
+        self.assertTrue(inventory["lungs"]["any_present"])
 
     def test_segment_case_propagates_worker_shutdown_for_queue_retry(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -244,6 +250,42 @@ class TestSegmentationReuse(unittest.TestCase):
             )
 
         self.assertEqual([task["name"] for task in tasks], ["total", "tissue_types"])
+
+    def test_resolve_segmentation_plan_keeps_lung_nodules_when_requested_metric_needs_it(self):
+        segmentation_profile = {
+            "required": {"modality": "CT", "selected_phase": ["native"]},
+            "tasks": [
+                {"name": "total", "enabled": True, "output_dir": "artifacts/total"},
+                {"name": "lung_nodules", "enabled": True, "output_dir": "artifacts/lung_nodules"},
+                {"name": "tissue_types", "enabled": True, "output_dir": "artifacts/tissue_types"},
+            ],
+        }
+        metrics_profile = {
+            "jobs": [
+                {
+                    "name": "lung_nodules",
+                    "enabled": True,
+                    "requires_segmentation_tasks": ["total", "lung_nodules"],
+                },
+            ],
+        }
+        with (
+            patch(
+                "heimdallr.segmentation.worker.load_segmentation_pipeline_profile",
+                return_value=("ct_native_segmentation_only", segmentation_profile),
+            ),
+            patch(
+                "heimdallr.segmentation.worker.load_metrics_pipeline_profile_for_segmentation",
+                return_value=("ct_native_basic_metrics", metrics_profile),
+            ),
+        ):
+            _profile_name, tasks = resolve_segmentation_plan(
+                "CT",
+                "native",
+                requested_metrics_modules=["lung_nodules"],
+            )
+
+        self.assertEqual([task["name"] for task in tasks], ["total", "lung_nodules"])
 
     def test_resolve_segmentation_plan_includes_automatic_head_tasks_with_requested_metric(self):
         segmentation_profile = {

@@ -47,7 +47,7 @@ curl -X POST "http://localhost:8001/jobs" \
   -F "source_system=partner_a" \
   -F "callback_url=http://receiver.local/heimdallr/callback" \
   -F 'requested_outputs={"metrics_json":true,"overlays_dicom":true,"artifacts_tree":false}' \
-  -F 'requested_metrics_modules=["l3_muscle_area","bone_health_l1_hu"]' \
+  -F 'requested_metrics_modules=["l3_muscle_area","bone_health_l1_hu","lung_nodules"]' \
   -F 'artifact_locale=pt_BR' \
   -F 'artifact_dicom_policy={"secondary_capture_transfer_syntax":"jpeg_ls_lossless"}' \
   -F 'series_selection_policy={"name":"orchestrum_ct_opportunistic_v1","required":{"modality":"CT","min_slices":60},"phase_priority":["native","portal_venous"]}'
@@ -174,8 +174,9 @@ profiles, `total` runs first and writes `artifacts/segmentation_inventory.json`;
 configured `requires_inventory` values then decide which requested, dependency,
 or automatic jobs are compatible with the case. For example, L3-dependent jobs
 require complete L3, organ volumetry requires at least one present parenchymal
-organ mask, and head tasks require complete brain. `total/skull.nii.gz` is
-optional crop and diagnostic context and may be truncated.
+organ mask, pulmonary nodule screening requires at least one present lung lobe
+mask, and head tasks require complete brain. `total/skull.nii.gz` is optional
+crop and diagnostic context and may be truncated.
 The
 `brain_volumetry` job is present in the tracked example profile as disabled
 opt-in behavior; hosts must enable it in their local metrics profile before
@@ -194,13 +195,19 @@ context slabs when the bleed mask is positive. The
 API-facing bleed signal is
 `metrics.head_complete_qc.measurement.cerebral_bleed.has_cerebral_bleed`, with
 the same value mirrored in `notification_bool`.
+The `lung_nodules` module uses the TotalSegmentator `lung_nodules` task when
+the lung inventory gate passes. Its API-facing signal is
+`metrics.lung_nodules.measurement.has_pulmonary_nodule`, with the same value
+mirrored in `notification_bool`; positive cases may emit a Secondary Capture
+DICOM overlay when `requested_outputs.overlays_dicom=true`.
 
 Example:
 
 ```json
 [
   "l3_muscle_area",
-  "bone_health_l1_hu"
+  "bone_health_l1_hu",
+  "lung_nodules"
 ]
 ```
 

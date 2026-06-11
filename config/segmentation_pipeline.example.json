@@ -32,6 +32,20 @@
           "license_required": false
         },
         {
+          "name": "lung_nodules",
+          "enabled": true,
+          "output_dir": "artifacts/lung_nodules",
+          "extra_args": [
+            "--device",
+            "cpu",
+            "--nr_thr_resamp",
+            "14",
+            "--nr_thr_saving",
+            "14"
+          ],
+          "license_required": false
+        },
+        {
           "name": "tissue_types",
           "enabled": true,
           "output_dir": "artifacts/tissue_types",
@@ -89,6 +103,20 @@
           "output_dir": "artifacts/total",
           "extra_args": [
             "--fast",
+            "--device",
+            "cpu",
+            "--nr_thr_resamp",
+            "14",
+            "--nr_thr_saving",
+            "14"
+          ],
+          "license_required": false
+        },
+        {
+          "name": "lung_nodules",
+          "enabled": true,
+          "output_dir": "artifacts/lung_nodules",
+          "extra_args": [
             "--device",
             "cpu",
             "--nr_thr_resamp",

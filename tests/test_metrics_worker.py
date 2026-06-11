@@ -52,6 +52,9 @@ class TestMetricsWorker(unittest.TestCase):
             jobs["parenchymal_organ_volumetry"]["requires_inventory"],
             ["parenchymal_organs.any_present"],
         )
+        self.assertEqual(jobs["lung_nodules"]["requires_inventory"], ["lungs.any_present"])
+        self.assertEqual(jobs["lung_nodules"]["requires_segmentation_tasks"], ["total", "lung_nodules"])
+        self.assertTrue(jobs["lung_nodules"]["automatic"])
 
     def test_filter_jobs_by_inventory_selects_compatible_ct_jobs(self):
         jobs = _resolve_enabled_jobs(
@@ -64,6 +67,7 @@ class TestMetricsWorker(unittest.TestCase):
                         "name": "parenchymal_organ_volumetry",
                         "requires_inventory": ["parenchymal_organs.any_present"],
                     },
+                    {"name": "lung_nodules", "requires_inventory": ["lungs.any_present"]},
                 ]
             }
         )
@@ -71,15 +75,29 @@ class TestMetricsWorker(unittest.TestCase):
             "brain": {"complete": False},
             "vertebrae_L3": {"complete": True},
             "parenchymal_organs": {"any_present": True},
+            "lungs": {"any_present": True},
         }
 
         selected, skipped = filter_jobs_by_inventory(jobs, inventory)
 
         self.assertEqual(
             [job["name"] for job in selected],
-            ["l3_muscle_area", "vat_sat_ratio", "parenchymal_organ_volumetry"],
+            ["l3_muscle_area", "vat_sat_ratio", "parenchymal_organ_volumetry", "lung_nodules"],
         )
         self.assertEqual([job["name"] for job in skipped], ["head_complete_qc"])
+
+    def test_filter_jobs_by_inventory_skips_lung_nodules_without_lung(self):
+        jobs = _resolve_enabled_jobs(
+            {
+                "jobs": [
+                    {"name": "lung_nodules", "requires_inventory": ["lungs.any_present"]},
+                ]
+            }
+        )
+        selected, skipped = filter_jobs_by_inventory(jobs, {"lungs": {"any_present": False}})
+
+        self.assertEqual(selected, [])
+        self.assertEqual([job["name"] for job in skipped], ["lung_nodules"])
 
     def test_record_metrics_pipeline_state_closes_failed_stage(self):
         with tempfile.TemporaryDirectory() as tmpdir:

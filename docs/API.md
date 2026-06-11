@@ -113,6 +113,18 @@ voxels; it is rendered on the brain-geometry normalized CT grid as 5 mm slabs
 with adjacent context slabs, no text panel, and a red transparent contour over
 positive mask regions.
 
+The automatic CT pipeline also supports pulmonary nodule screening through the
+`lung_nodules` TotalSegmentator task. The task is selected after `total` only
+when `artifacts/segmentation_inventory.json` reports at least one non-empty
+lung lobe mask under `lungs.any_present`; complete bilateral lung coverage is
+not required, so partial lung bases or apices can still be screened. External
+submitters may also request the module explicitly with
+`requested_metrics_modules=["lung_nodules"]`. The metrics result exposes
+`measurement.has_pulmonary_nodule` and
+`measurement.notification_bool`, both set from whether any `lung_nodules` mask
+has positive voxels. Positive cases emit a Secondary Capture DICOM overlay;
+negative cases write result JSON without a nodule overlay.
+
 If `series_selection_policy` is provided, Heimdallr deep-merges that object over
 the active `config/series_selection.json` profile for the submitted job. The
 selected series audit in `metadata/id.json` records `PolicySource` and

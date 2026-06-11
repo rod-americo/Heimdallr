@@ -58,6 +58,8 @@ cp config/resource_monitor.example.json config/resource_monitor.json
 Run each command in its own process supervisor unit or terminal.
 Restart `heimdallr.metrics` after deploying metrics job or metrics overlay code
 changes so resident workers render new payload and DICOM artifact behavior.
+Restart `heimdallr.segmentation` after deploying segmentation task planning or
+profile changes so resident workers load the new TotalSegmentator task list.
 
 `heimdallr.dicom_egress` starts a configurable worker pool for outbound C-STORE
 delivery. Set `worker_count` in `config/dicom_egress.json` to control concurrent
@@ -294,8 +296,10 @@ The tracked automatic CT examples use `ct_automatic_segmentation` and
 writes `artifacts/segmentation_inventory.json`, and uses that inventory to
 select compatible metrics and any additional segmentation tasks. L3-dependent
 body jobs require a complete L3 mask, organ volumetry requires at least one
-present parenchymal organ mask, and `cerebral_bleed` plus `brain_structures`
-require a complete `total/brain.nii.gz` mask. The `total/skull.nii.gz` mask is
+present parenchymal organ mask, pulmonary nodule screening requires at least one
+present lung lobe mask and then runs TotalSegmentator `lung_nodules`, and
+`cerebral_bleed` plus `brain_structures` require a complete `total/brain.nii.gz`
+mask. The `total/skull.nii.gz` mask is
 optional crop and diagnostic context; skull truncation is reported but does not
 block the head workflow.
 For dedicated complete-head CT validation, hosts can still use profiles derived

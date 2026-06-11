@@ -919,6 +919,8 @@ def segment_case_metrics(case_input: Path, queue_id: int | None = None) -> bool:
                     "parenchymal_organs_present": list(
                         inventory.get("parenchymal_organs", {}).get("present", [])
                     ),
+                    "lungs_present": list(inventory.get("lungs", {}).get("present", [])),
+                    "lungs_any_present": bool(inventory.get("lungs", {}).get("any_present")),
                 }
         if not jobs:
             logger.log(f"[Metrics] No enabled jobs for profile {profile_name}")
