@@ -366,3 +366,12 @@ msgstr "Temporal lobe"
 
 msgid "head.structures.thalamus"
 msgstr "Thalamus"
+
+msgid "lung_nodules.overlay.title"
+msgstr "Pulmonary nodules"
+
+msgid "lung_nodules.overlay.series_description"
+msgstr "Heimdallr Pulmonary Nodule Overlay"
+
+msgid "lung_nodules.overlay.derivation_description"
+msgstr "Pulmonary nodule detection overlay from lung_nodules segmentation."

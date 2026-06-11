@@ -30,6 +30,12 @@ from heimdallr.metrics.jobs._dicom_secondary_capture import (
     create_secondary_capture_from_rgb,
     secondary_capture_options_from_job_config,
 )
+from heimdallr.metrics.jobs._lung_nodules_overlay_text import (
+    derivation_description,
+    overlay_title,
+    resolve_artifact_locale,
+    series_description,
+)
 from heimdallr.shared.paths import study_artifacts_dir
 
 
@@ -202,6 +208,7 @@ def main() -> int:
 
     try:
         case_dir, metric_dir, result_path = metric_output_dir(args.case_id, METRIC_KEY)
+        artifact_locale = resolve_artifact_locale(job_config)
         artifacts_dir = study_artifacts_dir(args.case_id)
         ct_path = resolve_canonical_nifti(args.case_id)
         nodule_dir = artifacts_dir / "lung_nodules"
@@ -247,6 +254,7 @@ def main() -> int:
             "nodule_masks": nodule_statuses,
             "lung_masks": lung_statuses,
             "lung_voxel_count": int(np.count_nonzero(lung_mask)),
+            "artifact_locale": artifact_locale,
         }
         payload["artifacts"] = {
             "result_json": _relpath(case_dir, result_path),
@@ -257,7 +265,7 @@ def main() -> int:
                 ct_data,
                 lung_mask,
                 nodule_mask,
-                title="Pulmonary nodules",
+                title=overlay_title(artifact_locale),
             )
             from PIL import Image
 
@@ -274,10 +282,10 @@ def main() -> int:
                     rgb,
                     overlay_sc_path,
                     case_metadata,
-                    series_description="Heimdallr Pulmonary Nodule Overlay",
+                    series_description=series_description(artifact_locale),
                     series_number=SERIES_NUMBER,
                     instance_number=1,
-                    derivation_description="Pulmonary nodule detection overlay from lung_nodules segmentation.",
+                    derivation_description=derivation_description(artifact_locale),
                     max_dimension=options["max_dimension"],
                     transfer_syntax=options["transfer_syntax"],
                 )

@@ -104,6 +104,7 @@ class TestLungNodulesJob(unittest.TestCase):
                 {
                     "secondary_capture_transfer_syntax": "original",
                     "secondary_capture_max_dimension": 512,
+                    "locale": "pt_BR",
                 },
             )
 
@@ -115,7 +116,11 @@ class TestLungNodulesJob(unittest.TestCase):
             self.assertIn("overlay_sc_dcm", result["artifacts"])
             self.assertEqual(result["dicom_exports"][0]["kind"], "secondary_capture")
             ds = pydicom.dcmread(case_dir / result["artifacts"]["overlay_sc_dcm"])
-            self.assertEqual(ds.SeriesDescription, "Heimdallr Pulmonary Nodule Overlay")
+            self.assertEqual(ds.SeriesDescription, "Heimdallr Overlay de Nódulos Pulmonares")
+            self.assertEqual(
+                ds.DerivationDescription,
+                "Overlay de detecção de nódulos pulmonares a partir da segmentação lung_nodules.",
+            )
 
 
 if __name__ == "__main__":
