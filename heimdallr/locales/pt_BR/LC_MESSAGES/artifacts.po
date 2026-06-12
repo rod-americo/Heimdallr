@@ -370,6 +370,24 @@ msgstr "Tálamo"
 msgid "lung_nodules.overlay.title"
 msgstr "Nódulos pulmonares"
 
+msgid "lung_nodules.overlay.component_title"
+msgstr "Nódulo pulmonar {component}/{total}"
+
+msgid "lung_nodules.overlay.component_id"
+msgstr "ID do componente: {value}"
+
+msgid "lung_nodules.overlay.nifti_slice"
+msgstr "Corte NIfTI: {value}"
+
+msgid "lung_nodules.overlay.viewer_slice"
+msgstr "Provável corte no visualizador: {value}"
+
+msgid "lung_nodules.overlay.voxel_count"
+msgstr "Voxels: {value}"
+
+msgid "lung_nodules.overlay.volume_cm3"
+msgstr "Volume: {value} cm³"
+
 msgid "lung_nodules.overlay.series_description"
 msgstr "Heimdallr Overlay de Nódulos Pulmonares"
 

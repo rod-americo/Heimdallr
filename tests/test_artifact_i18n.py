@@ -31,6 +31,10 @@ from heimdallr.metrics.jobs._brain_volumetry_overlay_text import (  # noqa: E402
     resolve_artifact_locale as resolve_brain_locale,
     series_description as brain_series_description,
 )
+from heimdallr.metrics.jobs._lung_nodules_overlay_text import (  # noqa: E402
+    build_component_overlay_text as build_lung_nodule_overlay_text,
+    series_description as lung_nodule_series_description,
+)
 from heimdallr.shared.i18n import translate  # noqa: E402
 
 
@@ -140,6 +144,31 @@ class TestArtifactI18n(unittest.TestCase):
                 ratio=0.229,
             ),
         )
+
+    def test_lung_nodule_component_overlay_text_in_pt_br_records_viewer_slice(self):
+        title, lines = build_lung_nodule_overlay_text(
+            component_id=7,
+            component_index=2,
+            component_count=4,
+            slice_idx=33,
+            probable_viewer_slice_index_one_based=120,
+            voxel_count=42,
+            volume_cm3=0.126,
+            locale="pt_BR",
+        )
+
+        self.assertEqual(title, "Nódulo pulmonar 2/4")
+        self.assertEqual(
+            lines,
+            [
+                "ID do componente: 7",
+                "Corte NIfTI: 33",
+                "Provável corte no visualizador: 120",
+                "Voxels: 42",
+                "Volume: 0,126 cm³",
+            ],
+        )
+        self.assertEqual(lung_nodule_series_description("pt_BR"), "Heimdallr Overlay de Nódulos Pulmonares")
 
     def test_l3_overlay_text_omits_density_when_unavailable(self):
         _title, lines = build_overlay_text(

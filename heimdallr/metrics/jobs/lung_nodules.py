@@ -14,13 +14,19 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import nibabel as nib
 import numpy as np
+from PIL import Image
+from pydicom.uid import generate_uid
 from scipy.ndimage import label as ndlabel
 
 from heimdallr.metrics.jobs._bone_job_common import (
+    display_aspect_from_spacing_mm,
     load_case_json_bundle,
     load_ct_volume,
     load_job_config,
     load_nifti_mask,
+    plane_source_axis_codes,
+    reorient_display_array,
+    reorient_display_spacing_mm,
     metric_output_dir,
     parse_args,
     resolve_canonical_nifti,
@@ -31,6 +37,7 @@ from heimdallr.metrics.jobs._dicom_secondary_capture import (
     secondary_capture_options_from_job_config,
 )
 from heimdallr.metrics.jobs._lung_nodules_overlay_text import (
+    build_component_overlay_text,
     derivation_description,
     overlay_title,
     resolve_artifact_locale,
@@ -137,10 +144,10 @@ def _load_lung_union(artifacts_dir: Path, reference_shape: tuple[int, ...]) -> t
     return union, statuses
 
 
-def _component_summary(mask: np.ndarray, voxel_volume_cm3: float) -> list[dict[str, Any]]:
+def _label_components(mask: np.ndarray, voxel_volume_cm3: float) -> tuple[np.ndarray, list[dict[str, Any]]]:
     mask_bool = np.asarray(mask, dtype=bool)
     if not np.any(mask_bool):
-        return []
+        return np.zeros(mask_bool.shape, dtype=np.int32), []
     labeled, component_count = ndlabel(mask_bool, structure=np.ones((3, 3, 3), dtype=np.uint8))
     components: list[dict[str, Any]] = []
     for component_id in range(1, int(component_count) + 1):
@@ -160,6 +167,11 @@ def _component_summary(mask: np.ndarray, voxel_volume_cm3: float) -> list[dict[s
             }
         )
     components.sort(key=lambda item: item["voxel_count"], reverse=True)
+    return labeled, components
+
+
+def _component_summary(mask: np.ndarray, voxel_volume_cm3: float) -> list[dict[str, Any]]:
+    _labeled, components = _label_components(mask, voxel_volume_cm3)
     return components
 
 
@@ -170,28 +182,96 @@ def _center_slice(mask: np.ndarray) -> int:
     return int(z_indices[len(z_indices) // 2])
 
 
+def _display_axial_slices(
+    ct_slice: np.ndarray,
+    lung_slice: np.ndarray,
+    nodule_slice: np.ndarray,
+    *,
+    ct_affine: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, tuple[str, str]]:
+    source_axis_codes = plane_source_axis_codes(ct_affine, "z")
+    return (
+        reorient_display_array(
+            np.asarray(ct_slice, dtype=np.float32),
+            source_axis_codes=source_axis_codes,
+            desired_row_code="P",
+            desired_col_code="L",
+        ),
+        reorient_display_array(
+            np.asarray(lung_slice, dtype=np.uint8),
+            source_axis_codes=source_axis_codes,
+            desired_row_code="P",
+            desired_col_code="L",
+        ).astype(bool),
+        reorient_display_array(
+            np.asarray(nodule_slice, dtype=np.uint8),
+            source_axis_codes=source_axis_codes,
+            desired_row_code="P",
+            desired_col_code="L",
+        ).astype(bool),
+        source_axis_codes,
+    )
+
+
 def render_axial_overlay_rgb(
     ct_data: np.ndarray,
+    ct_affine: np.ndarray,
+    spacing_mm: tuple[float, float, float],
     lung_mask: np.ndarray,
     nodule_mask: np.ndarray,
     *,
     title: str,
+    slice_index: int | None = None,
+    summary_lines: list[str] | None = None,
 ) -> np.ndarray:
-    slice_index = _center_slice(nodule_mask)
+    if slice_index is None:
+        slice_index = _center_slice(nodule_mask)
     ct_slice = np.asarray(ct_data[:, :, slice_index], dtype=np.float32)
     lung_slice = np.asarray(lung_mask[:, :, slice_index], dtype=bool)
     nodule_slice = np.asarray(nodule_mask[:, :, slice_index], dtype=bool)
+    display_ct, display_lung, display_nodule, source_axis_codes = _display_axial_slices(
+        ct_slice,
+        lung_slice,
+        nodule_slice,
+        ct_affine=ct_affine,
+    )
+    display_spacing = reorient_display_spacing_mm(
+        (float(spacing_mm[0]), float(spacing_mm[1])),
+        source_axis_codes=source_axis_codes,
+        desired_row_code="P",
+        desired_col_code="L",
+    )
+    display_aspect = display_aspect_from_spacing_mm(display_spacing)
 
     fig, ax = plt.subplots(figsize=(7, 7), facecolor="black")
     ax.set_facecolor("black")
-    ax.imshow(ct_slice.T, cmap="gray", vmin=-1000.0, vmax=400.0, origin="lower", interpolation="nearest")
-    if lung_slice.any():
-        ax.contour(lung_slice.T, levels=[0.5], colors=["#64d2ff"], linewidths=0.8, origin="lower")
-    if nodule_slice.any():
-        masked = np.ma.masked_where(~nodule_slice.T, nodule_slice.T.astype(np.uint8))
-        ax.imshow(masked, cmap="Reds", alpha=0.65, origin="lower", interpolation="nearest")
-        ax.contour(nodule_slice.T, levels=[0.5], colors=["#ff453a"], linewidths=1.2, origin="lower")
+    ax.imshow(
+        display_ct,
+        cmap="gray",
+        vmin=-1000.0,
+        vmax=400.0,
+        interpolation="nearest",
+        aspect=display_aspect,
+    )
+    if display_lung.any():
+        ax.contour(display_lung, levels=[0.5], colors=["#64d2ff"], linewidths=0.8)
+    if display_nodule.any():
+        masked = np.ma.masked_where(~display_nodule, display_nodule.astype(np.uint8))
+        ax.imshow(masked, cmap="Reds", alpha=0.65, interpolation="nearest", aspect=display_aspect)
+        ax.contour(display_nodule, levels=[0.5], colors=["#ff453a"], linewidths=1.2)
     ax.set_title(title, fontsize=13, color="white")
+    if summary_lines:
+        ax.text(
+            0.03,
+            0.97,
+            "\n".join(summary_lines),
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            fontsize=10,
+            color="white",
+            bbox={"boxstyle": "round,pad=0.4", "facecolor": "black", "alpha": 0.55, "edgecolor": "none"},
+        )
     ax.axis("off")
     fig.tight_layout()
     fig.canvas.draw()
@@ -199,6 +279,11 @@ def render_axial_overlay_rgb(
     rgb = np.ascontiguousarray(rgba[:, :, :3])
     plt.close(fig)
     return rgb
+
+
+def _component_overlay_paths(metric_dir: Path, component_index: int) -> tuple[Path, Path]:
+    stem = f"nodule_component_{component_index:04d}"
+    return metric_dir / f"{stem}.png", metric_dir / f"{stem}.dcm"
 
 
 def main() -> int:
@@ -212,8 +297,6 @@ def main() -> int:
         artifacts_dir = study_artifacts_dir(args.case_id)
         ct_path = resolve_canonical_nifti(args.case_id)
         nodule_dir = artifacts_dir / "lung_nodules"
-        overlay_png_path = metric_dir / "overlay.png"
-        overlay_sc_path = metric_dir / "overlay_sc.dcm"
 
         payload["inputs"] = {
             "canonical_nifti": _relpath(case_dir, ct_path) if ct_path and ct_path.exists() else None,
@@ -237,9 +320,10 @@ def main() -> int:
         nodule_mask, nodule_statuses = _load_union_mask(nodule_paths, reference_shape)
         lung_mask, lung_statuses = _load_lung_union(artifacts_dir, reference_shape)
         voxel_volume_cm3 = _mask_voxel_volume_cm3(ct_img)
-        components = _component_summary(nodule_mask, voxel_volume_cm3)
+        labeled_components, components = _label_components(nodule_mask, voxel_volume_cm3)
         nodule_voxel_count = int(np.count_nonzero(nodule_mask))
         has_pulmonary_nodule = bool(nodule_voxel_count > 0)
+        total_slices = int(reference_shape[2])
 
         payload["status"] = "done"
         payload["measurement"] = {
@@ -251,6 +335,9 @@ def main() -> int:
             "nodule_component_count": len(components),
             "nodule_total_volume_cm3": float(nodule_voxel_count * voxel_volume_cm3),
             "components": components,
+            "slice_index_basis": "nifti_zero_based",
+            "probable_viewer_slice_index_basis": "one_based_reverse_z",
+            "total_slices": total_slices,
             "nodule_masks": nodule_statuses,
             "lung_masks": lung_statuses,
             "lung_voxel_count": int(np.count_nonzero(lung_mask)),
@@ -261,41 +348,98 @@ def main() -> int:
         }
 
         if has_pulmonary_nodule and bool(job_config.get("generate_overlay", True)):
-            rgb = render_axial_overlay_rgb(
-                ct_data,
-                lung_mask,
-                nodule_mask,
-                title=overlay_title(artifact_locale),
-            )
-            from PIL import Image
-
-            Image.fromarray(rgb).save(overlay_png_path)
-            payload["artifacts"]["overlay_png"] = _relpath(case_dir, overlay_png_path)
-
-            if bool(job_config.get("emit_secondary_capture_dicom", True)):
+            component_overlays: list[dict[str, Any]] = []
+            dicom_exports: list[dict[str, Any]] = []
+            emit_dicom = bool(job_config.get("emit_secondary_capture_dicom", True))
+            case_metadata: dict[str, Any] | None = None
+            options: dict[str, Any] | None = None
+            series_instance_uid = generate_uid() if emit_dicom else None
+            if emit_dicom:
                 bundle = load_case_json_bundle(args.case_id)
-                case_metadata: dict[str, Any] = {}
+                case_metadata = {}
                 case_metadata.update(bundle.get("id_json", {}))
                 case_metadata.update(bundle.get("metadata_json", {}))
                 options = secondary_capture_options_from_job_config(job_config)
-                create_secondary_capture_from_rgb(
-                    rgb,
-                    overlay_sc_path,
-                    case_metadata,
-                    series_description=series_description(artifact_locale),
-                    series_number=SERIES_NUMBER,
-                    instance_number=1,
-                    derivation_description=derivation_description(artifact_locale),
-                    max_dimension=options["max_dimension"],
-                    transfer_syntax=options["transfer_syntax"],
+
+            for component_index, component in enumerate(components, start=1):
+                component_id = int(component["component_id"])
+                component_mask = labeled_components == component_id
+                slice_index = _center_slice(component_mask)
+                probable_viewer_slice = int(total_slices - slice_index)
+                component["center_slice_index"] = slice_index
+                component["slice_index"] = slice_index
+                component["slice_index_basis"] = "nifti_zero_based"
+                component["probable_viewer_slice_index_one_based"] = probable_viewer_slice
+                component["total_slices"] = total_slices
+
+                title, summary_lines = build_component_overlay_text(
+                    component_id=component_id,
+                    component_index=component_index,
+                    component_count=len(components),
+                    slice_idx=slice_index,
+                    probable_viewer_slice_index_one_based=probable_viewer_slice,
+                    voxel_count=int(component["voxel_count"]),
+                    volume_cm3=float(component["volume_cm3"]),
+                    locale=artifact_locale,
                 )
-                payload["artifacts"]["overlay_sc_dcm"] = _relpath(case_dir, overlay_sc_path)
-                payload["dicom_exports"] = [
-                    {
-                        "path": _relpath(case_dir, overlay_sc_path),
-                        "kind": "secondary_capture",
-                    }
-                ]
+                rgb = render_axial_overlay_rgb(
+                    ct_data,
+                    ct_img.affine,
+                    tuple(float(value) for value in ct_img.header.get_zooms()[:3]),
+                    lung_mask,
+                    component_mask,
+                    title=title or overlay_title(artifact_locale),
+                    slice_index=slice_index,
+                    summary_lines=summary_lines,
+                )
+                component_png_path, component_dcm_path = _component_overlay_paths(metric_dir, component_index)
+                Image.fromarray(rgb).save(component_png_path)
+                component["overlay_png"] = _relpath(case_dir, component_png_path)
+
+                overlay_entry: dict[str, Any] = {
+                    "component_id": component_id,
+                    "component_index": component_index,
+                    "slice_index": slice_index,
+                    "probable_viewer_slice_index_one_based": probable_viewer_slice,
+                    "overlay_png": _relpath(case_dir, component_png_path),
+                }
+                if component_index == 1:
+                    payload["artifacts"]["overlay_png"] = _relpath(case_dir, component_png_path)
+
+                if emit_dicom and case_metadata is not None and options is not None:
+                    create_secondary_capture_from_rgb(
+                        rgb,
+                        component_dcm_path,
+                        case_metadata,
+                        series_instance_uid=series_instance_uid,
+                        series_description=series_description(artifact_locale),
+                        series_number=SERIES_NUMBER,
+                        instance_number=component_index,
+                        derivation_description=derivation_description(artifact_locale),
+                        max_dimension=options["max_dimension"],
+                        transfer_syntax=options["transfer_syntax"],
+                    )
+                    component["overlay_sc_dcm"] = _relpath(case_dir, component_dcm_path)
+                    overlay_entry["overlay_sc_dcm"] = _relpath(case_dir, component_dcm_path)
+                    dicom_exports.append(
+                        {
+                            "path": _relpath(case_dir, component_dcm_path),
+                            "component_id": component_id,
+                            "component_index": component_index,
+                            "slice_index": slice_index,
+                            "probable_viewer_slice_index_one_based": probable_viewer_slice,
+                            "kind": "secondary_capture",
+                        }
+                    )
+                    if component_index == 1:
+                        payload["artifacts"]["overlay_sc_dcm"] = _relpath(case_dir, component_dcm_path)
+
+                component_overlays.append(overlay_entry)
+
+            payload["artifacts"]["component_overlays"] = component_overlays
+            payload["measurement"]["components"] = components
+            if dicom_exports:
+                payload["dicom_exports"] = dicom_exports
 
         write_payload(result_path, payload)
         print(json.dumps(payload, indent=2))

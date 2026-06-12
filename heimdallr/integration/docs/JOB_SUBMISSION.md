@@ -199,7 +199,9 @@ The `lung_nodules` module uses the TotalSegmentator `lung_nodules` task when
 the lung inventory gate passes. Its API-facing signal is
 `metrics.lung_nodules.measurement.has_pulmonary_nodule`, with the same value
 mirrored in `notification_bool`; positive cases may emit a Secondary Capture
-DICOM overlay when `requested_outputs.overlays_dicom=true`.
+DICOM series when `requested_outputs.overlays_dicom=true`, with one image per
+connected nodule component. Each DICOM export is linked back to its
+`component_id` in `metrics.lung_nodules.measurement.components`.
 
 Example:
 

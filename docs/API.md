@@ -122,8 +122,11 @@ submitters may also request the module explicitly with
 `requested_metrics_modules=["lung_nodules"]`. The metrics result exposes
 `measurement.has_pulmonary_nodule` and
 `measurement.notification_bool`, both set from whether any `lung_nodules` mask
-has positive voxels. Positive cases emit a Secondary Capture DICOM overlay;
-negative cases write result JSON without a nodule overlay.
+has positive voxels. Positive cases emit one Secondary Capture DICOM image per
+connected nodule component in a single DICOM series; each component entry in
+`measurement.components` records its `component_id`, NIfTI `slice_index`, the
+approximate `probable_viewer_slice_index_one_based`, and the corresponding
+overlay path. Negative cases write result JSON without a nodule overlay.
 
 If `series_selection_policy` is provided, Heimdallr deep-merges that object over
 the active `config/series_selection.json` profile for the submitted job. The

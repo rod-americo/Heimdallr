@@ -370,6 +370,24 @@ msgstr "Thalamus"
 msgid "lung_nodules.overlay.title"
 msgstr "Pulmonary nodules"
 
+msgid "lung_nodules.overlay.component_title"
+msgstr "Pulmonary nodule {component}/{total}"
+
+msgid "lung_nodules.overlay.component_id"
+msgstr "Component ID: {value}"
+
+msgid "lung_nodules.overlay.nifti_slice"
+msgstr "NIfTI slice: {value}"
+
+msgid "lung_nodules.overlay.viewer_slice"
+msgstr "Probable viewer slice: {value}"
+
+msgid "lung_nodules.overlay.voxel_count"
+msgstr "Voxels: {value}"
+
+msgid "lung_nodules.overlay.volume_cm3"
+msgstr "Volume: {value} cm³"
+
 msgid "lung_nodules.overlay.series_description"
 msgstr "Heimdallr Pulmonary Nodule Overlay"
 
