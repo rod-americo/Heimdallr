@@ -79,16 +79,16 @@ def classify_segmentation_coverage(total_artifacts_dir: Path) -> str:
     if not complete:
         return SEGMENTATION_COVERAGE_UNKNOWN
 
-    chest_complete = all(name in complete for name in _LUNG_MASK_NAMES)
+    thorax_complete = all(name in complete for name in _LUNG_MASK_NAMES)
     abdominal_complete_count = sum(1 for name in _ABDOMINAL_MASK_NAMES if name in complete)
     abdomen_complete = (
         abdominal_complete_count >= 3
         and any(name in complete for name in _ABDOMINAL_CORE_MASK_NAMES)
     )
 
-    if chest_complete and abdomen_complete:
+    if thorax_complete and abdomen_complete:
         return SEGMENTATION_COVERAGE_CHEST_ABDOMEN
-    if chest_complete:
+    if thorax_complete:
         return SEGMENTATION_COVERAGE_CHEST_ONLY
     if abdomen_complete:
         return SEGMENTATION_COVERAGE_ABDOMEN_ONLY
