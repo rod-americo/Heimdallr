@@ -143,7 +143,11 @@ git rev-parse --short HEAD
 ssh thor 'cd ~/Heimdallr && git status --short --branch && git rev-parse --short HEAD'
 ```
 
-If code should be tested on `thor`, push locally first and update `thor` with `git pull --ff-only`. Do not edit code, host-local config, runtime state, or the POC venv on `thor` unless the user explicitly asks for host-side changes.
+Keep local and `thor` moving together during active code-test work. Prefer
+small, reviewable commits; after each local commit that should exist on `thor`,
+push locally and update `thor` with `git pull --ff-only` before comparing
+runtime behavior. Do not edit code, host-local config, runtime state, or the
+POC venv on `thor` unless the user explicitly asks for host-side changes.
 
 Use `docs/RUNTIME_REQUIREMENTS.md` and `scripts/check_runtime_requirements.py` when auditing or rebuilding Python environments.
 
