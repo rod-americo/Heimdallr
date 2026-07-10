@@ -287,6 +287,48 @@ class TestSegmentationReuse(unittest.TestCase):
 
         self.assertEqual([task["name"] for task in tasks], ["total", "lung_nodules"])
 
+    def test_resolve_segmentation_plan_keeps_effusion_task_when_requested_metric_needs_it(self):
+        segmentation_profile = {
+            "required": {"modality": "CT", "selected_phase": ["native"]},
+            "tasks": [
+                {"name": "total", "enabled": True, "output_dir": "artifacts/total"},
+                {
+                    "name": "pleural_pericard_effusion",
+                    "enabled": True,
+                    "output_dir": "artifacts/pleural_pericard_effusion",
+                },
+            ],
+        }
+        metrics_profile = {
+            "jobs": [
+                {
+                    "name": "pleural_pericard_effusion",
+                    "enabled": True,
+                    "requires_segmentation_tasks": ["total", "pleural_pericard_effusion"],
+                },
+            ],
+        }
+        with (
+            patch(
+                "heimdallr.segmentation.worker.load_segmentation_pipeline_profile",
+                return_value=("ct_native_segmentation_only", segmentation_profile),
+            ),
+            patch(
+                "heimdallr.segmentation.worker.load_metrics_pipeline_profile_for_segmentation",
+                return_value=("ct_native_basic_metrics", metrics_profile),
+            ),
+        ):
+            _profile_name, tasks = resolve_segmentation_plan(
+                "CT",
+                "native",
+                requested_metrics_modules=["pleural_pericard_effusion"],
+            )
+
+        self.assertEqual(
+            [task["name"] for task in tasks],
+            ["total", "pleural_pericard_effusion"],
+        )
+
     def test_resolve_segmentation_plan_includes_automatic_head_tasks_with_requested_metric(self):
         segmentation_profile = {
             "required": {"modality": "CT", "selected_phase": ["native"]},
@@ -497,10 +539,13 @@ class TestSegmentationReuse(unittest.TestCase):
                 if task_name == "total":
                     l3 = np.zeros((10, 10, 10), dtype=np.float32)
                     liver = np.zeros((10, 10, 10), dtype=np.float32)
+                    lung = np.zeros((10, 10, 10), dtype=np.float32)
                     l3[3:7, 3:7, 3:7] = 1.0
                     liver[1:8, 1:8, 0:4] = 1.0
+                    lung[1:8, 1:8, 1:9] = 1.0
                     write_nifti(Path(output_folder) / "vertebrae_L3.nii.gz", l3)
                     write_nifti(Path(output_folder) / "liver.nii.gz", liver)
+                    write_nifti(Path(output_folder) / "lung_lower_lobe_right.nii.gz", lung)
                 else:
                     Path(output_folder, "mask.nii.gz").write_bytes(gzip.compress(b"ok"))
 
@@ -526,6 +571,12 @@ class TestSegmentationReuse(unittest.TestCase):
                         "requires_segmentation_tasks": ["total"],
                         "requires_inventory": ["parenchymal_organs.any_present"],
                     },
+                    {
+                        "name": "pleural_pericard_effusion",
+                        "automatic": True,
+                        "requires_segmentation_tasks": ["total", "pleural_pericard_effusion"],
+                        "requires_inventory": ["lungs.any_present"],
+                    },
                 ],
             }
 
@@ -537,6 +588,10 @@ class TestSegmentationReuse(unittest.TestCase):
                         [
                             {"name": "total", "output_dir": "artifacts/total"},
                             {"name": "tissue_types", "output_dir": "artifacts/tissue_types"},
+                            {
+                                "name": "pleural_pericard_effusion",
+                                "output_dir": "artifacts/pleural_pericard_effusion",
+                            },
                             {"name": "cerebral_bleed", "output_dir": "artifacts/cerebral_bleed"},
                             {"name": "brain_structures", "output_dir": "artifacts/brain_structures"},
                         ],
@@ -559,10 +614,14 @@ class TestSegmentationReuse(unittest.TestCase):
                     logger=PipelineLogger(None),
                 )
 
-            self.assertEqual(calls, ["total", "tissue_types"])
+            self.assertEqual(calls, ["total", "tissue_types", "pleural_pericard_effusion"])
             self.assertEqual(
                 info["automatic_ct_plan"]["selected_jobs"],
-                ["l3_muscle_area", "parenchymal_organ_volumetry"],
+                [
+                    "l3_muscle_area",
+                    "parenchymal_organ_volumetry",
+                    "pleural_pericard_effusion",
+                ],
             )
             self.assertEqual(
                 [task["name"] for task in info["skipped_tasks"]],

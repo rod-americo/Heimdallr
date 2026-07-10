@@ -402,3 +402,27 @@ msgstr "Heimdallr Overlay de Nódulos Pulmonares"
 
 msgid "lung_nodules.overlay.derivation_description"
 msgstr "Overlay de detecção de nódulos pulmonares a partir da segmentação lung_nodules."
+
+msgid "pleural_pericard_effusion.finding.pleural_effusion"
+msgstr "Derrame pleural"
+
+msgid "pleural_pericard_effusion.finding.pericardial_effusion"
+msgstr "Derrame pericárdico"
+
+msgid "pleural_pericard_effusion.overlay.component_title"
+msgstr "{finding} {component}/{total}"
+
+msgid "pleural_pericard_effusion.overlay.nifti_slice"
+msgstr "Corte NIfTI: {value}"
+
+msgid "pleural_pericard_effusion.overlay.viewer_slice"
+msgstr "Provável corte no visualizador: {value}"
+
+msgid "pleural_pericard_effusion.overlay.volume_cm3"
+msgstr "Volume: {value} cm³"
+
+msgid "pleural_pericard_effusion.overlay.series_description"
+msgstr "Heimdallr Derrames Pleural e Pericárdico"
+
+msgid "pleural_pericard_effusion.overlay.derivation_description"
+msgstr "Overlay positivo de derrame pleural ou pericárdico a partir da segmentação TotalSegmentator."

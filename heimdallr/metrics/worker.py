@@ -508,6 +508,17 @@ def _upsert_results(case_id: str, metric_key: str, payload: dict, metadata: dict
     _write_results(case_id, results, metadata)
 
 
+def _remove_result(case_id: str, metric_key: str, metadata: dict) -> None:
+    results = _load_results(case_id)
+    metrics = results.get("metrics")
+    if not isinstance(metrics, dict) or metric_key not in metrics:
+        return
+    metrics.pop(metric_key, None)
+    if not metrics:
+        results.pop("metrics", None)
+    _write_results(case_id, results, metadata)
+
+
 def _load_results(case_id: str) -> dict:
     results_path = study_results_json(case_id)
     if results_path.exists():
@@ -954,7 +965,10 @@ def _execute_jobs(
                     continue
 
                 job_payloads[job_name] = payload
-                _upsert_results(case_id, job_name, payload, metadata)
+                if payload.get("publish_result", True):
+                    _upsert_results(case_id, job_name, payload, metadata)
+                else:
+                    _remove_result(case_id, job_name, metadata)
                 job_dicom_exports = _normalize_dicom_exports(payload)
                 dicom_exports_by_name[job_name] = job_dicom_exports
                 completed_jobs_by_name[job_name] = {

@@ -45,6 +45,20 @@
           "license_required": false
         },
         {
+          "name": "pleural_pericard_effusion",
+          "enabled": true,
+          "output_dir": "artifacts/pleural_pericard_effusion",
+          "extra_args": [
+            "--device",
+            "gpu",
+            "--nr_thr_resamp",
+            "14",
+            "--nr_thr_saving",
+            "14"
+          ],
+          "license_required": false
+        },
+        {
           "name": "tissue_types",
           "enabled": true,
           "output_dir": "artifacts/tissue_types",
@@ -114,6 +128,20 @@
           "name": "lung_nodules",
           "enabled": true,
           "output_dir": "artifacts/lung_nodules",
+          "extra_args": [
+            "--device",
+            "gpu",
+            "--nr_thr_resamp",
+            "14",
+            "--nr_thr_saving",
+            "14"
+          ],
+          "license_required": false
+        },
+        {
+          "name": "pleural_pericard_effusion",
+          "enabled": true,
+          "output_dir": "artifacts/pleural_pericard_effusion",
           "extra_args": [
             "--device",
             "gpu",

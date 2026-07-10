@@ -78,6 +78,21 @@
           "secondary_capture_transfer_syntax": "jpeg_ls_lossless"
         },
         {
+          "name": "pleural_pericard_effusion",
+          "enabled": true,
+          "automatic": true,
+          "requires_segmentation_tasks": [
+            "total",
+            "pleural_pericard_effusion"
+          ],
+          "requires_inventory": [
+            "lungs.any_present"
+          ],
+          "generate_overlay": true,
+          "emit_secondary_capture_dicom": true,
+          "secondary_capture_transfer_syntax": "jpeg_ls_lossless"
+        },
+        {
           "name": "brain_volumetry",
           "enabled": false,
           "requires_segmentation_tasks": [
@@ -204,6 +219,17 @@
           "requires_segmentation_tasks": [
             "total",
             "lung_nodules"
+          ],
+          "generate_overlay": true,
+          "emit_secondary_capture_dicom": true,
+          "secondary_capture_transfer_syntax": "jpeg_ls_lossless"
+        },
+        {
+          "name": "pleural_pericard_effusion",
+          "enabled": true,
+          "requires_segmentation_tasks": [
+            "total",
+            "pleural_pericard_effusion"
           ],
           "generate_overlay": true,
           "emit_secondary_capture_dicom": true,

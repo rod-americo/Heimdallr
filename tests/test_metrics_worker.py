@@ -21,6 +21,7 @@ from heimdallr.metrics.worker import (
     _requested_metrics_modules_from_metadata,
     _execute_jobs,
     _harmonize_secondary_capture_series,
+    _remove_result,
     _validate_case_against_profile,
     _resolve_enabled_jobs,
     _resolve_job_module_name,
@@ -62,6 +63,15 @@ class TestMetricsWorker(unittest.TestCase):
         self.assertEqual(jobs["lung_nodules"]["requires_inventory"], ["lungs.any_present"])
         self.assertEqual(jobs["lung_nodules"]["requires_segmentation_tasks"], ["total", "lung_nodules"])
         self.assertTrue(jobs["lung_nodules"]["automatic"])
+        self.assertEqual(
+            jobs["pleural_pericard_effusion"]["requires_inventory"],
+            ["lungs.any_present"],
+        )
+        self.assertEqual(
+            jobs["pleural_pericard_effusion"]["requires_segmentation_tasks"],
+            ["total", "pleural_pericard_effusion"],
+        )
+        self.assertTrue(jobs["pleural_pericard_effusion"]["automatic"])
 
     def test_filter_jobs_by_inventory_selects_compatible_ct_jobs(self):
         jobs = _resolve_enabled_jobs(
@@ -75,6 +85,10 @@ class TestMetricsWorker(unittest.TestCase):
                         "requires_inventory": ["parenchymal_organs.any_present"],
                     },
                     {"name": "lung_nodules", "requires_inventory": ["lungs.any_present"]},
+                    {
+                        "name": "pleural_pericard_effusion",
+                        "requires_inventory": ["lungs.any_present"],
+                    },
                 ]
             }
         )
@@ -89,7 +103,13 @@ class TestMetricsWorker(unittest.TestCase):
 
         self.assertEqual(
             [job["name"] for job in selected],
-            ["l3_muscle_area", "vat_sat_ratio", "parenchymal_organ_volumetry", "lung_nodules"],
+            [
+                "l3_muscle_area",
+                "vat_sat_ratio",
+                "parenchymal_organ_volumetry",
+                "lung_nodules",
+                "pleural_pericard_effusion",
+            ],
         )
         self.assertEqual([job["name"] for job in skipped], ["head_complete_qc"])
 
@@ -105,6 +125,55 @@ class TestMetricsWorker(unittest.TestCase):
 
         self.assertEqual(selected, [])
         self.assertEqual([job["name"] for job in skipped], ["lung_nodules"])
+
+    def test_remove_result_deletes_stale_positive_only_metric(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            results_path = Path(tmpdir) / "resultados.json"
+            results_path.write_text(
+                json.dumps(
+                    {
+                        "metrics": {
+                            "pleural_pericard_effusion": {"status": "done"},
+                            "lung_nodules": {"status": "done"},
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with patch("heimdallr.metrics.worker.study_results_json", return_value=results_path):
+                _remove_result("case-1", "pleural_pericard_effusion", {})
+
+            results = json.loads(results_path.read_text(encoding="utf-8"))
+            self.assertNotIn("pleural_pericard_effusion", results["metrics"])
+            self.assertIn("lung_nodules", results["metrics"])
+
+    def test_execute_jobs_keeps_non_published_result_out_of_public_results(self):
+        payload = {
+            "metric_key": "pleural_pericard_effusion",
+            "status": "not_present",
+            "publish_result": False,
+            "measurement": {"notification_bool": False},
+            "artifacts": {},
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with (
+                patch("heimdallr.metrics.worker._run_job", return_value=payload),
+                patch("heimdallr.metrics.worker._upsert_results") as upsert,
+                patch("heimdallr.metrics.worker._remove_result") as remove,
+            ):
+                completed, exports = _execute_jobs(
+                    "case-1",
+                    [{"name": "pleural_pericard_effusion", "needs": []}],
+                    max_parallel_jobs=1,
+                    log_dir=Path(tmpdir),
+                    logger=MetricsLogger(None),
+                    metadata={},
+                )
+
+        upsert.assert_not_called()
+        remove.assert_called_once_with("case-1", "pleural_pericard_effusion", {})
+        self.assertEqual(completed[0]["status"], "not_present")
+        self.assertEqual(exports, [])
 
     def test_record_metrics_pipeline_state_closes_failed_stage(self):
         with tempfile.TemporaryDirectory() as tmpdir:
