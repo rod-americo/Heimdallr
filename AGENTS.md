@@ -129,6 +129,15 @@ If the change affects resident services, document restart impact in `docs/OPERAT
 
 ## 7. Thor POC Host Protocol
 
+The host accelerator policy is fixed unless the user explicitly changes it:
+
+- local `odin`: `mps` for TotalSegmentator segmentation tasks
+- `thor`: `gpu`
+- `ms-heimdallr`: `cpu`
+
+The local `odin` phase detector remains a documented exception and uses CPU;
+see `docs/OPERATIONS.md` before changing `totalseg_get_phase` device settings.
+
 Use `thor` as the POC code-test host when the task requires host-level validation. The current project venv is:
 
 ```text /home/rodrigo/Heimdallr/.venv
