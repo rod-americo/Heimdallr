@@ -144,10 +144,13 @@ ssh thor 'cd ~/Heimdallr && git status --short --branch && git rev-parse --short
 ```
 
 Keep local and `thor` moving together during active code-test work. Prefer
-small, reviewable commits; after each local commit that should exist on `thor`,
-push locally and update `thor` with `git pull --ff-only` before comparing
-runtime behavior. Do not edit code, host-local config, runtime state, or the
-POC venv on `thor` unless the user explicitly asks for host-side changes.
+small, reviewable commits, and create those commits automatically when a change
+is ready unless the user asks to hold them uncommitted. After every local push,
+update `thor` with `git pull --ff-only` so both repositories keep the same
+commit. Resident services on the local host and on `thor` may be restarted when
+needed for a code or configuration change to take effect. Do not edit code,
+host-local config, runtime state, or the POC venv on `thor` unless the user
+explicitly asks for host-side changes.
 
 Use `docs/RUNTIME_REQUIREMENTS.md` and `scripts/check_runtime_requirements.py` when auditing or rebuilding Python environments.
 
@@ -200,7 +203,12 @@ separate validation step.
 
 ## 11. Git Workflow
 
-Use the branch that is already checked out for the current task. Do not create or switch branches unless the user explicitly asks for that branch workflow.
+Commit directly on `main` for Heimdallr work. Do not create or switch branches
+unless the user explicitly asks for that branch workflow.
+
+Commits should be short, focused, and automatic once a change is ready unless
+the user asks to hold the work uncommitted. After every local push, pull the same
+commit on `thor` with `git pull --ff-only`.
 
 Commit messages must be en-US, imperative, and semantic:
 
