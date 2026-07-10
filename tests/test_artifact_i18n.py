@@ -20,6 +20,7 @@ from heimdallr.metrics.jobs._vat_sat_overlay_text import (  # noqa: E402
     series_description as vat_sat_series_description,
 )
 from heimdallr.metrics.jobs._parenchymal_overlay_text import (  # noqa: E402
+    build_overlay_lines as build_parenchymal_overlay_lines,
     build_overlay_text as build_parenchymal_overlay_text,
     derivation_description as parenchymal_derivation_description,
     resolve_artifact_locale as resolve_parenchymal_locale,
@@ -272,6 +273,63 @@ class TestArtifactI18n(unittest.TestCase):
                 "Órgãos parenquimatosos:",
                 "Fígado: 1.355 cm³",
             ],
+        )
+
+    def test_parenchymal_overlay_marks_only_out_of_range_volume_values(self):
+        lines = build_parenchymal_overlay_lines(
+            organ_measurements={
+                "liver": {
+                    "analysis_status": "complete",
+                    "observed_volume_cm3": 1801.0,
+                    "hu_mean": 49.0,
+                },
+                "spleen": {
+                    "analysis_status": "complete",
+                    "observed_volume_cm3": 400.0,
+                    "hu_mean": 50.0,
+                },
+                "kidney_right": {
+                    "analysis_status": "complete",
+                    "observed_volume_cm3": 99.0,
+                    "hu_mean": 30.0,
+                },
+                "kidney_left": {
+                    "analysis_status": "complete",
+                    "observed_volume_cm3": 100.0,
+                    "hu_mean": 30.0,
+                },
+            },
+            locale="pt_BR",
+        )
+
+        alert_text = {
+            line.text[line.alert_span[0] : line.alert_span[1]]
+            for line in lines
+            if line.alert_span is not None
+        }
+        self.assertEqual(alert_text, {"1.801", "99"})
+
+    def test_parenchymal_overlay_adds_localized_steatosis_line_below_liver(self):
+        lines = build_parenchymal_overlay_text(
+            organ_measurements={
+                "liver": {
+                    "analysis_status": "complete",
+                    "observed_volume_cm3": 1355.0,
+                    "hu_mean": 45.0,
+                },
+                "spleen": {
+                    "analysis_status": "complete",
+                    "observed_volume_cm3": 384.0,
+                    "hu_mean": 50.0,
+                },
+            },
+            locale="pt_BR",
+            hepatic_steatosis={"status": "estimated", "estimated_percent": 12},
+        )
+
+        self.assertEqual(
+            lines[1:4],
+            ["Fígado: 1.355 cm³ | 45 UH", "Esteatose: 12%", "Baço: 384 cm³ | 50 UH"],
         )
 
     def test_brain_volumetry_overlay_text_in_en_us(self):

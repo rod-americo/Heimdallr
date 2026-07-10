@@ -12,7 +12,10 @@ from PIL import Image, ImageDraw, ImageFont
 from pydicom.uid import generate_uid
 from scipy.ndimage import binary_erosion
 
-from heimdallr.metrics.analysis.hepatic_steatosis import estimate_pdff_from_unenhanced_ct_hu
+from heimdallr.metrics.analysis.hepatic_steatosis import (
+    assess_hepatic_steatosis,
+    estimate_pdff_from_unenhanced_ct_hu,
+)
 from heimdallr.metrics.jobs._bone_job_common import (
     load_ct_volume,
     load_job_config,
@@ -31,7 +34,8 @@ from heimdallr.metrics.jobs._dicom_secondary_capture import (
     secondary_capture_options_from_job_config,
 )
 from heimdallr.metrics.jobs._parenchymal_overlay_text import (
-    build_overlay_text,
+    OverlayTextLine,
+    build_overlay_lines,
     derivation_description,
     resolve_artifact_locale,
     series_description,
@@ -313,7 +317,7 @@ def _mask_slab(mask_data: np.ndarray, source_indices: list[int]) -> np.ndarray:
 def _render_slice_rgb(
     ct_slice: np.ndarray,
     masks_for_slice: list[tuple[np.ndarray, tuple[int, int, int]]],
-    summary_lines: list[str],
+    summary_lines: list[OverlayTextLine],
     *,
     source_axis_codes: tuple[str, str],
 ) -> np.ndarray:
@@ -341,7 +345,7 @@ def _render_slice_rgb(
     max_width = 0
     for idx, line in enumerate(summary_lines):
         font = title_font if idx == 0 else body_font
-        bbox = draw.textbbox((0, 0), line, font=font)
+        bbox = draw.textbbox((0, 0), line.text, font=font)
         max_width = max(max_width, bbox[2] - bbox[0])
         line_heights.append((bbox[3] - bbox[1]) + (8 if idx == 0 else 6))
     available_width = max(1, image.width - 20)
@@ -358,7 +362,16 @@ def _render_slice_rgb(
     for idx, line in enumerate(summary_lines):
         font = title_font if idx == 0 else body_font
         fill = (255, 255, 255, 255) if idx == 0 else (235, 235, 235, 255)
-        draw.text((20, y), line, font=font, fill=fill)
+        draw.text((20, y), line.text, font=font, fill=fill)
+        if line.alert_span is not None:
+            alert_start, alert_end = line.alert_span
+            prefix_width = draw.textlength(line.text[:alert_start], font=font)
+            draw.text(
+                (20 + prefix_width, y),
+                line.text[alert_start:alert_end],
+                font=font,
+                fill=(255, 80, 80, 255),
+            )
         y += line_heights[idx]
 
     return np.asarray(image, dtype=np.uint8)
@@ -446,6 +459,18 @@ def main() -> int:
                 mask_label,
                 overlay_mask,
             )
+
+        liver_measurement = organ_measurements.get("liver") or {}
+        spleen_measurement = organ_measurements.get("spleen") or {}
+        hepatic_steatosis = assess_hepatic_steatosis(
+            (
+                liver_measurement.get("hu_mean")
+                if liver_measurement.get("volume_cm3") is not None
+                else None
+            ),
+            spleen_measurement.get("hu_mean"),
+            technique_context.get("kvp"),
+        )
 
         available_masks = [mask for mask in organ_masks.values() if mask is not None and np.any(mask)]
         complete_overlay_only_masks = [
@@ -543,9 +568,10 @@ def main() -> int:
                     if slice_mask.any():
                         masks_for_slice.append((slice_mask, color))
 
-                summary_lines = build_overlay_text(
+                summary_lines = build_overlay_lines(
                     organ_measurements=organ_measurements,
                     locale=artifact_locale,
+                    hepatic_steatosis=hepatic_steatosis,
                 )
                 rgb = _render_slice_rgb(
                     _average_ct_slab(ct_data, source_indices),
@@ -591,6 +617,7 @@ def main() -> int:
                 "reconstruction_mode": "slab_average",
                 "selected_phase": selected_phase or None,
                 "density_suppressed_due_to_contrast": bool(suppress_density),
+                "hepatic_steatosis": hepatic_steatosis,
                 "source_slice_count": int(ct_data.shape[2]),
                 "exported_slice_count": len(dicom_exports),
                 "exported_slabs": export_slabs,

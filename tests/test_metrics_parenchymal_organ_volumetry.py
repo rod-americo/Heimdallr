@@ -15,7 +15,10 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from heimdallr.metrics.jobs import parenchymal_organ_volumetry  # noqa: E402
-from heimdallr.metrics.jobs._parenchymal_overlay_text import build_overlay_text  # noqa: E402
+from heimdallr.metrics.jobs._parenchymal_overlay_text import (  # noqa: E402
+    build_overlay_lines,
+    build_overlay_text,
+)
 from heimdallr.shared import settings  # noqa: E402
 
 
@@ -26,6 +29,28 @@ def write_nifti(path: Path, data: np.ndarray, spacing=(1.0, 1.0, 1.0)) -> None:
 
 
 class TestParenchymalOrganVolumetryJob(unittest.TestCase):
+    def test_renderer_draws_alert_volume_span_in_red(self):
+        lines = build_overlay_lines(
+            organ_measurements={
+                "liver": {
+                    "analysis_status": "complete",
+                    "observed_volume_cm3": 1801.0,
+                    "hu_mean": 49.0,
+                },
+            },
+            locale="en_US",
+        )
+
+        rgb = parenchymal_organ_volumetry._render_slice_rgb(
+            np.zeros((256, 256), dtype=np.float32),
+            [],
+            lines,
+            source_axis_codes=("R", "A"),
+        )
+
+        red_pixels = (rgb[:, :, 0] > 245) & (rgb[:, :, 1] < 110) & (rgb[:, :, 2] < 110)
+        self.assertTrue(np.any(red_pixels))
+
     def test_truncated_mask_does_not_report_volume_or_overlay_text(self):
         shape = (8, 8, 6)
         ct = np.zeros(shape, dtype=np.float32)
@@ -68,6 +93,7 @@ class TestParenchymalOrganVolumetryJob(unittest.TestCase):
                 "StudyInstanceUID": "1.2.826.0.1.3680043.8.498.1",
                 "PatientName": "Test^Patient",
                 "PatientID": "P001",
+                "KVP": 120,
                 "Pipeline": {"series_selection": {"SelectedPhase": "native"}},
             }
             (case_dir / "metadata" / "id.json").write_text(json.dumps(id_payload), encoding="utf-8")
@@ -134,6 +160,7 @@ class TestParenchymalOrganVolumetryJob(unittest.TestCase):
                 10.41,
                 places=2,
             )
+            self.assertEqual(result["measurement"]["hepatic_steatosis"]["status"], "normal")
             self.assertTrue(result["measurement"]["organs"]["pancreas"]["complete"])
 
             first_dicom = case_dir / result["dicom_exports"][0]["path"]

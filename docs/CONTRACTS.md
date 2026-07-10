@@ -217,6 +217,16 @@ artifact and is deleted after successful prepare.
 - Volumetry artifacts should not be published when every candidate organ is
 missing, empty, or incomplete. The metrics result JSON should preserve the
 reason and per-organ status for audit.
+- Parenchymal-organ overlays render the volume number in red when liver volume
+is greater than 1,800 cm³, spleen volume is greater than 400 cm³, or either
+kidney volume is less than 100 cm³. The liver row is followed by a steatosis
+line when liver attenuation is available. Examinations outside the inclusive
+115-125 kVp range are identified as outside range; within that range, liver
+attenuation of at least 50 HU or a liver-to-spleen attenuation ratio greater
+than 1 is reported as no steatosis, otherwise the displayed whole-number
+percentage is `-0.58 × liver HU + 38.2`. The result JSON records the assessment
+status, kVp, source attenuation values, liver-to-spleen ratio when available,
+and the displayed estimated percentage.
 - The parenchymal-organ overlay series may include a complete
 `total/vertebrae_L1.nii.gz` mask as an overlay-only structure. L1 must not be
 reported as an organ volume or attenuation measurement by
