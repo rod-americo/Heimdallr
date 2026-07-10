@@ -51,9 +51,11 @@ Heimdallr transforms incoming radiological imaging studies into traceable runtim
 Every DICOM Secondary Capture anatomical overlay carries the exact image-plane
 geometry of the nearest preserved source axial DICOM instance. This includes
 single-panel axial overlays, axial slab series, and multipanel presentations;
-the axial panel or analyzed axial level defines the position. Textual tables,
-instructions, and PDF artifacts are non-spatial and do not receive an invented
-anatomic position.
+the axial panel or analyzed axial level defines the position. The derived pixel
+spacing preserves the source axial field of view when the rendered matrix size
+differs, so the physical image center remains aligned during viewer
+synchronization. Textual tables, instructions, and PDF artifacts are
+non-spatial and do not receive an invented anatomic position.
 | Integration dispatch events | external HTTP endpoint | JSON HTTP POST | Delivered when configured destinations accept the event. |
 | Job status lookup | `GET /jobs/{job_id}` | JSON | Best-effort state for accepted external jobs. |
 | Queue capacity lookup | `GET /ops/queues` | JSON | Non-identifying queue counts, concurrency, and disk capacity for external feeders. |

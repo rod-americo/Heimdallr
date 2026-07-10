@@ -159,6 +159,7 @@ def load_source_dicom_geometry(
                 continue
             position = np.asarray(ds.ImagePositionPatient, dtype=float)
             orientation = np.asarray(ds.ImageOrientationPatient, dtype=float)
+            pixel_spacing = np.asarray(ds.PixelSpacing, dtype=float)
             normal = np.cross(orientation[:3], orientation[3:])
             normal /= np.linalg.norm(normal)
         except Exception:
@@ -168,6 +169,9 @@ def load_source_dicom_geometry(
                 "image_position_patient": [float(value) for value in position],
                 "image_orientation_patient": [float(value) for value in orientation],
                 "slice_location": float(np.dot(position, normal)),
+                "source_rows": int(ds.Rows),
+                "source_columns": int(ds.Columns),
+                "source_pixel_spacing": [float(value) for value in pixel_spacing],
             }
         )
     return geometries
@@ -232,6 +236,9 @@ def create_secondary_capture_from_rgb(
     slice_location: float | None = None,
     slice_thickness_mm: float | None = None,
     spacing_between_slices_mm: float | None = None,
+    source_rows: int | None = None,
+    source_columns: int | None = None,
+    source_pixel_spacing: list[float] | tuple[float, ...] | None = None,
     max_dimension: int | None = DEFAULT_SECONDARY_CAPTURE_MAX_DIMENSION,
     transfer_syntax: Any = DEFAULT_SECONDARY_CAPTURE_TRANSFER_SYNTAX,
 ) -> None:
@@ -348,6 +355,17 @@ def create_secondary_capture_from_rgb(
 
     ds.Rows = int(rgb_u8.shape[0])
     ds.Columns = int(rgb_u8.shape[1])
+    if source_pixel_spacing is not None:
+        source_spacing = [float(value) for value in source_pixel_spacing]
+        source_rows = int(source_rows or ds.Rows)
+        source_columns = int(source_columns or ds.Columns)
+        row_spacing = source_spacing[0]
+        column_spacing = source_spacing[1]
+        if ds.Rows > 1 and source_rows > 1:
+            row_spacing *= float(source_rows - 1) / float(ds.Rows - 1)
+        if ds.Columns > 1 and source_columns > 1:
+            column_spacing *= float(source_columns - 1) / float(ds.Columns - 1)
+        ds.PixelSpacing = [row_spacing, column_spacing]
     ds.SamplesPerPixel = 3
     ds.PhotometricInterpretation = "RGB"
     ds.PlanarConfiguration = 0

@@ -134,6 +134,9 @@ class TestDicomSecondaryCapture(unittest.TestCase):
                 slice_location=60.0,
                 slice_thickness_mm=5.0,
                 spacing_between_slices_mm=5.0,
+                source_rows=512,
+                source_columns=512,
+                source_pixel_spacing=[0.7, 0.8],
             )
             ds = pydicom.dcmread(str(output_path))
 
@@ -162,6 +165,8 @@ class TestDicomSecondaryCapture(unittest.TestCase):
         self.assertEqual(float(ds.SliceLocation), 60.0)
         self.assertEqual(float(ds.SliceThickness), 5.0)
         self.assertEqual(float(ds.SpacingBetweenSlices), 5.0)
+        self.assertAlmostEqual(float(ds.PixelSpacing[0]), 0.7 * 511 / 7)
+        self.assertAlmostEqual(float(ds.PixelSpacing[1]), 0.8 * 511 / 7)
         self.assertNotEqual(ds.SeriesInstanceUID, case_metadata["ReferenceDicom"].get("SeriesInstanceUID"))
         self.assertNotEqual(ds.SOPInstanceUID, case_metadata["ReferenceDicom"].get("SOPInstanceUID"))
 
