@@ -163,7 +163,10 @@ series, narrows TotalSegmentator tasks when an external submission requested
 metrics with declared segmentation requirements, runs or reuses outputs, writes
 pipeline state, and enqueues metrics.
 5. `metrics` claims the case, resolves the active metrics profile, executes
-enabled jobs and dependencies, writes `metadata/resultados.json`, creates artifacts, and enqueues outbound delivery where configured.
+enabled jobs and dependencies, writes publishable findings to
+`metadata/resultados.json`, creates artifacts, and enqueues outbound delivery
+where configured. Positive-only jobs retain negative execution state in the
+pipeline audit without publishing an absent finding.
 6. `dicom_egress`, `integration.dispatch`, and `integration.delivery` drain
 their queues independently. External `/jobs` submissions can request a subset
 of enabled metrics jobs through `requested_metrics_modules`, a subset of

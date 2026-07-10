@@ -188,7 +188,8 @@ configured `requires_inventory` values then decide which requested, dependency,
 or automatic jobs are compatible with the case. For example, L3-dependent jobs
 require complete L3, organ volumetry requires at least one present parenchymal
 organ mask, pulmonary nodule screening requires at least one present lung lobe
-mask, and head tasks require complete brain. `total/skull.nii.gz` is optional
+mask, pleural/pericardial effusion screening uses the same lung gate, and head
+tasks require complete brain. `total/skull.nii.gz` is optional
 crop and diagnostic context and may be truncated.
 The
 `brain_volumetry` job is present in the tracked example profile as disabled
@@ -215,6 +216,12 @@ mirrored in `notification_bool`; positive cases may emit a Secondary Capture
 DICOM series when `requested_outputs.overlays_dicom=true`, with one image per
 connected nodule component. Each DICOM export is linked back to its
 `component_id` in `metrics.lung_nodules.measurement.components`.
+The `pleural_pericard_effusion` module is also automatic after the lung gate and
+may be requested explicitly. It is positive-only: when both TotalSegmentator
+masks are empty, it is omitted from `metadata/resultados.json` and no result
+JSON, PNG, or DICOM artifact is delivered. Positive results list only present
+findings and expose true `has_pleural_effusion` and/or
+`has_pericardial_effusion` fields with volume and component details.
 
 Example:
 
@@ -222,7 +229,8 @@ Example:
 [
   "l3_muscle_area",
   "bone_health_l1_hu",
-  "lung_nodules"
+  "lung_nodules",
+  "pleural_pericard_effusion"
 ]
 ```
 

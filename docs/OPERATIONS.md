@@ -323,11 +323,19 @@ writes `artifacts/segmentation_inventory.json`, and uses that inventory to
 select compatible metrics and any additional segmentation tasks. L3-dependent
 body jobs require a complete L3 mask, organ volumetry requires at least one
 present parenchymal organ mask, pulmonary nodule screening requires at least one
-present lung lobe mask and then runs TotalSegmentator `lung_nodules`, and
+present lung lobe mask and then runs TotalSegmentator `lung_nodules`,
+pleural/pericardial effusion screening uses the same lung gate and then runs
+TotalSegmentator `pleural_pericard_effusion`, and
 `cerebral_bleed` plus `brain_structures` require a complete `total/brain.nii.gz`
 mask. The `total/skull.nii.gz` mask is
 optional crop and diagnostic context; skull truncation is reported but does not
 block the head workflow.
+The `pleural_pericard_effusion` task does not support TotalSegmentator `--fast`.
+Configure its accelerator independently as `--device mps` on local Apple
+Silicon and `--device gpu` on `thor`. Its metrics job publishes results and
+presentation artifacts only when pleural or pericardial effusion is present.
+Restart both segmentation and metrics workers after adding or changing this
+task and job in host-local profiles.
 For dedicated complete-head CT validation, hosts can still use profiles derived
 from the tracked examples:
 

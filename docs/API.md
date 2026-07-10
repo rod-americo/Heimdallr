@@ -128,6 +128,18 @@ connected nodule component in a single DICOM series; each component entry in
 approximate `probable_viewer_slice_index_one_based`, and the corresponding
 overlay path. Negative cases write result JSON without a nodule overlay.
 
+Pleural and pericardial effusion screening uses the TotalSegmentator
+`pleural_pericard_effusion` task under the same `lungs.any_present` automatic
+gate. External submitters may request it explicitly with
+`requested_metrics_modules=["pleural_pericard_effusion"]`, but enabled automatic
+profiles include it without requiring the consumer to name it. The module is
+positive-only: `metrics.pleural_pericard_effusion` and its result JSON, PNG, and
+DICOM artifacts are absent when both masks are empty. Positive results list only
+the present findings, expose true `has_pleural_effusion` and/or
+`has_pericardial_effusion` fields, and include volume and connected-component
+details. Positive components are exported as Secondary Capture images in one
+DICOM series.
+
 If `series_selection_policy` is provided, Heimdallr deep-merges that object over
 the active `config/series_selection.json` profile for the submitted job. The
 selected series audit in `metadata/id.json` records `PolicySource` and
