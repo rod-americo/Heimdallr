@@ -18,6 +18,11 @@ from heimdallr.tui.snapshot import (
 
 
 class TestTuiSnapshot(unittest.TestCase):
+    def setUp(self):
+        locale_patch = patch.object(settings, "TUI_LOCALE", "en_US")
+        locale_patch.start()
+        self.addCleanup(locale_patch.stop)
+
     def test_format_process_elapsed_shortens_ps_etime(self):
         self.assertEqual(_format_process_elapsed("1-21:10:49"), "1d 21:10")
         self.assertEqual(_format_process_elapsed("17:52:00"), "17:52")

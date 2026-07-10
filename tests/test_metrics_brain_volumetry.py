@@ -93,7 +93,7 @@ class TestBrainVolumetryJob(unittest.TestCase):
                         "--case-id",
                         case_id,
                         "--job-config-json",
-                        '{"generate_overlay": true, "emit_secondary_capture_dicom": true}',
+                        '{"generate_overlay": true, "emit_secondary_capture_dicom": true, "locale": "en_US"}',
                     ],
                 ):
                     self.assertEqual(brain_volumetry.main(), 0)
