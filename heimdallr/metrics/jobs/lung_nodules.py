@@ -33,6 +33,7 @@ from heimdallr.metrics.jobs._bone_job_common import (
     write_payload,
 )
 from heimdallr.metrics.jobs._dicom_secondary_capture import (
+    axial_dicom_geometry_from_nifti,
     create_secondary_capture_from_rgb,
     secondary_capture_options_from_job_config,
 )
@@ -413,6 +414,10 @@ def main() -> int:
                     payload["artifacts"]["overlay_png"] = _relpath(case_dir, component_png_path)
 
                 if emit_dicom and case_metadata is not None and options is not None:
+                    slice_geometry = axial_dicom_geometry_from_nifti(
+                        ct_img.affine,
+                        float(slice_index),
+                    )
                     create_secondary_capture_from_rgb(
                         rgb,
                         component_dcm_path,
@@ -422,6 +427,8 @@ def main() -> int:
                         series_number=SERIES_NUMBER,
                         instance_number=component_index,
                         derivation_description=derivation_description(artifact_locale),
+                        **slice_geometry,
+                        slice_thickness_mm=float(ct_img.header.get_zooms()[2]),
                         max_dimension=options["max_dimension"],
                         transfer_syntax=options["transfer_syntax"],
                     )

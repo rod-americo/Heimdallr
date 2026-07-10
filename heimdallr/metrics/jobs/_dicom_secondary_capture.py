@@ -111,6 +111,36 @@ def secondary_capture_options_from_job_config(job_config: dict[str, Any]) -> dic
     }
 
 
+def axial_dicom_geometry_from_nifti(
+    affine: np.ndarray,
+    slice_index: float,
+) -> dict[str, Any]:
+    """Return axial DICOM LPS geometry for a NIfTI voxel plane."""
+    affine_array = np.asarray(affine, dtype=float)
+    if affine_array.shape != (4, 4):
+        raise ValueError(f"NIfTI affine must have shape (4, 4). Got {affine_array.shape}")
+
+    ras_to_lps = np.diag([-1.0, -1.0, 1.0])
+    position_ras = affine_array @ np.asarray([0.0, 0.0, float(slice_index), 1.0])
+    position_lps = ras_to_lps @ position_ras[:3]
+
+    row_lps = ras_to_lps @ affine_array[:3, 0]
+    column_lps = ras_to_lps @ affine_array[:3, 1]
+    row_lps /= np.linalg.norm(row_lps)
+    column_lps /= np.linalg.norm(column_lps)
+    normal_lps = np.cross(row_lps, column_lps)
+    normal_lps /= np.linalg.norm(normal_lps)
+
+    return {
+        "image_position_patient": [float(value) for value in position_lps],
+        "image_orientation_patient": [
+            *[float(value) for value in row_lps],
+            *[float(value) for value in column_lps],
+        ],
+        "slice_location": float(np.dot(position_lps, normal_lps)),
+    }
+
+
 def create_secondary_capture_from_rgb(
     rgb: np.ndarray,
     output_path: Path,
@@ -121,6 +151,11 @@ def create_secondary_capture_from_rgb(
     series_number: int,
     instance_number: int,
     derivation_description: str,
+    image_position_patient: list[float] | tuple[float, ...] | None = None,
+    image_orientation_patient: list[float] | tuple[float, ...] | None = None,
+    slice_location: float | None = None,
+    slice_thickness_mm: float | None = None,
+    spacing_between_slices_mm: float | None = None,
     max_dimension: int | None = DEFAULT_SECONDARY_CAPTURE_MAX_DIMENSION,
     transfer_syntax: Any = DEFAULT_SECONDARY_CAPTURE_TRANSFER_SYNTAX,
 ) -> None:
@@ -224,6 +259,16 @@ def create_secondary_capture_from_rgb(
     ds.InstanceCreationTime = ds.ContentTime
     ds.SeriesNumber = str(int(series_number))
     ds.InstanceNumber = int(instance_number)
+    if image_position_patient is not None:
+        ds.ImagePositionPatient = [float(value) for value in image_position_patient]
+    if image_orientation_patient is not None:
+        ds.ImageOrientationPatient = [float(value) for value in image_orientation_patient]
+    if slice_location is not None:
+        ds.SliceLocation = float(slice_location)
+    if slice_thickness_mm is not None:
+        ds.SliceThickness = float(slice_thickness_mm)
+    if spacing_between_slices_mm is not None:
+        ds.SpacingBetweenSlices = float(spacing_between_slices_mm)
 
     ds.Rows = int(rgb_u8.shape[0])
     ds.Columns = int(rgb_u8.shape[1])

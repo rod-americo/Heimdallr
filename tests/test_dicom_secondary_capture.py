@@ -7,6 +7,7 @@ import pydicom
 from pydicom.uid import DeflatedExplicitVRLittleEndian, JPEGLSLossless
 
 from heimdallr.metrics.jobs._dicom_secondary_capture import (
+    axial_dicom_geometry_from_nifti,
     create_secondary_capture_from_rgb,
     metadata_value,
     resolve_secondary_capture_transfer_syntax,
@@ -14,6 +15,25 @@ from heimdallr.metrics.jobs._dicom_secondary_capture import (
 
 
 class TestDicomSecondaryCapture(unittest.TestCase):
+    def test_axial_geometry_converts_nifti_ras_position_to_dicom_lps(self):
+        affine = np.asarray(
+            [
+                [0.8, 0.0, 0.0, 12.0],
+                [0.0, 0.8, 0.0, -34.0],
+                [0.0, 0.0, 2.5, 50.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ]
+        )
+
+        geometry = axial_dicom_geometry_from_nifti(affine, 4.0)
+
+        self.assertEqual(geometry["image_position_patient"], [-12.0, 34.0, 60.0])
+        self.assertEqual(
+            geometry["image_orientation_patient"],
+            [-1.0, 0.0, 0.0, 0.0, -1.0, 0.0],
+        )
+        self.assertEqual(geometry["slice_location"], 60.0)
+
     def test_metadata_value_prefers_raw_reference_patient_name(self):
         case_metadata = {
             "PatientName": "JOAO SILVA",
@@ -90,6 +110,11 @@ class TestDicomSecondaryCapture(unittest.TestCase):
                 series_number=9001,
                 instance_number=1,
                 derivation_description="Test artifact",
+                image_position_patient=[-12.0, 34.0, 60.0],
+                image_orientation_patient=[-1.0, 0.0, 0.0, 0.0, -1.0, 0.0],
+                slice_location=60.0,
+                slice_thickness_mm=5.0,
+                spacing_between_slices_mm=5.0,
             )
             ds = pydicom.dcmread(str(output_path))
 
@@ -114,6 +139,10 @@ class TestDicomSecondaryCapture(unittest.TestCase):
         self.assertEqual(str(ds.OperatorsName), "TECH^ONE")
         self.assertEqual(ds.FrameOfReferenceUID, "1.2.3.4.5")
         self.assertEqual(ds.BodyPartExamined, "ABDOMEN")
+        self.assertEqual([float(value) for value in ds.ImagePositionPatient], [-12.0, 34.0, 60.0])
+        self.assertEqual(float(ds.SliceLocation), 60.0)
+        self.assertEqual(float(ds.SliceThickness), 5.0)
+        self.assertEqual(float(ds.SpacingBetweenSlices), 5.0)
         self.assertNotEqual(ds.SeriesInstanceUID, case_metadata["ReferenceDicom"].get("SeriesInstanceUID"))
         self.assertNotEqual(ds.SOPInstanceUID, case_metadata["ReferenceDicom"].get("SOPInstanceUID"))
 

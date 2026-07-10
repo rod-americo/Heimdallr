@@ -162,6 +162,11 @@ class TestLungNodulesJob(unittest.TestCase):
             self.assertEqual(ds.SeriesInstanceUID, ds_second.SeriesInstanceUID)
             self.assertEqual(ds.InstanceNumber, 1)
             self.assertEqual(ds_second.InstanceNumber, 2)
+            self.assertEqual(
+                [float(value) for value in ds.ImagePositionPatient],
+                [0.0, 0.0, 6.0],
+            )
+            self.assertEqual(float(ds.SliceLocation), 6.0)
 
 
 if __name__ == "__main__":

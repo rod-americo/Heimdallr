@@ -34,6 +34,7 @@ from heimdallr.metrics.jobs._bone_job_common import (
     write_payload,
 )
 from heimdallr.metrics.jobs._dicom_secondary_capture import (
+    axial_dicom_geometry_from_nifti,
     create_secondary_capture_from_rgb,
     secondary_capture_options_from_job_config,
 )
@@ -414,6 +415,10 @@ def main() -> int:
                     slab_index=output_index,
                     slab_count=len(export_slabs),
                     center_mm=float(slab["center_mm"]),
+                    finding_volumes_cm3={
+                        finding: float(positive_findings[finding]["volume_cm3"])
+                        for finding in present_in_slab
+                    },
                     locale=locale,
                 )
                 rgb = render_overlay_rgb(
@@ -439,6 +444,10 @@ def main() -> int:
                     payload["artifacts"]["overlay_png"] = overlay["overlay_png"]
 
                 if emit_dicom and case_metadata is not None and options is not None:
+                    slab_geometry = axial_dicom_geometry_from_nifti(
+                        ct_img.affine,
+                        float(np.mean(source_indices)),
+                    )
                     create_secondary_capture_from_rgb(
                         rgb,
                         dcm_path,
@@ -448,6 +457,9 @@ def main() -> int:
                         series_number=SERIES_NUMBER,
                         instance_number=output_index,
                         derivation_description=derivation_description(locale),
+                        **slab_geometry,
+                        slice_thickness_mm=TARGET_SLICE_THICKNESS_MM,
+                        spacing_between_slices_mm=TARGET_SLICE_THICKNESS_MM,
                         max_dimension=options["max_dimension"],
                         transfer_syntax=options["transfer_syntax"],
                     )
