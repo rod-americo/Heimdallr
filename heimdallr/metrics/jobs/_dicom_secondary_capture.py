@@ -359,13 +359,34 @@ def create_secondary_capture_from_rgb(
         source_spacing = [float(value) for value in source_pixel_spacing]
         source_rows = int(source_rows or ds.Rows)
         source_columns = int(source_columns or ds.Columns)
-        row_spacing = source_spacing[0]
-        column_spacing = source_spacing[1]
-        if ds.Rows > 1 and source_rows > 1:
-            row_spacing *= float(source_rows - 1) / float(ds.Rows - 1)
-        if ds.Columns > 1 and source_columns > 1:
-            column_spacing *= float(source_columns - 1) / float(ds.Columns - 1)
+        row_scale = (
+            float(source_rows - 1) / float(ds.Rows - 1)
+            if ds.Rows > 1 and source_rows > 1
+            else 1.0
+        )
+        column_scale = (
+            float(source_columns - 1) / float(ds.Columns - 1)
+            if ds.Columns > 1 and source_columns > 1
+            else 1.0
+        )
+        uniform_scale = max(row_scale, column_scale)
+        row_spacing = source_spacing[0] * uniform_scale
+        column_spacing = source_spacing[1] * uniform_scale
         ds.PixelSpacing = [row_spacing, column_spacing]
+        if image_position_patient is not None and image_orientation_patient is not None:
+            orientation = np.asarray(image_orientation_patient, dtype=float)
+            source_origin = np.asarray(image_position_patient, dtype=float)
+            source_center = (
+                source_origin
+                + orientation[:3] * source_spacing[1] * float(source_columns - 1) / 2.0
+                + orientation[3:] * source_spacing[0] * float(source_rows - 1) / 2.0
+            )
+            output_origin = (
+                source_center
+                - orientation[:3] * column_spacing * float(ds.Columns - 1) / 2.0
+                - orientation[3:] * row_spacing * float(ds.Rows - 1) / 2.0
+            )
+            ds.ImagePositionPatient = [float(value) for value in output_origin]
     ds.SamplesPerPixel = 3
     ds.PhotometricInterpretation = "RGB"
     ds.PlanarConfiguration = 0

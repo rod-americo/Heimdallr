@@ -161,7 +161,10 @@ class TestDicomSecondaryCapture(unittest.TestCase):
         self.assertEqual(str(ds.OperatorsName), "TECH^ONE")
         self.assertEqual(ds.FrameOfReferenceUID, "1.2.3.4.5")
         self.assertEqual(ds.BodyPartExamined, "ABDOMEN")
-        self.assertEqual([float(value) for value in ds.ImagePositionPatient], [-12.0, 34.0, 60.0])
+        np.testing.assert_allclose(
+            [float(value) for value in ds.ImagePositionPatient],
+            [-12.0, 34.0, 60.0],
+        )
         self.assertEqual(float(ds.SliceLocation), 60.0)
         self.assertEqual(float(ds.SliceThickness), 5.0)
         self.assertEqual(float(ds.SpacingBetweenSlices), 5.0)
@@ -190,6 +193,44 @@ class TestDicomSecondaryCapture(unittest.TestCase):
         self.assertEqual(ds.Columns, 512)
         self.assertLess(ds.Rows, 512)
         self.assertLess(len(ds.PixelData), 800 * 1260 * 3)
+
+    def test_secondary_capture_preserves_multipanel_aspect_ratio_and_source_center(self):
+        rgb = np.zeros((400, 800, 3), dtype=np.uint8)
+        case_metadata = {"StudyInstanceUID": "1.2.3", "PatientName": "Test^Patient"}
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "multipanel_sc.dcm"
+            create_secondary_capture_from_rgb(
+                rgb,
+                output_path,
+                case_metadata,
+                series_description="Multipanel",
+                series_number=9001,
+                instance_number=1,
+                derivation_description="Test multipanel",
+                image_position_patient=[-170.1, -41.2, 100.0],
+                image_orientation_patient=[1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+                source_rows=512,
+                source_columns=512,
+                source_pixel_spacing=[0.7, 0.7],
+                max_dimension=800,
+                transfer_syntax="original",
+            )
+            ds = pydicom.dcmread(output_path)
+
+        self.assertAlmostEqual(float(ds.PixelSpacing[0]), float(ds.PixelSpacing[1]))
+        orientation = np.asarray(ds.ImageOrientationPatient, dtype=float)
+        origin = np.asarray(ds.ImagePositionPatient, dtype=float)
+        spacing = np.asarray(ds.PixelSpacing, dtype=float)
+        output_center = (
+            origin
+            + orientation[:3] * spacing[1] * (int(ds.Columns) - 1) / 2.0
+            + orientation[3:] * spacing[0] * (int(ds.Rows) - 1) / 2.0
+        )
+        source_center = np.asarray(
+            [-170.1 + 0.7 * 511 / 2.0, -41.2 + 0.7 * 511 / 2.0, 100.0]
+        )
+        np.testing.assert_allclose(output_center, source_center)
 
     def test_secondary_capture_can_write_deflated_lossless(self):
         rgb = np.zeros((64, 64, 3), dtype=np.uint8)
