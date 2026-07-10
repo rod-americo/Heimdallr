@@ -65,6 +65,15 @@ that policy when a case is claimed.
 Restart `heimdallr.segmentation` after deploying segmentation task planning or
 profile changes so resident workers load the new TotalSegmentator task list.
 
+On Apple Silicon hosts, classify the compute-heavy `heimdallr.prepare`,
+`heimdallr.segmentation`, and `heimdallr.metrics` LaunchAgents with
+`ProcessType=Interactive`. A `Background` classification is inherited by
+TotalSegmentator and other child processes and can keep CPU work on efficiency
+cores even when the active profile requests multiple workers. Keep lightweight
+resident services in the background classification. Changing `ProcessType`
+requires `launchctl bootout` followed by `launchctl bootstrap`; `kickstart`
+alone does not reload plist properties.
+
 `heimdallr.dicom_egress` starts a configurable worker pool for outbound C-STORE
 delivery. Set `worker_count` in `config/dicom_egress.json` to control concurrent
 queue items; the default is 10. Generated DICOM artifacts should prefer
