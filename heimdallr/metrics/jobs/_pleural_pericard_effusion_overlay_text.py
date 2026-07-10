@@ -14,40 +14,28 @@ def finding_name(finding: str, locale: str) -> str:
     return translate(f"pleural_pericard_effusion.finding.{finding}", locale=locale)
 
 
-def build_component_overlay_text(
+def build_slab_overlay_text(
     *,
-    finding: str,
-    component_index: int,
-    component_count: int,
-    slice_index: int,
-    probable_viewer_slice_index_one_based: int,
-    volume_cm3: float,
+    present_findings: list[str],
+    slab_index: int,
+    slab_count: int,
+    center_mm: float,
     locale: str,
 ) -> tuple[str, list[str]]:
     title = translate(
-        "pleural_pericard_effusion.overlay.component_title",
+        "pleural_pericard_effusion.overlay.slab_title",
         locale=locale,
-        finding=finding_name(finding, locale),
-        component=component_index,
-        total=component_count,
+        slab=slab_index,
+        total=slab_count,
     )
     lines = [
         translate(
-            "pleural_pericard_effusion.overlay.nifti_slice",
+            "pleural_pericard_effusion.overlay.slab_center",
             locale=locale,
-            value=slice_index,
-        ),
-        translate(
-            "pleural_pericard_effusion.overlay.viewer_slice",
-            locale=locale,
-            value=probable_viewer_slice_index_one_based,
-        ),
-        translate(
-            "pleural_pericard_effusion.overlay.volume_cm3",
-            locale=locale,
-            value=format_decimal(volume_cm3, 2, locale=locale),
+            value=format_decimal(center_mm, 1, locale=locale),
         ),
     ]
+    lines.extend(finding_name(finding, locale) for finding in present_findings)
     return title, lines
 
 

@@ -409,20 +409,14 @@ msgstr "Pleural effusion"
 msgid "pleural_pericard_effusion.finding.pericardial_effusion"
 msgstr "Pericardial effusion"
 
-msgid "pleural_pericard_effusion.overlay.component_title"
-msgstr "{finding} {component}/{total}"
+msgid "pleural_pericard_effusion.overlay.slab_title"
+msgstr "Pleural/pericardial effusion 5 mm {slab}/{total}"
 
-msgid "pleural_pericard_effusion.overlay.nifti_slice"
-msgstr "NIfTI slice: {value}"
-
-msgid "pleural_pericard_effusion.overlay.viewer_slice"
-msgstr "Probable viewer slice: {value}"
-
-msgid "pleural_pericard_effusion.overlay.volume_cm3"
-msgstr "Volume: {value} cm³"
+msgid "pleural_pericard_effusion.overlay.slab_center"
+msgstr "Slab center: {value} mm"
 
 msgid "pleural_pericard_effusion.overlay.series_description"
 msgstr "Heimdallr Pleural Pericardial Effusion"
 
 msgid "pleural_pericard_effusion.overlay.derivation_description"
-msgstr "Positive pleural or pericardial effusion overlay from TotalSegmentator segmentation."
+msgstr "Positive pleural or pericardial effusion overlay in 5 mm axial slabs from TotalSegmentator segmentation."

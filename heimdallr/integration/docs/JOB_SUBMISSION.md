@@ -221,7 +221,9 @@ may be requested explicitly. It is positive-only: when both TotalSegmentator
 masks are empty, it is omitted from `metadata/resultados.json` and no result
 JSON, PNG, or DICOM artifact is delivered. Positive results list only present
 findings and expose true `has_pleural_effusion` and/or
-`has_pericardial_effusion` fields with volume and component details.
+`has_pericardial_effusion` fields with volume and component details. Positive
+presentation artifacts use 5 mm axial slab averages in a mediastinal window and
+cover every slab intersecting either positive mask.
 
 Example:
 

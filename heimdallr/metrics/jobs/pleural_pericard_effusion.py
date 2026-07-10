@@ -38,7 +38,7 @@ from heimdallr.metrics.jobs._dicom_secondary_capture import (
     secondary_capture_options_from_job_config,
 )
 from heimdallr.metrics.jobs._pleural_pericard_effusion_overlay_text import (
-    build_component_overlay_text,
+    build_slab_overlay_text,
     derivation_description,
     resolve_artifact_locale,
     series_description,
@@ -48,6 +48,7 @@ from heimdallr.shared.paths import study_artifacts_dir
 
 METRIC_KEY = "pleural_pericard_effusion"
 SERIES_NUMBER = 9131
+TARGET_SLICE_THICKNESS_MM = 5.0
 MEDIASTINAL_WINDOW_LEVEL_HU = 40.0
 MEDIASTINAL_WINDOW_WIDTH_HU = 400.0
 MEDIASTINAL_WINDOW_LIMITS_HU = (
@@ -144,11 +145,57 @@ def _label_components(mask: np.ndarray, voxel_volume_cm3: float) -> tuple[np.nda
     return labeled, components
 
 
-def _representative_slice(mask: np.ndarray) -> int:
-    areas = np.asarray(mask, dtype=bool).sum(axis=(0, 1))
-    if not np.any(areas):
-        return int(mask.shape[2] // 2)
-    return int(np.argmax(areas))
+def _select_slab_source_indices(
+    source_positions_mm: np.ndarray,
+    *,
+    center_mm: float,
+    slab_thickness_mm: float,
+) -> list[int]:
+    half_thickness = float(slab_thickness_mm) / 2.0
+    selected = np.where(
+        (source_positions_mm >= center_mm - half_thickness)
+        & (source_positions_mm <= center_mm + half_thickness)
+    )[0]
+    if selected.size == 0:
+        selected = np.asarray([int(np.argmin(np.abs(source_positions_mm - center_mm)))])
+    return [int(index) for index in selected]
+
+
+def _build_positive_slabs(
+    union_mask: np.ndarray,
+    *,
+    spacing_z: float,
+    slab_thickness_mm: float = TARGET_SLICE_THICKNESS_MM,
+) -> list[dict[str, Any]]:
+    occupied = np.where(np.asarray(union_mask, dtype=bool).sum(axis=(0, 1)) > 0)[0]
+    if occupied.size == 0:
+        return []
+    positions = np.arange(union_mask.shape[2], dtype=np.float32) * float(spacing_z)
+    center_indices = sorted(
+        {
+            int(np.floor((float(positions[int(index)]) / slab_thickness_mm) + 0.5))
+            for index in occupied
+        }
+    )
+    return [
+        {
+            "center_mm": float(center_index * slab_thickness_mm),
+            "source_indices": _select_slab_source_indices(
+                positions,
+                center_mm=float(center_index * slab_thickness_mm),
+                slab_thickness_mm=slab_thickness_mm,
+            ),
+        }
+        for center_index in center_indices
+    ]
+
+
+def _average_ct_slab(ct_data: np.ndarray, source_indices: list[int]) -> np.ndarray:
+    return np.mean(np.asarray(ct_data[:, :, source_indices], dtype=np.float32), axis=2)
+
+
+def _mask_slab(mask: np.ndarray, source_indices: list[int]) -> np.ndarray:
+    return np.any(np.asarray(mask[:, :, source_indices], dtype=bool), axis=2)
 
 
 def _display_axial(
@@ -165,28 +212,22 @@ def _display_axial(
 
 
 def render_overlay_rgb(
-    ct_data: np.ndarray,
+    ct_slice: np.ndarray,
     ct_affine: np.ndarray,
     spacing_mm: tuple[float, float, float],
-    lung_mask: np.ndarray,
-    finding_mask: np.ndarray,
+    lung_slice: np.ndarray,
+    finding_slices: dict[str, np.ndarray],
     *,
-    color: str,
     title: str,
     summary_lines: list[str],
-    slice_index: int,
 ) -> np.ndarray:
     source_axis_codes = plane_source_axis_codes(ct_affine, "z")
     display_ct = _display_axial(
-        np.asarray(ct_data[:, :, slice_index], dtype=np.float32),
+        np.asarray(ct_slice, dtype=np.float32),
         source_axis_codes=source_axis_codes,
     )
     display_lung = _display_axial(
-        np.asarray(lung_mask[:, :, slice_index], dtype=np.uint8),
-        source_axis_codes=source_axis_codes,
-    ).astype(bool)
-    display_finding = _display_axial(
-        np.asarray(finding_mask[:, :, slice_index], dtype=np.uint8),
+        np.asarray(lung_slice, dtype=np.uint8),
         source_axis_codes=source_axis_codes,
     ).astype(bool)
     display_spacing = reorient_display_spacing_mm(
@@ -209,7 +250,14 @@ def render_overlay_rgb(
     )
     if display_lung.any():
         ax.contour(display_lung, levels=[0.5], colors=["#64d2ff"], linewidths=0.7)
-    if display_finding.any():
+    for finding, finding_slice in finding_slices.items():
+        display_finding = _display_axial(
+            np.asarray(finding_slice, dtype=np.uint8),
+            source_axis_codes=source_axis_codes,
+        ).astype(bool)
+        if not display_finding.any():
+            continue
+        color = FINDINGS[finding]
         overlay = np.ma.masked_where(~display_finding, display_finding.astype(np.uint8))
         ax.imshow(overlay, cmap=ListedColormap([color]), alpha=0.62, interpolation="nearest", aspect=aspect)
         ax.contour(display_finding, levels=[0.5], colors=[color], linewidths=1.3)
@@ -267,7 +315,7 @@ def main() -> int:
         voxel_volume_cm3 = _voxel_volume_cm3(ct_img)
         lung_mask = _load_lung_union(artifacts_dir, reference_shape)
         positive_findings: dict[str, dict[str, Any]] = {}
-        labeled_findings: dict[str, np.ndarray] = {}
+        positive_masks: dict[str, np.ndarray] = {}
         mask_statuses: dict[str, dict[str, Any]] = {}
 
         for finding in FINDINGS:
@@ -276,8 +324,8 @@ def main() -> int:
             voxel_count = int(np.count_nonzero(mask))
             if voxel_count == 0:
                 continue
-            labeled, components = _label_components(mask, voxel_volume_cm3)
-            labeled_findings[finding] = labeled
+            _labeled, components = _label_components(mask, voxel_volume_cm3)
+            positive_masks[finding] = mask
             positive_findings[finding] = {
                 "present": True,
                 "voxel_count": voxel_count,
@@ -303,14 +351,30 @@ def main() -> int:
             print(json.dumps(payload, indent=2))
             return 0
 
+        union_mask = np.zeros(reference_shape, dtype=bool)
+        for mask in positive_masks.values():
+            union_mask |= mask
+        spacing_xyz = tuple(float(value) for value in ct_img.header.get_zooms()[:3])
+        export_slabs = _build_positive_slabs(
+            union_mask,
+            spacing_z=spacing_xyz[2],
+        )
+
         measurement: dict[str, Any] = {
             "job_status": "complete",
             "notification_bool": True,
             "present_findings": list(positive_findings),
             "findings": positive_findings,
             "artifact_locale": locale,
-            "slice_index_basis": "nifti_zero_based",
-            "probable_viewer_slice_index_basis": "one_based_reverse_z",
+            "target_slice_thickness_mm": TARGET_SLICE_THICKNESS_MM,
+            "reconstruction_mode": "slab_average",
+            "source_spacing_mm": {
+                "x": spacing_xyz[0],
+                "y": spacing_xyz[1],
+                "z": spacing_xyz[2],
+            },
+            "exported_slice_count": len(export_slabs),
+            "exported_slabs": export_slabs,
             "total_slices": int(reference_shape[2]),
         }
         for finding in positive_findings:
@@ -334,83 +398,71 @@ def main() -> int:
 
             overlays: list[dict[str, Any]] = []
             dicom_exports: list[dict[str, Any]] = []
-            instance_number = 0
-            for finding, finding_payload in positive_findings.items():
-                labeled = labeled_findings[finding]
-                components = finding_payload["components"]
-                for component_index, component in enumerate(components, start=1):
-                    instance_number += 1
-                    component_mask = labeled == int(component["component_id"])
-                    slice_index = _representative_slice(component_mask)
-                    viewer_slice = int(reference_shape[2] - slice_index)
-                    component.update(
+            for output_index, slab in enumerate(export_slabs, start=1):
+                source_indices = slab["source_indices"]
+                finding_slices = {
+                    finding: _mask_slab(mask, source_indices)
+                    for finding, mask in positive_masks.items()
+                }
+                present_in_slab = [
+                    finding for finding, mask in finding_slices.items() if mask.any()
+                ]
+                if not present_in_slab:
+                    continue
+                title, lines = build_slab_overlay_text(
+                    present_findings=present_in_slab,
+                    slab_index=output_index,
+                    slab_count=len(export_slabs),
+                    center_mm=float(slab["center_mm"]),
+                    locale=locale,
+                )
+                rgb = render_overlay_rgb(
+                    _average_ct_slab(ct_data, source_indices),
+                    ct_img.affine,
+                    spacing_xyz,
+                    _mask_slab(lung_mask, source_indices),
+                    finding_slices,
+                    title=title,
+                    summary_lines=lines,
+                )
+                png_path = metric_dir / f"overlay_{output_index:04d}.png"
+                dcm_path = metric_dir / f"overlay_{output_index:04d}.dcm"
+                Image.fromarray(rgb).save(png_path)
+                overlay: dict[str, Any] = {
+                    "slab_index": output_index,
+                    "center_mm": float(slab["center_mm"]),
+                    "source_indices": source_indices,
+                    "present_findings": present_in_slab,
+                    "overlay_png": _relpath(case_dir, png_path),
+                }
+                if "overlay_png" not in payload["artifacts"]:
+                    payload["artifacts"]["overlay_png"] = overlay["overlay_png"]
+
+                if emit_dicom and case_metadata is not None and options is not None:
+                    create_secondary_capture_from_rgb(
+                        rgb,
+                        dcm_path,
+                        case_metadata,
+                        series_instance_uid=series_instance_uid,
+                        series_description=series_description(locale),
+                        series_number=SERIES_NUMBER,
+                        instance_number=output_index,
+                        derivation_description=derivation_description(locale),
+                        max_dimension=options["max_dimension"],
+                        transfer_syntax=options["transfer_syntax"],
+                    )
+                    overlay["overlay_sc_dcm"] = _relpath(case_dir, dcm_path)
+                    dicom_exports.append(
                         {
-                            "slice_index": slice_index,
-                            "probable_viewer_slice_index_one_based": viewer_slice,
+                            "path": overlay["overlay_sc_dcm"],
+                            "kind": "secondary_capture",
+                            "slab_index": output_index,
+                            "present_findings": present_in_slab,
                         }
                     )
-                    title, lines = build_component_overlay_text(
-                        finding=finding,
-                        component_index=component_index,
-                        component_count=len(components),
-                        slice_index=slice_index,
-                        probable_viewer_slice_index_one_based=viewer_slice,
-                        volume_cm3=float(component["volume_cm3"]),
-                        locale=locale,
-                    )
-                    rgb = render_overlay_rgb(
-                        ct_data,
-                        ct_img.affine,
-                        tuple(float(value) for value in ct_img.header.get_zooms()[:3]),
-                        lung_mask,
-                        component_mask,
-                        color=FINDINGS[finding],
-                        title=title,
-                        summary_lines=lines,
-                        slice_index=slice_index,
-                    )
-                    stem = f"{finding}_component_{component_index:04d}"
-                    png_path = metric_dir / f"{stem}.png"
-                    dcm_path = metric_dir / f"{stem}.dcm"
-                    Image.fromarray(rgb).save(png_path)
-                    overlay: dict[str, Any] = {
-                        "finding": finding,
-                        "component_id": int(component["component_id"]),
-                        "component_index": component_index,
-                        "slice_index": slice_index,
-                        "probable_viewer_slice_index_one_based": viewer_slice,
-                        "overlay_png": _relpath(case_dir, png_path),
-                    }
-                    component["overlay_png"] = overlay["overlay_png"]
-                    if "overlay_png" not in payload["artifacts"]:
-                        payload["artifacts"]["overlay_png"] = overlay["overlay_png"]
-
-                    if emit_dicom and case_metadata is not None and options is not None:
-                        create_secondary_capture_from_rgb(
-                            rgb,
-                            dcm_path,
-                            case_metadata,
-                            series_instance_uid=series_instance_uid,
-                            series_description=series_description(locale),
-                            series_number=SERIES_NUMBER,
-                            instance_number=instance_number,
-                            derivation_description=derivation_description(locale),
-                            max_dimension=options["max_dimension"],
-                            transfer_syntax=options["transfer_syntax"],
-                        )
-                        overlay["overlay_sc_dcm"] = _relpath(case_dir, dcm_path)
-                        component["overlay_sc_dcm"] = overlay["overlay_sc_dcm"]
-                        dicom_exports.append(
-                            {
-                                "path": overlay["overlay_sc_dcm"],
-                                "kind": "secondary_capture",
-                                "finding": finding,
-                                "component_id": int(component["component_id"]),
-                            }
-                        )
-                        if "overlay_sc_dcm" not in payload["artifacts"]:
-                            payload["artifacts"]["overlay_sc_dcm"] = overlay["overlay_sc_dcm"]
-                    overlays.append(overlay)
+                    if "overlay_sc_dcm" not in payload["artifacts"]:
+                        payload["artifacts"]["overlay_sc_dcm"] = overlay["overlay_sc_dcm"]
+                overlays.append(overlay)
 
             payload["artifacts"]["overlays"] = overlays
             if dicom_exports:

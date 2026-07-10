@@ -137,8 +137,10 @@ positive-only: `metrics.pleural_pericard_effusion` and its result JSON, PNG, and
 DICOM artifacts are absent when both masks are empty. Positive results list only
 the present findings, expose true `has_pleural_effusion` and/or
 `has_pericardial_effusion` fields, and include volume and connected-component
-details. Positive components are exported as Secondary Capture images in one
-DICOM series.
+details. Positive findings are exported as Secondary Capture images in one
+DICOM series. Presentation images are 5 mm axial slab averages in a mediastinal
+window and include every slab intersecting either positive mask; both findings
+are overlaid together when present in the same slab.
 
 If `series_selection_policy` is provided, Heimdallr deep-merges that object over
 the active `config/series_selection.json` profile for the submitted job. The

@@ -112,7 +112,7 @@ class TestPleuralPericardEffusionJob(unittest.TestCase):
             self.assertFalse(payload["measurement"]["notification_bool"])
             self.assertEqual(list(metric_dir.iterdir()), [])
 
-    def test_positive_findings_write_component_overlays_in_one_dicom_series(self):
+    def test_positive_findings_write_complete_5mm_slab_overlay_series(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             case_dir = Path(tmpdir) / "CaseEffusionPositive"
             ct = np.full((20, 20, 12), -750.0, dtype=np.float32)
@@ -166,6 +166,23 @@ class TestPleuralPericardEffusionJob(unittest.TestCase):
                 measurement["findings"]["pericardial_effusion"]["volume_cm3"],
                 0.096,
             )
+            self.assertEqual(measurement["target_slice_thickness_mm"], 5.0)
+            self.assertEqual(measurement["reconstruction_mode"], "slab_average")
+            self.assertEqual(
+                [slab["center_mm"] for slab in measurement["exported_slabs"]],
+                [5.0, 10.0, 15.0],
+            )
+            exported_source_indices = {
+                index
+                for slab in measurement["exported_slabs"]
+                for index in slab["source_indices"]
+            }
+            self.assertTrue(set(range(3, 8)).issubset(exported_source_indices))
+            self.assertEqual(len(payload["artifacts"]["overlays"]), 3)
+            self.assertEqual(
+                payload["artifacts"]["overlays"][1]["present_findings"],
+                ["pleural_effusion", "pericardial_effusion"],
+            )
             self.assertEqual(len(payload["dicom_exports"]), 3)
             datasets = [pydicom.dcmread(case_dir / item["path"]) for item in payload["dicom_exports"]]
             self.assertEqual(len({str(ds.SeriesInstanceUID) for ds in datasets}), 1)
@@ -174,6 +191,7 @@ class TestPleuralPericardEffusionJob(unittest.TestCase):
                 datasets[0].SeriesDescription,
                 "Heimdallr Derrames Pleural e Pericárdico",
             )
+            self.assertIn("slabs axiais de 5 mm", datasets[0].DerivationDescription)
 
     def test_single_positive_finding_omits_absent_finding_from_public_payload(self):
         with tempfile.TemporaryDirectory() as tmpdir:
