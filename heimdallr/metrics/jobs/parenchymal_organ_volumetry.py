@@ -118,6 +118,9 @@ def _compute_mask_measurement(
             "analysis_status": "missing",
             "complete": False,
             "voxel_count": 0,
+            "attenuation_sample_volume_cm3": None,
+            "attenuation_sample_slice_count": 0,
+            "attenuation_sample_axial_extent_mm": None,
             "observed_volume_cm3": None,
             "volume_cm3": None,
             "hu_mean": None,
@@ -133,6 +136,9 @@ def _compute_mask_measurement(
             "analysis_status": "empty",
             "complete": False,
             "voxel_count": 0,
+            "attenuation_sample_volume_cm3": 0.0,
+            "attenuation_sample_slice_count": 0,
+            "attenuation_sample_axial_extent_mm": 0.0,
             "observed_volume_cm3": 0.0,
             "volume_cm3": None,
             "hu_mean": None,
@@ -151,10 +157,18 @@ def _compute_mask_measurement(
         estimated_pdff_percent = estimate_pdff_from_unenhanced_ct_hu(hu_mean)
     complete = mask_complete(mask_bool)
     voxel_volume_cm3 = float(spacing_xyz[0] * spacing_xyz[1] * spacing_xyz[2]) / 1000.0
+    attenuation_sample_volume_cm3 = round(voxel_count * voxel_volume_cm3, 3)
     observed_volume_cm3 = round(voxel_count * voxel_volume_cm3, 3) if complete else None
     occupied_indices = np.where(mask_bool.sum(axis=(0, 1)) > 0)[0]
     axial_slice_extent = None
+    attenuation_sample_slice_count = int(occupied_indices.size)
+    attenuation_sample_axial_extent_mm = 0.0
     if occupied_indices.size > 0:
+        axial_span_slices = int(occupied_indices[-1] - occupied_indices[0] + 1)
+        attenuation_sample_axial_extent_mm = round(
+            axial_span_slices * float(spacing_xyz[2]),
+            3,
+        )
         axial_slice_extent = {
             "start": int(occupied_indices[0]),
             "end": int(occupied_indices[-1]),
@@ -168,6 +182,9 @@ def _compute_mask_measurement(
         "truncated_at_scan_bounds": not bool(complete),
         "axial_slice_extent": axial_slice_extent,
         "voxel_count": voxel_count,
+        "attenuation_sample_volume_cm3": attenuation_sample_volume_cm3,
+        "attenuation_sample_slice_count": attenuation_sample_slice_count,
+        "attenuation_sample_axial_extent_mm": attenuation_sample_axial_extent_mm,
         "observed_volume_cm3": observed_volume_cm3,
         "volume_cm3": observed_volume_cm3,
         "hu_mean": hu_mean,
@@ -464,13 +481,15 @@ def main() -> int:
         liver_measurement = organ_measurements.get("liver") or {}
         spleen_measurement = organ_measurements.get("spleen") or {}
         hepatic_steatosis = assess_hepatic_steatosis(
-            (
-                liver_measurement.get("hu_mean")
-                if liver_measurement.get("volume_cm3") is not None
-                else None
-            ),
+            liver_measurement.get("hu_mean"),
             spleen_measurement.get("hu_mean"),
             technique_context.get("kvp"),
+            liver_complete=liver_measurement.get("complete") is True,
+            liver_sample_volume_cm3=liver_measurement.get("attenuation_sample_volume_cm3"),
+            liver_sample_axial_extent_mm=liver_measurement.get("attenuation_sample_axial_extent_mm"),
+            spleen_complete=spleen_measurement.get("complete") is True,
+            spleen_sample_volume_cm3=spleen_measurement.get("attenuation_sample_volume_cm3"),
+            spleen_sample_axial_extent_mm=spleen_measurement.get("attenuation_sample_axial_extent_mm"),
         )
 
         available_masks = [mask for mask in organ_masks.values() if mask is not None and np.any(mask)]
@@ -496,12 +515,17 @@ def main() -> int:
             for organ_key, measurement in organ_measurements.items()
             if measurement.get("volume_cm3") is not None
         ]
-        if not publishable_organs and not complete_overlay_only_masks:
+        steatosis_sample_publishable = bool(
+            hepatic_steatosis
+            and (hepatic_steatosis.get("sample_qc") or {}).get("liver", {}).get("sufficient")
+        )
+        if not publishable_organs and not complete_overlay_only_masks and not steatosis_sample_publishable:
             payload["status"] = "skipped"
             payload["measurement"] = {
                 "job_status": "no_complete_organ_volume",
                 "selected_phase": selected_phase or None,
                 "density_suppressed_due_to_contrast": bool(suppress_density),
+                "hepatic_steatosis": hepatic_steatosis,
                 "organs": organ_measurements,
                 "overlay_only_masks": overlay_only_measurements,
             }
@@ -615,7 +639,13 @@ def main() -> int:
             "case_id": args.case_id,
             "inputs": payload["inputs"],
             "measurement": {
-                "job_status": "complete" if publishable_organs else "overlay_only",
+                "job_status": (
+                    "complete"
+                    if publishable_organs
+                    else "attenuation_only"
+                    if steatosis_sample_publishable
+                    else "overlay_only"
+                ),
                 "target_slice_thickness_mm": TARGET_SLICE_THICKNESS_MM,
                 "source_spacing_mm": {
                     "x": spacing_xyz[0],

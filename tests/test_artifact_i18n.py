@@ -332,6 +332,42 @@ class TestArtifactI18n(unittest.TestCase):
             ["Fígado: 1.355 cm³ | 45 UH", "Esteatose: 12%", "Baço: 384 cm³ | 50 UH"],
         )
 
+    def test_parenchymal_overlay_localizes_partial_and_insufficient_samples(self):
+        organ_measurements = {
+            "liver": {
+                "analysis_status": "incomplete",
+                "observed_volume_cm3": None,
+                "hu_mean": 45.0,
+            }
+        }
+
+        estimated = build_parenchymal_overlay_text(
+            organ_measurements=organ_measurements,
+            locale="pt_BR",
+            hepatic_steatosis={
+                "status": "estimated",
+                "estimated_percent": 12,
+                "partial_coverage": True,
+            },
+        )
+        indeterminate = build_parenchymal_overlay_text(
+            organ_measurements=organ_measurements,
+            locale="pt_BR",
+            hepatic_steatosis={"status": "spleen_sample_insufficient"},
+        )
+        insufficient = build_parenchymal_overlay_text(
+            organ_measurements=organ_measurements,
+            locale="pt_BR",
+            hepatic_steatosis={"status": "liver_sample_insufficient"},
+        )
+
+        self.assertEqual(estimated[-1], "Esteatose: 12% (cobertura parcial)")
+        self.assertEqual(
+            indeterminate[-1],
+            "Esteatose: indeterminada — amostra esplênica insuficiente",
+        )
+        self.assertEqual(insufficient[-1], "Esteatose: amostra hepática insuficiente")
+
     def test_brain_volumetry_overlay_text_in_en_us(self):
         with patch("heimdallr.metrics.jobs._brain_volumetry_overlay_text.settings.ARTIFACTS_LOCALE", "pt_BR"):
             self.assertEqual(resolve_brain_locale({"locale": "en_US"}), "en_US")

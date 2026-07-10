@@ -118,8 +118,20 @@ msgstr "Esteatose: exame fora da faixa de KVp"
 msgid "parenchymal.overlay.steatosis.normal"
 msgstr "Esteatose: não"
 
+msgid "parenchymal.overlay.steatosis.normal_partial"
+msgstr "Esteatose: não (cobertura parcial)"
+
 msgid "parenchymal.overlay.steatosis.estimated"
 msgstr "Esteatose: {percent}%"
+
+msgid "parenchymal.overlay.steatosis.estimated_partial"
+msgstr "Esteatose: {percent}% (cobertura parcial)"
+
+msgid "parenchymal.overlay.steatosis.liver_sample_insufficient"
+msgstr "Esteatose: amostra hepática insuficiente"
+
+msgid "parenchymal.overlay.steatosis.spleen_sample_insufficient"
+msgstr "Esteatose: indeterminada — amostra esplênica insuficiente"
 
 msgid "parenchymal.overlay.series_description"
 msgstr "Heimdallr Overlay de Órgãos Parenquimatosos 5 mm"

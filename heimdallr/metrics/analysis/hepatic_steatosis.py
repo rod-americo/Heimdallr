@@ -6,6 +6,10 @@ import math
 
 
 STEATOSIS_KVP_RANGE = (115.0, 125.0)
+MIN_LIVER_SAMPLE_VOLUME_CM3 = 100.0
+MIN_LIVER_SAMPLE_AXIAL_EXTENT_MM = 30.0
+MIN_SPLEEN_SAMPLE_VOLUME_CM3 = 20.0
+MIN_SPLEEN_SAMPLE_AXIAL_EXTENT_MM = 20.0
 
 
 def estimate_pdff_from_unenhanced_ct_hu(hu_mean: float | None) -> float | None:
@@ -23,7 +27,14 @@ def assess_hepatic_steatosis(
     liver_hu: float | None,
     spleen_hu: float | None,
     kvp: float | None,
-) -> dict[str, float | int | str | None] | None:
+    *,
+    liver_complete: bool = True,
+    liver_sample_volume_cm3: float | None = None,
+    liver_sample_axial_extent_mm: float | None = None,
+    spleen_complete: bool = True,
+    spleen_sample_volume_cm3: float | None = None,
+    spleen_sample_axial_extent_mm: float | None = None,
+) -> dict[str, object] | None:
     """Assess steatosis for the parenchymal overlay using the requested CT rule."""
     try:
         liver_value = float(liver_hu) if liver_hu is not None else None
@@ -40,10 +51,57 @@ def assess_hepatic_steatosis(
         spleen_value = None
     ratio = liver_value / spleen_value if spleen_value not in (None, 0.0) else None
 
+    liver_sample_sufficient = bool(liver_complete) or (
+        liver_sample_volume_cm3 is not None
+        and float(liver_sample_volume_cm3) >= MIN_LIVER_SAMPLE_VOLUME_CM3
+        and liver_sample_axial_extent_mm is not None
+        and float(liver_sample_axial_extent_mm) >= MIN_LIVER_SAMPLE_AXIAL_EXTENT_MM
+    )
+    spleen_sample_sufficient = bool(spleen_complete) and spleen_value is not None
+    if not spleen_complete:
+        spleen_sample_sufficient = (
+            spleen_value is not None
+            and spleen_sample_volume_cm3 is not None
+            and float(spleen_sample_volume_cm3) >= MIN_SPLEEN_SAMPLE_VOLUME_CM3
+            and spleen_sample_axial_extent_mm is not None
+            and float(spleen_sample_axial_extent_mm) >= MIN_SPLEEN_SAMPLE_AXIAL_EXTENT_MM
+        )
+    sample_qc = {
+        "thresholds": {
+            "liver_min_volume_cm3": MIN_LIVER_SAMPLE_VOLUME_CM3,
+            "liver_min_axial_extent_mm": MIN_LIVER_SAMPLE_AXIAL_EXTENT_MM,
+            "spleen_min_volume_cm3": MIN_SPLEEN_SAMPLE_VOLUME_CM3,
+            "spleen_min_axial_extent_mm": MIN_SPLEEN_SAMPLE_AXIAL_EXTENT_MM,
+        },
+        "liver": {
+            "complete": bool(liver_complete),
+            "sample_volume_cm3": liver_sample_volume_cm3,
+            "sample_axial_extent_mm": liver_sample_axial_extent_mm,
+            "sufficient": liver_sample_sufficient,
+        },
+        "spleen": {
+            "complete": bool(spleen_complete),
+            "sample_volume_cm3": spleen_sample_volume_cm3,
+            "sample_axial_extent_mm": spleen_sample_axial_extent_mm,
+            "sufficient": spleen_sample_sufficient,
+        },
+    }
+
     try:
         kvp_value = float(kvp) if kvp is not None else None
     except (TypeError, ValueError):
         kvp_value = None
+    if not liver_sample_sufficient:
+        return {
+            "status": "liver_sample_insufficient",
+            "kvp": kvp_value,
+            "liver_hu": liver_value,
+            "spleen_hu": spleen_value,
+            "liver_to_spleen_ratio": ratio,
+            "estimated_percent": None,
+            "partial_coverage": True,
+            "sample_qc": sample_qc,
+        }
     if kvp_value is None or not math.isfinite(kvp_value) or not (
         STEATOSIS_KVP_RANGE[0] <= kvp_value <= STEATOSIS_KVP_RANGE[1]
     ):
@@ -54,15 +112,27 @@ def assess_hepatic_steatosis(
             "spleen_hu": spleen_value,
             "liver_to_spleen_ratio": ratio,
             "estimated_percent": None,
+            "partial_coverage": not (bool(liver_complete) and bool(spleen_complete)),
+            "sample_qc": sample_qc,
         }
 
-    if liver_value >= 50.0 or (ratio is not None and ratio > 1.0):
+    if liver_value >= 50.0:
         status = "normal"
         estimated_percent = None
+        spleen_used = False
+    elif not spleen_sample_sufficient or ratio is None:
+        status = "spleen_sample_insufficient"
+        estimated_percent = None
+        spleen_used = True
+    elif ratio > 1.0:
+        status = "normal"
+        estimated_percent = None
+        spleen_used = True
     else:
         status = "estimated"
         raw_percent = max(0.0, (-0.58 * liver_value) + 38.2)
         estimated_percent = int(math.floor(raw_percent + 0.5))
+        spleen_used = True
 
     return {
         "status": status,
@@ -71,4 +141,7 @@ def assess_hepatic_steatosis(
         "spleen_hu": spleen_value,
         "liver_to_spleen_ratio": ratio,
         "estimated_percent": estimated_percent,
+        "partial_coverage": not bool(liver_complete)
+        or (spleen_used and not bool(spleen_complete)),
+        "sample_qc": sample_qc,
     }

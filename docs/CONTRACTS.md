@@ -233,9 +233,12 @@ case workspace. `AvailableSeries` and `DiscardedSeries` may include
 `SourceDicomSeriesPath` and `SourceDicomInstanceCount` so later operators can
 audit or reprocess from the same series set. The upload ZIP remains a transport
 artifact and is deleted after successful prepare.
-- Volumetry artifacts should not be published when every candidate organ is
-missing, empty, or incomplete. The metrics result JSON should preserve the
-reason and per-organ status for audit.
+- Organ volumes should not be published when every candidate organ is missing,
+empty, or incomplete. The parenchymal overlay may still be emitted as an
+`attenuation_only` artifact when an incomplete liver provides at least 100 cm³
+of segmented tissue over at least 30 mm of axial extent. Incomplete organ
+volumes remain omitted. The metrics result JSON preserves the reason,
+per-organ status, physical attenuation sample size, and sample QC audit.
 - Parenchymal-organ overlays render the volume number in red when liver volume
 is greater than 1,800 cm³, spleen volume is greater than 400 cm³, or either
 kidney volume is less than 100 cm³. The liver row is followed by a steatosis
@@ -246,6 +249,14 @@ than 1 is reported as no steatosis, otherwise the displayed whole-number
 percentage is `-0.58 × liver HU + 38.2`. The result JSON records the assessment
 status, kVp, source attenuation values, liver-to-spleen ratio when available,
 and the displayed estimated percentage.
+- Hepatic attenuation from an incomplete mask is eligible only when its sample
+contains at least 100 cm³ over 30 mm of axial extent. When liver attenuation is
+below 50 HU, an incomplete spleen must independently contain at least 20 cm³
+over 20 mm before the liver-to-spleen ratio or percentage is reported. Eligible
+partial assessments are labeled `partial coverage`; insufficient liver samples
+are rejected, and insufficient spleen samples make a low-liver-HU assessment
+indeterminate. These are deterministic engineering QC thresholds and are not
+a clinical-validation claim.
 - The parenchymal-organ overlay series may include a complete
 `total/vertebrae_L1.nii.gz` mask as an overlay-only structure. L1 must not be
 reported as an organ volume or attenuation measurement by

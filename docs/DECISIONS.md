@@ -15,6 +15,49 @@ Each decision should include:
 
 ## Decisions
 
+### 2026-07-10 - Gate partial-organ steatosis by physical sample size
+
+**Context**
+
+The parenchymal-organ job previously required a complete liver mask before it
+could present hepatic steatosis in the volume overlay. A truncated mask can
+still contain a physically substantial attenuation sample, while slice count
+alone is not comparable across reconstructions with different spacing.
+
+**Decision**
+
+Keep incomplete organ volumes non-publishable, but permit an
+`attenuation_only` parenchymal overlay when an incomplete liver contains at
+least 100 cm³ of segmented tissue across at least 30 mm of axial extent. For a
+liver mean below 50 HU, require an incomplete spleen to contain at least 20 cm³
+across at least 20 mm before using the liver-to-spleen ratio or reporting the
+formula-derived percentage. Label accepted results as partial coverage and
+record the sample measurements and thresholds in result JSON.
+
+**Impact**
+
+- Substantial partial liver and spleen masks can support the deterministic
+  attenuation rule without presenting their incomplete volumes as valid.
+- Low-liver-HU cases with an inadequate spleen sample are explicitly
+  indeterminate instead of silently falling back to the liver-only formula.
+- Metrics workers must be restarted before resident processing uses the new
+  sampling policy and localized overlay lines.
+
+**Tradeoff**
+
+The physical sample thresholds are engineering QC defaults rather than
+clinically validated cutoffs. Clinical validation and outcome calibration
+remain outside the automated repository checks.
+
+**Alternatives rejected**
+
+- Use only slice count, which changes meaning with reconstruction spacing.
+- Publish incomplete organ volumes alongside the attenuation assessment.
+- Calculate a percentage from low liver attenuation when the spleen sample is
+  unavailable or too small to evaluate the requested ratio condition.
+
+---
+
 ### 2026-05-30 - Scope head structure QC per segmented structure
 
 **Context**

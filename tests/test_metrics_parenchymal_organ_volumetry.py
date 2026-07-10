@@ -69,6 +69,9 @@ class TestParenchymalOrganVolumetryJob(unittest.TestCase):
         self.assertEqual(measurement["analysis_status"], "incomplete")
         self.assertFalse(measurement["complete"])
         self.assertTrue(measurement["truncated_at_scan_bounds"])
+        self.assertEqual(measurement["attenuation_sample_volume_cm3"], 0.064)
+        self.assertEqual(measurement["attenuation_sample_slice_count"], 4)
+        self.assertEqual(measurement["attenuation_sample_axial_extent_mm"], 4.0)
         self.assertIsNone(measurement["observed_volume_cm3"])
         self.assertIsNone(measurement["volume_cm3"])
 
@@ -77,6 +80,74 @@ class TestParenchymalOrganVolumetryJob(unittest.TestCase):
             locale="en_US",
         )
         self.assertEqual(lines, ["Parenchymal organs:"])
+
+    def test_partial_liver_sample_generates_attenuation_only_overlay(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            case_id = "CaseParenchyma_Partial_20260710_001"
+            case_dir = tmp_path / case_id
+            (case_dir / "metadata").mkdir(parents=True)
+            (case_dir / "derived").mkdir(parents=True)
+            (case_dir / "artifacts" / "total").mkdir(parents=True)
+
+            id_payload = {
+                "CaseID": case_id,
+                "Modality": "CT",
+                "StudyInstanceUID": "1.2.826.0.1.3680043.8.498.5",
+                "PatientName": "Test^Patient",
+                "PatientID": "P005",
+                "KVP": 120,
+                "Pipeline": {"series_selection": {"SelectedPhase": "native"}},
+            }
+            (case_dir / "metadata" / "id.json").write_text(json.dumps(id_payload), encoding="utf-8")
+            (case_dir / "metadata" / "metadata.json").write_text(
+                json.dumps(id_payload),
+                encoding="utf-8",
+            )
+            (case_dir / "metadata" / "resultados.json").write_text("{}", encoding="utf-8")
+
+            shape = (10, 10, 10)
+            ct = np.zeros(shape, dtype=np.float32)
+            liver = np.zeros(shape, dtype=np.float32)
+            liver[2:7, 2:7, 0:4] = 1.0
+            ct[liver.astype(bool)] = 55.0
+            write_nifti(case_dir / "derived" / f"{case_id}.nii.gz", ct, spacing=(10.0, 10.0, 10.0))
+            write_nifti(
+                case_dir / "artifacts" / "total" / "liver.nii.gz",
+                liver,
+                spacing=(10.0, 10.0, 10.0),
+            )
+
+            with patch.object(settings, "STUDIES_DIR", tmp_path):
+                with patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "parenchymal_organ_volumetry",
+                        "--case-id",
+                        case_id,
+                        "--job-config-json",
+                        '{"generate_overlay": true, "emit_secondary_capture_dicom": true, "locale": "pt_BR"}',
+                    ],
+                ):
+                    self.assertEqual(parenchymal_organ_volumetry.main(), 0)
+
+            result_path = case_dir / "artifacts" / "metrics" / "parenchymal_organ_volumetry" / "result.json"
+            result = json.loads(result_path.read_text(encoding="utf-8"))
+            assessment = result["measurement"]["hepatic_steatosis"]
+
+            self.assertEqual(result["status"], "done")
+            self.assertEqual(result["measurement"]["job_status"], "attenuation_only")
+            self.assertIsNone(result["measurement"]["organs"]["liver"]["volume_cm3"])
+            self.assertEqual(assessment["status"], "normal")
+            self.assertTrue(assessment["partial_coverage"])
+            self.assertEqual(len(result["dicom_exports"]), 8)
+            lines = build_overlay_text(
+                organ_measurements=result["measurement"]["organs"],
+                locale="pt_BR",
+                hepatic_steatosis=assessment,
+            )
+            self.assertEqual(lines, ["Órgãos parenquimatosos:", "Esteatose: não (cobertura parcial)"])
 
     def test_job_writes_metrics_and_dicom_series(self):
         with tempfile.TemporaryDirectory() as tmp:

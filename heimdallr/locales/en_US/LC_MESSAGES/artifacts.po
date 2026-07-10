@@ -118,8 +118,20 @@ msgstr "Steatosis: exam outside kVp range"
 msgid "parenchymal.overlay.steatosis.normal"
 msgstr "Steatosis: no"
 
+msgid "parenchymal.overlay.steatosis.normal_partial"
+msgstr "Steatosis: no (partial coverage)"
+
 msgid "parenchymal.overlay.steatosis.estimated"
 msgstr "Steatosis: {percent}%"
+
+msgid "parenchymal.overlay.steatosis.estimated_partial"
+msgstr "Steatosis: {percent}% (partial coverage)"
+
+msgid "parenchymal.overlay.steatosis.liver_sample_insufficient"
+msgstr "Steatosis: insufficient liver sample"
+
+msgid "parenchymal.overlay.steatosis.spleen_sample_insufficient"
+msgstr "Steatosis: indeterminate — insufficient spleen sample"
 
 msgid "parenchymal.overlay.series_description"
 msgstr "Heimdallr Parenchymal Organ Overlay 5 mm"

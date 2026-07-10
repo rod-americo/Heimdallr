@@ -64,11 +64,25 @@ def _steatosis_line(assessment: dict | None, *, locale: str) -> OverlayTextLine 
         message_id = "parenchymal.overlay.steatosis.kvp_out_of_range"
         kwargs = {}
     elif status == "normal":
-        message_id = "parenchymal.overlay.steatosis.normal"
+        message_id = (
+            "parenchymal.overlay.steatosis.normal_partial"
+            if assessment.get("partial_coverage")
+            else "parenchymal.overlay.steatosis.normal"
+        )
         kwargs = {}
     elif status == "estimated" and assessment.get("estimated_percent") is not None:
-        message_id = "parenchymal.overlay.steatosis.estimated"
+        message_id = (
+            "parenchymal.overlay.steatosis.estimated_partial"
+            if assessment.get("partial_coverage")
+            else "parenchymal.overlay.steatosis.estimated"
+        )
         kwargs = {"percent": format_integer(assessment["estimated_percent"], locale=locale)}
+    elif status == "liver_sample_insufficient":
+        message_id = "parenchymal.overlay.steatosis.liver_sample_insufficient"
+        kwargs = {}
+    elif status == "spleen_sample_insufficient":
+        message_id = "parenchymal.overlay.steatosis.spleen_sample_insufficient"
+        kwargs = {}
     else:
         return None
     return OverlayTextLine(translate(message_id, locale=locale, **kwargs))
@@ -93,6 +107,10 @@ def build_overlay_lines(
             volume_cm3 = measurement.get("observed_volume_cm3")
         hu_mean = measurement.get("hu_mean")
         if volume_cm3 is None:
+            if organ_key == "liver":
+                steatosis_line = _steatosis_line(hepatic_steatosis, locale=locale)
+                if steatosis_line is not None:
+                    summary_lines.append(steatosis_line)
             continue
 
         if hu_mean is None:

@@ -58,6 +58,8 @@ cp config/resource_monitor.example.json config/resource_monitor.json
 Run each command in its own process supervisor unit or terminal.
 Restart `heimdallr.metrics` after deploying metrics job or metrics overlay code
 changes so resident workers render new payload and DICOM artifact behavior.
+This includes changes to partial-organ attenuation sample QC and hepatic
+steatosis overlay presentation.
 Restart `heimdallr.metrics` after changing
 `config/metrics_pipeline.json` profile execution policy such as
 `artifact_dicom_policy.secondary_capture_series_mode`; resident workers load
