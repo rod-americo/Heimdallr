@@ -48,6 +48,12 @@ from heimdallr.shared.paths import study_artifacts_dir
 
 METRIC_KEY = "pleural_pericard_effusion"
 SERIES_NUMBER = 9131
+MEDIASTINAL_WINDOW_LEVEL_HU = 40.0
+MEDIASTINAL_WINDOW_WIDTH_HU = 400.0
+MEDIASTINAL_WINDOW_LIMITS_HU = (
+    MEDIASTINAL_WINDOW_LEVEL_HU - (MEDIASTINAL_WINDOW_WIDTH_HU / 2.0),
+    MEDIASTINAL_WINDOW_LEVEL_HU + (MEDIASTINAL_WINDOW_WIDTH_HU / 2.0),
+)
 FINDINGS = {
     "pleural_effusion": "#32d74b",
     "pericardial_effusion": "#ff9f0a",
@@ -193,7 +199,14 @@ def render_overlay_rgb(
 
     fig, ax = plt.subplots(figsize=(7, 7), facecolor="black")
     ax.set_facecolor("black")
-    ax.imshow(display_ct, cmap="gray", vmin=-1000.0, vmax=400.0, interpolation="nearest", aspect=aspect)
+    ax.imshow(
+        display_ct,
+        cmap="gray",
+        vmin=MEDIASTINAL_WINDOW_LIMITS_HU[0],
+        vmax=MEDIASTINAL_WINDOW_LIMITS_HU[1],
+        interpolation="nearest",
+        aspect=aspect,
+    )
     if display_lung.any():
         ax.contour(display_lung, levels=[0.5], colors=["#64d2ff"], linewidths=0.7)
     if display_finding.any():

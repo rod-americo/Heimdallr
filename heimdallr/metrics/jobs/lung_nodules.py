@@ -48,6 +48,12 @@ from heimdallr.shared.paths import study_artifacts_dir
 
 METRIC_KEY = "lung_nodules"
 SERIES_NUMBER = 9130
+LUNG_WINDOW_LEVEL_HU = -600.0
+LUNG_WINDOW_WIDTH_HU = 1500.0
+LUNG_WINDOW_LIMITS_HU = (
+    LUNG_WINDOW_LEVEL_HU - (LUNG_WINDOW_WIDTH_HU / 2.0),
+    LUNG_WINDOW_LEVEL_HU + (LUNG_WINDOW_WIDTH_HU / 2.0),
+)
 LUNG_MASK_NAMES = (
     "lung_upper_lobe_left",
     "lung_upper_lobe_right",
@@ -248,8 +254,8 @@ def render_axial_overlay_rgb(
     ax.imshow(
         display_ct,
         cmap="gray",
-        vmin=-1000.0,
-        vmax=400.0,
+        vmin=LUNG_WINDOW_LIMITS_HU[0],
+        vmax=LUNG_WINDOW_LIMITS_HU[1],
         interpolation="nearest",
         aspect=display_aspect,
     )

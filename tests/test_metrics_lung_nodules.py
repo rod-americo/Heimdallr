@@ -21,6 +21,11 @@ def write_nifti(path: Path, data: np.ndarray, spacing=(1.0, 1.0, 1.0)) -> None:
 
 
 class TestLungNodulesJob(unittest.TestCase):
+    def test_overlay_uses_lung_window(self):
+        self.assertEqual(lung_nodules.LUNG_WINDOW_LEVEL_HU, -600.0)
+        self.assertEqual(lung_nodules.LUNG_WINDOW_WIDTH_HU, 1500.0)
+        self.assertEqual(lung_nodules.LUNG_WINDOW_LIMITS_HU, (-1350.0, 150.0))
+
     def test_axial_overlay_display_keeps_anterior_at_top_for_lps_affine(self):
         ct_slice = np.array([[1, 2, 3], [4, 5, 6]], dtype=np.float32)
         lung_slice = ct_slice > 2

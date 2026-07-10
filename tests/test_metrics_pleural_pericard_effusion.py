@@ -21,6 +21,14 @@ def write_nifti(path: Path, data: np.ndarray, spacing=(1.0, 1.0, 1.0)) -> None:
 
 
 class TestPleuralPericardEffusionJob(unittest.TestCase):
+    def test_overlay_uses_mediastinal_window(self):
+        self.assertEqual(pleural_pericard_effusion.MEDIASTINAL_WINDOW_LEVEL_HU, 40.0)
+        self.assertEqual(pleural_pericard_effusion.MEDIASTINAL_WINDOW_WIDTH_HU, 400.0)
+        self.assertEqual(
+            pleural_pericard_effusion.MEDIASTINAL_WINDOW_LIMITS_HU,
+            (-160.0, 240.0),
+        )
+
     def _run_job(self, case_dir: Path, job_config: dict | None = None) -> tuple[int, dict]:
         case_id = case_dir.name
         artifacts_dir = case_dir / "artifacts"
