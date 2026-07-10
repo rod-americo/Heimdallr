@@ -58,6 +58,10 @@ cp config/resource_monitor.example.json config/resource_monitor.json
 Run each command in its own process supervisor unit or terminal.
 Restart `heimdallr.metrics` after deploying metrics job or metrics overlay code
 changes so resident workers render new payload and DICOM artifact behavior.
+Restart `heimdallr.metrics` after changing
+`config/metrics_pipeline.json` profile execution policy such as
+`artifact_dicom_policy.secondary_capture_series_mode`; resident workers load
+that policy when a case is claimed.
 Restart `heimdallr.segmentation` after deploying segmentation task planning or
 profile changes so resident workers load the new TotalSegmentator task list.
 
@@ -170,6 +174,19 @@ Project presentation default:
 - `en_US` is the default artifact and TUI locale.
 - `pt_BR` remains a supported locale for explicit host-local overrides and i18n
 tests.
+
+Metrics DICOM artifact policy:
+
+- `config/metrics_pipeline.json` profiles may set
+  `execution.artifact_dicom_policy.secondary_capture_series_mode`.
+- `separate` preserves the legacy behavior where Secondary Capture artifacts
+  keep their job-generated series.
+- `single_series` rewrites only generated Secondary Capture artifacts for a
+  case into one artifact series. Derived CT and Encapsulated PDF artifacts keep
+  their own series.
+- External `/jobs` submissions may override this field through
+  `artifact_dicom_policy`; omitted fields fall back to the active metrics
+  profile.
 
 ## 5. Minimum Validation
 

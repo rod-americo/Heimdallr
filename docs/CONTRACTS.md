@@ -238,6 +238,21 @@ remains legible after DICOM import.
 lossless options are original uncompressed, Deflated Explicit VR Little Endian,
 JPEG-LS lossless, JPEG 2000 lossless, and RLE lossless. The repository default
 is JPEG-LS lossless.
+- Secondary Capture DICOM series grouping is configurable per metrics profile
+through
+`execution.artifact_dicom_policy.secondary_capture_series_mode` and per
+external `/jobs` submission through
+`artifact_dicom_policy.secondary_capture_series_mode`. The supported values are
+`separate` and `single_series`, and the default is `separate`. In
+`single_series`, generated DICOM Secondary Capture artifacts for the case,
+including instruction documents emitted as Secondary Capture, are rewritten to
+share one `SeriesInstanceUID`, `SeriesNumber`, and `SeriesDescription`, with
+unique sequential `InstanceNumber` values. Derived CT and Encapsulated PDF
+DICOM artifacts are not grouped.
+- The effective artifact DICOM policy is recorded in
+`metadata/id.json` under `Pipeline.metrics_pipeline.artifact_dicom_policy`.
+When `single_series` rewrites at least one Secondary Capture file, the same
+audit object includes `secondary_capture_series_instance_uid`.
 - Head derived CT DICOM uses `derived_ct_transfer_syntax` with the same option
 vocabulary. DICOM egress negotiates the peer's accepted presentation context and
 transcodes only for transfer when the peer does not accept the artifact's stored

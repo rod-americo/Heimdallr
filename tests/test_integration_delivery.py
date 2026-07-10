@@ -31,6 +31,12 @@ class TestJobSubmissionRoute(unittest.TestCase):
             {"secondary_capture_transfer_syntax": "deflated"},
         )
 
+    def test_artifact_dicom_policy_normalizes_secondary_capture_series_mode(self):
+        self.assertEqual(
+            normalize_artifact_dicom_policy({"secondary_capture_series_mode": "single-series"}),
+            {"secondary_capture_series_mode": "single_series"},
+        )
+
     def test_submit_job_stores_zip_and_submission_sidecar(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             upload_dir = Path(tmpdir) / "uploads" / "external"
@@ -50,7 +56,10 @@ class TestJobSubmissionRoute(unittest.TestCase):
                         "requested_metrics_modules": json.dumps(["l3_muscle_area", "bone_health_l1_hu"]),
                         "artifact_locale": "pt_BR",
                         "artifact_dicom_policy": json.dumps(
-                            {"secondary_capture_transfer_syntax": "jpeg_ls_lossless"}
+                            {
+                                "secondary_capture_transfer_syntax": "jpeg_ls_lossless",
+                                "secondary_capture_series_mode": "single_series",
+                            }
                         ),
                         "series_selection_policy": json.dumps(
                             {
@@ -74,7 +83,10 @@ class TestJobSubmissionRoute(unittest.TestCase):
             self.assertEqual(sidecar["artifact_locale"], "pt_BR")
             self.assertEqual(
                 sidecar["artifact_dicom_policy"],
-                {"secondary_capture_transfer_syntax": "jpeg_ls_lossless"},
+                {
+                    "secondary_capture_transfer_syntax": "jpeg_ls_lossless",
+                    "secondary_capture_series_mode": "single_series",
+                },
             )
             self.assertEqual(
                 sidecar["requested_metrics_modules"],
@@ -94,7 +106,10 @@ class TestJobSubmissionRoute(unittest.TestCase):
             self.assertEqual(body["artifact_locale"], "pt_BR")
             self.assertEqual(
                 body["artifact_dicom_policy"],
-                {"secondary_capture_transfer_syntax": "jpeg_ls_lossless"},
+                {
+                    "secondary_capture_transfer_syntax": "jpeg_ls_lossless",
+                    "secondary_capture_series_mode": "single_series",
+                },
             )
             self.assertEqual(body["series_selection_policy"]["required"]["min_slices"], 60)
 
@@ -149,6 +164,29 @@ class TestJobSubmissionRoute(unittest.TestCase):
 
             self.assertEqual(response.status_code, 400)
             self.assertIn("artifact_dicom_policy.secondary_capture_transfer_syntax", response.json()["detail"])
+
+    def test_submit_job_rejects_invalid_secondary_capture_series_mode(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            upload_dir = Path(tmpdir) / "uploads" / "external"
+            upload_dir.mkdir(parents=True, exist_ok=True)
+            app = create_app()
+            client = TestClient(app)
+
+            with patch.object(settings, "UPLOAD_EXTERNAL_DIR", upload_dir):
+                response = client.post(
+                    "/jobs",
+                    files={"study_file": ("study.zip", io.BytesIO(b"fake zip payload"), "application/zip")},
+                    data={
+                        "client_case_id": "external-123",
+                        "callback_url": "http://receiver.local/callback",
+                        "artifact_dicom_policy": json.dumps(
+                            {"secondary_capture_series_mode": "per_metric"}
+                        ),
+                    },
+                )
+
+            self.assertEqual(response.status_code, 400)
+            self.assertIn("artifact_dicom_policy.secondary_capture_series_mode", response.json()["detail"])
 
 
 class TestIntegrationDeliveryStore(unittest.TestCase):

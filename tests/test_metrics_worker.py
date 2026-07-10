@@ -6,14 +6,21 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import numpy as np
+import pydicom
+from pydicom.uid import CTImageStorage, generate_uid
+
+from heimdallr.metrics.jobs._dicom_secondary_capture import create_secondary_capture_from_rgb
 from heimdallr.metrics.worker import (
     MetricsLogger,
     _record_metrics_pipeline_state,
     _apply_artifact_dicom_policy,
     _apply_artifact_locale,
     _artifact_dicom_policy_from_metadata,
+    _effective_artifact_dicom_policy,
     _requested_metrics_modules_from_metadata,
     _execute_jobs,
+    _harmonize_secondary_capture_series,
     _validate_case_against_profile,
     _resolve_enabled_jobs,
     _resolve_job_module_name,
@@ -271,6 +278,39 @@ class TestMetricsWorker(unittest.TestCase):
 
         self.assertEqual(policy, {"secondary_capture_transfer_syntax": "jpeg_2000_lossless"})
 
+    def test_effective_artifact_dicom_policy_defaults_to_separate(self):
+        self.assertEqual(
+            _effective_artifact_dicom_policy({"execution": {}}, {}),
+            {"secondary_capture_series_mode": "separate"},
+        )
+
+    def test_effective_artifact_dicom_policy_merges_api_over_profile(self):
+        policy = _effective_artifact_dicom_policy(
+            {
+                "execution": {
+                    "artifact_dicom_policy": {
+                        "secondary_capture_transfer_syntax": "jpeg_ls_lossless",
+                        "secondary_capture_series_mode": "separate",
+                    }
+                }
+            },
+            {
+                "ExternalDelivery": {
+                    "artifact_dicom_policy": {
+                        "secondary_capture_series_mode": "single_series",
+                    }
+                }
+            },
+        )
+
+        self.assertEqual(
+            policy,
+            {
+                "secondary_capture_transfer_syntax": "jpeg_ls_lossless",
+                "secondary_capture_series_mode": "single_series",
+            },
+        )
+
     def test_apply_artifact_dicom_policy_sets_job_transfer_syntax(self):
         jobs = [
             {"name": "l3_muscle_area"},
@@ -285,6 +325,73 @@ class TestMetricsWorker(unittest.TestCase):
         self.assertEqual(configured[0]["secondary_capture_transfer_syntax"], "rle_lossless")
         self.assertEqual(configured[1]["secondary_capture_transfer_syntax"], "rle_lossless")
         self.assertNotIn("secondary_capture_transfer_syntax", jobs[0])
+
+    def test_harmonize_secondary_capture_series_rewrites_only_secondary_capture(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            case_root = Path(tmpdir)
+            metrics_dir = case_root / "artifacts" / "metrics"
+            sc_a = metrics_dir / "job_a" / "a.dcm"
+            sc_b = metrics_dir / "job_b" / "b.dcm"
+            ct_path = metrics_dir / "head" / "derived_ct.dcm"
+            metadata = {"StudyInstanceUID": "1.2.826.0.1.3680043.10.543.1", "PatientName": "Test^Case"}
+            rgb = np.zeros((8, 8, 3), dtype=np.uint8)
+
+            for path, series_number in ((sc_a, 9001), (sc_b, 9002)):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                create_secondary_capture_from_rgb(
+                    rgb,
+                    path,
+                    metadata,
+                    series_description="Original",
+                    series_number=series_number,
+                    instance_number=1,
+                    derivation_description="Test artifact",
+                    transfer_syntax="original",
+                )
+            ct_path.parent.mkdir(parents=True, exist_ok=True)
+            create_secondary_capture_from_rgb(
+                rgb,
+                ct_path,
+                metadata,
+                series_description="Derived CT Stand-in",
+                series_number=9300,
+                instance_number=1,
+                derivation_description="Test artifact",
+                transfer_syntax="original",
+            )
+            ct_dataset = pydicom.dcmread(str(ct_path))
+            original_ct_series_uid = str(ct_dataset.SeriesInstanceUID)
+            ct_dataset.SOPClassUID = CTImageStorage
+            ct_dataset.file_meta.MediaStorageSOPClassUID = CTImageStorage
+            ct_dataset.SOPInstanceUID = str(generate_uid())
+            ct_dataset.file_meta.MediaStorageSOPInstanceUID = ct_dataset.SOPInstanceUID
+            ct_dataset.save_as(str(ct_path), write_like_original=False)
+
+            series_uid = _harmonize_secondary_capture_series(
+                case_root,
+                [
+                    {"path": "artifacts/metrics/job_a/a.dcm", "kind": "secondary_capture"},
+                    {"path": "artifacts/metrics/head/derived_ct.dcm", "kind": "derived_ct"},
+                    {"path": "artifacts/metrics/job_b/b.dcm", "kind": "secondary_capture"},
+                ],
+                None,
+                series_instance_uid="1.2.826.0.1.3680043.10.543.999",
+            )
+
+            self.assertEqual(series_uid, "1.2.826.0.1.3680043.10.543.999")
+            first = pydicom.dcmread(str(sc_a))
+            second = pydicom.dcmread(str(sc_b))
+            derived = pydicom.dcmread(str(ct_path))
+            self.assertEqual(first.SeriesInstanceUID, series_uid)
+            self.assertEqual(second.SeriesInstanceUID, series_uid)
+            self.assertEqual(first.SeriesNumber, 9900)
+            self.assertEqual(second.SeriesNumber, 9900)
+            self.assertEqual(first.SeriesDescription, "Heimdallr Artifact Series")
+            self.assertEqual(second.SeriesDescription, "Heimdallr Artifact Series")
+            self.assertEqual(first.InstanceNumber, 1)
+            self.assertEqual(second.InstanceNumber, 2)
+            self.assertEqual(str(derived.SeriesInstanceUID), original_ct_series_uid)
+            self.assertEqual(str(derived.SOPClassUID), str(CTImageStorage))
 
     def test_resolve_max_parallel_jobs_uses_profile_execution(self):
         self.assertEqual(_resolve_max_parallel_jobs({"execution": {"max_parallel_jobs": 3}}), 3)
@@ -387,6 +494,111 @@ class TestMetricsWorker(unittest.TestCase):
             starts[("parenchymal_organ_volumetry", "end")],
         )
 
+    def test_segment_case_metrics_groups_secondary_capture_exports_when_configured(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            case_id = "CaseSC_20260415_1"
+            case_dir = root / case_id
+            metadata_dir = case_dir / "metadata"
+            logs_dir = case_dir / "logs"
+            sc_dir = case_dir / "artifacts" / "metrics" / "mock"
+            metadata_dir.mkdir(parents=True, exist_ok=True)
+            logs_dir.mkdir(parents=True, exist_ok=True)
+            id_json_path = metadata_dir / "id.json"
+            results_json_path = metadata_dir / "resultados.json"
+            case_metadata = {
+                "CaseID": case_id,
+                "StudyInstanceUID": "1.2.826.0.1.3680043.10.543.2",
+                "PatientName": "Alice Example",
+                "AccessionNumber": "123",
+                "StudyDate": "20260415",
+                "Modality": "CT",
+                "Pipeline": {"series_selection": {"SelectedPhase": "native"}},
+            }
+            id_json_path.write_text(json.dumps(case_metadata), encoding="utf-8")
+            results_json_path.write_text("{}", encoding="utf-8")
+            rgb = np.zeros((8, 8, 3), dtype=np.uint8)
+            first_path = sc_dir / "first.dcm"
+            second_path = sc_dir / "second.dcm"
+
+            def fake_execute_jobs(*args, **kwargs):
+                sc_dir.mkdir(parents=True, exist_ok=True)
+                create_secondary_capture_from_rgb(
+                    rgb,
+                    first_path,
+                    case_metadata,
+                    series_description="First",
+                    series_number=9001,
+                    instance_number=1,
+                    derivation_description="First artifact",
+                    transfer_syntax="original",
+                )
+                create_secondary_capture_from_rgb(
+                    rgb,
+                    second_path,
+                    case_metadata,
+                    series_description="Second",
+                    series_number=9002,
+                    instance_number=1,
+                    derivation_description="Second artifact",
+                    transfer_syntax="original",
+                )
+                return (
+                    [{"name": "mock_sc", "status": "done"}],
+                    [
+                        {"path": "artifacts/metrics/mock/first.dcm", "kind": "secondary_capture"},
+                        {"path": "artifacts/metrics/mock/second.dcm", "kind": "secondary_capture"},
+                    ],
+                )
+
+            with (
+                patch("heimdallr.metrics.worker.study_id_json", return_value=id_json_path),
+                patch("heimdallr.metrics.worker.study_results_json", return_value=results_json_path),
+                patch("heimdallr.metrics.worker.study_logs_dir", return_value=logs_dir),
+                patch("heimdallr.metrics.worker.study_dir", return_value=case_dir),
+                patch(
+                    "heimdallr.metrics.worker.load_metrics_pipeline_profile",
+                    return_value=(
+                        "test_profile",
+                        {
+                            "execution": {
+                                "artifact_dicom_policy": {
+                                    "secondary_capture_series_mode": "single_series",
+                                }
+                            },
+                            "jobs": [{"name": "mock_sc"}],
+                        },
+                    ),
+                ),
+                patch("heimdallr.metrics.worker._validate_case_against_profile"),
+                patch("heimdallr.metrics.worker._resolve_enabled_jobs", return_value=[{"name": "mock_sc"}]),
+                patch("heimdallr.metrics.worker._validate_job_dependency_graph"),
+                patch("heimdallr.metrics.worker._resolve_max_parallel_jobs", return_value=1),
+                patch("heimdallr.metrics.worker._execute_jobs", side_effect=fake_execute_jobs),
+                patch("heimdallr.metrics.worker._generate_instruction_pdf_artifact", return_value=None),
+                patch("heimdallr.metrics.worker._enqueue_case_dicom_exports", return_value=2),
+                patch("heimdallr.metrics.worker.settings.ARTIFACTS_LOCALE", "en_US"),
+                patch("heimdallr.metrics.worker.db_connect") as mock_connect,
+                patch("heimdallr.metrics.worker.store.update_metrics_completion"),
+                patch("heimdallr.metrics.worker.store.update_calculation_results"),
+                patch("heimdallr.metrics.worker.store.update_id_json"),
+            ):
+                mock_connect.return_value = MagicMock()
+                ok = segment_case_metrics(case_dir)
+
+            self.assertTrue(ok)
+            first = pydicom.dcmread(str(first_path))
+            second = pydicom.dcmread(str(second_path))
+            self.assertEqual(first.SeriesInstanceUID, second.SeriesInstanceUID)
+            self.assertEqual(first.SeriesDescription, "Heimdallr Artifact Series")
+            self.assertEqual(second.SeriesDescription, "Heimdallr Artifact Series")
+            self.assertEqual(first.InstanceNumber, 1)
+            self.assertEqual(second.InstanceNumber, 2)
+            metadata_payload = json.loads(id_json_path.read_text(encoding="utf-8"))
+            policy = metadata_payload["Pipeline"]["metrics_pipeline"]["artifact_dicom_policy"]
+            self.assertEqual(policy["secondary_capture_series_mode"], "single_series")
+            self.assertEqual(policy["secondary_capture_series_instance_uid"], str(first.SeriesInstanceUID))
+
     def test_segment_case_metrics_generates_instruction_sc_by_default(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -449,6 +661,7 @@ class TestMetricsWorker(unittest.TestCase):
                 patch("heimdallr.metrics.worker._enqueue_case_dicom_exports", return_value=0) as enqueue_mock,
                 patch("heimdallr.metrics.worker.build_artifact_instructions_pdf", side_effect=fake_build_pdf),
                 patch("heimdallr.metrics.worker.build_artifact_instructions_secondary_capture", side_effect=fake_build_sc),
+                patch("heimdallr.metrics.worker.settings.ARTIFACTS_LOCALE", "en_US"),
                 patch("heimdallr.metrics.worker.db_connect") as mock_connect,
                 patch("heimdallr.metrics.worker.store.update_metrics_completion"),
                 patch("heimdallr.metrics.worker.store.update_calculation_results"),
@@ -569,6 +782,7 @@ class TestMetricsWorker(unittest.TestCase):
                 patch("heimdallr.metrics.worker._enqueue_case_dicom_exports", return_value=0) as enqueue_mock,
                 patch("heimdallr.metrics.worker.build_artifact_instructions_pdf", side_effect=fake_build_pdf),
                 patch("heimdallr.metrics.worker.create_encapsulated_pdf_dicom", side_effect=fake_create_dicom),
+                patch("heimdallr.metrics.worker.settings.ARTIFACTS_LOCALE", "en_US"),
                 patch("heimdallr.metrics.worker.db_connect") as mock_connect,
                 patch("heimdallr.metrics.worker.store.update_metrics_completion"),
                 patch("heimdallr.metrics.worker.store.update_calculation_results"),

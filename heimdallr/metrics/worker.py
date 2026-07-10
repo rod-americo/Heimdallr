@@ -17,11 +17,15 @@ import time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from pydicom import dcmread
+from pydicom.uid import SecondaryCaptureImageStorage, generate_uid
+
 from heimdallr.metrics.artifact_instructions_pdf import (
     build_artifact_instructions_pdf,
     build_artifact_instructions_secondary_capture,
 )
 from heimdallr.integration.delivery import enqueue_case_delivery, enqueue_case_failed_delivery
+from heimdallr.integration.submissions import normalize_artifact_dicom_policy
 from heimdallr.metrics.jobs._dicom_encapsulated_pdf import create_encapsulated_pdf_dicom
 from heimdallr.dicom_egress.config import build_egress_queue_items
 from heimdallr.shared import settings, store
@@ -48,6 +52,10 @@ JOB_ALLOWED_MODULE_PREFIXES = (
     "heimdallr.metrics.jobs.",
     "heimdallr.metrics.analysis.",
 )
+DEFAULT_SECONDARY_CAPTURE_SERIES_MODE = "separate"
+SECONDARY_CAPTURE_SINGLE_SERIES_MODE = "single_series"
+SECONDARY_CAPTURE_SINGLE_SERIES_DESCRIPTION = "Heimdallr Artifact Series"
+SECONDARY_CAPTURE_SINGLE_SERIES_NUMBER = 9900
 
 
 def _enqueue_external_failure_if_present(case_id: str, *, failure_stage: str, error_message: str) -> None:
@@ -291,7 +299,26 @@ def _artifact_dicom_policy_from_metadata(metadata: dict) -> dict:
     if not isinstance(external_delivery, dict):
         return {}
     policy = external_delivery.get("artifact_dicom_policy", {})
-    return policy if isinstance(policy, dict) else {}
+    if not isinstance(policy, dict):
+        return {}
+    return normalize_artifact_dicom_policy(policy)
+
+
+def _artifact_dicom_policy_from_profile(profile: dict) -> dict:
+    execution = profile.get("execution", {})
+    if not isinstance(execution, dict):
+        return {}
+    policy = execution.get("artifact_dicom_policy", {})
+    if not isinstance(policy, dict):
+        return {}
+    return normalize_artifact_dicom_policy(policy)
+
+
+def _effective_artifact_dicom_policy(profile: dict, metadata: dict) -> dict:
+    policy = {"secondary_capture_series_mode": DEFAULT_SECONDARY_CAPTURE_SERIES_MODE}
+    policy.update(_artifact_dicom_policy_from_profile(profile))
+    policy.update(_artifact_dicom_policy_from_metadata(metadata))
+    return policy
 
 
 def _apply_artifact_locale(jobs: list[dict], locale: str | None) -> list[dict]:
@@ -318,6 +345,108 @@ def _apply_artifact_dicom_policy(jobs: list[dict], policy: dict | None) -> list[
         configured["secondary_capture_transfer_syntax"] = transfer_syntax
         configured_jobs.append(configured)
     return configured_jobs
+
+
+def _secondary_capture_export_paths(
+    case_root: Path,
+    dicom_exports: list[dict],
+    instruction_dicom: dict | None,
+) -> list[Path]:
+    paths: list[Path] = []
+    seen: set[Path] = set()
+
+    def add_path(raw_path: str) -> None:
+        relpath = str(raw_path or "").strip()
+        if not relpath:
+            return
+        path = case_root / relpath
+        if path in seen:
+            return
+        seen.add(path)
+        paths.append(path)
+
+    for export in dicom_exports:
+        if not isinstance(export, dict):
+            continue
+        if str(export.get("kind") or "").strip() != "secondary_capture":
+            continue
+        add_path(str(export.get("path") or ""))
+
+    if isinstance(instruction_dicom, dict) and instruction_dicom.get("kind") == "secondary_capture":
+        for relpath in instruction_dicom.get("paths", []):
+            add_path(str(relpath or ""))
+
+    return paths
+
+
+def _harmonize_secondary_capture_series(
+    case_root: Path,
+    dicom_exports: list[dict],
+    instruction_dicom: dict | None,
+    *,
+    series_instance_uid: str | None = None,
+    logger: MetricsLogger | None = None,
+) -> str | None:
+    paths = _secondary_capture_export_paths(case_root, dicom_exports, instruction_dicom)
+    if not paths:
+        return None
+
+    series_uid = series_instance_uid or str(generate_uid())
+    rewritten = 0
+    for path in paths:
+        if not path.exists():
+            if logger:
+                logger.log(f"[Metrics] Warning: Secondary Capture artifact not found for series grouping: {path}")
+            continue
+        try:
+            dataset = dcmread(str(path))
+        except Exception as exc:
+            if logger:
+                logger.log(f"[Metrics] Warning: failed to read Secondary Capture artifact {path}: {exc}")
+            continue
+
+        if str(getattr(dataset, "SOPClassUID", "") or "") != str(SecondaryCaptureImageStorage):
+            continue
+
+        rewritten += 1
+        dataset.SeriesInstanceUID = series_uid
+        dataset.SeriesNumber = SECONDARY_CAPTURE_SINGLE_SERIES_NUMBER
+        dataset.SeriesDescription = SECONDARY_CAPTURE_SINGLE_SERIES_DESCRIPTION
+        dataset.InstanceNumber = rewritten
+        dataset.save_as(str(path), write_like_original=False)
+
+    return series_uid if rewritten else None
+
+
+def _apply_secondary_capture_series_policy(
+    case_id: str,
+    artifact_dicom_policy: dict,
+    dicom_exports: list[dict],
+    instruction_dicom: dict | None,
+    logger: MetricsLogger,
+) -> str | None:
+    mode = str(
+        artifact_dicom_policy.get(
+            "secondary_capture_series_mode",
+            DEFAULT_SECONDARY_CAPTURE_SERIES_MODE,
+        )
+        or DEFAULT_SECONDARY_CAPTURE_SERIES_MODE
+    ).strip()
+    if mode != SECONDARY_CAPTURE_SINGLE_SERIES_MODE:
+        return None
+
+    series_uid = _harmonize_secondary_capture_series(
+        study_dir(case_id),
+        dicom_exports,
+        instruction_dicom,
+        logger=logger,
+    )
+    if series_uid:
+        logger.log(
+            "[Metrics] Grouped Secondary Capture artifacts into one series: "
+            f"{series_uid}"
+        )
+    return series_uid
 
 
 def _load_case_metadata(case_id: str) -> dict:
@@ -899,7 +1028,7 @@ def segment_case_metrics(case_input: Path, queue_id: int | None = None) -> bool:
         _validate_case_against_profile(case_id, metadata, profile_name, profile)
         requested_job_names = _requested_metrics_modules_from_metadata(metadata)
         artifact_locale = _artifact_locale_from_metadata(metadata)
-        artifact_dicom_policy = _artifact_dicom_policy_from_metadata(metadata)
+        artifact_dicom_policy = _effective_artifact_dicom_policy(profile, metadata)
         jobs = _apply_artifact_dicom_policy(
             _apply_artifact_locale(
                 _resolve_enabled_jobs(profile, requested_job_names=requested_job_names),
@@ -959,11 +1088,10 @@ def segment_case_metrics(case_input: Path, queue_id: int | None = None) -> bool:
             logger.log(f"[Metrics] Requested jobs: {', '.join(requested_job_names)}")
         if artifact_locale:
             logger.log(f"[Metrics] Artifact locale: {artifact_locale}")
-        if artifact_dicom_policy:
-            logger.log(
-                "[Metrics] Artifact DICOM policy: "
-                f"{json.dumps(artifact_dicom_policy, sort_keys=True)}"
-            )
+        logger.log(
+            "[Metrics] Artifact DICOM policy: "
+            f"{json.dumps(artifact_dicom_policy, sort_keys=True)}"
+        )
         if skipped_jobs:
             logger.log(
                 "[Metrics] Inventory skipped jobs: "
@@ -1002,6 +1130,16 @@ def segment_case_metrics(case_input: Path, queue_id: int | None = None) -> bool:
                 "[Metrics] Instruction document generated locally but excluded from DICOM egress "
                 f"(kind={instruction_dicom['kind']})"
             )
+        secondary_capture_series_uid = _apply_secondary_capture_series_policy(
+            case_id,
+            artifact_dicom_policy,
+            dicom_exports,
+            instruction_dicom,
+            logger,
+        )
+        if secondary_capture_series_uid:
+            artifact_dicom_policy = dict(artifact_dicom_policy)
+            artifact_dicom_policy["secondary_capture_series_instance_uid"] = secondary_capture_series_uid
 
         canceled = queue_id is not None and is_metrics_queue_item_canceled(queue_id)
         if canceled:

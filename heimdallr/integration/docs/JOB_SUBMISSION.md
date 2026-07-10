@@ -35,8 +35,10 @@ presentation artifacts where localization is supported, including burned-in
 overlays and case-report DICOM metadata.
 - `series_selection_policy` chooses which prepared CT series should feed
 segmentation for this job.
-- `artifact_dicom_policy` chooses the transfer syntax used for generated
-Secondary Capture DICOM artifacts in this job.
+- `artifact_dicom_policy` chooses DICOM artifact policy for this job. It can
+select the transfer syntax used for generated Secondary Capture DICOM artifacts
+and whether generated Secondary Capture artifacts stay in separate series or
+are grouped into one case-level series.
 
 Example request:
 
@@ -49,7 +51,7 @@ curl -X POST "http://localhost:8001/jobs" \
   -F 'requested_outputs={"metrics_json":true,"overlays_dicom":true,"artifacts_tree":false}' \
   -F 'requested_metrics_modules=["l3_muscle_area","bone_health_l1_hu","lung_nodules"]' \
   -F 'artifact_locale=pt_BR' \
-  -F 'artifact_dicom_policy={"secondary_capture_transfer_syntax":"jpeg_ls_lossless"}' \
+  -F 'artifact_dicom_policy={"secondary_capture_transfer_syntax":"jpeg_ls_lossless","secondary_capture_series_mode":"single_series"}' \
   -F 'series_selection_policy={"name":"orchestrum_ct_opportunistic_v1","required":{"modality":"CT","min_slices":60},"phase_priority":["native","portal_venous"]}'
 ```
 
@@ -122,6 +124,17 @@ intake/direct pipeline runs and per `/jobs` submission through
 `original`, `deflated`, `jpeg_ls_lossless`, `jpeg_2000_lossless`, and
 `rle_lossless`. The repository default is `jpeg_ls_lossless` unless a metrics
 job or submission explicitly overrides it.
+
+Secondary Capture series mode is configurable in the active metrics profile
+through `execution.artifact_dicom_policy.secondary_capture_series_mode` and per
+`/jobs` submission through
+`artifact_dicom_policy.secondary_capture_series_mode`. Supported values are
+`separate` and `single_series`; the default is `separate`. Submissions override
+only the fields they include, and omitted fields fall back to the active
+profile. `single_series` rewrites only DICOM Secondary Capture artifacts from
+the case into one series with sequential instance numbers, including
+instruction-document DICOM when it is emitted as Secondary Capture. Derived CT
+and Encapsulated PDF artifacts remain in their own series.
 
 Compression experiment on a `parenchymal_organ_volumetry` Secondary Capture
 series with 512 x 512 RGB slices showed the following approximate per-slice

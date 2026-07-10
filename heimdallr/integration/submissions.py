@@ -51,6 +51,11 @@ ARTIFACT_DICOM_SECONDARY_CAPTURE_TRANSFER_SYNTAXES = {
     "1.2.840.10008.1.2.5": "rle_lossless",
 }
 
+ARTIFACT_DICOM_SECONDARY_CAPTURE_SERIES_MODES = {
+    "separate": "separate",
+    "single_series": "single_series",
+}
+
 
 def normalize_requested_outputs(raw: dict[str, Any] | None) -> dict[str, bool]:
     normalized = {key: False for key in DEFAULT_REQUESTED_OUTPUTS}
@@ -116,34 +121,49 @@ def normalize_artifact_dicom_policy(raw: Any) -> dict[str, Any]:
         raise ValueError("artifact_dicom_policy must be a JSON object")
 
     policy: dict[str, Any] = {}
-    if "secondary_capture_transfer_syntax" not in raw:
-        return policy
+    if "secondary_capture_transfer_syntax" in raw:
+        value = (
+            str(raw.get("secondary_capture_transfer_syntax") or "")
+            .strip()
+            .lower()
+            .replace("-", "_")
+            .replace(" ", "_")
+        )
+        if value:
+            normalized = ARTIFACT_DICOM_SECONDARY_CAPTURE_TRANSFER_SYNTAXES.get(value)
+            if normalized is None:
+                allowed = ", ".join(
+                    [
+                        "original",
+                        "deflated",
+                        "jpeg_ls_lossless",
+                        "jpeg_2000_lossless",
+                        "rle_lossless",
+                    ]
+                )
+                raise ValueError(
+                    "artifact_dicom_policy.secondary_capture_transfer_syntax "
+                    f"must be one of: {allowed}"
+                )
+            policy["secondary_capture_transfer_syntax"] = normalized
 
-    value = (
-        str(raw.get("secondary_capture_transfer_syntax") or "")
-        .strip()
-        .lower()
-        .replace("-", "_")
-        .replace(" ", "_")
-    )
-    if not value:
-        return policy
-    normalized = ARTIFACT_DICOM_SECONDARY_CAPTURE_TRANSFER_SYNTAXES.get(value)
-    if normalized is None:
-        allowed = ", ".join(
-            [
-                "original",
-                "deflated",
-                "jpeg_ls_lossless",
-                "jpeg_2000_lossless",
-                "rle_lossless",
-            ]
+    if "secondary_capture_series_mode" in raw:
+        value = (
+            str(raw.get("secondary_capture_series_mode") or "")
+            .strip()
+            .lower()
+            .replace("-", "_")
+            .replace(" ", "_")
         )
-        raise ValueError(
-            "artifact_dicom_policy.secondary_capture_transfer_syntax "
-            f"must be one of: {allowed}"
-        )
-    policy["secondary_capture_transfer_syntax"] = normalized
+        if value:
+            normalized = ARTIFACT_DICOM_SECONDARY_CAPTURE_SERIES_MODES.get(value)
+            if normalized is None:
+                allowed = ", ".join(["separate", "single_series"])
+                raise ValueError(
+                    "artifact_dicom_policy.secondary_capture_series_mode "
+                    f"must be one of: {allowed}"
+                )
+            policy["secondary_capture_series_mode"] = normalized
     return policy
 
 

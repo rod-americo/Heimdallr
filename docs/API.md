@@ -133,18 +133,25 @@ the active `config/series_selection.json` profile for the submitted job. The
 selected series audit in `metadata/id.json` records `PolicySource` and
 `ExternalPolicyName`.
 
-If `artifact_dicom_policy` is provided, Heimdallr applies it to metric jobs for
-that submitted job only. Supported `secondary_capture_transfer_syntax` values
-are `original`, `deflated`, `jpeg_ls_lossless`, `jpeg_2000_lossless`, and
-`rle_lossless`. Head CT jobs also support `derived_ct_transfer_syntax` with the
-same values for generated derived CT series. The repository default for
-generated DICOM artifacts is `jpeg_ls_lossless`; DICOM egress negotiates the
-peer's accepted presentation context and transcodes only for transfer.
+If `artifact_dicom_policy` is provided, Heimdallr applies it to generated DICOM
+artifacts for that submitted job only. Omitted fields fall back to the active
+metrics profile. Supported `secondary_capture_transfer_syntax` values are
+`original`, `deflated`, `jpeg_ls_lossless`, `jpeg_2000_lossless`, and
+`rle_lossless`. Supported `secondary_capture_series_mode` values are
+`separate` and `single_series`; the default is `separate`. In `single_series`
+mode, only DICOM Secondary Capture artifacts are rewritten into one artifact
+series for the case, including instruction documents when
+`instruction_dicom_kind=secondary_capture`. Derived CT and Encapsulated PDF
+DICOM artifacts remain in their own series. Head CT jobs also support
+`derived_ct_transfer_syntax` with the same values for generated derived CT
+series. The repository default for generated Secondary Capture storage is
+`jpeg_ls_lossless`; DICOM egress negotiates the peer's accepted presentation
+context and transcodes only for transfer.
 
 Example:
 
 ```bash
--F 'artifact_dicom_policy={"secondary_capture_transfer_syntax":"jpeg_ls_lossless"}'
+-F 'artifact_dicom_policy={"secondary_capture_transfer_syntax":"jpeg_ls_lossless","secondary_capture_series_mode":"single_series"}'
 ```
 
 The options map to these DICOM transfer syntaxes:
