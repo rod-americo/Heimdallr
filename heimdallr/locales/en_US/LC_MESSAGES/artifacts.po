@@ -412,9 +412,6 @@ msgstr "Pericardial effusion"
 msgid "pleural_pericard_effusion.overlay.slab_title"
 msgstr "Pleural/pericardial effusion 5 mm {slab}/{total}"
 
-msgid "pleural_pericard_effusion.overlay.slab_center"
-msgstr "Slab center: {value} mm"
-
 msgid "pleural_pericard_effusion.overlay.finding_volume"
 msgstr "{finding}: {value} cm³"
 

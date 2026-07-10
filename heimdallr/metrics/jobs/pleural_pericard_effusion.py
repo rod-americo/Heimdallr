@@ -490,7 +490,6 @@ def main() -> int:
                     present_findings=present_in_slab,
                     slab_index=output_index,
                     slab_count=len(export_slabs),
-                    center_mm=float(slab["center_mm"]),
                     finding_volumes_cm3={
                         finding: float(positive_findings[finding]["volume_cm3"])
                         for finding in present_in_slab

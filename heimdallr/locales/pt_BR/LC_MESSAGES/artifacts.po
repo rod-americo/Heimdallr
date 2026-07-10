@@ -412,9 +412,6 @@ msgstr "Derrame pericárdico"
 msgid "pleural_pericard_effusion.overlay.slab_title"
 msgstr "Derrame pleural/pericárdico 5 mm {slab}/{total}"
 
-msgid "pleural_pericard_effusion.overlay.slab_center"
-msgstr "Centro do slab: {value} mm"
-
 msgid "pleural_pericard_effusion.overlay.finding_volume"
 msgstr "{finding}: {value} cm³"
 

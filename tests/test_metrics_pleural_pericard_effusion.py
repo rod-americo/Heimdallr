@@ -217,7 +217,6 @@ class TestPleuralPericardEffusionJob(unittest.TestCase):
                 present_findings=["pleural_effusion", "pericardial_effusion"],
                 slab_index=2,
                 slab_count=3,
-                center_mm=10.0,
                 finding_volumes_cm3={
                     finding: measurement["findings"][finding]["volume_cm3"]
                     for finding in measurement["present_findings"]
@@ -226,6 +225,7 @@ class TestPleuralPericardEffusionJob(unittest.TestCase):
             )
             self.assertIn("Derrame pleural: 0,2 cm³", overlay_lines)
             self.assertIn("Derrame pericárdico: 0,1 cm³", overlay_lines)
+            self.assertFalse(any("Centro do slab" in line for line in overlay_lines))
 
     def test_single_positive_finding_omits_absent_finding_from_public_payload(self):
         with tempfile.TemporaryDirectory() as tmpdir:

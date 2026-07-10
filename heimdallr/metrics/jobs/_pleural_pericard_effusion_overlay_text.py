@@ -19,7 +19,6 @@ def build_slab_overlay_text(
     present_findings: list[str],
     slab_index: int,
     slab_count: int,
-    center_mm: float,
     finding_volumes_cm3: dict[str, float],
     pleural_side_volumes_cm3: dict[str, float] | None = None,
     locale: str,
@@ -30,13 +29,7 @@ def build_slab_overlay_text(
         slab=slab_index,
         total=slab_count,
     )
-    lines = [
-        translate(
-            "pleural_pericard_effusion.overlay.slab_center",
-            locale=locale,
-            value=format_decimal(center_mm, 1, locale=locale),
-        ),
-    ]
+    lines = []
     for finding in present_findings:
         if finding == "pleural_effusion" and pleural_side_volumes_cm3:
             for side in ("right", "left", "indeterminate"):
