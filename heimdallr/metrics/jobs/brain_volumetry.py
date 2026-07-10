@@ -32,6 +32,7 @@ from heimdallr.metrics.jobs._brain_volumetry_overlay_text import (
     series_description,
 )
 from heimdallr.metrics.jobs._dicom_secondary_capture import (
+    axial_source_geometry,
     create_secondary_capture_from_rgb,
     secondary_capture_options_from_job_config,
 )
@@ -381,6 +382,13 @@ def main() -> int:
                         series_number=SERIES_NUMBER,
                         instance_number=output_idx,
                         derivation_description=derivation_description(artifact_locale),
+                        **axial_source_geometry(
+                            case_dir,
+                            ct_img,
+                            float(np.mean(source_indices)),
+                        ),
+                        slice_thickness_mm=TARGET_SLICE_THICKNESS_MM,
+                        spacing_between_slices_mm=TARGET_SLICE_THICKNESS_MM,
                         **secondary_capture_options,
                     )
                     dicom_exports.append(

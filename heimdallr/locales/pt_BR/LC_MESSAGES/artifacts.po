@@ -418,6 +418,18 @@ msgstr "Centro do slab: {value} mm"
 msgid "pleural_pericard_effusion.overlay.finding_volume"
 msgstr "{finding}: {value} cm³"
 
+msgid "pleural_pericard_effusion.overlay.pleural_side_volume"
+msgstr "Derrame pleural {side}: {value} cm³"
+
+msgid "pleural_pericard_effusion.side.right"
+msgstr "direito"
+
+msgid "pleural_pericard_effusion.side.left"
+msgstr "esquerdo"
+
+msgid "pleural_pericard_effusion.side.indeterminate"
+msgstr "indeterminado"
+
 msgid "pleural_pericard_effusion.overlay.series_description"
 msgstr "Heimdallr Derrames Pleural e Pericárdico"
 

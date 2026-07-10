@@ -35,6 +35,9 @@ from heimdallr.metrics.jobs._bone_job_common import (
 from heimdallr.metrics.jobs._dicom_secondary_capture import (
     axial_dicom_geometry_from_nifti,
     create_secondary_capture_from_rgb,
+    load_source_dicom_geometry,
+    nearest_source_dicom_geometry,
+    nifti_voxel_position_lps,
     secondary_capture_options_from_job_config,
 )
 from heimdallr.metrics.jobs._lung_nodules_overlay_text import (
@@ -367,6 +370,15 @@ def main() -> int:
                 case_metadata.update(bundle.get("id_json", {}))
                 case_metadata.update(bundle.get("metadata_json", {}))
                 options = secondary_capture_options_from_job_config(job_config)
+                source_geometry = load_source_dicom_geometry(
+                    case_dir,
+                    series_instance_uid=str(
+                        (case_metadata.get("ReferenceDicom") or {}).get("SeriesInstanceUID") or ""
+                    )
+                    or None,
+                )
+            else:
+                source_geometry = []
 
             for component_index, component in enumerate(components, start=1):
                 component_id = int(component["component_id"])
@@ -414,10 +426,20 @@ def main() -> int:
                     payload["artifacts"]["overlay_png"] = _relpath(case_dir, component_png_path)
 
                 if emit_dicom and case_metadata is not None and options is not None:
-                    slice_geometry = axial_dicom_geometry_from_nifti(
+                    target_position = nifti_voxel_position_lps(
                         ct_img.affine,
-                        float(slice_index),
+                        (
+                            (reference_shape[0] - 1) / 2.0,
+                            (reference_shape[1] - 1) / 2.0,
+                            float(slice_index),
+                        ),
                     )
+                    slice_geometry = nearest_source_dicom_geometry(source_geometry, target_position)
+                    if slice_geometry is None:
+                        slice_geometry = axial_dicom_geometry_from_nifti(
+                            ct_img.affine,
+                            float(slice_index),
+                        )
                     create_secondary_capture_from_rgb(
                         rgb,
                         component_dcm_path,

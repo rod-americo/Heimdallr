@@ -17,7 +17,8 @@ import numpy as np
 from matplotlib.colors import ListedColormap
 from PIL import Image
 from pydicom.uid import generate_uid
-from scipy.ndimage import label as ndlabel
+from scipy.ndimage import binary_erosion, label as ndlabel
+from scipy.spatial import cKDTree
 
 from heimdallr.metrics.jobs._bone_job_common import (
     display_aspect_from_spacing_mm,
@@ -36,6 +37,9 @@ from heimdallr.metrics.jobs._bone_job_common import (
 from heimdallr.metrics.jobs._dicom_secondary_capture import (
     axial_dicom_geometry_from_nifti,
     create_secondary_capture_from_rgb,
+    load_source_dicom_geometry,
+    nearest_source_dicom_geometry,
+    nifti_voxel_position_lps,
     secondary_capture_options_from_job_config,
 )
 from heimdallr.metrics.jobs._pleural_pericard_effusion_overlay_text import (
@@ -119,6 +123,54 @@ def _load_lung_union(artifacts_dir: Path, reference_shape: tuple[int, ...]) -> n
         mask, _status = _load_mask(artifacts_dir / "total" / f"{name}.nii.gz", reference_shape)
         union |= mask
     return union
+
+
+def _load_lung_side(artifacts_dir: Path, reference_shape: tuple[int, ...], side: str) -> np.ndarray:
+    names = [name for name in LUNG_MASK_NAMES if name.endswith(f"_{side}")]
+    union = np.zeros(reference_shape, dtype=bool)
+    for name in names:
+        mask, _status = _load_mask(artifacts_dir / "total" / f"{name}.nii.gz", reference_shape)
+        union |= mask
+    return union
+
+
+def _surface_points_mm(mask: np.ndarray, spacing_xyz: tuple[float, float, float]) -> np.ndarray:
+    surface = np.asarray(mask, dtype=bool) & ~binary_erosion(mask, structure=np.ones((3, 3, 3)))
+    return np.argwhere(surface).astype(np.float32) * np.asarray(spacing_xyz, dtype=np.float32)
+
+
+def _lateralize_pleural_components(
+    labeled: np.ndarray,
+    components: list[dict[str, Any]],
+    left_lung: np.ndarray,
+    right_lung: np.ndarray,
+    spacing_xyz: tuple[float, float, float],
+) -> dict[str, Any]:
+    side_points = {
+        "left": _surface_points_mm(left_lung, spacing_xyz),
+        "right": _surface_points_mm(right_lung, spacing_xyz),
+    }
+    if any(points.size == 0 for points in side_points.values()):
+        return {"status": "unavailable", "volumes_cm3": {}}
+    trees = {side: cKDTree(points) for side, points in side_points.items()}
+    volumes = {"left": 0.0, "right": 0.0, "indeterminate": 0.0}
+    assignments: list[dict[str, Any]] = []
+    for component in components:
+        component_id = int(component["component_id"])
+        points = _surface_points_mm(labeled == component_id, spacing_xyz)
+        distances = {
+            side: float(np.percentile(tree.query(points, workers=-1)[0], 10.0))
+            for side, tree in trees.items()
+        }
+        ordered = sorted(distances, key=distances.get)
+        nearest, other = ordered
+        ambiguous = distances[other] - distances[nearest] < 5.0
+        side = "indeterminate" if ambiguous else nearest
+        component["laterality"] = side
+        component["lung_surface_distance_mm"] = distances
+        volumes[side] += float(component["volume_cm3"])
+        assignments.append({"component_id": component_id, "laterality": side, **distances})
+    return {"status": "complete", "volumes_cm3": volumes, "components": assignments}
 
 
 def _label_components(mask: np.ndarray, voxel_volume_cm3: float) -> tuple[np.ndarray, list[dict[str, Any]]]:
@@ -315,6 +367,8 @@ def main() -> int:
         reference_shape = tuple(int(value) for value in ct_data.shape[:3])
         voxel_volume_cm3 = _voxel_volume_cm3(ct_img)
         lung_mask = _load_lung_union(artifacts_dir, reference_shape)
+        left_lung_mask = _load_lung_side(artifacts_dir, reference_shape, "left")
+        right_lung_mask = _load_lung_side(artifacts_dir, reference_shape, "right")
         positive_findings: dict[str, dict[str, Any]] = {}
         positive_masks: dict[str, np.ndarray] = {}
         mask_statuses: dict[str, dict[str, Any]] = {}
@@ -325,7 +379,16 @@ def main() -> int:
             voxel_count = int(np.count_nonzero(mask))
             if voxel_count == 0:
                 continue
-            _labeled, components = _label_components(mask, voxel_volume_cm3)
+            labeled, components = _label_components(mask, voxel_volume_cm3)
+            lateralization = None
+            if finding == "pleural_effusion":
+                lateralization = _lateralize_pleural_components(
+                    labeled,
+                    components,
+                    left_lung_mask,
+                    right_lung_mask,
+                    tuple(float(value) for value in ct_img.header.get_zooms()[:3]),
+                )
             positive_masks[finding] = mask
             positive_findings[finding] = {
                 "present": True,
@@ -335,6 +398,10 @@ def main() -> int:
                 "components": components,
                 "source_mask": _relpath(case_dir, segmentation_dir / f"{finding}.nii.gz"),
             }
+            if lateralization is not None:
+                positive_findings[finding]["laterality"] = lateralization
+                for side, volume in lateralization.get("volumes_cm3", {}).items():
+                    positive_findings[finding][f"{side}_volume_cm3"] = float(volume)
 
         if not positive_findings:
             payload.update(
@@ -396,6 +463,15 @@ def main() -> int:
             if emit_dicom:
                 bundle = load_case_json_bundle(args.case_id)
                 case_metadata = {**bundle.get("id_json", {}), **bundle.get("metadata_json", {})}
+                source_geometry = load_source_dicom_geometry(
+                    case_dir,
+                    series_instance_uid=str(
+                        (case_metadata.get("ReferenceDicom") or {}).get("SeriesInstanceUID") or ""
+                    )
+                    or None,
+                )
+            else:
+                source_geometry = []
 
             overlays: list[dict[str, Any]] = []
             dicom_exports: list[dict[str, Any]] = []
@@ -419,6 +495,11 @@ def main() -> int:
                         finding: float(positive_findings[finding]["volume_cm3"])
                         for finding in present_in_slab
                     },
+                    pleural_side_volumes_cm3=(
+                        positive_findings.get("pleural_effusion", {})
+                        .get("laterality", {})
+                        .get("volumes_cm3")
+                    ),
                     locale=locale,
                 )
                 rgb = render_overlay_rgb(
@@ -444,10 +525,20 @@ def main() -> int:
                     payload["artifacts"]["overlay_png"] = overlay["overlay_png"]
 
                 if emit_dicom and case_metadata is not None and options is not None:
-                    slab_geometry = axial_dicom_geometry_from_nifti(
+                    target_position = nifti_voxel_position_lps(
                         ct_img.affine,
-                        float(np.mean(source_indices)),
+                        (
+                            (reference_shape[0] - 1) / 2.0,
+                            (reference_shape[1] - 1) / 2.0,
+                            float(np.mean(source_indices)),
+                        ),
                     )
+                    slab_geometry = nearest_source_dicom_geometry(source_geometry, target_position)
+                    if slab_geometry is None:
+                        slab_geometry = axial_dicom_geometry_from_nifti(
+                            ct_img.affine,
+                            float(np.mean(source_indices)),
+                        )
                     create_secondary_capture_from_rgb(
                         rgb,
                         dcm_path,

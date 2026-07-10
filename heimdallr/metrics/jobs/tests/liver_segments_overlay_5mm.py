@@ -18,7 +18,10 @@ from heimdallr.metrics.jobs._bone_job_common import (
     resolve_canonical_nifti,
     write_payload,
 )
-from heimdallr.metrics.jobs._dicom_secondary_capture import create_secondary_capture_from_rgb
+from heimdallr.metrics.jobs._dicom_secondary_capture import (
+    axial_source_geometry,
+    create_secondary_capture_from_rgb,
+)
 from heimdallr.metrics.jobs.parenchymal_organ_volumetry import (
     TARGET_SLICE_THICKNESS_MM,
     _average_ct_slab,
@@ -164,6 +167,9 @@ def main() -> int:
                 series_number=SERIES_NUMBER,
                 instance_number=output_idx,
                 derivation_description="5 mm slab average with hepatic segment overlays",
+                **axial_source_geometry(case_dir, ct_img, float(np.mean(source_indices))),
+                slice_thickness_mm=TARGET_SLICE_THICKNESS_MM,
+                spacing_between_slices_mm=TARGET_SLICE_THICKNESS_MM,
             )
             dicom_exports.append(
                 {

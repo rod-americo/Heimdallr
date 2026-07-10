@@ -36,6 +36,7 @@ from heimdallr.metrics.jobs._bone_job_common import (
     write_payload,
 )
 from heimdallr.metrics.jobs._dicom_secondary_capture import (
+    axial_source_geometry,
     create_secondary_capture_from_rgb,
     secondary_capture_options_from_job_config,
 )
@@ -984,6 +985,14 @@ def main() -> int:
                     series_number=STRUCTURE_SERIES_NUMBER,
                     instance_number=output_idx,
                     derivation_description=translate("head.structures_overlay.derivation_description", locale=artifact_locale),
+                    **axial_source_geometry(
+                        case_dir,
+                        normalized_geometry_image,
+                        float(np.mean(source_indices)),
+                    ),
+                    slice_thickness_mm=float(
+                        job_config.get("overlay_slice_thickness_mm", OVERLAY_SLICE_THICKNESS_MM)
+                    ),
                     **secondary_capture_options,
                 )
                 dicom_exports.append({"path": _relpath(case_dir, dicom_path), "kind": "secondary_capture"})
@@ -1032,6 +1041,17 @@ def main() -> int:
                     series_number=BLEED_SERIES_NUMBER,
                     instance_number=output_idx,
                     derivation_description=translate("head.bleed_overlay.derivation_description", locale=artifact_locale),
+                    **axial_source_geometry(
+                        case_dir,
+                        normalized_geometry_image,
+                        float(np.mean(source_indices)),
+                    ),
+                    slice_thickness_mm=float(
+                        job_config.get(
+                            "bleed_overlay_slice_thickness_mm",
+                            BLEED_OVERLAY_SLICE_THICKNESS_MM,
+                        )
+                    ),
                     **secondary_capture_options,
                 )
                 dicom_exports.append({"path": _relpath(case_dir, dicom_path), "kind": "secondary_capture"})

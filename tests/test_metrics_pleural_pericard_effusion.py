@@ -117,9 +117,18 @@ class TestPleuralPericardEffusionJob(unittest.TestCase):
             case_dir = Path(tmpdir) / "CaseEffusionPositive"
             ct = np.full((20, 20, 12), -750.0, dtype=np.float32)
             write_nifti(case_dir / "derived" / "CaseEffusionPositive.nii.gz", ct)
-            lung = np.zeros_like(ct)
-            lung[2:18, 2:18, 1:11] = 1.0
-            write_nifti(case_dir / "artifacts" / "total" / "lung_lower_lobe_right.nii.gz", lung)
+            left_lung = np.zeros_like(ct)
+            left_lung[2:9, 2:18, 1:11] = 1.0
+            right_lung = np.zeros_like(ct)
+            right_lung[11:18, 2:18, 1:11] = 1.0
+            write_nifti(
+                case_dir / "artifacts" / "total" / "lung_lower_lobe_left.nii.gz",
+                left_lung,
+            )
+            write_nifti(
+                case_dir / "artifacts" / "total" / "lung_lower_lobe_right.nii.gz",
+                right_lung,
+            )
             pleural = np.zeros_like(ct)
             pleural[2:5, 2:8, 3:6] = 1.0
             pleural[15:18, 12:18, 4:7] = 1.0
@@ -158,6 +167,10 @@ class TestPleuralPericardEffusionJob(unittest.TestCase):
             self.assertTrue(measurement["has_pleural_effusion"])
             self.assertTrue(measurement["has_pericardial_effusion"])
             self.assertEqual(measurement["findings"]["pleural_effusion"]["component_count"], 2)
+            pleural_measurement = measurement["findings"]["pleural_effusion"]
+            self.assertAlmostEqual(pleural_measurement["left_volume_cm3"], 0.108)
+            self.assertAlmostEqual(pleural_measurement["right_volume_cm3"], 0.108)
+            self.assertEqual(pleural_measurement["indeterminate_volume_cm3"], 0.0)
             self.assertEqual(
                 measurement["findings"]["pericardial_effusion"]["component_count"],
                 1,

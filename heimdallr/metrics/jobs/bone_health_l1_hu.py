@@ -39,6 +39,7 @@ from heimdallr.metrics.jobs._bone_health_overlay_text import (
     series_description,
 )
 from heimdallr.metrics.jobs._dicom_secondary_capture import (
+    axial_source_geometry,
     create_secondary_capture_from_rgb,
     secondary_capture_options_from_job_config,
 )
@@ -304,6 +305,7 @@ def main() -> int:
                 artifacts["overlay_png"] = str(overlay_png_path.relative_to(case_dir))
 
         if emit_dicom:
+            axial_level_index = float(np.argwhere(l1_mask).mean(axis=0)[2])
             create_secondary_capture_from_rgb(
                 overlay_rgb,
                 overlay_sc_path,
@@ -315,6 +317,7 @@ def main() -> int:
                     artifact_locale,
                     hu_mean=slice_stats["mean_hu"],
                 ),
+                **axial_source_geometry(case_dir, ct_img, axial_level_index),
                 **secondary_capture_options_from_job_config(job_config),
             )
             artifacts["overlay_sc_dcm"] = str(overlay_sc_path.relative_to(case_dir))

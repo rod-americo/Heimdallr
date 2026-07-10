@@ -41,7 +41,10 @@ from heimdallr.metrics.jobs.tests._vertebral_fracture_overlay_text import (
     resolve_artifact_locale,
     series_description,
 )
-from heimdallr.metrics.jobs._dicom_secondary_capture import create_secondary_capture_from_rgb
+from heimdallr.metrics.jobs._dicom_secondary_capture import (
+    axial_source_geometry,
+    create_secondary_capture_from_rgb,
+)
 from heimdallr.shared.paths import study_artifacts_dir
 
 
@@ -529,6 +532,10 @@ def main() -> int:
                     aspect=aspect,
                     title=build_overlay_title(locale=artifact_locale),
                 )
+                overlay_union = np.zeros(ct_data.shape, dtype=bool)
+                for mask in overlay_body_masks_by_vertebra.values():
+                    overlay_union |= np.asarray(mask, dtype=bool)
+                axial_level_index = float(np.argwhere(overlay_union).mean(axis=0)[2])
                 create_secondary_capture_from_rgb(
                     overlay_rgb,
                     overlay_sc_path,
@@ -537,6 +544,7 @@ def main() -> int:
                     series_number=SERIES_NUMBER,
                     instance_number=1,
                     derivation_description=derivation_description(artifact_locale, vertebrae=vertebrae),
+                    **axial_source_geometry(case_dir, ct_img, axial_level_index),
                 )
                 artifacts["overlay_sc_dcm"] = str(overlay_sc_path.relative_to(case_dir))
                 dicom_exports.append(

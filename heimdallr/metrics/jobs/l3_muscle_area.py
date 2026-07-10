@@ -23,6 +23,7 @@ from heimdallr.metrics.jobs._bone_job_common import (
 )
 from heimdallr.metrics.jobs._dicom_secondary_capture import (
     DEFAULT_SECONDARY_CAPTURE_MAX_DIMENSION,
+    axial_source_geometry,
     create_secondary_capture_from_rgb,
     parse_optional_float,
     secondary_capture_options_from_job_config,
@@ -382,6 +383,7 @@ def create_secondary_capture(
     artifact_locale: str,
     max_dimension: int | None = DEFAULT_SECONDARY_CAPTURE_MAX_DIMENSION,
     transfer_syntax: str | None = None,
+    axial_geometry: dict | None = None,
 ) -> None:
     create_secondary_capture_from_rgb(
         rgb,
@@ -396,6 +398,7 @@ def create_secondary_capture(
             smi_cm2_m2=measurement.get("smi_cm2_m2"),
             muscle_density_hu_mean=measurement.get("skeletal_muscle_density_hu_mean"),
         ),
+        **(axial_geometry or {}),
         max_dimension=max_dimension,
         transfer_syntax=transfer_syntax,
     )
@@ -592,6 +595,7 @@ def main() -> int:
                 case_metadata,
                 measurement_stub,
                 artifact_locale,
+                axial_geometry=axial_source_geometry(case_dir, ct_img, float(slice_idx)),
                 **secondary_capture_options_from_job_config(job_config),
             )
             artifacts["overlay_sc_dcm"] = str(overlay_sc_path.relative_to(case_dir))

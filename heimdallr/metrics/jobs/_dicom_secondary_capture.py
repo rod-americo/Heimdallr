@@ -4,11 +4,13 @@
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 from PIL import Image
+import pydicom
 from pydicom.dataset import FileDataset, FileMetaDataset
 from pydicom.uid import (
     DeflatedExplicitVRLittleEndian,
@@ -139,6 +141,80 @@ def axial_dicom_geometry_from_nifti(
         ],
         "slice_location": float(np.dot(position_lps, normal_lps)),
     }
+
+
+@lru_cache(maxsize=32)
+def load_source_dicom_geometry(
+    case_dir: Path,
+    *,
+    series_instance_uid: str | None = None,
+) -> list[dict[str, Any]]:
+    """Load image-plane geometry from preserved source DICOM instances."""
+    geometries: list[dict[str, Any]] = []
+    source_root = case_dir / "source" / "dicom" / "series"
+    for path in source_root.rglob("*.dcm") if source_root.exists() else ():
+        try:
+            ds = pydicom.dcmread(path, stop_before_pixels=True)
+            if series_instance_uid and str(getattr(ds, "SeriesInstanceUID", "")) != series_instance_uid:
+                continue
+            position = np.asarray(ds.ImagePositionPatient, dtype=float)
+            orientation = np.asarray(ds.ImageOrientationPatient, dtype=float)
+            normal = np.cross(orientation[:3], orientation[3:])
+            normal /= np.linalg.norm(normal)
+        except Exception:
+            continue
+        geometries.append(
+            {
+                "image_position_patient": [float(value) for value in position],
+                "image_orientation_patient": [float(value) for value in orientation],
+                "slice_location": float(np.dot(position, normal)),
+            }
+        )
+    return geometries
+
+
+def nearest_source_dicom_geometry(
+    geometries: list[dict[str, Any]],
+    target_position_lps: list[float] | tuple[float, ...] | np.ndarray,
+) -> dict[str, Any] | None:
+    """Return exact source geometry for the plane nearest a target LPS point."""
+    target = np.asarray(target_position_lps, dtype=float)
+    if not geometries:
+        return None
+
+    def plane_distance(geometry: dict[str, Any]) -> float:
+        orientation = np.asarray(geometry["image_orientation_patient"], dtype=float)
+        normal = np.cross(orientation[:3], orientation[3:])
+        normal /= np.linalg.norm(normal)
+        position = np.asarray(geometry["image_position_patient"], dtype=float)
+        return abs(float(np.dot(target - position, normal)))
+
+    return dict(min(geometries, key=plane_distance))
+
+
+def nifti_voxel_position_lps(affine: np.ndarray, index_xyz: tuple[float, float, float]) -> list[float]:
+    position_ras = np.asarray(affine, dtype=float) @ np.asarray([*index_xyz, 1.0])
+    return [float(-position_ras[0]), float(-position_ras[1]), float(position_ras[2])]
+
+
+def axial_source_geometry(
+    case_dir: Path,
+    nifti_image: Any,
+    slice_index: float,
+    *,
+    series_instance_uid: str | None = None,
+) -> dict[str, Any]:
+    """Resolve an axial NIfTI plane to the exact nearest source DICOM plane."""
+    shape = tuple(int(value) for value in nifti_image.shape[:3])
+    target = nifti_voxel_position_lps(
+        nifti_image.affine,
+        ((shape[0] - 1) / 2.0, (shape[1] - 1) / 2.0, float(slice_index)),
+    )
+    geometry = nearest_source_dicom_geometry(
+        load_source_dicom_geometry(case_dir, series_instance_uid=series_instance_uid),
+        target,
+    )
+    return geometry or axial_dicom_geometry_from_nifti(nifti_image.affine, slice_index)
 
 
 def create_secondary_capture_from_rgb(

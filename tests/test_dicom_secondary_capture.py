@@ -10,11 +10,30 @@ from heimdallr.metrics.jobs._dicom_secondary_capture import (
     axial_dicom_geometry_from_nifti,
     create_secondary_capture_from_rgb,
     metadata_value,
+    nearest_source_dicom_geometry,
     resolve_secondary_capture_transfer_syntax,
 )
 
 
 class TestDicomSecondaryCapture(unittest.TestCase):
+    def test_nearest_source_geometry_preserves_source_orientation_and_position(self):
+        geometries = [
+            {
+                "image_position_patient": [-170.1, -41.2, 78.76],
+                "image_orientation_patient": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+                "slice_location": 78.76,
+            },
+            {
+                "image_position_patient": [-170.1, -41.2, 79.76],
+                "image_orientation_patient": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+                "slice_location": 79.76,
+            },
+        ]
+
+        geometry = nearest_source_dicom_geometry(geometries, [10.0, 20.0, 78.8])
+
+        self.assertEqual(geometry, geometries[0])
+
     def test_axial_geometry_converts_nifti_ras_position_to_dicom_lps(self):
         affine = np.asarray(
             [

@@ -22,6 +22,7 @@ from heimdallr.metrics.jobs._bone_job_common import (
     reorient_display_spacing_mm,
 )
 from heimdallr.metrics.jobs._dicom_secondary_capture import (
+    axial_source_geometry,
     create_secondary_capture_from_rgb,
     parse_optional_float,
     secondary_capture_options_from_job_config,
@@ -442,6 +443,7 @@ def main() -> int:
                         sat_area_cm2=sat_area,
                         ratio=ratio,
                     ),
+                    **axial_source_geometry(case_dir, ct_img, float(slice_idx)),
                     **secondary_capture_options_from_job_config(job_config),
                 )
                 artifacts["overlay_sc_dcm"] = str(overlay_sc_path.relative_to(case_dir))
