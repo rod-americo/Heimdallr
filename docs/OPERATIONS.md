@@ -396,9 +396,10 @@ overlay series on the brain-geometry normalized CT grid containing positive
 slabs plus adjacent slabs, without a text panel, using a red transparent
 contour for the positive mask, and sets
 `measurement.cerebral_bleed.has_cerebral_bleed=true`.
-`brain_structures` is a licensed TotalSegmentator task in 2.13.0, so the
-segmentation worker needs a valid license before this profile is used. Restart
-segmentation and metrics workers after changing either profile.
+`brain_structures` remains a licensed TotalSegmentator task in the pinned
+2.15.0 runtime, so the segmentation worker needs a valid license before this
+profile is used. Restart segmentation and metrics workers after changing
+either profile.
 
 Do not mutate `thor` host config, runtime state, or the POC venv unless the
 task explicitly calls for host-side changes.
