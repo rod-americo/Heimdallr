@@ -135,8 +135,9 @@ The host accelerator policy is fixed unless the user explicitly changes it:
 - `thor`: `gpu`
 - `ms-heimdallr`: `cpu`
 
-The local `odin` phase detector remains a documented exception and uses CPU;
-see `docs/OPERATIONS.md` before changing `totalseg_get_phase` device settings.
+The local `odin` phase detector uses MPS with one internal thread after the
+TotalSegmentator 2.15.0 validation; see `docs/OPERATIONS.md` before changing
+`totalseg_get_phase` device settings.
 
 Use `thor` as the POC code-test host when the task requires host-level validation. The current project venv is:
 
@@ -152,14 +153,20 @@ git rev-parse --short HEAD
 ssh thor 'cd ~/Heimdallr && git status --short --branch && git rev-parse --short HEAD'
 ```
 
-Keep local and `thor` moving together during active code-test work. Prefer
+Keep local, `thor`, and `ms-heimdallr` moving together during active code-test work. Prefer
 small, reviewable commits, and create those commits automatically when a change
 is ready unless the user asks to hold them uncommitted. After every local push,
-update `thor` with `git pull --ff-only` so both repositories keep the same
-commit. Resident services on the local host and on `thor` may be restarted when
-needed for a code or configuration change to take effect. Do not edit code,
-host-local config, runtime state, or the POC venv on `thor` unless the user
-explicitly asks for host-side changes.
+update both `thor` and `ms-heimdallr` with `git pull --ff-only` so all three
+repositories keep the same commit. Before pulling `ms-heimdallr`, fetch and
+inspect its worktree plus incoming changes under `config/`. Never edit
+host-local configuration on `ms-heimdallr` as part of routine synchronization.
+Warn the user before pulling when a tracked config change could alter or impair
+that host's CPU pipeline; stop and resolve the risk instead of applying a
+questionable config change. Resident services on the local host and on `thor`
+may be restarted when needed for a code or configuration change to take effect.
+Do not restart services on `ms-heimdallr`, or edit its code, host-local config,
+runtime state, or venv, unless the user explicitly requests that host-side
+operation.
 
 Use `docs/RUNTIME_REQUIREMENTS.md` and `scripts/check_runtime_requirements.py` when auditing or rebuilding Python environments.
 
@@ -217,7 +224,8 @@ unless the user explicitly asks for that branch workflow.
 
 Commits should be short, focused, and automatic once a change is ready unless
 the user asks to hold the work uncommitted. After every local push, pull the same
-commit on `thor` with `git pull --ff-only`.
+commit on both `thor` and `ms-heimdallr` with `git pull --ff-only`, subject to
+the `ms-heimdallr` configuration-impact audit above.
 
 Commit messages must be en-US, imperative, and semantic:
 

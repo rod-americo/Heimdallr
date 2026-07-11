@@ -279,6 +279,16 @@ segmentation-only fallback; new deployments should use
 `HEIMDALLR_SEGMENTATION_MAX_PARALLEL_CASES`. Changing a worker's capacity
 requires restarting only that resident service.
 
+### Repository synchronization
+
+After every push to `main`, update both `thor` and `ms-heimdallr` with a
+fast-forward-only pull. Before updating `ms-heimdallr`, verify its worktree and
+inspect incoming changes under `config/`. That host's ignored operational JSON
+must not be edited during routine repository synchronization. If a tracked
+configuration change can affect its CPU-only pipeline, warn the operator and
+assess compatibility before pulling. Routine synchronization does not authorize
+restarting `ms-heimdallr` services or changing its venv.
+
 On `thor`, the current local smoke fixture is:
 
 ```text runtime/test_datasets/prometheus_smoke/heimdallr_smoke_001_anonymized.zip runtime/test_datasets/prometheus_smoke/heimdallr_smoke_001_manifest.json
