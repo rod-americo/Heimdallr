@@ -29,3 +29,8 @@ current host-local pipeline JSON:
 Manifests are repo-root-relative. Keep them free of secrets, PHI, callback
 tokens, local runtime paths containing case identifiers, and concrete PACS
 credentials.
+
+Record independent host ceilings in `limits.prepare_max_parallel_cases`,
+`limits.segmentation_max_parallel_cases`, `limits.metrics_max_parallel_cases`,
+and `limits.metrics_max_parallel_jobs`. Runtime JSON may select any value up to
+those ceilings; omitted case limits are treated as `1` for compatibility.

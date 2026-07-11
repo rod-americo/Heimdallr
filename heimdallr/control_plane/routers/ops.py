@@ -77,7 +77,11 @@ async def queue_capacity(db=Depends(get_db)):
             "disk": _disk_summary(),
         },
         "capacity": {
-            "max_parallel_cases": int(settings.MAX_PARALLEL_CASES),
+            "prepare_max_parallel_cases": int(settings.PREPARE_MAX_PARALLEL_CASES),
+            "segmentation_max_parallel_cases": int(settings.SEGMENTATION_MAX_PARALLEL_CASES),
+            "metrics_max_parallel_cases": int(settings.METRICS_MAX_PARALLEL_CASES),
+            # Backward-compatible alias; this has always meant segmentation capacity.
+            "max_parallel_cases": int(settings.SEGMENTATION_MAX_PARALLEL_CASES),
             "segmentation_active": int(segmentation["active"]),
             "segmentation_pending": int(segmentation["pending"]),
             "segmentation_claimed": int(segmentation["claimed"]),

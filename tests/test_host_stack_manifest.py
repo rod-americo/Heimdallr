@@ -35,7 +35,9 @@ class TestHostStackManifest(unittest.TestCase):
                 "allowed_devices": allowed_devices,
             },
             "limits": {
+                "prepare_max_parallel_cases": 1,
                 "segmentation_max_parallel_cases": segmentation_limit,
+                "metrics_max_parallel_cases": 1,
                 "metrics_max_parallel_jobs": metrics_limit,
                 "retroactive_workers": 1,
             },
@@ -84,6 +86,7 @@ class TestHostStackManifest(unittest.TestCase):
 
             result = check_host_stack_manifest.validate_runtime_configs(
                 self.base_manifest(kind="mps"),
+                intake_config_path=None,
                 segmentation_config_path=segmentation_path,
                 metrics_config_path=metrics_path,
             )
@@ -114,6 +117,7 @@ class TestHostStackManifest(unittest.TestCase):
 
             result = check_host_stack_manifest.validate_runtime_configs(
                 self.base_manifest(kind="cpu", allowed_devices=["cpu"], metrics_limit=2),
+                intake_config_path=None,
                 segmentation_config_path=segmentation_path,
                 metrics_config_path=metrics_path,
             )

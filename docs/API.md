@@ -190,7 +190,10 @@ Deflated Explicit VR Little Endian.
 
 `GET /ops/queues` returns non-identifying operational capacity for external
 feeders: queue status counts, oldest pending timestamps, segmentation
-concurrency, and runtime disk usage. It does not return case IDs, study UIDs,
+activity, independent `prepare_max_parallel_cases`,
+`segmentation_max_parallel_cases`, and `metrics_max_parallel_cases` capacity,
+and runtime disk usage. The legacy `max_parallel_cases` field remains an alias
+for segmentation capacity. It does not return case IDs, study UIDs,
 patient identifiers, or package paths.
 
 ### Patients and Results

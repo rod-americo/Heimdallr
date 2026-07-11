@@ -66,6 +66,16 @@ def _config_bool(env_name: str, config: dict, keys: tuple[str, ...], default: bo
     return str(configured).strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _config_str(env_name: str, config: dict, keys: tuple[str, ...], default: str) -> str:
+    explicit = os.getenv(env_name)
+    if explicit is not None:
+        return explicit.strip()
+    configured = _get_nested_config(config, *keys)
+    if configured is None:
+        return default
+    return str(configured).strip()
+
+
 BASE_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_RUNTIME_PYTHON = str(Path(sys.executable))
 DEFAULT_BIN_DIR = BASE_DIR / "bin"
@@ -154,6 +164,18 @@ PREPARE_STABLE_AGE_SECONDS = _config_int(
     ("prepare_watchdog", "stable_age_seconds"),
     5,
 )
+PREPARE_MAX_PARALLEL_CASES = _config_int(
+    "HEIMDALLR_PREPARE_MAX_PARALLEL_CASES",
+    INTAKE_PIPELINE_CONFIG,
+    ("prepare_watchdog", "max_parallel_cases"),
+    1,
+)
+PREPARE_SERIES_CONVERSION_WORKERS = _config_int(
+    "HEIMDALLR_PREPARE_SERIES_CONVERSION_WORKERS",
+    INTAKE_PIPELINE_CONFIG,
+    ("prepare_watchdog", "series_conversion_workers"),
+    5,
+)
 PREPARE_MIN_SERIES_IMAGES = int(os.getenv("HEIMDALLR_PREPARE_MIN_SERIES_IMAGES", "120"))
 TOTALSEGMENTATOR_LICENSE = os.getenv("TOTALSEGMENTATOR_LICENSE")
 SEGMENTATION_SCAN_INTERVAL = int(os.getenv("HEIMDALLR_SEGMENTATION_SCAN_INTERVAL", "2"))
@@ -185,7 +207,14 @@ METRICS_PIPELINE_CONFIG_PATH = Path(
         str(CONFIG_DIR / "metrics_pipeline.json"),
     )
 )
+METRICS_PIPELINE_CONFIG = _load_json_config(METRICS_PIPELINE_CONFIG_PATH)
 METRICS_PIPELINE_PROFILE = os.getenv("HEIMDALLR_METRICS_PIPELINE_PROFILE")
+METRICS_MAX_PARALLEL_CASES = _config_int(
+    "HEIMDALLR_METRICS_MAX_PARALLEL_CASES",
+    METRICS_PIPELINE_CONFIG,
+    ("execution", "max_parallel_cases"),
+    1,
+)
 DICOM_EGRESS_CONFIG_PATH = Path(
     os.getenv(
         "HEIMDALLR_DICOM_EGRESS_CONFIG",
@@ -284,12 +313,15 @@ SEGMENTATION_PIPELINE_CONFIG_PATH = Path(
 )
 SEGMENTATION_PIPELINE_CONFIG = _load_json_config(SEGMENTATION_PIPELINE_CONFIG_PATH)
 SEGMENTATION_PIPELINE_PROFILE = os.getenv("HEIMDALLR_SEGMENTATION_PIPELINE_PROFILE")
-MAX_PARALLEL_CASES = _config_int(
-    "HEIMDALLR_MAX_PARALLEL_CASES",
+_legacy_segmentation_parallel_cases = os.getenv("HEIMDALLR_MAX_PARALLEL_CASES")
+SEGMENTATION_MAX_PARALLEL_CASES = _config_int(
+    "HEIMDALLR_SEGMENTATION_MAX_PARALLEL_CASES",
     SEGMENTATION_PIPELINE_CONFIG,
     ("execution", "max_parallel_cases"),
-    1,
+    int(_legacy_segmentation_parallel_cases) if _legacy_segmentation_parallel_cases is not None else 1,
 )
+# Compatibility alias for integrations that still read the old settings symbol.
+MAX_PARALLEL_CASES = SEGMENTATION_MAX_PARALLEL_CASES
 PRESENTATION_CONFIG_PATH = Path(
     os.getenv(
         "HEIMDALLR_PRESENTATION_CONFIG",
@@ -388,24 +420,29 @@ def _default_totalseg_get_phase_device() -> str | None:
     return None
 
 
-TOTALSEG_GET_PHASE_DEVICE = os.getenv(
+TOTALSEG_GET_PHASE_DEVICE = _config_str(
     "HEIMDALLR_TOTALSEG_GET_PHASE_DEVICE",
+    INTAKE_PIPELINE_CONFIG,
+    ("prepare_watchdog", "phase_detection", "device"),
     _default_totalseg_get_phase_device() or "",
-).strip()
-TOTALSEG_GET_PHASE_TIMEOUT_SECONDS = int(
-    os.getenv("HEIMDALLR_TOTALSEG_GET_PHASE_TIMEOUT_SECONDS", "120")
 )
-TOTALSEG_GET_PHASE_THREAD_LIMIT = int(
-    os.getenv(
-        "HEIMDALLR_TOTALSEG_GET_PHASE_THREAD_LIMIT",
-        "1" if platform.system().lower() == "darwin" else "0",
-    )
+TOTALSEG_GET_PHASE_TIMEOUT_SECONDS = _config_int(
+    "HEIMDALLR_TOTALSEG_GET_PHASE_TIMEOUT_SECONDS",
+    INTAKE_PIPELINE_CONFIG,
+    ("prepare_watchdog", "phase_detection", "timeout_seconds"),
+    120,
 )
-TOTALSEG_GET_PHASE_MAX_PARALLEL = int(
-    os.getenv(
-        "HEIMDALLR_TOTALSEG_GET_PHASE_MAX_PARALLEL",
-        "1" if platform.system().lower() == "darwin" else "0",
-    )
+TOTALSEG_GET_PHASE_THREAD_LIMIT = _config_int(
+    "HEIMDALLR_TOTALSEG_GET_PHASE_THREAD_LIMIT",
+    INTAKE_PIPELINE_CONFIG,
+    ("prepare_watchdog", "phase_detection", "thread_limit"),
+    1 if platform.system().lower() == "darwin" else 0,
+)
+TOTALSEG_GET_PHASE_MAX_PARALLEL = _config_int(
+    "HEIMDALLR_TOTALSEG_GET_PHASE_MAX_PARALLEL",
+    INTAKE_PIPELINE_CONFIG,
+    ("prepare_watchdog", "phase_detection", "max_parallel"),
+    1 if platform.system().lower() == "darwin" else 0,
 )
 TOTALSEGMENTATOR_BIN = os.getenv(
     "HEIMDALLR_TOTALSEGMENTATOR_BIN",

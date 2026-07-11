@@ -141,8 +141,10 @@ The external consumer contract is maintained in `heimdallr/integration/docs/JOB_
 
 `GET /ops/queues` returns non-identifying operational capacity for feeders that
 need backpressure before submitting more studies. The response includes queue
-status counts, oldest pending timestamps, `MAX_PARALLEL_CASES`, segmentation
-active counts, and runtime disk usage. It must not include `case_id`, study
+status counts, oldest pending timestamps, independent prepare, segmentation,
+and metrics case capacities, segmentation active counts, and runtime disk
+usage. The legacy `max_parallel_cases` field remains a segmentation-capacity
+alias. It must not include `case_id`, study
 UIDs, patient identifiers, file paths inside a case, callback URLs, or package
 contents.
 
@@ -168,6 +170,22 @@ Inbound DICOM defaults:
 Outbound DICOM destinations are host-local and defined in `config/dicom_egress.json`.
 The same file controls DICOM egress queue concurrency with `worker_count`; the
 default is 10 workers.
+
+### Worker Concurrency
+
+Resident services own concurrency independently:
+
+- `prepare_watchdog.max_parallel_cases` controls studies prepared concurrently;
+  `series_conversion_workers` and `phase_detection.max_parallel` control work
+  inside those studies.
+- `segmentation_pipeline.execution.max_parallel_cases` controls studies being
+  segmented concurrently.
+- `metrics_pipeline.execution.max_parallel_cases` controls studies executing
+  metrics concurrently, while `profiles.*.execution.max_parallel_jobs` controls
+  independent jobs inside each study.
+
+All case-concurrency defaults are `1`. API submission concurrency does not
+override resident worker capacity.
 
 ## 7. Invariants
 

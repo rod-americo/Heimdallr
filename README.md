@@ -171,6 +171,9 @@ Configuration is centralized in `heimdallr/shared/settings.py` plus JSON files u
 | `HEIMDALLR_INTAKE_PIPELINE_CONFIG` | env/file | no | repo or host | `config/intake_pipeline.json` |
 | `HEIMDALLR_SEGMENTATION_PIPELINE_CONFIG` | env/file | yes for segmentation | host-local | `config/segmentation_pipeline.json` |
 | `HEIMDALLR_METRICS_PIPELINE_CONFIG` | env/file | yes for metrics | host-local | `config/metrics_pipeline.json` |
+| `HEIMDALLR_PREPARE_MAX_PARALLEL_CASES` | env/config | no | host | `1` |
+| `HEIMDALLR_SEGMENTATION_MAX_PARALLEL_CASES` | env/config | no | host | `1` |
+| `HEIMDALLR_METRICS_MAX_PARALLEL_CASES` | env/config | no | host | `1` |
 | `HEIMDALLR_DICOM_EGRESS_CONFIG` | env/file | yes for egress | host-local | `config/dicom_egress.json` |
 | `HEIMDALLR_INTEGRATION_DISPATCH_CONFIG` | env/file | no | host-local | `config/integration_dispatch.json` |
 | `HEIMDALLR_INTEGRATION_DELIVERY_CONFIG` | env/file | no | host-local | `config/integration_delivery.json` |

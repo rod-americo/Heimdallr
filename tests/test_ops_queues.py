@@ -45,6 +45,18 @@ class TestOpsQueues(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertEqual(body["status"], "ok")
+        self.assertEqual(
+            body["capacity"]["prepare_max_parallel_cases"],
+            settings.PREPARE_MAX_PARALLEL_CASES,
+        )
+        self.assertEqual(
+            body["capacity"]["segmentation_max_parallel_cases"],
+            settings.SEGMENTATION_MAX_PARALLEL_CASES,
+        )
+        self.assertEqual(
+            body["capacity"]["metrics_max_parallel_cases"],
+            settings.METRICS_MAX_PARALLEL_CASES,
+        )
         self.assertEqual(body["capacity"]["segmentation_active"], 2)
         self.assertEqual(body["queues"]["segmentation"]["pending"], 1)
         self.assertEqual(body["queues"]["segmentation"]["claimed"], 1)

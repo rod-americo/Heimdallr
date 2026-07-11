@@ -103,7 +103,8 @@ class TestPrepareConversion(unittest.TestCase):
             self.assertIn("--device", cmd)
             self.assertIn("mps", cmd)
             self.assertTrue(kwargs["start_new_session"])
-            self.assertNotIn("OMP_NUM_THREADS", kwargs["env"])
+            self.assertEqual(kwargs["env"]["OMP_NUM_THREADS"], "1")
+            self.assertEqual(kwargs["env"]["VECLIB_MAXIMUM_THREADS"], "1")
             terminate_mock.assert_called_with(12345)
 
     def test_totalseg_phase_limits_threads_for_cpu_device(self):

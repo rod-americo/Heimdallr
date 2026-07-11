@@ -177,14 +177,14 @@ markers in `requirements.txt`.
 - PyTorch-family pins must stay Python 3.14-compatible. On macOS, confirm MPS
 readiness with `python -c "import torch; print(torch.backends.mps.is_available())"`
 before using MPS for segmentation experiments.
-- Keep `totalseg_get_phase` device and thread policy explicit per host. The
-  local macOS stack should use `HEIMDALLR_TOTALSEG_GET_PHASE_DEVICE=cpu` with
-  `HEIMDALLR_TOTALSEG_GET_PHASE_THREAD_LIMIT=1` and
-  `HEIMDALLR_TOTALSEG_GET_PHASE_MAX_PARALLEL=1`; `mps` crashed during local
-  phase-detector validation, while CPU completed when worker thread counts were
-  bounded. On Apple Silicon, avoid concurrent phase-detector subprocesses
-  because each detector may still spawn multiple PyTorch/nnU-Net child
-  processes. CUDA hosts such as `thor` should use `gpu`.
+- Keep `totalseg_get_phase` device and thread policy explicit per host.
+  TotalSegmentator 2.15.0 completed a controlled local MPS phase smoke, while
+  internal detector multithreading still stalled. The local macOS stack may use
+  `HEIMDALLR_TOTALSEG_GET_PHASE_DEVICE=mps`, must keep
+  `HEIMDALLR_TOTALSEG_GET_PHASE_THREAD_LIMIT=1`, and should scale throughput
+  with bounded independent subprocesses through
+  `HEIMDALLR_TOTALSEG_GET_PHASE_MAX_PARALLEL`. CUDA hosts such as `thor` should
+  use `gpu`.
 - TUI support requires `textual==8.1.1` in the selected venv.
 - Default presentation locale is `en_US`; use `pt_BR` only through an explicit
 host-local override or targeted i18n tests.

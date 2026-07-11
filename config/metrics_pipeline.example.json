@@ -10,6 +10,9 @@
     "artifact_dicom_policy": "Profiles may set execution.artifact_dicom_policy.secondary_capture_series_mode to separate or single_series. The default is separate. single_series groups only Secondary Capture artifacts from the case; Derived CT and Encapsulated PDF keep their own series."
   },
   "default_profile": "ct_automatic_metrics",
+  "execution": {
+    "max_parallel_cases": 1
+  },
   "profiles": {
     "ct_automatic_metrics": {
       "planning": {

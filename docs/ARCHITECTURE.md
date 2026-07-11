@@ -160,8 +160,9 @@ Future extraction should be behavior-driven and tested, not directory-first.
 3. `prepare` claims a stable ZIP, extracts it, scans DICOM metadata, persists
 the scanned instances grouped by DICOM series inside the case workspace, records
 candidate-series geometry, converts DICOM to NIfTI, writes study metadata, and
-enqueues segmentation. The upload ZIP remains a spool transport artifact and is
-deleted after successful prepare.
+enqueues segmentation. Its case concurrency, per-case series conversion pool,
+and phase-detector concurrency are independent prepare settings. The upload ZIP
+remains a spool transport artifact and is deleted after successful prepare.
 4. `segmentation` claims the case, resolves the active segmentation profile,
 deep-merges any external per-job series-selection policy, selects the target
 series, narrows TotalSegmentator tasks when an external submission requested
@@ -170,7 +171,8 @@ pipeline state, and enqueues metrics.
 5. `metrics` claims the case, resolves the active metrics profile, executes
 enabled jobs and dependencies, writes publishable findings to
 `metadata/resultados.json`, creates artifacts, and enqueues outbound delivery
-where configured. Positive-only jobs retain negative execution state in the
+where configured. Case concurrency is independent from each profile's internal
+job concurrency. Positive-only jobs retain negative execution state in the
 pipeline audit without publishing an absent finding.
 6. `dicom_egress`, `integration.dispatch`, and `integration.delivery` drain
 their queues independently. External `/jobs` submissions can request a subset

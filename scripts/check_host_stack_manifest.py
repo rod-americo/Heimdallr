@@ -146,6 +146,16 @@ def validate_manifest_shape(
         result,
     )
     positive_int(
+        limits.get("prepare_max_parallel_cases", 1),
+        "limits.prepare_max_parallel_cases",
+        result,
+    )
+    positive_int(
+        limits.get("metrics_max_parallel_cases", 1),
+        "limits.metrics_max_parallel_cases",
+        result,
+    )
+    positive_int(
         limits.get("metrics_max_parallel_jobs"),
         "limits.metrics_max_parallel_jobs",
         result,
@@ -215,6 +225,7 @@ def _task_device(task: dict[str, Any]) -> tuple[str | None, str | None]:
 def validate_runtime_configs(
     manifest: dict[str, Any],
     *,
+    intake_config_path: Path | None = None,
     segmentation_config_path: Path | None,
     metrics_config_path: Path | None,
 ) -> ValidationResult:
@@ -238,6 +249,34 @@ def validate_runtime_configs(
         "limits.metrics_max_parallel_jobs",
         result,
     ) or 1
+    prepare_case_limit = positive_int(
+        limits.get("prepare_max_parallel_cases", 1),
+        "limits.prepare_max_parallel_cases",
+        result,
+    ) or 1
+    metrics_case_limit = positive_int(
+        limits.get("metrics_max_parallel_cases", 1),
+        "limits.metrics_max_parallel_cases",
+        result,
+    ) or 1
+
+    if intake_config_path is not None:
+        try:
+            intake_config = load_json(intake_config_path)
+        except RuntimeError as exc:
+            result.error(str(exc))
+        else:
+            prepare_config = intake_config.get("prepare_watchdog", {})
+            max_prepare_cases = positive_int(
+                prepare_config.get("max_parallel_cases", 1),
+                "prepare_watchdog.max_parallel_cases",
+                result,
+            )
+            if max_prepare_cases is not None and max_prepare_cases > prepare_case_limit:
+                result.error(
+                    f"prepare max_parallel_cases={max_prepare_cases} exceeds host limit "
+                    f"{prepare_case_limit}"
+                )
 
     if segmentation_config_path is not None:
         try:
@@ -288,6 +327,16 @@ def validate_runtime_configs(
         except RuntimeError as exc:
             result.error(str(exc))
         else:
+            max_metric_cases = positive_int(
+                metrics_config.get("execution", {}).get("max_parallel_cases", 1),
+                "metrics.execution.max_parallel_cases",
+                result,
+            )
+            if max_metric_cases is not None and max_metric_cases > metrics_case_limit:
+                result.error(
+                    f"metrics max_parallel_cases={max_metric_cases} exceeds host limit "
+                    f"{metrics_case_limit}"
+                )
             expected_profile = profile_expectations.get("metrics")
             profile_name, profile_source = _profile_name(
                 metrics_config,
@@ -365,6 +414,12 @@ def parse_args() -> argparse.Namespace:
         help="host stack manifest path; defaults to config/host_stack/<hostname>.json",
     )
     parser.add_argument(
+        "--intake-config",
+        type=Path,
+        default=None,
+        help="override intake pipeline JSON path",
+    )
+    parser.add_argument(
         "--segmentation-config",
         type=Path,
         default=None,
@@ -420,6 +475,9 @@ def main() -> int:
 
     if not args.manifest_only:
         config_paths = manifest.get("config_paths", {})
+        intake_config = args.intake_config or resolve_repo_path(
+            config_paths.get("intake_pipeline", "config/intake_pipeline.json")
+        )
         segmentation_config = args.segmentation_config or resolve_repo_path(
             config_paths.get("segmentation_pipeline", "config/segmentation_pipeline.json")
         )
@@ -429,6 +487,7 @@ def main() -> int:
         results.append(
             validate_runtime_configs(
                 manifest,
+                intake_config_path=intake_config,
                 segmentation_config_path=segmentation_config,
                 metrics_config_path=metrics_config,
             )

@@ -1,4 +1,5 @@
 import tempfile
+import threading
 import unittest
 import zipfile
 import sqlite3
@@ -12,6 +13,51 @@ from heimdallr.shared.spool import CLAIM_SUFFIX
 
 
 class TestPrepareSpoolOrder(unittest.TestCase):
+    def test_watch_upload_spool_processes_cases_concurrently(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            upload_root = Path(tmpdir)
+            from_prepare_dir = upload_root / "from_prepare"
+            external_dir = upload_root / "external"
+            failed_dir = upload_root / "failed"
+            for path in (from_prepare_dir, external_dir, failed_dir):
+                path.mkdir(parents=True)
+            for name in ("study_a.zip", "study_b.zip"):
+                (from_prepare_dir / name).write_bytes(b"zip")
+
+            lock = threading.Lock()
+            active = 0
+            peak_active = 0
+            processed = []
+
+            def fake_process(path):
+                nonlocal active, peak_active
+                with lock:
+                    active += 1
+                    peak_active = max(peak_active, active)
+                threading.Event().wait(0.05)
+                Path(path).unlink()
+                with lock:
+                    processed.append(Path(path).name)
+                    active -= 1
+                return True
+
+            with (
+                patch.object(worker.settings, "UPLOAD_DIR", upload_root),
+                patch.object(worker.settings, "UPLOAD_FROM_PREPARE_DIR", from_prepare_dir),
+                patch.object(worker.settings, "UPLOAD_EXTERNAL_DIR", external_dir),
+                patch.object(worker.settings, "UPLOAD_FAILED_DIR", failed_dir),
+                patch.object(worker.settings, "PREPARE_MAX_PARALLEL_CASES", 2),
+                patch.object(worker.settings, "PREPARE_SCAN_INTERVAL", 0.01),
+                patch.object(worker, "is_spooled_zip_stable", return_value=True),
+                patch.object(worker, "process_spooled_zip", side_effect=fake_process),
+                patch.object(worker.time, "sleep", side_effect=KeyboardInterrupt),
+            ):
+                result = worker.watch_upload_spool()
+
+            self.assertEqual(result, 0)
+            self.assertEqual(len(processed), 2)
+            self.assertEqual(peak_active, 2)
+
     def test_update_global_biometrics_from_dataset_fills_missing_values(self):
         global_meta = {"Height": None, "Weight": None}
 

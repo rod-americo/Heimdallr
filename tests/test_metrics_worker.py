@@ -1,5 +1,6 @@
 import json
 import tempfile
+import threading
 import time
 import unittest
 from datetime import datetime
@@ -11,6 +12,7 @@ import pydicom
 from pydicom.uid import CTImageStorage, generate_uid
 
 from heimdallr.metrics.jobs._dicom_secondary_capture import create_secondary_capture_from_rgb
+from heimdallr.metrics import worker as metrics_worker
 from heimdallr.metrics.worker import (
     MetricsLogger,
     _record_metrics_pipeline_state,
@@ -33,6 +35,66 @@ from heimdallr.shared.automatic_ct import filter_jobs_by_inventory
 
 
 class TestMetricsWorker(unittest.TestCase):
+    def test_metrics_main_processes_cases_concurrently(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            paths = [Path(tmpdir) / "case_a", Path(tmpdir) / "case_b"]
+            for path in paths:
+                path.mkdir()
+            queue_items = [
+                (1, "case-a", str(paths[0])),
+                (2, "case-b", str(paths[1])),
+            ]
+            lock = threading.Lock()
+            both_started = threading.Event()
+            both_finished = threading.Event()
+            active = 0
+            peak_active = 0
+            finished = 0
+
+            def claim_next():
+                with lock:
+                    return queue_items.pop(0) if queue_items else None
+
+            def run_case(_path, _queue_id):
+                nonlocal active, peak_active, finished
+                with lock:
+                    active += 1
+                    peak_active = max(peak_active, active)
+                    if active == 2:
+                        both_started.set()
+                self.assertTrue(both_started.wait(1))
+                with lock:
+                    active -= 1
+                    finished += 1
+                    if finished == 2:
+                        both_finished.set()
+                return True
+
+            def scan_wait(_seconds):
+                if both_finished.wait(1):
+                    metrics_worker._SHUTDOWN_EVENT.set()
+
+            metrics_worker._SHUTDOWN_EVENT.clear()
+            try:
+                with (
+                    patch.object(metrics_worker.settings, "METRICS_MAX_PARALLEL_CASES", 2),
+                    patch.object(metrics_worker, "ensure_metrics_queue_table"),
+                    patch.object(metrics_worker, "recover_claimed_metrics_queue_items", return_value=0),
+                    patch.object(metrics_worker, "claim_next_pending_metrics_queue_item", side_effect=claim_next),
+                    patch.object(metrics_worker, "_segment_case_metrics_with_heartbeat", side_effect=run_case),
+                    patch.object(metrics_worker, "mark_metrics_queue_item_done") as mark_done,
+                    patch.object(metrics_worker.time, "sleep", side_effect=scan_wait),
+                    patch.object(metrics_worker, "_install_signal_handlers"),
+                    patch.object(metrics_worker, "_terminate_registered_child_processes"),
+                ):
+                    result = metrics_worker.main()
+            finally:
+                metrics_worker._SHUTDOWN_EVENT.clear()
+
+            self.assertEqual(result, 0)
+            self.assertEqual(peak_active, 2)
+            self.assertEqual(mark_done.call_count, 2)
+
     def test_example_profile_limits_secondary_capture_1024_to_validated_jobs(self):
         config_path = Path(__file__).resolve().parents[1] / "config" / "metrics_pipeline.example.json"
         config = json.loads(config_path.read_text(encoding="utf-8"))

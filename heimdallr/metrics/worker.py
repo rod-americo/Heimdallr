@@ -1267,7 +1267,9 @@ def main() -> int:
     recovered_claims = recover_claimed_metrics_queue_items()
     if recovered_claims:
         print(f"[Metrics] Recovered {recovered_claims} claimed queue item(s) on startup")
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    max_cases = max(1, int(settings.METRICS_MAX_PARALLEL_CASES))
+    print(f"[Metrics] Max parallel cases: {max_cases}")
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_cases)
     active_futures: set[concurrent.futures.Future] = set()
     lock = threading.Lock()
 
@@ -1313,22 +1315,23 @@ def main() -> int:
     try:
         while not _SHUTDOWN_EVENT.is_set():
             try:
-                if _active_case_count() < 1:
+                while _active_case_count() < max_cases:
                     queue_item = claim_next_pending_metrics_queue_item()
-                    if queue_item:
-                        queue_id, _, input_path_str = queue_item
-                        case_path = Path(input_path_str)
-                        if not case_path.exists():
-                            error_message = f"Input path not found: {case_path}"
-                            mark_metrics_queue_item_error(queue_id, error_message)
-                            _enqueue_external_failure_if_present(
-                                case_path.name,
-                                failure_stage="metrics",
-                                error_message=error_message,
-                            )
-                        else:
-                            print(f"[Metrics] Claimed queue item: {case_path.name}")
-                            _submit_case(case_path, queue_id=queue_id)
+                    if not queue_item:
+                        break
+                    queue_id, _, input_path_str = queue_item
+                    case_path = Path(input_path_str)
+                    if not case_path.exists():
+                        error_message = f"Input path not found: {case_path}"
+                        mark_metrics_queue_item_error(queue_id, error_message)
+                        _enqueue_external_failure_if_present(
+                            case_path.name,
+                            failure_stage="metrics",
+                            error_message=error_message,
+                        )
+                    else:
+                        print(f"[Metrics] Claimed queue item: {case_path.name}")
+                        _submit_case(case_path, queue_id=queue_id)
 
                 time.sleep(settings.METRICS_SCAN_INTERVAL)
             except Exception as exc:
@@ -1339,7 +1342,7 @@ def main() -> int:
         _SHUTDOWN_EVENT.set()
     finally:
         _terminate_registered_child_processes(reason="metrics worker shutdown")
-        executor.shutdown(wait=False, cancel_futures=True)
+        executor.shutdown(wait=True, cancel_futures=True)
     return 0
 
 

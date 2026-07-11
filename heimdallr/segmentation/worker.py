@@ -2149,7 +2149,7 @@ def main():
     if recovered_claims:
         print(f"[Segmentation] Recovered {recovered_claims} claimed queue item(s) on startup")
     
-    max_cases = settings.MAX_PARALLEL_CASES  # Maximum concurrent cases from config
+    max_cases = max(1, int(settings.SEGMENTATION_MAX_PARALLEL_CASES))
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_cases)
     
     active_futures: set[concurrent.futures.Future] = set()

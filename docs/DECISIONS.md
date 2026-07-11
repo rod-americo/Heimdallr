@@ -642,3 +642,43 @@ desktop execution plan in `docs/DESKTOP.md`.
   coordination overhead before the engine/daemon/app contracts are stable.
 - Put Swift, Go, and packaging files as loose top-level directories without a
   single desktop boundary.
+
+---
+
+### 2026-07-11 - Keep resident worker concurrency independent
+
+**Context**
+
+Prepare, segmentation, and metrics are separate resident services with
+different CPU, accelerator, memory, and internal parallelism characteristics.
+The existing segmentation-only `MAX_PARALLEL_CASES` name looked global, while
+prepare and metrics serialized cases with hardcoded worker counts.
+
+**Decision**
+
+Give each service an independent case limit. Prepare additionally owns its
+series-conversion and phase-detector limits; metrics separately owns profile
+job concurrency. Keep every case limit at `1` by default. Preserve
+`HEIMDALLR_MAX_PARALLEL_CASES` only as a compatibility fallback for
+segmentation and use service-qualified environment names for new deployments.
+API ingestion does not override resident service capacity.
+
+**Impact**
+
+- Hosts may tune each stage without changing other services.
+- Four accepted API jobs do not imply four concurrent cases at every stage.
+- Prepare can scale one-thread phase-detector subprocesses between studies
+  without enabling unstable internal detector multithreading.
+
+**Tradeoff**
+
+- Operators must reason about case concurrency and per-case concurrency as
+  separate multiplicative limits.
+- Host manifests and runbooks must record each service capacity explicitly.
+
+**Alternatives rejected**
+
+- One global pipeline worker count, which cannot represent heterogeneous
+  resource constraints.
+- Deriving worker capacity from API server worker count.
+- Increasing hardcoded executor sizes per host.

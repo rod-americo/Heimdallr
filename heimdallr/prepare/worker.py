@@ -908,7 +908,7 @@ def _totalseg_phase_subprocess_env() -> dict[str, str]:
     env = os.environ.copy()
     device = str(settings.TOTALSEG_GET_PHASE_DEVICE or "").strip().lower()
     thread_limit = int(getattr(settings, "TOTALSEG_GET_PHASE_THREAD_LIMIT", 0) or 0)
-    if device == "cpu" and thread_limit > 0:
+    if thread_limit > 0:
         limit = str(thread_limit)
         for name in (
             "OMP_NUM_THREADS",
@@ -1523,10 +1523,14 @@ def process_zip(zip_path):
         else:
             # --- CT LOGIC: CONVERT, PRESERVE AND CHARACTERIZE ALL SERIES ---
             select_started = time.perf_counter()
-            print("  [CT Mode] Converting, preserving and characterizing all CT series (Parallel - 5 Threads)...")
+            series_workers = max(1, int(settings.PREPARE_SERIES_CONVERSION_WORKERS))
+            print(
+                "  [CT Mode] Converting, preserving and characterizing all CT series "
+                f"(parallel workers: {series_workers})..."
+            )
             candidates = []
             
-            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=series_workers) as executor:
                 futures = []
                 for uid, s_data in series_map.items():
                     futures.append(
@@ -1850,18 +1854,49 @@ def watch_upload_spool() -> int:
     print(f"  Failed spool: {settings.UPLOAD_FAILED_DIR}")
     print(f"  Stable age: {settings.PREPARE_STABLE_AGE_SECONDS}s")
     print(f"  Scan interval: {settings.PREPARE_SCAN_INTERVAL}s")
+    max_cases = max(1, int(settings.PREPARE_MAX_PARALLEL_CASES))
+    print(f"  Max parallel cases: {max_cases}")
+    executor = concurrent.futures.ThreadPoolExecutor(
+        max_workers=max_cases,
+        thread_name_prefix="prepare-case",
+    )
+    active: dict[concurrent.futures.Future, Path] = {}
 
     try:
         while True:
-            handled_any = False
-            for zip_path in iter_claimable_uploads():
-                handled_any = True
-                process_spooled_zip(zip_path)
-            if not handled_any:
+            done = [future for future in active if future.done()]
+            for future in done:
+                zip_path = active.pop(future)
+                try:
+                    future.result()
+                except Exception as exc:
+                    print(f"[Prepare] Unexpected worker failure for {zip_path.name}: {exc}")
+
+            active_paths = set(active.values())
+            while len(active) < max_cases:
+                next_path = next(
+                    (path for path in iter_claimable_uploads() if path not in active_paths),
+                    None,
+                )
+                if next_path is None:
+                    break
+                future = executor.submit(process_spooled_zip, next_path)
+                active[future] = next_path
+                active_paths.add(next_path)
+
+            if not active:
                 time.sleep(settings.PREPARE_SCAN_INTERVAL)
+            else:
+                concurrent.futures.wait(
+                    active,
+                    timeout=settings.PREPARE_SCAN_INTERVAL,
+                    return_when=concurrent.futures.FIRST_COMPLETED,
+                )
     except KeyboardInterrupt:
         print("\nStopping prepare watchdog...")
         return 0
+    finally:
+        executor.shutdown(wait=True, cancel_futures=False)
 
 def main(argv=None):
     parser = argparse.ArgumentParser()

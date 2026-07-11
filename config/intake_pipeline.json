@@ -5,6 +5,14 @@
   },
   "prepare_watchdog": {
     "scan_interval_seconds": 2,
-    "stable_age_seconds": 2
+    "stable_age_seconds": 2,
+    "max_parallel_cases": 1,
+    "series_conversion_workers": 5,
+    "phase_detection": {
+      "device": "cpu",
+      "timeout_seconds": 120,
+      "thread_limit": 1,
+      "max_parallel": 1
+    }
   }
 }

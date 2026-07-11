@@ -134,6 +134,10 @@ Critical environment variables:
 - `HEIMDALLR_TOTALSEG_GET_PHASE_TIMEOUT_SECONDS`
 - `HEIMDALLR_TOTALSEG_GET_PHASE_THREAD_LIMIT`
 - `HEIMDALLR_TOTALSEG_GET_PHASE_MAX_PARALLEL`
+- `HEIMDALLR_PREPARE_MAX_PARALLEL_CASES`
+- `HEIMDALLR_PREPARE_SERIES_CONVERSION_WORKERS`
+- `HEIMDALLR_SEGMENTATION_MAX_PARALLEL_CASES`
+- `HEIMDALLR_METRICS_MAX_PARALLEL_CASES`
 - `TOTALSEGMENTATOR_LICENSE`
 
 Runtime state:
@@ -252,17 +256,27 @@ and are deleted after successful prepare.
 
 - `thor`: `gpu`
 - Linux CPU hosts: `cpu`
-- local macOS/MPS host: `cpu`
+- local macOS/MPS host: `mps` after TotalSegmentator 2.15.0 validation
 
-Do not use `mps` for `totalseg_get_phase` on the local macOS stack until that
-upstream path is validated; it has crashed in local testing. On macOS, keep
-`HEIMDALLR_TOTALSEG_GET_PHASE_THREAD_LIMIT=1` so the CPU path does not overrun
-PyTorch/nnU-Net worker threads. Use
-`HEIMDALLR_TOTALSEG_GET_PHASE_MAX_PARALLEL=1` on the local Apple Silicon stack
-because concurrent phase-detector subprocesses can still fan out into multiple
-PyTorch/nnU-Net child processes even when CPU thread pools are bounded. When
-unset, Heimdallr defaults the phase device to `cpu` on macOS, applies thread
-limit `1`, and runs one phase subprocess at a time.
+TotalSegmentator 2.15.0 completed the controlled local `mps` phase smoke with
+the same result as CPU. Keep `HEIMDALLR_TOTALSEG_GET_PHASE_THREAD_LIMIT=1` so
+CPU preprocessing and library pools remain bounded. Internal detector
+multithreading still stalled in local testing; scale phase throughput with
+independent one-thread subprocesses through
+`HEIMDALLR_TOTALSEG_GET_PHASE_MAX_PARALLEL`. The conservative code default on
+macOS remains CPU with one phase subprocess until a host explicitly selects
+MPS and its capacity.
+
+Worker capacity is configured independently. `prepare_watchdog.max_parallel_cases`
+and `series_conversion_workers` live in `config/intake_pipeline.json`;
+`segmentation_pipeline.execution.max_parallel_cases` lives in the host-local
+segmentation config; and `metrics_pipeline.execution.max_parallel_cases` lives
+in the host-local metrics config. Metrics profiles separately control
+`execution.max_parallel_jobs`. Environment overrides use the service-specific
+names listed above. The legacy `HEIMDALLR_MAX_PARALLEL_CASES` remains a
+segmentation-only fallback; new deployments should use
+`HEIMDALLR_SEGMENTATION_MAX_PARALLEL_CASES`. Changing a worker's capacity
+requires restarting only that resident service.
 
 On `thor`, the current local smoke fixture is:
 
