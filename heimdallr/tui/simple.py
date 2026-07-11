@@ -37,14 +37,14 @@ class SimpleQueueTextualApp(App[None]):
     ]
     CSS = """
     Screen {
-        background: transparent;
+        background: #08111f;
         color: auto;
     }
 
     #queue {
         width: 100%;
         height: 1fr;
-        background: transparent;
+        background: #08111f;
         color: auto;
     }
     """

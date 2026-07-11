@@ -494,6 +494,7 @@ class TestTuiSnapshot(unittest.TestCase):
                             "prepare_elapsed_time": "0:00:40.000000",
                             "start_time": segmentation_start.isoformat(),
                             "segmentation_start_time": segmentation_start.isoformat(),
+                            "segmentation_elapsed_time": "0:00:05",
                             "prepare_input_origin": "E",
                         },
                         "AvailableSeries": [{}],
@@ -514,14 +515,37 @@ class TestTuiSnapshot(unittest.TestCase):
                 failed_dir=failed,
                 studies_dir=studies,
             )
+            db_path = base / "dicom.db"
+            with sqlite3.connect(db_path) as conn:
+                conn.execute(
+                    """
+                    CREATE TABLE segmentation_queue (
+                        case_id TEXT,
+                        status TEXT,
+                        created_at TEXT,
+                        claimed_at TEXT,
+                        finished_at TEXT,
+                        error TEXT
+                    )
+                    """
+                )
+                conn.execute(
+                    "INSERT INTO segmentation_queue VALUES (?, 'claimed', ?, ?, NULL, NULL)",
+                    (
+                        "LiveCase_20260401_9",
+                        segmentation_start.isoformat(),
+                        segmentation_start.isoformat(),
+                    ),
+                )
 
-            snapshot = build_snapshot(layout=layout, db_path=base / "missing.db")
+            snapshot = build_snapshot(layout=layout, db_path=db_path)
             case = next(item for item in snapshot.cases if item.case_id == "LiveCase_20260401_9")
 
             self.assertEqual(case.stage_key, "segmentation")
             self.assertEqual(case.origin, "E")
             self.assertEqual(case.prepare_elapsed, "0:00:40")
             self.assertNotEqual(case.segmentation_elapsed, "-")
+            self.assertNotEqual(case.segmentation_elapsed, "0:00:05")
             self.assertRegex(case.segmentation_elapsed, r"^\d+:\d{2}:\d{2}$")
             self.assertNotEqual(case.total_elapsed, "-")
             self.assertRegex(case.total_elapsed, r"^\d+:\d{2}:\d{2}$")

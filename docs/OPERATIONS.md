@@ -94,6 +94,11 @@ A simpler queue-first TUI, styled after the WebRISAhead operational console, is:
 .venv/bin/python -m heimdallr.tui.simple
 ```
 
+Both TUI entrypoints use a fixed application background so the same terminal
+renders consistently across local and remote hosts. For a claimed segmentation
+queue item, the displayed segmentation duration is live and is recomputed from
+the recorded segmentation start time on every refresh.
+
 The compact queue TUI lists the 20 most recent studies in the upper queue table
 with stable visible indexes (`01`, `02`, ...). Press `q` to exit, `r` to refresh,
 `pNN` to prioritize a visible queued study as the next pending queue item, or

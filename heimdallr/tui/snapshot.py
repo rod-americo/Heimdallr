@@ -182,6 +182,7 @@ def build_snapshot(
                 "study_date": study.get("study_date") or case["study_date"],
                 "prepare_elapsed": study.get("prepare_elapsed") or case["prepare_elapsed"],
                 "segmentation_elapsed": study.get("segmentation_elapsed") or case["segmentation_elapsed"],
+                "segmentation_start_time": study.get("segmentation_start_time") or case["segmentation_start_time"],
                 "metrics_elapsed": study.get("metrics_elapsed") or case["metrics_elapsed"],
                 "total_elapsed": study.get("total_elapsed") or case["total_elapsed"],
                 "segmentation_reused": study.get("segmentation_reused", case["segmentation_reused"]),
@@ -238,6 +239,9 @@ def build_snapshot(
             claimed_at = _parse_datetime(row["claimed_at"])
             if claimed_at is not None:
                 segmentation_claim_times.append(claimed_at)
+            segmentation_start = _parse_datetime(case.get("segmentation_start_time")) or claimed_at
+            if segmentation_start is not None and generated_at >= segmentation_start:
+                case["segmentation_elapsed"] = str(generated_at - segmentation_start)
 
     for row in metrics_queue_rows:
         case_id = row["case_id"]
@@ -765,6 +769,7 @@ def _empty_case(case_id: str) -> dict[str, Any]:
         "updated_at": None,
         "prepare_elapsed": "",
         "segmentation_elapsed": "",
+        "segmentation_start_time": "",
         "metrics_elapsed": "",
         "total_elapsed": "",
         "metrics_started": False,
@@ -885,6 +890,9 @@ def _load_studies(studies_dir: Path, now: datetime) -> dict[str, dict[str, Any]]
                 elapsed_keys=("segmentation_elapsed_time", "processing_elapsed_time", "elapsed_time"),
                 start_keys=("segmentation_start_time", "start_time"),
                 end_keys=("segmentation_end_time", "end_time"),
+            ),
+            "segmentation_start_time": str(
+                pipeline.get("segmentation_start_time") or pipeline.get("start_time") or ""
             ),
             "metrics_elapsed": _resolve_elapsed_time(
                 pipeline,
