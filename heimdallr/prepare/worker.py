@@ -154,6 +154,31 @@ def parse_optional_float(value):
         return None
 
 
+def _serialize_dicom_selection_value(value):
+    """Serialize a compact DICOM value for series-selection metadata."""
+    if value in (None, ""):
+        return None
+    if isinstance(value, (pydicom.multival.MultiValue, list, tuple)):
+        return [str(item) for item in value]
+    return str(value).strip()
+
+
+def extract_series_selection_context(ds) -> dict:
+    """Extract vendor and presentation hints used by deferred series selection."""
+    fields = (
+        "Manufacturer",
+        "ManufacturerModelName",
+        "ProtocolName",
+        "WindowCenter",
+        "WindowWidth",
+        "ReconstructionAlgorithm",
+    )
+    return {
+        field: _serialize_dicom_selection_value(get_tag_value(ds, field, None))
+        for field in fields
+    }
+
+
 def _parse_float_sequence(value, expected_len: int | None = None) -> list[float]:
     if value is None or value == "":
         return []
@@ -855,6 +880,17 @@ def process_ct_series_concurrency(uid, s_data, case_output_dir, temp_dir):
             "description": s_data["SeriesDescription"],
             "description_raw": s_data.get("SeriesDescriptionOriginal", ""),
             "modality": s_data["Modality"],
+            "selection_context": {
+                field: s_data.get(field)
+                for field in (
+                    "Manufacturer",
+                    "ManufacturerModelName",
+                    "ProtocolName",
+                    "WindowCenter",
+                    "WindowWidth",
+                    "ReconstructionAlgorithm",
+                )
+            },
             "phase": phase,
             "convert_method": conversion["method"],
             "convert_seconds": convert_seconds,
@@ -1191,6 +1227,7 @@ def process_zip(zip_path):
                         modality = get_tag_value(ds, "Modality", "OT")
                         
                         if uid not in series_map:
+                            selection_context = extract_series_selection_context(ds)
                             series_map[uid] = {
                                 "SeriesInstanceUID": uid,
                                 "SeriesNumber": str(get_tag_value(ds, "SeriesNumber", "0")),
@@ -1203,6 +1240,7 @@ def process_zip(zip_path):
                                 "SliceThicknessValues": [],
                                 "SpacingBetweenSlicesValues": [],
                                 "GeometryPositions": [],
+                                **selection_context,
                             }
                             # Global Metadata (first encounter)
                             if global_meta["PatientName"] == "Unknown":
@@ -1453,6 +1491,17 @@ def process_zip(zip_path):
                     "Modality": s_data["Modality"],
                     "SeriesDescription": s_data.get("SeriesDescriptionOriginal", ""),
                     "ConvolutionKernel": s_data["ConvolutionKernel"],
+                    **{
+                        field: s_data.get(field)
+                        for field in (
+                            "Manufacturer",
+                            "ManufacturerModelName",
+                            "ProtocolName",
+                            "WindowCenter",
+                            "WindowWidth",
+                            "ReconstructionAlgorithm",
+                        )
+                    },
                     "SliceCount": len(s_data["files"]),
                     "Is4D": candidate["is_4d"],
                     "SelectionScore": candidate["score"],
@@ -1519,6 +1568,7 @@ def process_zip(zip_path):
                     "Modality": candidate["modality"],
                     "SeriesDescription": candidate.get("description_raw", ""),
                     "ConvolutionKernel": candidate.get("kernel_raw", ""),
+                    **candidate.get("selection_context", {}),
                     "SliceCount": candidate["num_slices"],
                     "DetectedPhase": candidate["phase"],
                     "PhaseDetected": candidate["phase_detected"],

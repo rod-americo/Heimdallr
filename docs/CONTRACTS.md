@@ -234,11 +234,25 @@ production-facing profile.
 the thinnest available reconstruction only among coverage-equivalent eligible
 series. If geometric metadata is absent, the selector falls back to the legacy
 slice-count ranking.
+- Series-selection text matching is case-insensitive and accent-insensitive so
+equivalent terms such as `pulmao` and `pulmão` follow the same rule. Hard
+rejections remain explicit profile rules; generic `sharp` kernel text is a soft
+penalty rather than a global rejection. After phase and geometry constraints,
+the selector can combine positive/negative description, kernel, and protocol
+hints with auxiliary window classification and matching manufacturer rules.
+Window center/width must not be used as a hard rejection because presentation
+windows do not change the stored HU values.
 - Prepared studies preserve source DICOM instances grouped by series under the
 case workspace. `AvailableSeries` and `DiscardedSeries` may include
 `SourceDicomSeriesPath` and `SourceDicomInstanceCount` so later operators can
 audit or reprocess from the same series set. The upload ZIP remains a transport
 artifact and is deleted after successful prepare.
+- New prepared-series entries also preserve `Manufacturer`,
+`ManufacturerModelName`, `ProtocolName`, `WindowCenter`, `WindowWidth`, and
+`ReconstructionAlgorithm` when present. Selection audit records the preference
+score, auxiliary window class, and applied manufacturer hint names. Historical
+entries without these fields remain eligible through the existing phase,
+geometry, description, and kernel rules.
 - Organ volumes should not be published when every candidate organ is missing,
 empty, or incomplete. The parenchymal overlay may still be emitted as an
 `attenuation_only` artifact when an incomplete liver provides at least 100 cm³

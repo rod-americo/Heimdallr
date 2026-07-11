@@ -10,13 +10,14 @@
         "description_contains": [
           "mip",
           "lung",
+          "pulmao",
+          "pulmonary",
           "scout",
           "topogram"
         ],
         "kernel_contains": [
           "bone",
-          "lung",
-          "sharp"
+          "lung"
         ],
         "kernel_exact": [
           "fc51",
@@ -45,12 +46,60 @@
       "text_hints": {
         "description_avoid": [
           "mip",
-          "bone"
+          "bone",
+          "lung",
+          "pulmao",
+          "pulmonary"
+        ],
+        "description_prefer": [
+          "mediastino",
+          "mediastinum",
+          "soft",
+          "standard",
+          "body"
         ],
         "kernel_avoid": [
-          "bone"
+          "bone",
+          "lung",
+          "sharp"
+        ],
+        "kernel_prefer": [
+          "soft",
+          "standard",
+          "body"
         ]
-      }
+      },
+      "window_hints": {
+        "soft_tissue_center_range": [
+          -200,
+          200
+        ],
+        "soft_tissue_width_range": [
+          200,
+          800
+        ],
+        "lung_center_max": -300,
+        "lung_width_min": 1000
+      },
+      "manufacturer_hints": [
+        {
+          "name": "canon_toshiba_body_reconstruction",
+          "manufacturer_contains": [
+            "canon",
+            "toshiba"
+          ],
+          "description_prefer": [
+            "mediastino",
+            "mediastinum"
+          ],
+          "kernel_prefer": [
+            "body"
+          ],
+          "kernel_avoid": [
+            "fc30"
+          ]
+        }
+      ]
     }
   }
 }

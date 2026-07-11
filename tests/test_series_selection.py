@@ -100,6 +100,197 @@ class TestSeriesSelection(unittest.TestCase):
         self.assertEqual(selected_path.name, "accepted.nii.gz")
         self.assertEqual(selection_info["SelectedSeriesInstanceUID"], "1.2.3.good")
 
+    def test_prefers_canon_mediastinum_over_fc30_lung_reconstruction(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            case_id = "case-canon-chest-selection"
+            derived_dir = root / "runtime" / "studies" / case_id / "derived" / "series"
+            derived_dir.mkdir(parents=True, exist_ok=True)
+            mediastinum_path = derived_dir / "mediastinum.nii.gz"
+            lung_path = derived_dir / "lung.nii.gz"
+            mediastinum_path.write_bytes(b"mediastinum")
+            lung_path.write_bytes(b"lung")
+
+            config_path = root / "series_selection.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "default_profile": "ct_test",
+                        "profiles": {
+                            "ct_test": {
+                                "required": {"modality": "CT", "min_slices": 60},
+                                "hard_reject": {
+                                    "description_contains": ["lung", "pulmao"],
+                                    "kernel_contains": ["bone", "lung"],
+                                },
+                                "phase_priority": ["native"],
+                                "geometry_priority": {
+                                    "enabled": True,
+                                    "coverage_equivalence_ratio": 0.92,
+                                    "coverage_equivalence_mm": 50,
+                                    "prefer_thinner_within_equivalent_coverage": True,
+                                },
+                                "text_hints": {
+                                    "description_prefer": ["mediastino", "mediastinum"],
+                                    "kernel_avoid": ["sharp"],
+                                    "kernel_prefer": ["body"],
+                                },
+                                "window_hints": {
+                                    "soft_tissue_center_range": [-200, 200],
+                                    "soft_tissue_width_range": [200, 800],
+                                    "lung_center_max": -300,
+                                    "lung_width_min": 1000,
+                                },
+                                "manufacturer_hints": [
+                                    {
+                                        "name": "canon_toshiba_body_reconstruction",
+                                        "manufacturer_contains": ["canon", "toshiba"],
+                                        "kernel_prefer": ["body"],
+                                        "kernel_avoid": ["fc30"],
+                                    }
+                                ],
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            common = {
+                "Modality": "CT",
+                "SliceCount": 691,
+                "DetectedPhase": "native",
+                "PhaseDetected": True,
+                "PhaseData": {"probability": 1.0},
+                "CoverageMm": 345.0,
+                "ZSpacingMm": 0.5,
+                "SliceThicknessMm": 0.5,
+                "Manufacturer": "Canon Medical Systems",
+                "ManufacturerModelName": "Aquilion Lightning",
+                "ProtocolName": "SAF TORAX",
+            }
+            id_data = {
+                "AvailableSeries": [
+                    {
+                        **common,
+                        "SeriesInstanceUID": "1.2.3.mediastinum",
+                        "SeriesNumber": "6",
+                        "DerivedNiftiPath": "series/mediastinum.nii.gz",
+                        "SeriesDescription": "MEDIASTINO AICE 0.5",
+                        "ConvolutionKernel": "BODY_SHARP",
+                        "WindowCenter": "40",
+                        "WindowWidth": "400",
+                    },
+                    {
+                        **common,
+                        "SeriesInstanceUID": "1.2.3.lung",
+                        "SeriesNumber": "7",
+                        "DerivedNiftiPath": "series/lung.nii.gz",
+                        "SeriesDescription": "PULMÃO Bone 0.5",
+                        "ConvolutionKernel": "FC30",
+                        "WindowCenter": "-700",
+                        "WindowWidth": "1700",
+                    },
+                ]
+            }
+
+            with patch.object(settings, "STUDIES_DIR", root / "runtime" / "studies"), patch.object(
+                settings,
+                "SERIES_SELECTION_CONFIG_PATH",
+                config_path,
+            ):
+                selected_path, selection_info = select_prepared_series(case_id, id_data)
+
+        self.assertEqual(selected_path.name, "mediastinum.nii.gz")
+        self.assertEqual(selection_info["SelectedSeriesInstanceUID"], "1.2.3.mediastinum")
+        self.assertEqual(selection_info["SelectedWindowClass"], "soft_tissue")
+        self.assertIn(
+            "canon_toshiba_body_reconstruction",
+            selection_info["SelectedManufacturerHintRules"],
+        )
+        self.assertEqual(selection_info["RejectedSeries"][0]["reason"], "description_rejected:pulmao")
+
+    def test_soft_tissue_scoring_breaks_geometry_tie_without_hard_reject(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            case_id = "case-window-scoring"
+            derived_dir = root / "runtime" / "studies" / case_id / "derived" / "series"
+            derived_dir.mkdir(parents=True, exist_ok=True)
+            for name in ("body", "fc30"):
+                (derived_dir / f"{name}.nii.gz").write_bytes(name.encode())
+
+            config_path = root / "series_selection.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "default_profile": "ct_test",
+                        "profiles": {
+                            "ct_test": {
+                                "required": {"modality": "CT", "min_slices": 60},
+                                "hard_reject": {},
+                                "phase_priority": ["native"],
+                                "text_hints": {"kernel_avoid": ["sharp"], "kernel_prefer": ["body"]},
+                                "window_hints": {
+                                    "soft_tissue_center_range": [-200, 200],
+                                    "soft_tissue_width_range": [200, 800],
+                                    "lung_center_max": -300,
+                                    "lung_width_min": 1000,
+                                },
+                                "manufacturer_hints": [
+                                    {
+                                        "name": "canon",
+                                        "manufacturer_contains": ["canon"],
+                                        "kernel_avoid": ["fc30"],
+                                    }
+                                ],
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            common = {
+                "Modality": "CT",
+                "SliceCount": 200,
+                "DetectedPhase": "native",
+                "PhaseDetected": True,
+                "PhaseData": {"probability": 0.9},
+                "Manufacturer": "Canon Medical Systems",
+                "SeriesDescription": "CHEST ROUTINE",
+            }
+            id_data = {
+                "AvailableSeries": [
+                    {
+                        **common,
+                        "SeriesInstanceUID": "1.2.3.fc30",
+                        "SeriesNumber": "1",
+                        "DerivedNiftiPath": "series/fc30.nii.gz",
+                        "ConvolutionKernel": "FC30",
+                        "WindowCenter": "-700",
+                        "WindowWidth": "1700",
+                    },
+                    {
+                        **common,
+                        "SeriesInstanceUID": "1.2.3.body",
+                        "SeriesNumber": "2",
+                        "DerivedNiftiPath": "series/body.nii.gz",
+                        "ConvolutionKernel": "BODY_SHARP",
+                        "WindowCenter": "40",
+                        "WindowWidth": "400",
+                    },
+                ]
+            }
+
+            with patch.object(settings, "STUDIES_DIR", root / "runtime" / "studies"), patch.object(
+                settings,
+                "SERIES_SELECTION_CONFIG_PATH",
+                config_path,
+            ):
+                selected_path, selection_info = select_prepared_series(case_id, id_data)
+
+        self.assertEqual(selected_path.name, "body.nii.gz")
+        self.assertLess(selection_info["SelectedPreferenceScore"], 0)
+
     def test_external_policy_overrides_min_slices_for_job(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

@@ -242,7 +242,12 @@ If the field is omitted or empty, Heimdallr runs the enabled jobs and segmentati
 
 `series_selection_policy` accepts a JSON object with the same rule keys used by
 `config/series_selection.json`, such as `required`, `hard_reject`,
-`phase_priority`, `geometry_priority`, `follow_up_coverage`, and `text_hints`.
+`phase_priority`, `geometry_priority`, `follow_up_coverage`, `text_hints`,
+`window_hints`, and `manufacturer_hints`. Text matching is case-insensitive and
+accent-insensitive. Window hints contribute only an auxiliary preference score;
+they do not hard-reject a series. Manufacturer hint entries may match
+`manufacturer_contains` and `model_contains`, then contribute the same
+description, kernel, and protocol prefer/avoid hints used by `text_hints`.
 Heimdallr deep-merges the object over the active profile for that job only.
 Top-level keys like `name`, `profile_name`, `base_profile`, and
 `schema_version` are audit labels and are not treated as selection rules.

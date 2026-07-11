@@ -15,6 +15,54 @@ Each decision should include:
 
 ## Decisions
 
+### 2026-07-11 - Use contextual soft-tissue hints for CT series selection
+
+**Context**
+
+A Canon Aquilion Lightning chest study offered geometrically equivalent
+mediastinal and lung reconstructions. The mediastinal series carried kernel
+`BODY_SHARP`, while the lung series was described in Portuguese as `PULMAO`
+with kernel `FC30`. The former policy rejected every kernel containing `sharp`
+but recognized only the English word `lung`, causing TotalSegmentator and the
+derived overlays to use the lung reconstruction.
+
+**Decision**
+
+Normalize selection text case and accents, recognize Portuguese pulmonary
+descriptions, and stop treating generic `sharp` text as a hard rejection.
+Preserve manufacturer, model, protocol, reconstruction algorithm, and window
+metadata for each prepared series. After phase and geometry constraints, rank
+equivalent candidates with configurable positive/negative text hints,
+manufacturer-specific hints, and an auxiliary soft-tissue/lung window class.
+Window values never hard-reject a series.
+
+**Impact**
+
+- Existing prepared studies benefit from multilingual description handling and
+  remain selectable when the new metadata fields are absent.
+- Newly prepared studies expose enough context to audit vendor-specific kernel
+  hints and window-based tie-breaking.
+- `SelectionReason` and candidate audit include preference score, window class,
+  and applied manufacturer hint rules.
+- Deployments must restart prepare and segmentation workers after adopting the
+  policy and code.
+
+**Tradeoff**
+
+Manufacturer hints remain operational heuristics rather than a universal CT
+kernel ontology. Phase and anatomic coverage continue to outrank presentation
+preferences, and new scanner families may need explicit audited hints.
+
+**Alternatives rejected**
+
+- Hard-reject every kernel containing `sharp`, which incorrectly excludes
+  vendor body-reconstruction names.
+- Globally reject `FC30` without manufacturer or protocol context.
+- Select from display window alone, which is presentation metadata and does not
+  alter stored HU values.
+
+---
+
 ### 2026-07-10 - Gate partial-organ steatosis by physical sample size
 
 **Context**

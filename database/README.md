@@ -22,7 +22,7 @@ Stores DICOM metadata and calculation results for all processed studies.
 | `Modality` | TEXT | Imaging modality (CT, MR, etc.) |
 | `CallingAET` | TEXT | DICOM Calling AE Title captured by intake |
 | `RemoteIP` | TEXT | Sender IP captured by intake |
-| `IdJson` | TEXT | Complete id.json from output directory (includes Pipeline info, SelectedSeries) |
+| `IdJson` | TEXT | Complete id.json from output directory, including `AvailableSeries` vendor/protocol/window hints and the pipeline series-selection audit when available |
 | `JsonDump` | TEXT | Basic metadata JSON from `heimdallr.prepare` |
 | `DicomMetadata` | TEXT | Complete DICOM tags JSON from selected series |
 | `CalculationResults` | TEXT | Computed metrics JSON (volumes, densities, etc.) |

@@ -144,6 +144,10 @@ are overlaid together when present in the same slab.
 
 If `series_selection_policy` is provided, Heimdallr deep-merges that object over
 the active `config/series_selection.json` profile for the submitted job. The
+supported rule groups include `required`, `hard_reject`, `phase_priority`,
+`geometry_priority`, `follow_up_coverage`, `text_hints`, `window_hints`, and
+`manufacturer_hints`. Text hints are accent-insensitive; window hints are
+auxiliary preferences rather than hard-rejection criteria. The
 selected series audit in `metadata/id.json` records `PolicySource` and
 `ExternalPolicyName`.
 

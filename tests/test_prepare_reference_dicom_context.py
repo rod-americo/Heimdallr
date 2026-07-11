@@ -2,10 +2,28 @@ import unittest
 
 from pydicom.dataset import Dataset
 
-from heimdallr.prepare.worker import build_reference_dicom_context
+from heimdallr.prepare.worker import build_reference_dicom_context, extract_series_selection_context
 
 
 class TestPrepareReferenceDicomContext(unittest.TestCase):
+    def test_series_selection_context_preserves_vendor_protocol_and_window(self):
+        ds = Dataset()
+        ds.Manufacturer = "Canon Medical Systems"
+        ds.ManufacturerModelName = "Aquilion Lightning"
+        ds.ProtocolName = "SAF TORAX"
+        ds.WindowCenter = [40, 80]
+        ds.WindowWidth = [400, 1600]
+        ds.ReconstructionAlgorithm = "ITERATIVE"
+
+        context = extract_series_selection_context(ds)
+
+        self.assertEqual(context["Manufacturer"], "Canon Medical Systems")
+        self.assertEqual(context["ManufacturerModelName"], "Aquilion Lightning")
+        self.assertEqual(context["ProtocolName"], "SAF TORAX")
+        self.assertEqual(context["WindowCenter"], ["40.0", "80.0"])
+        self.assertEqual(context["WindowWidth"], ["400.0", "1600.0"])
+        self.assertEqual(context["ReconstructionAlgorithm"], "ITERATIVE")
+
     def test_reference_context_preserves_grouping_tags_and_person_names(self):
         ds = Dataset()
         ds.StudyInstanceUID = "1.2.3"

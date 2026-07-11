@@ -159,6 +159,13 @@ Tracked config:
 - `config/*.example.json`
 - `config/doctor.json`
 
+The CT profile in `config/series_selection.json` may include
+accent-insensitive `text_hints`, auxiliary `window_hints`, and
+`manufacturer_hints`. Treat window values as preference signals only. After
+changing these rules, restart both prepare and segmentation: prepare must
+restart to persist enriched series metadata, and segmentation must restart to
+apply the selector policy.
+
 Ignored host-local config:
 
 - `config/segmentation_pipeline.json`

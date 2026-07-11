@@ -32,6 +32,8 @@ import threading
 import sys
 import time
 import concurrent.futures  # For parallel case segmentation
+import re
+import unicodedata
 from pathlib import Path
 import datetime
 from zoneinfo import ZoneInfo
@@ -767,6 +769,9 @@ def _candidate_geometry_audit(candidate: dict) -> dict:
         "SliceThicknessMm": candidate.get("slice_thickness_mm"),
         "EffectiveThicknessMm": candidate.get("effective_thickness_mm"),
         "CoverageTier": candidate.get("coverage_tier"),
+        "PreferenceScore": candidate.get("preference_score"),
+        "WindowClass": candidate.get("window_class"),
+        "ManufacturerHintRules": candidate.get("manufacturer_hint_rules"),
     }
 
 
@@ -795,39 +800,126 @@ def _phase_allowed_with_fallback(allowed_phases, selected_phase) -> bool:
 
 
 def _text_tokens(series):
-    description = str(series.get("SeriesDescription", "") or "").lower()
-    kernel = str(series.get("ConvolutionKernel", "") or "").lower()
-    return description, kernel
+    return {
+        "description": _normalize_search_text(series.get("SeriesDescription")),
+        "kernel": _normalize_search_text(series.get("ConvolutionKernel")),
+        "protocol": _normalize_search_text(series.get("ProtocolName")),
+        "manufacturer": _normalize_search_text(series.get("Manufacturer")),
+        "model": _normalize_search_text(series.get("ManufacturerModelName")),
+    }
 
 
-def _series_text_penalty(series, text_hints):
-    description, kernel = _text_tokens(series)
-    penalty = 0
-    for token in text_hints.get("description_avoid", []):
-        if token.lower() in description:
-            penalty += 1
-    for token in text_hints.get("kernel_avoid", []):
-        if token.lower() in kernel:
-            penalty += 1
-    return penalty
+def _normalize_search_text(value) -> str:
+    if isinstance(value, (list, tuple)):
+        value = " ".join(str(item) for item in value)
+    normalized = unicodedata.normalize("NFKD", str(value or "").lower())
+    return "".join(char for char in normalized if not unicodedata.combining(char))
+
+
+def _normalized_hint_tokens(values) -> set[str]:
+    return {
+        normalized
+        for value in (values or [])
+        if (normalized := _normalize_search_text(value).strip())
+    }
+
+
+def _matching_manufacturer_hints(series, manufacturer_hints) -> list[dict]:
+    tokens = _text_tokens(series)
+    matched = []
+    for rule in manufacturer_hints or []:
+        manufacturers = _normalized_hint_tokens(rule.get("manufacturer_contains"))
+        models = _normalized_hint_tokens(rule.get("model_contains"))
+        manufacturer_match = not manufacturers or any(
+            token in tokens["manufacturer"] for token in manufacturers
+        )
+        model_match = not models or any(token in tokens["model"] for token in models)
+        if manufacturer_match and model_match:
+            matched.append(rule)
+    return matched
+
+
+def _hint_score(text: str, values, weight: int) -> int:
+    return sum(weight for token in _normalized_hint_tokens(values) if token in text)
+
+
+def _first_numeric_hint(value) -> float | None:
+    if isinstance(value, (list, tuple)):
+        value = value[0] if value else None
+    match = re.search(r"[-+]?\d+(?:[.,]\d+)?", str(value or ""))
+    if not match:
+        return None
+    return _safe_float(match.group(0).replace(",", "."), None)
+
+
+def _window_preference(series, window_hints) -> tuple[int, str]:
+    if not window_hints:
+        return 0, "unknown"
+    center = _first_numeric_hint(series.get("WindowCenter"))
+    width = _first_numeric_hint(series.get("WindowWidth"))
+    if center is None or width is None:
+        return 0, "unknown"
+
+    center_range = window_hints.get("soft_tissue_center_range") or []
+    width_range = window_hints.get("soft_tissue_width_range") or []
+    if (
+        len(center_range) == 2
+        and len(width_range) == 2
+        and float(center_range[0]) <= center <= float(center_range[1])
+        and float(width_range[0]) <= width <= float(width_range[1])
+    ):
+        return -1, "soft_tissue"
+
+    lung_center_max = _safe_float(window_hints.get("lung_center_max"), None)
+    lung_width_min = _safe_float(window_hints.get("lung_width_min"), None)
+    if (
+        lung_center_max is not None
+        and lung_width_min is not None
+        and center <= lung_center_max
+        and width >= lung_width_min
+    ):
+        return 1, "lung"
+    return 0, "other"
+
+
+def _series_preference(series, text_hints, manufacturer_hints, window_hints):
+    tokens = _text_tokens(series)
+    applied_rules = _matching_manufacturer_hints(series, manufacturer_hints)
+    hint_sets = [text_hints, *applied_rules]
+    score = 0
+    for hints in hint_sets:
+        score += _hint_score(tokens["description"], hints.get("description_avoid"), 1)
+        score += _hint_score(tokens["kernel"], hints.get("kernel_avoid"), 1)
+        score += _hint_score(tokens["protocol"], hints.get("protocol_avoid"), 1)
+        score += _hint_score(tokens["description"], hints.get("description_prefer"), -1)
+        score += _hint_score(tokens["kernel"], hints.get("kernel_prefer"), -1)
+        score += _hint_score(tokens["protocol"], hints.get("protocol_prefer"), -1)
+    window_score, window_class = _window_preference(series, window_hints)
+    return {
+        "score": score + window_score,
+        "window_class": window_class,
+        "manufacturer_hint_rules": [str(rule.get("name") or "unnamed") for rule in applied_rules],
+    }
 
 
 def _series_hard_reject_reason(series, rules):
-    description, kernel = _text_tokens(series)
+    tokens = _text_tokens(series)
+    description = tokens["description"]
+    kernel = tokens["kernel"]
     kernel_compact = kernel.strip()
 
     for token in rules.get("description_contains", []):
-        normalized = str(token or "").strip().lower()
+        normalized = _normalize_search_text(token).strip()
         if normalized and normalized in description:
             return f"description_rejected:{normalized}"
 
     for token in rules.get("kernel_contains", []):
-        normalized = str(token or "").strip().lower()
+        normalized = _normalize_search_text(token).strip()
         if normalized and normalized in kernel:
             return f"kernel_rejected_contains:{normalized}"
 
     for token in rules.get("kernel_exact", []):
-        normalized = str(token or "").strip().lower()
+        normalized = _normalize_search_text(token).strip()
         if normalized and kernel_compact == normalized:
             return f"kernel_rejected_exact:{normalized}"
 
@@ -835,7 +927,7 @@ def _series_hard_reject_reason(series, rules):
 
 
 def _series_region_hint(series: dict) -> str:
-    description = str(series.get("SeriesDescription", "") or "").lower()
+    description = _normalize_search_text(series.get("SeriesDescription"))
     if any(token in description for token in ("abdome", "abdomen", "abdominal")):
         return "abdomen"
     if any(token in description for token in ("torax", "tórax", "thorax", "chest", "pulmao", "pulmão", "mediast")):
@@ -887,6 +979,8 @@ def select_prepared_series(case_id, id_data):
     required = profile.get("required", {})
     hard_reject = profile.get("hard_reject", {})
     text_hints = profile.get("text_hints", {})
+    manufacturer_hints = profile.get("manufacturer_hints", [])
+    window_hints = profile.get("window_hints", {})
     follow_up_coverage = profile.get("follow_up_coverage", {})
     geometry_priority = _geometry_priority_settings(profile)
     phase_priority = [_normalize_phase(p) for p in profile.get("phase_priority", ["unknown"])]
@@ -963,7 +1057,7 @@ def select_prepared_series(case_id, id_data):
         phase_data = series.get("PhaseData") or {}
         probability = _safe_float(phase_data.get("probability"))
         phase_detected = bool(series.get("PhaseDetected"))
-        text_penalty = _series_text_penalty(series, text_hints)
+        preference = _series_preference(series, text_hints, manufacturer_hints, window_hints)
         geometry_metrics = _series_geometry_metrics(series)
 
         candidates.append(
@@ -974,7 +1068,9 @@ def select_prepared_series(case_id, id_data):
                 "phase_detected": phase_detected,
                 "phase_probability": probability,
                 "slice_count": slice_count,
-                "text_penalty": text_penalty,
+                "preference_score": preference["score"],
+                "window_class": preference["window_class"],
+                "manufacturer_hint_rules": preference["manufacturer_hint_rules"],
                 "phase_rank": resolved_phase_rank,
                 "fallback_reason": fallback_reason,
                 **geometry_metrics,
@@ -1004,10 +1100,10 @@ def select_prepared_series(case_id, id_data):
                     else float("inf")
                 ),
                 -(c.get("coverage_mm") or 0.0),
+                c["preference_score"],
                 0 if c["phase_detected"] else 1,
                 -c["phase_probability"],
                 -c["slice_count"],
-                c["text_penalty"],
                 str(c["series"].get("SeriesNumber", "")),
             )
         )
@@ -1015,10 +1111,10 @@ def select_prepared_series(case_id, id_data):
         candidates.sort(
             key=lambda c: (
                 c["phase_rank"],
+                c["preference_score"],
                 0 if c["phase_detected"] else 1,
                 -c["phase_probability"],
                 -c["slice_count"],
-                c["text_penalty"],
                 str(c["series"].get("SeriesNumber", "")),
             )
         )
@@ -1072,9 +1168,14 @@ def select_prepared_series(case_id, id_data):
         "SelectedEffectiveThicknessMm": selected.get("effective_thickness_mm"),
         "MaxCoverageMm": selected.get("max_coverage_mm"),
         "CoverageEquivalenceFloorMm": selected.get("coverage_equivalence_floor_mm"),
+        "SelectedPreferenceScore": selected.get("preference_score"),
+        "SelectedWindowClass": selected.get("window_class"),
+        "SelectedManufacturerHintRules": selected.get("manufacturer_hint_rules"),
         "SelectionReason": (
             f"phase={selected['phase']}, detected={selected['phase_detected']}, "
             f"probability={selected['phase_probability']}, slices={selected['slice_count']}"
+            f", preference_score={selected.get('preference_score')}"
+            f", window_class={selected.get('window_class')}"
             + (
                 f", coverage_mm={selected.get('coverage_mm')}, "
                 f"effective_thickness_mm={selected.get('effective_thickness_mm')}"
