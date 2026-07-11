@@ -59,9 +59,11 @@ non-spatial and do not receive an invented anatomic position.
 
 Pulmonary nodule component overlays are exported in monotonic axial position
 order rather than component-size order. When `secondary_capture_series_mode`
-is `single_series`, all spatial Secondary Captures are likewise renumbered by
-projected axial position; non-spatial Secondary Captures follow them in their
-original export order.
+is `single_series`, Secondary Captures are first grouped into contiguous blocks
+by their original artifact series, preserving the artifact export order. Within
+each block, spatial images are renumbered by projected axial position and
+non-spatial images follow in their original export order. This prevents distinct
+overlay products at overlapping anatomy from being interleaved.
 | Integration dispatch events | external HTTP endpoint | JSON HTTP POST | Delivered when configured destinations accept the event. |
 | Job status lookup | `GET /jobs/{job_id}` | JSON | Best-effort state for accepted external jobs. |
 | Queue capacity lookup | `GET /ops/queues` | JSON | Non-identifying queue counts, concurrency, and disk capacity for external feeders. |
@@ -325,8 +327,9 @@ external `/jobs` submission through
 `single_series`, generated DICOM Secondary Capture artifacts for the case,
 including instruction documents emitted as Secondary Capture, are rewritten to
 share one `SeriesInstanceUID`, `SeriesNumber`, and `SeriesDescription`, with
-unique sequential `InstanceNumber` values. Derived CT and Encapsulated PDF
-DICOM artifacts are not grouped.
+unique sequential `InstanceNumber` values. Original artifact series form
+contiguous blocks in export order, with anatomic ordering applied within each
+block. Derived CT and Encapsulated PDF DICOM artifacts are not grouped.
 - The effective artifact DICOM policy is recorded in
 `metadata/id.json` under `Pipeline.metrics_pipeline.artifact_dicom_policy`.
 When `single_series` rewrites at least one Secondary Capture file, the same

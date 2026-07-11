@@ -521,10 +521,57 @@ class TestMetricsWorker(unittest.TestCase):
             self.assertEqual(second.SeriesNumber, 9900)
             self.assertEqual(first.SeriesDescription, "Heimdallr Artifact Series")
             self.assertEqual(second.SeriesDescription, "Heimdallr Artifact Series")
-            self.assertEqual(first.InstanceNumber, 2)
-            self.assertEqual(second.InstanceNumber, 1)
+            self.assertEqual(first.InstanceNumber, 1)
+            self.assertEqual(second.InstanceNumber, 2)
             self.assertEqual(str(derived.SeriesInstanceUID), original_ct_series_uid)
             self.assertEqual(str(derived.SOPClassUID), str(CTImageStorage))
+
+    def test_harmonize_secondary_capture_series_keeps_artifact_blocks_contiguous(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            case_root = Path(tmpdir)
+            metadata = {"StudyInstanceUID": "1.2.826.0.1.3680043.10.543.1"}
+            rgb = np.zeros((8, 8, 3), dtype=np.uint8)
+            exports = []
+            paths: dict[tuple[str, int], Path] = {}
+
+            for artifact, series_number, locations in (
+                ("volumetry", 9001, (20, 10)),
+                ("effusion", 9002, (15, 5)),
+            ):
+                series_uid = str(generate_uid())
+                for index, location in enumerate(locations, start=1):
+                    path = case_root / "artifacts" / "metrics" / artifact / f"overlay_{index:04d}.dcm"
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    create_secondary_capture_from_rgb(
+                        rgb,
+                        path,
+                        metadata,
+                        series_description=artifact,
+                        series_number=series_number,
+                        instance_number=index,
+                        derivation_description=artifact,
+                        image_position_patient=[0.0, 0.0, location],
+                        image_orientation_patient=[1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+                        transfer_syntax="original",
+                    )
+                    dataset = pydicom.dcmread(str(path))
+                    dataset.SeriesInstanceUID = series_uid
+                    dataset.save_as(str(path), write_like_original=False)
+                    paths[(artifact, location)] = path
+                    exports.append(
+                        {"path": str(path.relative_to(case_root)), "kind": "secondary_capture"}
+                    )
+
+            _harmonize_secondary_capture_series(case_root, exports, None)
+
+            instance_numbers = {
+                key: pydicom.dcmread(str(path)).InstanceNumber
+                for key, path in paths.items()
+            }
+            self.assertEqual(instance_numbers[("volumetry", 10)], 1)
+            self.assertEqual(instance_numbers[("volumetry", 20)], 2)
+            self.assertEqual(instance_numbers[("effusion", 5)], 3)
+            self.assertEqual(instance_numbers[("effusion", 15)], 4)
 
     def test_resolve_max_parallel_jobs_uses_profile_execution(self):
         self.assertEqual(_resolve_max_parallel_jobs({"execution": {"max_parallel_jobs": 3}}), 3)

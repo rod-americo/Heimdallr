@@ -15,6 +15,41 @@ Each decision should include:
 
 ## Decisions
 
+### 2026-07-11 - Keep artifact blocks contiguous in single-series egress
+
+**Context**
+
+Global anatomic sorting of all Secondary Capture images interleaved distinct
+overlay products, such as parenchymal volumetry and pleural/pericardial
+effusion, when they covered overlapping axial positions.
+
+**Decision**
+
+In `single_series` mode, preserve the first-export order of each original DICOM
+artifact series as a contiguous block. Sort spatial images by projected axial
+position only within their original artifact block, followed by any non-spatial
+images from that block in export order.
+
+**Impact**
+
+- Distinct tables, overlays, and instruction products no longer alternate by
+  anatomy after sharing the Heimdallr artifact series.
+- Instance numbers remain unique and sequential across the combined series.
+- The metrics worker must be restarted before new cases use this ordering.
+
+**Tradeoff**
+
+The combined series is no longer globally monotonic by axial position across
+artifact boundaries; viewers encounter a new anatomic sequence at each block.
+
+**Alternatives rejected**
+
+- Continue global axial sorting, which mixes semantically distinct products.
+- Force separate DICOM series, which removes the explicitly configured
+  `single_series` workflow.
+
+---
+
 ### 2026-07-11 - Use contextual soft-tissue hints for CT series selection
 
 **Context**

@@ -209,8 +209,9 @@ Metrics DICOM artifact policy:
 - `separate` preserves the legacy behavior where Secondary Capture artifacts
   keep their job-generated series.
 - `single_series` rewrites only generated Secondary Capture artifacts for a
-  case into one artifact series. Derived CT and Encapsulated PDF artifacts keep
-  their own series.
+  case into one artifact series. Original artifact series remain contiguous in
+  export order, with anatomic ordering inside each block. Derived CT and
+  Encapsulated PDF artifacts keep their own series.
 - External `/jobs` submissions may override this field through
   `artifact_dicom_policy`; omitted fields fall back to the active metrics
   profile.

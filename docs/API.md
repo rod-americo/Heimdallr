@@ -160,7 +160,9 @@ metrics profile. Supported `secondary_capture_transfer_syntax` values are
 mode, only DICOM Secondary Capture artifacts are rewritten into one artifact
 series for the case, including instruction documents when
 `instruction_dicom_kind=secondary_capture`. Derived CT and Encapsulated PDF
-DICOM artifacts remain in their own series. Head CT jobs also support
+DICOM artifacts remain in their own series. Secondary Captures retain
+contiguous blocks by original artifact series and are ordered anatomically
+within each block. Head CT jobs also support
 `derived_ct_transfer_syntax` with the same values for generated derived CT
 series. The repository default for generated Secondary Capture storage is
 `jpeg_ls_lossless`; DICOM egress negotiates the peer's accepted presentation

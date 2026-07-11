@@ -394,8 +394,7 @@ def _harmonize_secondary_capture_series(
         return None
 
     series_uid = series_instance_uid or str(generate_uid())
-    spatial_datasets: list[tuple[float, int, Path, Any]] = []
-    nonspatial_datasets: list[tuple[int, Path, Any]] = []
+    artifact_groups: dict[str, list[tuple[float | None, int, Path, Any]]] = {}
     for original_index, path in enumerate(paths):
         if not path.exists():
             if logger:
@@ -411,25 +410,34 @@ def _harmonize_secondary_capture_series(
         if str(getattr(dataset, "SOPClassUID", "") or "") != str(SecondaryCaptureImageStorage):
             continue
 
+        artifact_group = str(getattr(dataset, "SeriesInstanceUID", "") or path.parent)
+        location: float | None = None
         if hasattr(dataset, "ImagePositionPatient") and hasattr(dataset, "ImageOrientationPatient"):
             try:
                 position = np.asarray(dataset.ImagePositionPatient, dtype=float)
                 orientation = np.asarray(dataset.ImageOrientationPatient, dtype=float)
                 normal = np.cross(orientation[:3], orientation[3:])
                 location = float(np.dot(position, normal))
-                spatial_datasets.append((location, original_index, path, dataset))
-                continue
             except (TypeError, ValueError):
                 pass
-        nonspatial_datasets.append((original_index, path, dataset))
+        artifact_groups.setdefault(artifact_group, []).append(
+            (location, original_index, path, dataset)
+        )
 
-    ordered_datasets = [
-        (path, dataset)
-        for _location, _index, path, dataset in sorted(spatial_datasets)
-    ]
-    ordered_datasets.extend(
-        (path, dataset) for _index, path, dataset in sorted(nonspatial_datasets)
-    )
+    ordered_datasets: list[tuple[Path, Any]] = []
+    for group in artifact_groups.values():
+        spatial = sorted(
+            (item for item in group if item[0] is not None),
+            key=lambda item: (item[0], item[1]),
+        )
+        nonspatial = sorted(
+            (item for item in group if item[0] is None),
+            key=lambda item: item[1],
+        )
+        ordered_datasets.extend(
+            (path, dataset)
+            for _location, _index, path, dataset in [*spatial, *nonspatial]
+        )
 
     rewritten = 0
     for path, dataset in ordered_datasets:

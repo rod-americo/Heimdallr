@@ -7,7 +7,7 @@
     "inventory_requirements": "Automatic CT jobs should declare requires_inventory so the metrics worker only runs jobs compatible with the total segmentation inventory.",
     "experimental_jobs": "Experimental metrics modules should live under heimdallr.metrics.jobs.tests or heimdallr.metrics.analysis and be enabled only via explicit jobs[].module overrides in host-local config.",
     "secondary_capture_transfer_syntax": "Jobs that emit Secondary Capture DICOM may set secondary_capture_transfer_syntax to original, deflated, jpeg_ls_lossless, jpeg_2000_lossless, or rle_lossless. Head derived CT DICOM may set derived_ct_transfer_syntax with the same values.",
-    "artifact_dicom_policy": "Profiles may set execution.artifact_dicom_policy.secondary_capture_series_mode to separate or single_series. The default is separate. single_series groups only Secondary Capture artifacts from the case; Derived CT and Encapsulated PDF keep their own series."
+    "artifact_dicom_policy": "Profiles may set execution.artifact_dicom_policy.secondary_capture_series_mode to separate or single_series. The default is separate. single_series groups only Secondary Capture artifacts from the case into contiguous original-artifact blocks, with anatomic ordering inside each block; Derived CT and Encapsulated PDF keep their own series."
   },
   "default_profile": "ct_automatic_metrics",
   "execution": {
