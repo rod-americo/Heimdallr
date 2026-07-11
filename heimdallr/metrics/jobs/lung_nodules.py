@@ -380,7 +380,7 @@ def main() -> int:
             else:
                 source_geometry = []
 
-            for component_index, component in enumerate(components, start=1):
+            for component in components:
                 component_id = int(component["component_id"])
                 component_mask = labeled_components == component_id
                 slice_index = _center_slice(component_mask)
@@ -390,6 +390,16 @@ def main() -> int:
                 component["slice_index_basis"] = "nifti_zero_based"
                 component["probable_viewer_slice_index_one_based"] = probable_viewer_slice
                 component["total_slices"] = total_slices
+
+            ordered_components = sorted(
+                components,
+                key=lambda item: (int(item["slice_index"]), int(item["component_id"])),
+            )
+            for component_index, component in enumerate(ordered_components, start=1):
+                component_id = int(component["component_id"])
+                component_mask = labeled_components == component_id
+                slice_index = int(component["slice_index"])
+                probable_viewer_slice = int(component["probable_viewer_slice_index_one_based"])
 
                 title, summary_lines = build_component_overlay_text(
                     component_id=component_id,
@@ -451,6 +461,7 @@ def main() -> int:
                         derivation_description=derivation_description(artifact_locale),
                         **slice_geometry,
                         slice_thickness_mm=float(ct_img.header.get_zooms()[2]),
+                        spacing_between_slices_mm=float(ct_img.header.get_zooms()[2]),
                         max_dimension=options["max_dimension"],
                         transfer_syntax=options["transfer_syntax"],
                     )

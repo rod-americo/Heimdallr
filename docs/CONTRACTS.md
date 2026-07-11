@@ -56,6 +56,12 @@ spacing uses one proportional scale factor when the rendered matrix size
 differs, preserving pixel aspect ratio while keeping the source field of view
 inside a physically centered canvas. Textual tables, instructions, and PDF artifacts are
 non-spatial and do not receive an invented anatomic position.
+
+Pulmonary nodule component overlays are exported in monotonic axial position
+order rather than component-size order. When `secondary_capture_series_mode`
+is `single_series`, all spatial Secondary Captures are likewise renumbered by
+projected axial position; non-spatial Secondary Captures follow them in their
+original export order.
 | Integration dispatch events | external HTTP endpoint | JSON HTTP POST | Delivered when configured destinations accept the event. |
 | Job status lookup | `GET /jobs/{job_id}` | JSON | Best-effort state for accepted external jobs. |
 | Queue capacity lookup | `GET /ops/queues` | JSON | Non-identifying queue counts, concurrency, and disk capacity for external feeders. |

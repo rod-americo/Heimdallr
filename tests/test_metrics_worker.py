@@ -405,7 +405,7 @@ class TestMetricsWorker(unittest.TestCase):
             metadata = {"StudyInstanceUID": "1.2.826.0.1.3680043.10.543.1", "PatientName": "Test^Case"}
             rgb = np.zeros((8, 8, 3), dtype=np.uint8)
 
-            for path, series_number in ((sc_a, 9001), (sc_b, 9002)):
+            for path, series_number, location in ((sc_a, 9001, 20.0), (sc_b, 9002, 10.0)):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 create_secondary_capture_from_rgb(
                     rgb,
@@ -415,6 +415,8 @@ class TestMetricsWorker(unittest.TestCase):
                     series_number=series_number,
                     instance_number=1,
                     derivation_description="Test artifact",
+                    image_position_patient=[0.0, 0.0, location],
+                    image_orientation_patient=[1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
                     transfer_syntax="original",
                 )
             ct_path.parent.mkdir(parents=True, exist_ok=True)
@@ -457,8 +459,8 @@ class TestMetricsWorker(unittest.TestCase):
             self.assertEqual(second.SeriesNumber, 9900)
             self.assertEqual(first.SeriesDescription, "Heimdallr Artifact Series")
             self.assertEqual(second.SeriesDescription, "Heimdallr Artifact Series")
-            self.assertEqual(first.InstanceNumber, 1)
-            self.assertEqual(second.InstanceNumber, 2)
+            self.assertEqual(first.InstanceNumber, 2)
+            self.assertEqual(second.InstanceNumber, 1)
             self.assertEqual(str(derived.SeriesInstanceUID), original_ct_series_uid)
             self.assertEqual(str(derived.SOPClassUID), str(CTImageStorage))
 

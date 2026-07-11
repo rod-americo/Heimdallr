@@ -146,7 +146,10 @@ class TestLungNodulesJob(unittest.TestCase):
             self.assertEqual(components[0]["voxel_count"], 8)
             self.assertEqual(components[0]["slice_index"], 6)
             self.assertEqual(components[0]["probable_viewer_slice_index_one_based"], 4)
-            self.assertEqual(result["dicom_exports"][0]["component_id"], components[0]["component_id"])
+            self.assertEqual(
+                [item["slice_index"] for item in result["dicom_exports"]],
+                [2, 6],
+            )
             self.assertEqual(result["dicom_exports"][0]["kind"], "secondary_capture")
             self.assertEqual(
                 result["artifacts"]["overlay_sc_dcm"],
@@ -164,9 +167,10 @@ class TestLungNodulesJob(unittest.TestCase):
             self.assertEqual(ds_second.InstanceNumber, 2)
             self.assertEqual(
                 [float(value) for value in ds.ImagePositionPatient],
-                [0.0, 0.0, 6.0],
+                [0.0, 0.0, 2.0],
             )
-            self.assertEqual(float(ds.SliceLocation), 6.0)
+            self.assertEqual(float(ds.SliceLocation), 2.0)
+            self.assertEqual(float(ds.SpacingBetweenSlices), 1.0)
 
 
 if __name__ == "__main__":

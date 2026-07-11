@@ -15,8 +15,10 @@ import subprocess
 import threading
 import time
 from pathlib import Path
+from typing import Any
 from zoneinfo import ZoneInfo
 
+import numpy as np
 from pydicom import dcmread
 from pydicom.uid import SecondaryCaptureImageStorage, generate_uid
 
@@ -392,8 +394,9 @@ def _harmonize_secondary_capture_series(
         return None
 
     series_uid = series_instance_uid or str(generate_uid())
-    rewritten = 0
-    for path in paths:
+    spatial_datasets: list[tuple[float, int, Path, Any]] = []
+    nonspatial_datasets: list[tuple[int, Path, Any]] = []
+    for original_index, path in enumerate(paths):
         if not path.exists():
             if logger:
                 logger.log(f"[Metrics] Warning: Secondary Capture artifact not found for series grouping: {path}")
@@ -408,6 +411,28 @@ def _harmonize_secondary_capture_series(
         if str(getattr(dataset, "SOPClassUID", "") or "") != str(SecondaryCaptureImageStorage):
             continue
 
+        if hasattr(dataset, "ImagePositionPatient") and hasattr(dataset, "ImageOrientationPatient"):
+            try:
+                position = np.asarray(dataset.ImagePositionPatient, dtype=float)
+                orientation = np.asarray(dataset.ImageOrientationPatient, dtype=float)
+                normal = np.cross(orientation[:3], orientation[3:])
+                location = float(np.dot(position, normal))
+                spatial_datasets.append((location, original_index, path, dataset))
+                continue
+            except (TypeError, ValueError):
+                pass
+        nonspatial_datasets.append((original_index, path, dataset))
+
+    ordered_datasets = [
+        (path, dataset)
+        for _location, _index, path, dataset in sorted(spatial_datasets)
+    ]
+    ordered_datasets.extend(
+        (path, dataset) for _index, path, dataset in sorted(nonspatial_datasets)
+    )
+
+    rewritten = 0
+    for path, dataset in ordered_datasets:
         rewritten += 1
         dataset.SeriesInstanceUID = series_uid
         dataset.SeriesNumber = SECONDARY_CAPTURE_SINGLE_SERIES_NUMBER
