@@ -54,6 +54,8 @@ from heimdallr.shared.paths import study_artifacts_dir
 METRIC_KEY = "pleural_pericard_effusion"
 SERIES_NUMBER = 9131
 TARGET_SLICE_THICKNESS_MM = 5.0
+MIN_PLEURAL_EFFUSION_VOLUME_PER_SIDE_ML = 50.0
+MIN_PERICARDIAL_EFFUSION_VOLUME_ML = 50.0
 MEDIASTINAL_WINDOW_LEVEL_HU = 40.0
 MEDIASTINAL_WINDOW_WIDTH_HU = 400.0
 MEDIASTINAL_WINDOW_LIMITS_HU = (
@@ -196,6 +198,50 @@ def _label_components(mask: np.ndarray, voxel_volume_cm3: float) -> tuple[np.nda
         )
     components.sort(key=lambda item: item["voxel_count"], reverse=True)
     return labeled, components
+
+
+def _apply_display_qc(
+    finding: str,
+    mask: np.ndarray,
+    labeled: np.ndarray,
+    finding_measurement: dict[str, Any],
+) -> tuple[np.ndarray, dict[str, Any]]:
+    if finding == "pericardial_effusion":
+        volume_ml = float(finding_measurement["volume_cm3"])
+        eligible = volume_ml >= MIN_PERICARDIAL_EFFUSION_VOLUME_ML
+        return (
+            np.asarray(mask, dtype=bool) if eligible else np.zeros_like(mask, dtype=bool),
+            {
+                "eligible": eligible,
+                "threshold_ml": MIN_PERICARDIAL_EFFUSION_VOLUME_ML,
+                "detected_volume_ml": volume_ml,
+            },
+        )
+
+    laterality = finding_measurement.get("laterality", {})
+    side_volumes = laterality.get("volumes_cm3", {}) if isinstance(laterality, dict) else {}
+    eligible_sides = [
+        side
+        for side in ("left", "right")
+        if float(side_volumes.get(side, 0.0)) >= MIN_PLEURAL_EFFUSION_VOLUME_PER_SIDE_ML
+    ]
+    eligible_component_ids = {
+        int(component["component_id"])
+        for component in finding_measurement.get("components", [])
+        if component.get("laterality") in eligible_sides
+    }
+    display_mask = np.isin(labeled, list(eligible_component_ids))
+    return display_mask, {
+        "eligible": bool(eligible_sides),
+        "threshold_ml_per_side": MIN_PLEURAL_EFFUSION_VOLUME_PER_SIDE_ML,
+        "lateralization_status": laterality.get("status", "unavailable"),
+        "detected_volume_ml_by_side": {
+            side: float(side_volumes.get(side, 0.0))
+            for side in ("left", "right", "indeterminate")
+        },
+        "eligible_sides": eligible_sides,
+        "excluded_sides": [side for side in ("left", "right") if side not in eligible_sides],
+    }
 
 
 def _select_slab_source_indices(
@@ -372,6 +418,7 @@ def main() -> int:
         positive_findings: dict[str, dict[str, Any]] = {}
         positive_masks: dict[str, np.ndarray] = {}
         mask_statuses: dict[str, dict[str, Any]] = {}
+        display_qc: dict[str, dict[str, Any]] = {}
 
         for finding in FINDINGS:
             mask, status = _load_mask(segmentation_dir / f"{finding}.nii.gz", reference_shape)
@@ -389,8 +436,7 @@ def main() -> int:
                     right_lung_mask,
                     tuple(float(value) for value in ct_img.header.get_zooms()[:3]),
                 )
-            positive_masks[finding] = mask
-            positive_findings[finding] = {
+            finding_measurement = {
                 "present": True,
                 "voxel_count": voxel_count,
                 "volume_cm3": float(voxel_count * voxel_volume_cm3),
@@ -399,9 +445,47 @@ def main() -> int:
                 "source_mask": _relpath(case_dir, segmentation_dir / f"{finding}.nii.gz"),
             }
             if lateralization is not None:
-                positive_findings[finding]["laterality"] = lateralization
+                finding_measurement["laterality"] = lateralization
                 for side, volume in lateralization.get("volumes_cm3", {}).items():
-                    positive_findings[finding][f"{side}_volume_cm3"] = float(volume)
+                    finding_measurement[f"{side}_volume_cm3"] = float(volume)
+
+            display_mask, qc = _apply_display_qc(
+                finding,
+                mask,
+                labeled,
+                finding_measurement,
+            )
+            display_qc[finding] = qc
+            if not qc["eligible"]:
+                continue
+
+            if finding == "pleural_effusion":
+                eligible_sides = set(qc["eligible_sides"])
+                eligible_components = [
+                    component
+                    for component in components
+                    if component.get("laterality") in eligible_sides
+                ]
+                eligible_side_volumes = {
+                    side: (
+                        float(lateralization["volumes_cm3"].get(side, 0.0))
+                        if side in eligible_sides
+                        else 0.0
+                    )
+                    for side in ("left", "right", "indeterminate")
+                }
+                finding_measurement["components"] = eligible_components
+                finding_measurement["component_count"] = len(eligible_components)
+                finding_measurement["volume_cm3"] = float(sum(eligible_side_volumes.values()))
+                finding_measurement["laterality"] = {
+                    **lateralization,
+                    "volumes_cm3": eligible_side_volumes,
+                }
+                for side, volume in eligible_side_volumes.items():
+                    finding_measurement[f"{side}_volume_cm3"] = volume
+
+            positive_masks[finding] = display_mask
+            positive_findings[finding] = finding_measurement
 
         if not positive_findings:
             payload.update(
@@ -412,6 +496,7 @@ def main() -> int:
                         "job_status": "complete",
                         "notification_bool": False,
                         "mask_statuses": mask_statuses,
+                        "display_qc": display_qc,
                     },
                     "artifacts": {},
                 }
@@ -433,6 +518,7 @@ def main() -> int:
             "notification_bool": True,
             "present_findings": list(positive_findings),
             "findings": positive_findings,
+            "display_qc": display_qc,
             "artifact_locale": locale,
             "target_slice_thickness_mm": TARGET_SLICE_THICKNESS_MM,
             "reconstruction_mode": "slab_average",

@@ -15,6 +15,35 @@ Each decision should include:
 
 ## Decisions
 
+### 2026-07-11 - Gate effusion overlays by minimum volume
+
+**Context**
+
+Small TotalSegmentator effusion masks can create visually prominent overlays
+despite limited segmented volume.
+
+**Decision**
+
+Require at least 50 mL total volume for pericardial effusion display. Require
+at least 50 mL independently for each lateralized pleural side, displaying only
+the sides that meet the threshold. Preserve raw detected volumes and the QC
+decision in the job payload audit.
+
+**Impact**
+
+- Subthreshold findings do not publish a positive result or produce overlays.
+- A qualifying unilateral pleural effusion does not display a subthreshold
+  contralateral component.
+- The metrics worker must be restarted before resident processing uses the QC.
+
+**Tradeoff**
+
+The thresholds are deterministic presentation QC values and are not a clinical
+validation guarantee. Pleural components without reliable lateralization are
+excluded because the per-side threshold cannot be evaluated.
+
+---
+
 ### 2026-07-11 - Keep artifact blocks contiguous in single-series egress
 
 **Context**

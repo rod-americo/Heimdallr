@@ -147,14 +147,26 @@ class TestPleuralPericardEffusionJob(unittest.TestCase):
                 spacing=(1.0, 1.0, 2.0),
             )
 
-            exit_code, payload = self._run_job(
-                case_dir,
-                {
-                    "secondary_capture_transfer_syntax": "original",
-                    "secondary_capture_max_dimension": 512,
-                    "locale": "pt_BR",
-                },
-            )
+            with (
+                patch.object(
+                    pleural_pericard_effusion,
+                    "MIN_PLEURAL_EFFUSION_VOLUME_PER_SIDE_ML",
+                    0.0,
+                ),
+                patch.object(
+                    pleural_pericard_effusion,
+                    "MIN_PERICARDIAL_EFFUSION_VOLUME_ML",
+                    0.0,
+                ),
+            ):
+                exit_code, payload = self._run_job(
+                    case_dir,
+                    {
+                        "secondary_capture_transfer_syntax": "original",
+                        "secondary_capture_max_dimension": 512,
+                        "locale": "pt_BR",
+                    },
+                )
 
             self.assertEqual(exit_code, 0)
             self.assertNotIn("publish_result", payload)
@@ -241,14 +253,55 @@ class TestPleuralPericardEffusionJob(unittest.TestCase):
             exit_code, payload = self._run_job(case_dir, {"generate_overlay": False})
 
             self.assertEqual(exit_code, 0)
-            measurement = payload["measurement"]
-            self.assertEqual(measurement["present_findings"], ["pleural_effusion"])
-            self.assertTrue(measurement["has_pleural_effusion"])
-            self.assertNotIn("has_pericardial_effusion", measurement)
-            self.assertNotIn("pericardial_effusion", measurement["findings"])
-            self.assertTrue(
-                (case_dir / "artifacts" / "metrics" / "pleural_pericard_effusion" / "result.json").exists()
-            )
+            self.assertEqual(payload["status"], "not_present")
+            self.assertFalse(payload["publish_result"])
+            qc = payload["measurement"]["display_qc"]["pleural_effusion"]
+            self.assertFalse(qc["eligible"])
+            self.assertEqual(qc["threshold_ml_per_side"], 50.0)
+
+    def test_display_qc_qualifies_pleural_per_side_and_pericardial_total(self):
+        mask = np.zeros((8, 8, 2), dtype=bool)
+        labeled = np.zeros_like(mask, dtype=np.int32)
+        labeled[1:3, 1:3, :] = 1
+        labeled[5:7, 5:7, :] = 2
+        mask = labeled > 0
+        measurement = {
+            "volume_cm3": 70.0,
+            "components": [
+                {"component_id": 1, "laterality": "left"},
+                {"component_id": 2, "laterality": "right"},
+            ],
+            "laterality": {
+                "status": "complete",
+                "volumes_cm3": {"left": 55.0, "right": 15.0, "indeterminate": 0.0},
+            },
+        }
+
+        display_mask, qc = pleural_pericard_effusion._apply_display_qc(
+            "pleural_effusion", mask, labeled, measurement
+        )
+
+        self.assertTrue(qc["eligible"])
+        self.assertEqual(qc["eligible_sides"], ["left"])
+        self.assertTrue(np.all(display_mask[labeled == 1]))
+        self.assertFalse(np.any(display_mask[labeled == 2]))
+
+        below_mask, below_qc = pleural_pericard_effusion._apply_display_qc(
+            "pericardial_effusion",
+            mask,
+            labeled,
+            {"volume_cm3": 49.9},
+        )
+        threshold_mask, threshold_qc = pleural_pericard_effusion._apply_display_qc(
+            "pericardial_effusion",
+            mask,
+            labeled,
+            {"volume_cm3": 50.0},
+        )
+        self.assertFalse(below_qc["eligible"])
+        self.assertFalse(np.any(below_mask))
+        self.assertTrue(threshold_qc["eligible"])
+        self.assertTrue(np.array_equal(threshold_mask, mask))
 
 
 if __name__ == "__main__":
