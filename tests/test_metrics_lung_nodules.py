@@ -120,6 +120,7 @@ class TestLungNodulesJob(unittest.TestCase):
             lung = np.zeros_like(ct, dtype=np.float32)
             lung[2:14, 2:14, 1:9] = 1.0
             nodule = np.zeros_like(ct, dtype=np.float32)
+            nodule[0:1, 0:1, 8:9] = 1.0
             nodule[7:9, 7:9, 5:7] = 1.0
             nodule[3:4, 3:4, 2:3] = 1.0
             write_nifti(case_dir / "artifacts" / "total" / "lung_lower_lobe_right.nii.gz", lung)
@@ -139,6 +140,16 @@ class TestLungNodulesJob(unittest.TestCase):
             result = json.loads(result_path.read_text(encoding="utf-8"))
             self.assertTrue(result["measurement"]["has_pulmonary_nodule"])
             self.assertEqual(result["measurement"]["nodule_component_count"], 2)
+            qc = result["measurement"]["anatomical_qc"]
+            self.assertEqual(qc["raw_component_count"], 3)
+            self.assertEqual(qc["eligible_component_count"], 2)
+            self.assertEqual(qc["excluded_component_count"], 1)
+            self.assertEqual(qc["raw_voxel_count"], 10)
+            self.assertEqual(qc["eligible_voxel_count"], 9)
+            self.assertEqual(qc["excluded_voxel_count"], 1)
+            excluded = [component for component in qc["components"] if not component["eligible"]]
+            self.assertEqual(len(excluded), 1)
+            self.assertEqual(excluded[0]["reason"], "outside_total_lungs")
             self.assertIn("overlay_sc_dcm", result["artifacts"])
             self.assertEqual(len(result["artifacts"]["component_overlays"]), 2)
             self.assertEqual(len(result["dicom_exports"]), 2)
@@ -171,6 +182,43 @@ class TestLungNodulesJob(unittest.TestCase):
             )
             self.assertEqual(float(ds.SliceLocation), 2.0)
             self.assertEqual(float(ds.SpacingBetweenSlices), 1.0)
+
+    def test_all_components_outside_lungs_produce_negative_result_without_overlays(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            case_dir = Path(tmpdir) / "CaseLungOutsideOnly"
+            shape = (12, 12, 8)
+            write_nifti(case_dir / "derived" / "CaseLungOutsideOnly.nii.gz", np.zeros(shape))
+            lung = np.zeros(shape)
+            lung[2:8, 2:8, 1:6] = 1
+            nodules = np.zeros(shape)
+            nodules[9:11, 9:11, 6:8] = 1
+            write_nifti(
+                case_dir / "artifacts" / "total" / "lung_lower_lobe_right.nii.gz",
+                lung,
+            )
+            write_nifti(
+                case_dir / "artifacts" / "lung_nodules" / "lung_nodules.nii.gz",
+                nodules,
+            )
+            metric_dir = case_dir / "artifacts" / "metrics" / "lung_nodules"
+            metric_dir.mkdir(parents=True)
+            (metric_dir / "stale_overlay.dcm").write_bytes(b"stale")
+
+            exit_code = self._run_job(case_dir)
+
+            self.assertEqual(exit_code, 0)
+            result = json.loads((metric_dir / "result.json").read_text(encoding="utf-8"))
+            measurement = result["measurement"]
+            self.assertFalse(measurement["has_pulmonary_nodule"])
+            self.assertFalse(measurement["notification_bool"])
+            self.assertEqual(measurement["nodule_component_count"], 0)
+            self.assertEqual(measurement["nodule_voxel_count"], 0)
+            self.assertEqual(measurement["nodule_total_volume_cm3"], 0.0)
+            self.assertEqual(measurement["anatomical_qc"]["raw_component_count"], 1)
+            self.assertEqual(measurement["anatomical_qc"]["excluded_component_count"], 1)
+            self.assertNotIn("dicom_exports", result)
+            self.assertNotIn("component_overlays", result["artifacts"])
+            self.assertFalse((metric_dir / "stale_overlay.dcm").exists())
 
 
 if __name__ == "__main__":

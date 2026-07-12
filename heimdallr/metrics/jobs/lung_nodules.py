@@ -74,6 +74,12 @@ def _relpath(case_dir: Path, path: Path) -> str:
         return str(path)
 
 
+def _clear_metric_dir(metric_dir: Path) -> None:
+    for path in metric_dir.iterdir():
+        if path.is_file():
+            path.unlink()
+
+
 def _mask_voxel_volume_cm3(image: nib.Nifti1Image) -> float:
     zooms = tuple(float(value) for value in image.header.get_zooms()[:3])
     return float(np.prod(zooms) / 1000.0)
@@ -178,6 +184,55 @@ def _label_components(mask: np.ndarray, voxel_volume_cm3: float) -> tuple[np.nda
         )
     components.sort(key=lambda item: item["voxel_count"], reverse=True)
     return labeled, components
+
+
+def _apply_lung_overlap_qc(
+    labeled: np.ndarray,
+    components: list[dict[str, Any]],
+    lung_mask: np.ndarray,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    eligible_components: list[dict[str, Any]] = []
+    component_audit: list[dict[str, Any]] = []
+    for component in components:
+        component_id = int(component["component_id"])
+        component_mask = labeled == component_id
+        voxel_count = int(component["voxel_count"])
+        overlap_voxel_count = int(np.count_nonzero(component_mask & lung_mask))
+        overlap_fraction = float(overlap_voxel_count / voxel_count) if voxel_count else 0.0
+        eligible = bool(overlap_voxel_count)
+        component_audit.append(
+            {
+                "component_id": component_id,
+                "voxel_count": voxel_count,
+                "lung_overlap_voxel_count": overlap_voxel_count,
+                "lung_overlap_fraction": overlap_fraction,
+                "eligible": eligible,
+                "reason": "intersects_total_lungs" if eligible else "outside_total_lungs",
+            }
+        )
+        if eligible:
+            eligible_component = dict(component)
+            eligible_component["lung_overlap_voxel_count"] = overlap_voxel_count
+            eligible_component["lung_overlap_fraction"] = overlap_fraction
+            eligible_components.append(eligible_component)
+
+    raw_voxel_count = sum(int(component["voxel_count"]) for component in components)
+    eligible_voxel_count = sum(
+        int(component["voxel_count"])
+        for component in eligible_components
+    )
+    return eligible_components, {
+        "method": "connected_component_intersection_with_total_lungs",
+        "source_masks": [f"artifacts/total/{name}.nii.gz" for name in LUNG_MASK_NAMES],
+        "minimum_overlap_voxels": 1,
+        "raw_component_count": len(components),
+        "eligible_component_count": len(eligible_components),
+        "excluded_component_count": len(components) - len(eligible_components),
+        "raw_voxel_count": raw_voxel_count,
+        "eligible_voxel_count": eligible_voxel_count,
+        "excluded_voxel_count": raw_voxel_count - eligible_voxel_count,
+        "components": component_audit,
+    }
 
 
 def _component_summary(mask: np.ndarray, voxel_volume_cm3: float) -> list[dict[str, Any]]:
@@ -303,6 +358,7 @@ def main() -> int:
 
     try:
         case_dir, metric_dir, result_path = metric_output_dir(args.case_id, METRIC_KEY)
+        _clear_metric_dir(metric_dir)
         artifact_locale = resolve_artifact_locale(job_config)
         artifacts_dir = study_artifacts_dir(args.case_id)
         ct_path = resolve_canonical_nifti(args.case_id)
@@ -330,8 +386,13 @@ def main() -> int:
         nodule_mask, nodule_statuses = _load_union_mask(nodule_paths, reference_shape)
         lung_mask, lung_statuses = _load_lung_union(artifacts_dir, reference_shape)
         voxel_volume_cm3 = _mask_voxel_volume_cm3(ct_img)
-        labeled_components, components = _label_components(nodule_mask, voxel_volume_cm3)
-        nodule_voxel_count = int(np.count_nonzero(nodule_mask))
+        labeled_components, raw_components = _label_components(nodule_mask, voxel_volume_cm3)
+        components, anatomical_qc = _apply_lung_overlap_qc(
+            labeled_components,
+            raw_components,
+            lung_mask,
+        )
+        nodule_voxel_count = sum(int(component["voxel_count"]) for component in components)
         has_pulmonary_nodule = bool(nodule_voxel_count > 0)
         total_slices = int(reference_shape[2])
 
@@ -345,6 +406,7 @@ def main() -> int:
             "nodule_component_count": len(components),
             "nodule_total_volume_cm3": float(nodule_voxel_count * voxel_volume_cm3),
             "components": components,
+            "anatomical_qc": anatomical_qc,
             "slice_index_basis": "nifti_zero_based",
             "probable_viewer_slice_index_basis": "one_based_reverse_z",
             "total_slices": total_slices,

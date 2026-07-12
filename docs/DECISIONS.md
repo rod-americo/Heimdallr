@@ -15,6 +15,38 @@ Each decision should include:
 
 ## Decisions
 
+### 2026-07-12 - Exclude pulmonary nodule components outside final lung masks
+
+**Context**
+
+Task-specific pulmonary nodule inference can produce connected components
+outside lung parenchyma even though the model uses its own localization logic.
+The maintained `total` segmentation already provides five final lung-lobe masks
+on the canonical CT geometry.
+
+**Decision**
+
+After `lung_nodules` inference, evaluate every connected component against the
+union of the final lung-lobe masks. Keep a component when at least one voxel
+intersects that union; exclude zero-overlap components from positive status,
+aggregate measurements, overlays, and DICOM exports. Preserve raw and filtered
+counts and the per-component decision in `measurement.anatomical_qc`.
+
+**Impact**
+
+- Extra-pulmonary predictions do not become public pulmonary findings.
+- An all-extra-pulmonary raw mask produces a negative result without overlays.
+- Components intersecting a lung mask retain their complete predicted extent.
+- Metrics workers must restart before resident processing uses the filter.
+
+**Tradeoff**
+
+A prediction overlapping a segmentation leak can still pass the QC. Stronger
+erosion or overlap-fraction thresholds could suppress true pleural or
+subpleural nodules and require separate validation.
+
+---
+
 ### 2026-07-12 - Exclude hepatic lesion components outside the final liver mask
 
 **Context**
