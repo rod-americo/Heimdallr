@@ -476,10 +476,19 @@ def main() -> int:
                 }
                 finding_measurement["components"] = eligible_components
                 finding_measurement["component_count"] = len(eligible_components)
+                finding_measurement["voxel_count"] = sum(
+                    int(component["voxel_count"])
+                    for component in eligible_components
+                )
                 finding_measurement["volume_cm3"] = float(sum(eligible_side_volumes.values()))
                 finding_measurement["laterality"] = {
                     **lateralization,
                     "volumes_cm3": eligible_side_volumes,
+                    "components": [
+                        assignment
+                        for assignment in lateralization.get("components", [])
+                        if assignment.get("laterality") in eligible_sides
+                    ],
                 }
                 for side, volume in eligible_side_volumes.items():
                     finding_measurement[f"{side}_volume_cm3"] = volume

@@ -303,6 +303,59 @@ class TestPleuralPericardEffusionJob(unittest.TestCase):
         self.assertTrue(threshold_qc["eligible"])
         self.assertTrue(np.array_equal(threshold_mask, mask))
 
+    def test_unilateral_pleural_qc_filters_final_payload_counts_and_volume(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            case_dir = Path(tmpdir) / "CasePleuralUnilateralQc"
+            spacing = (10.0, 10.0, 10.0)
+            ct = np.full((20, 20, 12), -800.0, dtype=np.float32)
+            write_nifti(
+                case_dir / "derived" / "CasePleuralUnilateralQc.nii.gz",
+                ct,
+                spacing=spacing,
+            )
+            left_lung = np.zeros_like(ct)
+            left_lung[1:9, 1:19, 1:11] = 1.0
+            right_lung = np.zeros_like(ct)
+            right_lung[11:19, 1:19, 1:11] = 1.0
+            write_nifti(
+                case_dir / "artifacts" / "total" / "lung_lower_lobe_left.nii.gz",
+                left_lung,
+                spacing=spacing,
+            )
+            write_nifti(
+                case_dir / "artifacts" / "total" / "lung_lower_lobe_right.nii.gz",
+                right_lung,
+                spacing=spacing,
+            )
+            pleural = np.zeros_like(ct)
+            pleural[2:5, 2:7, 3:7] = 1.0  # 60 voxels = 60 mL
+            pleural[15:17, 12:15, 4:6] = 1.0  # 12 voxels = 12 mL
+            task_dir = case_dir / "artifacts" / "pleural_pericard_effusion"
+            write_nifti(task_dir / "pleural_effusion.nii.gz", pleural, spacing=spacing)
+            write_nifti(
+                task_dir / "pericardial_effusion.nii.gz",
+                np.zeros_like(ct),
+                spacing=spacing,
+            )
+
+            exit_code, payload = self._run_job(case_dir, {"generate_overlay": False})
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(payload["status"], "done")
+            measurement = payload["measurement"]
+            finding = measurement["findings"]["pleural_effusion"]
+            qc = measurement["display_qc"]["pleural_effusion"]
+            self.assertEqual(len(qc["eligible_sides"]), 1)
+            self.assertEqual(
+                sorted(qc["detected_volume_ml_by_side"].values()),
+                [0.0, 12.0, 60.0],
+            )
+            self.assertEqual(finding["voxel_count"], 60)
+            self.assertEqual(finding["volume_cm3"], 60.0)
+            self.assertEqual(finding["component_count"], 1)
+            self.assertEqual(len(finding["components"]), 1)
+            self.assertEqual(len(finding["laterality"]["components"]), 1)
+
 
 if __name__ == "__main__":
     unittest.main()
