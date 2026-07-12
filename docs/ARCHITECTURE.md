@@ -131,12 +131,14 @@ The code does not currently expose a separate `domain/` package. Domain rules ar
 `series_selection_policy` from external `/jobs` submissions, and segmentation
 worker helpers. CT selection preserves the existing phase and rejection rules,
 then uses measured DICOM coverage and z-spacing when available to prefer
-maximum coverage before thinner reconstructions. Within those boundaries it
-normalizes multilingual description hints, applies positive and negative
-soft-tissue reconstruction preferences, uses window center/width only as an
-auxiliary signal, and can apply manufacturer-specific hints. Prepared series
-metadata preserves the vendor, model, protocol, reconstruction algorithm, and
-window values needed to audit those decisions.
+maximum coverage before thinner reconstructions. Inside the configured
+coverage-equivalence tier, equal effective spacing is resolved by
+reconstruction preference before residual sub-slice coverage differences.
+Within those boundaries it normalizes multilingual description hints, applies
+positive and negative soft-tissue reconstruction preferences, uses window
+center/width only as an auxiliary signal, and can apply manufacturer-specific
+hints. Prepared series metadata preserves the vendor, model, protocol,
+reconstruction algorithm, and window values needed to audit those decisions.
 - segmentation task gatekeepers in `heimdallr/segmentation/worker.py`. The
 automatic CT path passes each task's configured `extra_args` to
 TotalSegmentator, runs `total` first, writes a segmentation inventory from the

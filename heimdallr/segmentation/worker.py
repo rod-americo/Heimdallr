@@ -1099,8 +1099,8 @@ def select_prepared_series(case_id, id_data):
                     )
                     else float("inf")
                 ),
-                -(c.get("coverage_mm") or 0.0),
                 c["preference_score"],
+                -(c.get("coverage_mm") or 0.0),
                 0 if c["phase_detected"] else 1,
                 -c["phase_probability"],
                 -c["slice_count"],

@@ -15,6 +15,34 @@ Each decision should include:
 
 ## Decisions
 
+### 2026-07-11 - Prefer reconstruction hints over residual equivalent coverage
+
+**Context**
+
+A chest study had soft-tissue and lung reconstructions with the same phase,
+effective spacing, and coverage tier. The lung reconstruction covered one
+additional millimeter, so residual exact coverage overrode the stronger
+soft-tissue score and selected the harder kernel.
+
+**Decision**
+
+After phase, coverage tier, and effective spacing, rank reconstruction
+preference before residual exact coverage. Coverage outside the configured
+equivalence tier continues to outrank reconstruction hints.
+
+**Impact**
+
+- Equivalent chest reconstructions select the mediastinal/soft-tissue series
+  when only a sub-slice coverage difference favors the lung reconstruction.
+- Deployments must restart the segmentation worker to adopt the ordering.
+
+**Tradeoff**
+
+Residual exact coverage becomes a later tie-breaker inside the equivalence tier;
+large coverage differences and thinner effective spacing retain priority.
+
+---
+
 ### 2026-07-11 - Gate effusion overlays by minimum volume
 
 **Context**

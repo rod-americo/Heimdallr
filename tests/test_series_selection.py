@@ -291,6 +291,98 @@ class TestSeriesSelection(unittest.TestCase):
         self.assertEqual(selected_path.name, "body.nii.gz")
         self.assertLess(selection_info["SelectedPreferenceScore"], 0)
 
+    def test_soft_tissue_scoring_breaks_residual_coverage_tie(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            case_id = "case-mediastinum-residual-coverage"
+            derived_dir = root / "runtime" / "studies" / case_id / "derived" / "series"
+            derived_dir.mkdir(parents=True, exist_ok=True)
+            mediastinum_path = derived_dir / "mediastinum.nii.gz"
+            lung_path = derived_dir / "lung.nii.gz"
+            mediastinum_path.write_bytes(b"mediastinum")
+            lung_path.write_bytes(b"lung")
+
+            config_path = root / "series_selection.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "default_profile": "ct_test",
+                        "profiles": {
+                            "ct_test": {
+                                "required": {"modality": "CT", "min_slices": 60},
+                                "hard_reject": {},
+                                "phase_priority": ["native"],
+                                "geometry_priority": {
+                                    "enabled": True,
+                                    "coverage_equivalence_ratio": 0.92,
+                                    "coverage_equivalence_mm": 50,
+                                    "prefer_thinner_within_equivalent_coverage": True,
+                                },
+                                "text_hints": {
+                                    "description_prefer": ["mediastino"],
+                                },
+                                "window_hints": {
+                                    "soft_tissue_center_range": [-200, 200],
+                                    "soft_tissue_width_range": [200, 800],
+                                    "lung_center_max": -300,
+                                    "lung_width_min": 1000,
+                                },
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            common = {
+                "Modality": "CT",
+                "DetectedPhase": "native",
+                "PhaseDetected": True,
+                "PhaseData": {"probability": 1.0},
+                "ZSpacingMm": 1.0,
+            }
+            id_data = {
+                "AvailableSeries": [
+                    {
+                        **common,
+                        "SeriesInstanceUID": "1.2.3.mediastinum",
+                        "SeriesNumber": "2",
+                        "DerivedNiftiPath": "series/mediastinum.nii.gz",
+                        "SliceCount": 303,
+                        "SeriesDescription": "VOL MEDIASTINO",
+                        "ConvolutionKernel": ["Br36f", "4"],
+                        "WindowCenter": "40",
+                        "WindowWidth": "400",
+                        "CoverageMm": 302.0,
+                        "SliceThicknessMm": 2.0,
+                    },
+                    {
+                        **common,
+                        "SeriesInstanceUID": "1.2.3.lung",
+                        "SeriesNumber": "3",
+                        "DerivedNiftiPath": "series/lung.nii.gz",
+                        "SliceCount": 304,
+                        "SeriesDescription": "VOL PARENQUIMA",
+                        "ConvolutionKernel": ["Br60f", "3"],
+                        "WindowCenter": "-600",
+                        "WindowWidth": "1200",
+                        "CoverageMm": 303.0,
+                        "SliceThicknessMm": 1.0,
+                    },
+                ]
+            }
+
+            with patch.object(settings, "STUDIES_DIR", root / "runtime" / "studies"), patch.object(
+                settings,
+                "SERIES_SELECTION_CONFIG_PATH",
+                config_path,
+            ):
+                selected_path, selection_info = select_prepared_series(case_id, id_data)
+
+        self.assertEqual(selected_path.name, "mediastinum.nii.gz")
+        self.assertEqual(selection_info["SelectedWindowClass"], "soft_tissue")
+        self.assertEqual(selection_info["SelectedPreferenceScore"], -2)
+
     def test_external_policy_overrides_min_slices_for_job(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

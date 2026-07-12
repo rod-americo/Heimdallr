@@ -252,8 +252,11 @@ production-facing profile.
 - `StudyInstanceUID`, `case_id`, and `job_id` are not interchangeable.
 - Series selection should prefer maximum measured anatomical coverage first and
 the thinnest available reconstruction only among coverage-equivalent eligible
-series. If geometric metadata is absent, the selector falls back to the legacy
-slice-count ranking.
+series. Within the same coverage tier and effective spacing, reconstruction
+preference must precede residual exact-coverage differences so a one-slice
+coverage difference does not override a soft-tissue reconstruction. If
+geometric metadata is absent, the selector falls back to the legacy slice-count
+ranking.
 - Series-selection text matching is case-insensitive and accent-insensitive so
 equivalent terms such as `pulmao` and `pulmão` follow the same rule. Hard
 rejections remain explicit profile rules; generic `sharp` kernel text is a soft

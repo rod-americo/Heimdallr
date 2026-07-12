@@ -356,6 +356,10 @@ host-specific accelerator choices:
 - local macOS/Odin: `total` with `--fast --device mps`.
 - CPU POC: `total` with `--fast --device cpu`.
 
+Changes to series-ranking behavior in `heimdallr.segmentation` require a
+segmentation-worker restart. Changes that also alter prepared-series metadata
+extraction require restarting both prepare and segmentation workers.
+
 The tracked automatic CT examples use `ct_automatic_segmentation` and
 `ct_automatic_metrics` by default. The segmentation worker runs `total` first,
 writes `artifacts/segmentation_inventory.json`, and uses that inventory to
