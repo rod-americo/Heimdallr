@@ -359,13 +359,17 @@ def _render_slice_rgb(
     title_font = _load_overlay_font(size=18)
     body_font = _load_overlay_font(size=16)
 
+    title_bbox = draw.textbbox((0, 0), "Ag", font=title_font)
+    body_bbox = draw.textbbox((0, 0), "Ag", font=body_font)
+    title_line_height = (title_bbox[3] - title_bbox[1]) + 8
+    body_line_height = (body_bbox[3] - body_bbox[1]) + 6
     line_heights: list[int] = []
     max_width = 0
     for idx, line in enumerate(summary_lines):
         font = title_font if idx == 0 else body_font
         bbox = draw.textbbox((0, 0), line.text, font=font)
         max_width = max(max_width, bbox[2] - bbox[0])
-        line_heights.append((bbox[3] - bbox[1]) + (8 if idx == 0 else 6))
+        line_heights.append(title_line_height if idx == 0 else body_line_height)
     available_width = max(1, image.width - 20)
     available_height = max(1, image.height - 20)
     box_width = min(available_width, max_width + 24)

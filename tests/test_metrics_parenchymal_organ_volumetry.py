@@ -16,6 +16,7 @@ if str(ROOT) not in sys.path:
 
 from heimdallr.metrics.jobs import parenchymal_organ_volumetry  # noqa: E402
 from heimdallr.metrics.jobs._parenchymal_overlay_text import (  # noqa: E402
+    OverlayTextLine,
     build_overlay_lines,
     build_overlay_text,
 )
@@ -29,6 +30,39 @@ def write_nifti(path: Path, data: np.ndarray, spacing=(1.0, 1.0, 1.0)) -> None:
 
 
 class TestParenchymalOrganVolumetryJob(unittest.TestCase):
+    def test_renderer_uses_uniform_body_line_spacing(self):
+        lines = [
+            OverlayTextLine("Órgãos parenquimatosos:"),
+            OverlayTextLine("Fígado: 1.349 cm³ | 57 UH"),
+            OverlayTextLine("Esteatose: não"),
+            OverlayTextLine("Baço: 131 cm³ | 45 UH"),
+        ]
+        y_positions = []
+        original_draw = parenchymal_organ_volumetry.ImageDraw.Draw
+
+        class RecordingDraw:
+            def __init__(self, image, mode=None):
+                self._draw = original_draw(image, mode=mode)
+
+            def __getattr__(self, name):
+                return getattr(self._draw, name)
+
+            def text(self, xy, text, *args, **kwargs):
+                y_positions.append((text, xy[1]))
+                return self._draw.text(xy, text, *args, **kwargs)
+
+        with patch.object(parenchymal_organ_volumetry.ImageDraw, "Draw", RecordingDraw):
+            parenchymal_organ_volumetry._render_slice_rgb(
+                np.zeros((128, 256), dtype=np.float32),
+                [],
+                lines,
+                source_axis_codes=("R", "A"),
+            )
+
+        line_texts = {line.text for line in lines[1:]}
+        body_y = [y for text, y in y_positions if text in line_texts]
+        self.assertEqual(body_y[1] - body_y[0], body_y[2] - body_y[1])
+
     def test_renderer_draws_alert_volume_span_in_red(self):
         lines = build_overlay_lines(
             organ_measurements={
