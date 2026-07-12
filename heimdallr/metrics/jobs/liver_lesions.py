@@ -124,6 +124,55 @@ def _label_components(mask: np.ndarray, voxel_volume_cm3: float) -> tuple[np.nda
     return labeled, components
 
 
+def _apply_liver_overlap_qc(
+    labeled: np.ndarray,
+    components: list[dict[str, Any]],
+    liver_mask: np.ndarray,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    eligible_components: list[dict[str, Any]] = []
+    component_audit: list[dict[str, Any]] = []
+    for component in components:
+        component_id = int(component["component_id"])
+        component_mask = labeled == component_id
+        voxel_count = int(component["voxel_count"])
+        overlap_voxel_count = int(np.count_nonzero(component_mask & liver_mask))
+        overlap_fraction = float(overlap_voxel_count / voxel_count) if voxel_count else 0.0
+        eligible = bool(overlap_voxel_count)
+        component_audit.append(
+            {
+                "component_id": component_id,
+                "voxel_count": voxel_count,
+                "liver_overlap_voxel_count": overlap_voxel_count,
+                "liver_overlap_fraction": overlap_fraction,
+                "eligible": eligible,
+                "reason": "intersects_total_liver" if eligible else "outside_total_liver",
+            }
+        )
+        if eligible:
+            eligible_component = dict(component)
+            eligible_component["liver_overlap_voxel_count"] = overlap_voxel_count
+            eligible_component["liver_overlap_fraction"] = overlap_fraction
+            eligible_components.append(eligible_component)
+
+    raw_voxel_count = sum(int(component["voxel_count"]) for component in components)
+    eligible_voxel_count = sum(
+        int(component["voxel_count"])
+        for component in eligible_components
+    )
+    return eligible_components, {
+        "method": "connected_component_intersection_with_total_liver",
+        "source_mask": "artifacts/total/liver.nii.gz",
+        "minimum_overlap_voxels": 1,
+        "raw_component_count": len(components),
+        "eligible_component_count": len(eligible_components),
+        "excluded_component_count": len(components) - len(eligible_components),
+        "raw_voxel_count": raw_voxel_count,
+        "eligible_voxel_count": eligible_voxel_count,
+        "excluded_voxel_count": raw_voxel_count - eligible_voxel_count,
+        "components": component_audit,
+    }
+
+
 def _display_slice(array: np.ndarray, affine: np.ndarray) -> tuple[np.ndarray, tuple[str, str]]:
     axis_codes = plane_source_axis_codes(affine, "z")
     return (
@@ -242,8 +291,13 @@ def main() -> int:
         liver_mask, liver_status = _load_mask(liver_path, shape)
         spacing_xyz = tuple(float(value) for value in ct_img.header.get_zooms()[:3])
         voxel_volume_cm3 = float(np.prod(spacing_xyz) / 1000.0)
-        labeled, components = _label_components(lesion_mask, voxel_volume_cm3)
-        voxel_count = int(np.count_nonzero(lesion_mask))
+        labeled, raw_components = _label_components(lesion_mask, voxel_volume_cm3)
+        components, anatomical_qc = _apply_liver_overlap_qc(
+            labeled,
+            raw_components,
+            liver_mask,
+        )
+        voxel_count = sum(int(component["voxel_count"]) for component in components)
         has_lesion = bool(voxel_count)
 
         payload.update(
@@ -257,6 +311,7 @@ def main() -> int:
                     "lesion_component_count": len(components),
                     "lesion_total_volume_cm3": float(voxel_count * voxel_volume_cm3),
                     "components": components,
+                    "anatomical_qc": anatomical_qc,
                     "lesion_mask": lesion_status,
                     "liver_mask": liver_status,
                     "total_slices": int(shape[2]),

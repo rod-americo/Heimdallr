@@ -15,6 +15,38 @@ Each decision should include:
 
 ## Decisions
 
+### 2026-07-12 - Exclude hepatic lesion components outside the final liver mask
+
+**Context**
+
+The `liver_lesions` model performs its own robust coarse liver localization
+with a 10 mm crop margin. In a production case, two of four predicted connected
+components were entirely outside `total/liver.nii.gz`, at minimum distances of
+14.6 mm and 23.4 mm from the final liver segmentation.
+
+**Decision**
+
+After lesion inference, evaluate each connected component against the final
+`total/liver.nii.gz` mask. Keep a component when at least one voxel intersects
+the liver mask; exclude zero-overlap components from positive status, aggregate
+measurements, overlays, and DICOM exports. Preserve the raw and filtered counts
+and per-component overlap decision in `measurement.anatomical_qc`.
+
+**Impact**
+
+- Extra-hepatic predictions do not become public hepatic findings or overlays.
+- Components intersecting the liver retain their complete predicted extent;
+  the QC does not clip lesion boundaries at the liver-mask edge.
+- Metrics workers must restart before resident processing uses the filter.
+
+**Tradeoff**
+
+A false-positive region incorporated into the final liver segmentation can
+still pass this QC. Requiring erosion or a larger overlap fraction could remove
+subcapsular true lesions and therefore remains outside this decision.
+
+---
+
 ### 2026-07-12 - Gate hepatic lesion inference by liver presence and host
 
 **Context**

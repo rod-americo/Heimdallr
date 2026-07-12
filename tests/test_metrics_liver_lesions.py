@@ -107,6 +107,7 @@ class TestLiverLesionsJob(unittest.TestCase):
             liver = np.zeros(shape)
             liver[2:14, 2:14, 1:9] = 1
             lesions = np.zeros(shape)
+            lesions[0:1, 0:1, 8:9] = 1
             lesions[4:6, 4:6, 2:3] = 1
             lesions[9:12, 9:12, 6:8] = 1
             write_nifti(case_dir / "derived" / "CaseLiverPositive.nii.gz", ct)
@@ -129,6 +130,16 @@ class TestLiverLesionsJob(unittest.TestCase):
             self.assertTrue(measurement["has_hepatic_lesion"])
             self.assertEqual(measurement["lesion_component_count"], 2)
             self.assertEqual(measurement["lesion_voxel_count"], 22)
+            qc = measurement["anatomical_qc"]
+            self.assertEqual(qc["raw_component_count"], 3)
+            self.assertEqual(qc["eligible_component_count"], 2)
+            self.assertEqual(qc["excluded_component_count"], 1)
+            self.assertEqual(qc["raw_voxel_count"], 23)
+            self.assertEqual(qc["eligible_voxel_count"], 22)
+            self.assertEqual(qc["excluded_voxel_count"], 1)
+            excluded = [component for component in qc["components"] if not component["eligible"]]
+            self.assertEqual(len(excluded), 1)
+            self.assertEqual(excluded[0]["reason"], "outside_total_liver")
             self.assertEqual([item["slice_index"] for item in payload["dicom_exports"]], [2, 6])
             datasets = [pydicom.dcmread(case_dir / item["path"]) for item in payload["dicom_exports"]]
             self.assertEqual(len({str(dataset.SeriesInstanceUID) for dataset in datasets}), 1)
@@ -142,6 +153,35 @@ class TestLiverLesionsJob(unittest.TestCase):
                 "Heimdallr Overlay de Lesões Hepáticas",
             )
             self.assertIn("liver_lesions", datasets[0].DerivationDescription)
+
+    def test_all_components_outside_liver_produce_negative_result_without_overlays(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            case_dir = Path(tmpdir) / "CaseLiverOutsideOnly"
+            shape = (12, 12, 8)
+            write_nifti(case_dir / "derived" / "CaseLiverOutsideOnly.nii.gz", np.zeros(shape))
+            liver = np.zeros(shape)
+            liver[2:8, 2:8, 1:6] = 1
+            lesions = np.zeros(shape)
+            lesions[9:11, 9:11, 6:8] = 1
+            write_nifti(case_dir / "artifacts" / "total" / "liver.nii.gz", liver)
+            write_nifti(
+                case_dir / "artifacts" / "liver_lesions" / "liver_lesions.nii.gz",
+                lesions,
+            )
+
+            exit_code, payload = self._run_job(case_dir)
+
+            self.assertEqual(exit_code, 0)
+            measurement = payload["measurement"]
+            self.assertFalse(measurement["has_hepatic_lesion"])
+            self.assertFalse(measurement["notification_bool"])
+            self.assertEqual(measurement["lesion_component_count"], 0)
+            self.assertEqual(measurement["lesion_voxel_count"], 0)
+            self.assertEqual(measurement["lesion_total_volume_cm3"], 0.0)
+            self.assertEqual(measurement["anatomical_qc"]["raw_component_count"], 1)
+            self.assertEqual(measurement["anatomical_qc"]["excluded_component_count"], 1)
+            self.assertNotIn("dicom_exports", payload)
+            self.assertNotIn("component_overlays", payload["artifacts"])
 
 
 if __name__ == "__main__":
