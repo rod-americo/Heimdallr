@@ -216,6 +216,18 @@ Metrics DICOM artifact policy:
   `artifact_dicom_policy`; omitted fields fall back to the active metrics
   profile.
 
+Host-scoped hepatic lesion processing:
+
+- The production module and versioned examples include `liver_lesions`, but the
+  example segmentation task and metrics job are disabled by default.
+- Enable both entries only on accelerator hosts validated for this workload.
+  The current deployment enables the task on local `odin` with `mps` and on
+  `thor` with `gpu`; `ms-heimdallr` remains disabled.
+- In automatic CT mode, a positive `total/liver.nii.gz` inventory entry selects
+  the `liver_lesions` task and metrics job. An absent or empty liver mask skips
+  the additional model.
+- Restart segmentation and metrics after changing either host-local profile.
+
 ## 5. Minimum Validation
 
 ```bash

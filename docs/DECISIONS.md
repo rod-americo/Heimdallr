@@ -15,6 +15,39 @@ Each decision should include:
 
 ## Decisions
 
+### 2026-07-12 - Gate hepatic lesion inference by liver presence and host
+
+**Context**
+
+The open TotalSegmentator `liver_lesions` task produced reproducible negative
+output across MPS, GPU, and CPU testing, but its end-to-end runtime was about
+25 seconds on `thor`, 46 seconds on local `odin`, and 115 seconds on the CPU
+host for the same 512 x 512 x 501 study.
+
+**Decision**
+
+Add a production hepatic-lesion metrics module and spatial Secondary Capture
+overlays. In automatic CT planning, run the additional model only when the
+`total` segmentation contains a positive liver mask. Keep the versioned example
+task and job disabled, and enable them operationally only on `odin` (`mps`) and
+`thor` (`gpu`).
+
+**Impact**
+
+- Positive lesion components produce auditable JSON and position-preserving
+  DICOM overlays; negative masks produce JSON without presentation artifacts.
+- `ms-heimdallr` receives compatible code but does not schedule the additional
+  CPU workload.
+- Segmentation and metrics workers must restart after deployment or host-local
+  profile changes.
+
+**Tradeoff**
+
+Liver presence is an orchestration gate, not a clinical eligibility criterion.
+Clinical performance of the lesion model remains outside automated validation.
+
+---
+
 ### 2026-07-11 - Prefer reconstruction hints over residual equivalent coverage
 
 **Context**

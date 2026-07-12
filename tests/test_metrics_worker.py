@@ -134,6 +134,13 @@ class TestMetricsWorker(unittest.TestCase):
             ["total", "pleural_pericard_effusion"],
         )
         self.assertTrue(jobs["pleural_pericard_effusion"]["automatic"])
+        self.assertFalse(jobs["liver_lesions"]["enabled"])
+        self.assertTrue(jobs["liver_lesions"]["automatic"])
+        self.assertEqual(jobs["liver_lesions"]["requires_inventory"], ["liver.present"])
+        self.assertEqual(
+            jobs["liver_lesions"]["requires_segmentation_tasks"],
+            ["total", "liver_lesions"],
+        )
 
     def test_filter_jobs_by_inventory_selects_compatible_ct_jobs(self):
         jobs = _resolve_enabled_jobs(
@@ -187,6 +194,23 @@ class TestMetricsWorker(unittest.TestCase):
 
         self.assertEqual(selected, [])
         self.assertEqual([job["name"] for job in skipped], ["lung_nodules"])
+
+    def test_filter_jobs_by_inventory_skips_liver_lesions_without_liver(self):
+        jobs = _resolve_enabled_jobs(
+            {
+                "jobs": [
+                    {
+                        "name": "liver_lesions",
+                        "requires_inventory": ["liver.present"],
+                    },
+                ]
+            }
+        )
+
+        selected, skipped = filter_jobs_by_inventory(jobs, {"liver": {"present": False}})
+
+        self.assertEqual(selected, [])
+        self.assertEqual([job["name"] for job in skipped], ["liver_lesions"])
 
     def test_remove_result_deletes_stale_positive_only_metric(self):
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -59,6 +59,20 @@
           "license_required": false
         },
         {
+          "name": "liver_lesions",
+          "enabled": false,
+          "output_dir": "artifacts/liver_lesions",
+          "extra_args": [
+            "--device",
+            "gpu",
+            "--nr_thr_resamp",
+            "14",
+            "--nr_thr_saving",
+            "14"
+          ],
+          "license_required": false
+        },
+        {
           "name": "tissue_types",
           "enabled": true,
           "output_dir": "artifacts/tissue_types",

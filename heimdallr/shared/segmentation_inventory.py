@@ -146,6 +146,11 @@ def build_segmentation_inventory(total_dir: Path, reference_image_path: Path) ->
         "any_present": bool(present_organs),
         "any_complete": bool(complete_organs),
     }
+    liver = organ_statuses.get("liver", {})
+    inventory["liver"] = {
+        "present": bool(liver.get("present")),
+        "complete": bool(liver.get("complete")),
+    }
     inventory["lungs"] = {
         "mask_names": list(LUNG_MASKS),
         "present": present_lobes,

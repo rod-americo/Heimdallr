@@ -415,6 +415,24 @@ msgstr "Heimdallr Pulmonary Nodule Overlay"
 msgid "lung_nodules.overlay.derivation_description"
 msgstr "Pulmonary nodule detection overlay from lung_nodules segmentation."
 
+msgid "liver_lesions.overlay.title"
+msgstr "Hepatic Lesions"
+
+msgid "liver_lesions.overlay.component_title"
+msgstr "Hepatic lesion {index}/{count}"
+
+msgid "liver_lesions.overlay.voxel_count"
+msgstr "Voxels: {value}"
+
+msgid "liver_lesions.overlay.volume_cm3"
+msgstr "Volume: {value} cm³"
+
+msgid "liver_lesions.overlay.series_description"
+msgstr "Heimdallr Hepatic Lesion Overlay"
+
+msgid "liver_lesions.overlay.derivation_description"
+msgstr "Hepatic lesion detection overlay from liver_lesions segmentation."
+
 msgid "pleural_pericard_effusion.finding.pleural_effusion"
 msgstr "Pleural effusion"
 

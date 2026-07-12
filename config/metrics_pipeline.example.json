@@ -96,6 +96,21 @@
           "secondary_capture_transfer_syntax": "jpeg_ls_lossless"
         },
         {
+          "name": "liver_lesions",
+          "enabled": false,
+          "automatic": true,
+          "requires_segmentation_tasks": [
+            "total",
+            "liver_lesions"
+          ],
+          "requires_inventory": [
+            "liver.present"
+          ],
+          "generate_overlay": true,
+          "emit_secondary_capture_dicom": true,
+          "secondary_capture_transfer_syntax": "jpeg_ls_lossless"
+        },
+        {
           "name": "brain_volumetry",
           "enabled": false,
           "requires_segmentation_tasks": [

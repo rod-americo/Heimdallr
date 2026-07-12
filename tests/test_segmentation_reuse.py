@@ -56,6 +56,7 @@ class TestSegmentationReuse(unittest.TestCase):
         self.assertTrue(inventory["vertebrae_L3"]["complete"])
         self.assertEqual(inventory["parenchymal_organs"]["present"], ["liver"])
         self.assertTrue(inventory["parenchymal_organs"]["any_present"])
+        self.assertTrue(inventory["liver"]["present"])
         self.assertEqual(inventory["lungs"]["present_lobes"], ["lung_lower_lobe_right"])
         self.assertEqual(inventory["lungs"]["complete_lobes"], [])
         self.assertTrue(inventory["lungs"]["any_present"])
@@ -577,6 +578,12 @@ class TestSegmentationReuse(unittest.TestCase):
                         "requires_segmentation_tasks": ["total", "pleural_pericard_effusion"],
                         "requires_inventory": ["lungs.any_present"],
                     },
+                    {
+                        "name": "liver_lesions",
+                        "automatic": True,
+                        "requires_segmentation_tasks": ["total", "liver_lesions"],
+                        "requires_inventory": ["liver.present"],
+                    },
                 ],
             }
 
@@ -592,6 +599,7 @@ class TestSegmentationReuse(unittest.TestCase):
                                 "name": "pleural_pericard_effusion",
                                 "output_dir": "artifacts/pleural_pericard_effusion",
                             },
+                            {"name": "liver_lesions", "output_dir": "artifacts/liver_lesions"},
                             {"name": "cerebral_bleed", "output_dir": "artifacts/cerebral_bleed"},
                             {"name": "brain_structures", "output_dir": "artifacts/brain_structures"},
                         ],
@@ -614,13 +622,17 @@ class TestSegmentationReuse(unittest.TestCase):
                     logger=PipelineLogger(None),
                 )
 
-            self.assertEqual(calls, ["total", "tissue_types", "pleural_pericard_effusion"])
+            self.assertEqual(
+                calls,
+                ["total", "tissue_types", "pleural_pericard_effusion", "liver_lesions"],
+            )
             self.assertEqual(
                 info["automatic_ct_plan"]["selected_jobs"],
                 [
                     "l3_muscle_area",
                     "parenchymal_organ_volumetry",
                     "pleural_pericard_effusion",
+                    "liver_lesions",
                 ],
             )
             self.assertEqual(
