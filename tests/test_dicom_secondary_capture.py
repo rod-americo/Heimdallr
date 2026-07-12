@@ -9,7 +9,6 @@ from pydicom.uid import DeflatedExplicitVRLittleEndian, JPEGLSLossless
 from heimdallr.metrics.jobs._dicom_secondary_capture import (
     axial_dicom_geometry_from_nifti,
     create_secondary_capture_from_rgb,
-    load_source_dicom_geometry,
     metadata_value,
     nearest_source_dicom_geometry,
     resolve_secondary_capture_transfer_syntax,
@@ -17,41 +16,6 @@ from heimdallr.metrics.jobs._dicom_secondary_capture import (
 
 
 class TestDicomSecondaryCapture(unittest.TestCase):
-    def test_source_geometry_preserves_vendor_slice_location(self):
-        rgb = np.zeros((8, 8, 3), dtype=np.uint8)
-        metadata = {"StudyInstanceUID": "1.2.3", "PatientName": "Test^Patient"}
-        with tempfile.TemporaryDirectory() as tmpdir:
-            case_dir = Path(tmpdir)
-            source_path = case_dir / "source" / "dicom" / "series" / "series_1" / "image.dcm"
-            source_path.parent.mkdir(parents=True)
-            create_secondary_capture_from_rgb(
-                rgb,
-                source_path,
-                metadata,
-                series_description="Source",
-                series_number=1,
-                instance_number=1,
-                derivation_description="Source geometry fixture",
-                image_position_patient=[-159.0, -308.0, -236.0],
-                image_orientation_patient=[1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
-                slice_location=-236.0,
-                source_rows=512,
-                source_columns=512,
-                source_pixel_spacing=[0.66, 0.66],
-                transfer_syntax="original",
-            )
-            dataset = pydicom.dcmread(str(source_path))
-            dataset.SliceLocation = 236.0
-            dataset.save_as(str(source_path), write_like_original=False)
-            load_source_dicom_geometry.cache_clear()
-
-            geometries = load_source_dicom_geometry(case_dir)
-
-        load_source_dicom_geometry.cache_clear()
-        self.assertEqual(len(geometries), 1)
-        self.assertEqual(geometries[0]["image_position_patient"][2], -236.0)
-        self.assertEqual(geometries[0]["slice_location"], 236.0)
-
     def test_nearest_source_geometry_preserves_source_orientation_and_position(self):
         geometries = [
             {

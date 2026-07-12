@@ -624,6 +624,8 @@ def main() -> int:
                             ct_img,
                             float(np.mean(source_indices)),
                         ),
+                        slice_thickness_mm=TARGET_SLICE_THICKNESS_MM,
+                        spacing_between_slices_mm=TARGET_SLICE_THICKNESS_MM,
                         **secondary_capture_options,
                     )
                     dicom_exports.append(

@@ -15,41 +15,6 @@ Each decision should include:
 
 ## Decisions
 
-### 2026-07-12 - Preserve source slice location for synchronized overlays
-
-**Context**
-
-OsiriX synchronized point overlays such as VAT and osteoporosis with the source
-CT, but did not synchronize the multi-image parenchymal volume overlay. All
-volume images had matching frame of reference, orientation, and exact source
-positions. The source CT stored positive `SliceLocation` values for negative
-axial `ImagePositionPatient` Z coordinates, while Heimdallr recomputed negative
-slice locations. The volume Secondary Captures also declared themselves as a
-5 mm stack through `SliceThickness` and `SpacingBetweenSlices`.
-
-**Decision**
-
-When preserved source DICOM geometry is available, copy its `SliceLocation`
-verbatim and use the geometric projection only as a fallback. Keep exact source
-position, orientation, frame of reference, and derived pixel spacing. For the
-parenchymal 5 mm Secondary Capture series, omit `SliceThickness` and
-`SpacingBetweenSlices` so viewers use source-plane synchronization rather than
-treating the artifact as a separate reconstructed stack.
-
-**Impact**
-
-- Spatial overlays retain the source vendor's location convention.
-- Parenchymal overlays continue to represent 5 mm slab averages in pixels,
-  descriptions, and JSON while signaling a source plane to viewers.
-- Metrics workers must restart before new artifacts use this geometry.
-
-**Tradeoff**
-
-Secondary Capture headers no longer encode the slab thickness directly for the
-parenchymal series; consumers must use the artifact contract or result JSON.
-
----
-
 ### 2026-07-12 - Exclude pulmonary nodule components outside final lung masks
 
 **Context**
