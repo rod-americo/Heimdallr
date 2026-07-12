@@ -274,6 +274,8 @@ class TestParenchymalOrganVolumetryJob(unittest.TestCase):
             self.assertIn("5 mm axial reconstruction", str(ds.DerivationDescription))
             self.assertEqual(int(ds.InstanceNumber), 1)
             self.assertEqual(str(ds.Modality), "OT")
+            self.assertFalse(hasattr(ds, "SliceThickness"))
+            self.assertFalse(hasattr(ds, "SpacingBetweenSlices"))
             self.assertLessEqual(max(int(ds.Rows), int(ds.Columns)), 64)
             self.assertEqual(ds.file_meta.TransferSyntaxUID, JPEGLSLossless)
 

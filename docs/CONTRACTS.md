@@ -59,6 +59,14 @@ differs, preserving pixel aspect ratio while keeping the source field of view
 inside a physically centered canvas. Textual tables, instructions, and PDF artifacts are
 non-spatial and do not receive an invented anatomic position.
 
+Source-backed geometry preserves the source `SliceLocation` value rather than
+recomputing it from `ImagePositionPatient`, because vendor datasets may use the
+opposite sign convention. Parenchymal 5 mm slab Secondary Captures keep their
+central source-plane position but omit `SliceThickness` and
+`SpacingBetweenSlices`; the 5 mm reconstruction remains documented in the
+artifact description and result JSON without presenting the Secondary Captures
+as an independent tomographic stack.
+
 Pulmonary nodule component overlays are exported in monotonic axial position
 order rather than component-size order. When `secondary_capture_series_mode`
 is `single_series`, Secondary Captures are first grouped into contiguous blocks

@@ -162,13 +162,19 @@ def load_source_dicom_geometry(
             pixel_spacing = np.asarray(ds.PixelSpacing, dtype=float)
             normal = np.cross(orientation[:3], orientation[3:])
             normal /= np.linalg.norm(normal)
+            raw_slice_location = getattr(ds, "SliceLocation", None)
+            slice_location = (
+                float(raw_slice_location)
+                if raw_slice_location not in (None, "")
+                else float(np.dot(position, normal))
+            )
         except Exception:
             continue
         geometries.append(
             {
                 "image_position_patient": [float(value) for value in position],
                 "image_orientation_patient": [float(value) for value in orientation],
-                "slice_location": float(np.dot(position, normal)),
+                "slice_location": slice_location,
                 "source_rows": int(ds.Rows),
                 "source_columns": int(ds.Columns),
                 "source_pixel_spacing": [float(value) for value in pixel_spacing],
