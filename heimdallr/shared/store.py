@@ -83,6 +83,7 @@ PIPELINE_CANCEL_MESSAGE = "Canceled from simple TUI"
 _PIPELINE_CANCEL_QUEUE_TABLES = frozenset(
     {
         "segmentation_queue",
+        "qc_segmentation_queue",
         "metrics_queue",
         "dicom_egress_queue",
         "integration_dispatch_queue",
@@ -359,6 +360,119 @@ def ensure_schema(conn: sqlite3.Connection | None = None) -> None:
         """
         CREATE INDEX IF NOT EXISTS idx_study_handoff_state_status_seen
         ON study_handoff_state(status, last_seen_at, first_seen_at)
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS qc_study_analyses (
+            analysis_id TEXT PRIMARY KEY,
+            study_uid TEXT NOT NULL,
+            case_id TEXT NOT NULL,
+            analysis_version INTEGER NOT NULL,
+            fingerprint TEXT NOT NULL,
+            schema_version INTEGER NOT NULL DEFAULT 1,
+            policy_signature TEXT NOT NULL,
+            status TEXT NOT NULL,
+            qc_resolution_json TEXT NOT NULL,
+            pipeline_version TEXT,
+            model_versions_json TEXT,
+            coverage_json TEXT,
+            error TEXT,
+            artifacts_purged INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP NOT NULL,
+            completed_at TIMESTAMP,
+            UNIQUE(study_uid, fingerprint, policy_signature),
+            UNIQUE(study_uid, analysis_version)
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_qc_study_analyses_study_version
+        ON qc_study_analyses(study_uid, analysis_version DESC)
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS qc_series (
+            analysis_id TEXT NOT NULL,
+            series_uid TEXT NOT NULL,
+            acquisition_id TEXT,
+            segmentation_status TEXT NOT NULL DEFAULT 'not_segmented',
+            payload_json TEXT NOT NULL,
+            PRIMARY KEY(analysis_id, series_uid),
+            FOREIGN KEY(analysis_id) REFERENCES qc_study_analyses(analysis_id) ON DELETE CASCADE
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS qc_acquisitions (
+            analysis_id TEXT NOT NULL,
+            acquisition_id TEXT NOT NULL,
+            representative_series_uid TEXT,
+            segmentation_status TEXT NOT NULL DEFAULT 'not_segmented',
+            payload_json TEXT NOT NULL,
+            error TEXT,
+            PRIMARY KEY(analysis_id, acquisition_id),
+            FOREIGN KEY(analysis_id) REFERENCES qc_study_analyses(analysis_id) ON DELETE CASCADE
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS qc_anatomy_evidence (
+            analysis_id TEXT NOT NULL,
+            acquisition_id TEXT NOT NULL,
+            anatomy_key TEXT NOT NULL,
+            state TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            PRIMARY KEY(analysis_id, acquisition_id, anatomy_key),
+            FOREIGN KEY(analysis_id, acquisition_id)
+                REFERENCES qc_acquisitions(analysis_id, acquisition_id) ON DELETE CASCADE
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS qc_consolidated_provenance (
+            analysis_id TEXT NOT NULL,
+            anatomy_key TEXT NOT NULL,
+            state TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            updated_at TIMESTAMP NOT NULL,
+            PRIMARY KEY(analysis_id, anatomy_key),
+            FOREIGN KEY(analysis_id) REFERENCES qc_study_analyses(analysis_id) ON DELETE CASCADE
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS qc_segmentation_queue (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            analysis_id TEXT NOT NULL,
+            acquisition_id TEXT NOT NULL,
+            case_id TEXT NOT NULL,
+            series_uid TEXT NOT NULL,
+            input_path TEXT NOT NULL,
+            output_path TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            attempts INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP,
+            claimed_at TIMESTAMP,
+            claim_heartbeat_at TIMESTAMP,
+            finished_at TIMESTAMP,
+            error TEXT,
+            UNIQUE(analysis_id, acquisition_id),
+            FOREIGN KEY(analysis_id, acquisition_id)
+                REFERENCES qc_acquisitions(analysis_id, acquisition_id) ON DELETE CASCADE
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_qc_segmentation_queue_status_created
+        ON qc_segmentation_queue(status, created_at, id)
         """
     )
     cursor.execute(
@@ -1341,6 +1455,20 @@ def reset_claimed_segmentation_queue_items(conn: sqlite3.Connection) -> int:
     return int(cursor.rowcount or 0)
 
 
+def reset_claimed_qc_segmentation_queue_items(conn: sqlite3.Connection) -> int:
+    ensure_schema(conn)
+    cursor = conn.execute(
+        """
+        UPDATE qc_segmentation_queue
+        SET status = 'pending', claimed_at = NULL, claim_heartbeat_at = NULL,
+            finished_at = NULL, error = NULL
+        WHERE status = 'claimed'
+        """
+    )
+    conn.commit()
+    return int(cursor.rowcount or 0)
+
+
 def reset_claimed_metrics_queue_items(conn: sqlite3.Connection) -> int:
     ensure_schema(conn)
     cursor = conn.execute(
@@ -2038,7 +2166,7 @@ def mark_case_pipeline_canceled(conn: sqlite3.Connection, case_id: str) -> int:
     updates = 0
     cursor = conn.cursor()
     cursor.execute("BEGIN IMMEDIATE")
-    for table in ("segmentation_queue", "metrics_queue"):
+    for table in ("segmentation_queue", "metrics_queue", "qc_segmentation_queue"):
         cursor.execute(
             f"""
             UPDATE {table}
@@ -2474,7 +2602,12 @@ def list_protected_case_ids(conn: sqlite3.Connection) -> set[str]:
     """Return case IDs that should not be purged while still active in queues."""
     ensure_schema(conn)
     protected: set[str] = set()
-    for table_name in ("segmentation_queue", "metrics_queue", "dicom_egress_queue"):
+    for table_name in (
+        "segmentation_queue",
+        "qc_segmentation_queue",
+        "metrics_queue",
+        "dicom_egress_queue",
+    ):
         rows = conn.execute(
             f"""
             SELECT DISTINCT case_id
@@ -2542,6 +2675,521 @@ def get_case_dicom_egress_statuses(conn: sqlite3.Connection, case_id: str) -> se
     return {str(row[0]) for row in rows if row and row[0]}
 
 
+def register_qc_analysis(
+    conn: sqlite3.Connection,
+    *,
+    analysis_id: str,
+    study_uid: str,
+    case_id: str,
+    fingerprint: str,
+    policy_signature: str,
+    qc_resolution: dict[str, Any],
+    pipeline_version: str | None = None,
+) -> tuple[sqlite3.Row, bool]:
+    """Return an idempotent analysis row, creating the next study version if needed."""
+    ensure_schema(conn)
+    cursor = conn.cursor()
+    cursor.execute("BEGIN IMMEDIATE")
+    existing = cursor.execute(
+        """
+        SELECT * FROM qc_study_analyses
+        WHERE study_uid = ? AND fingerprint = ? AND policy_signature = ?
+        """,
+        (study_uid, fingerprint, policy_signature),
+    ).fetchone()
+    if existing:
+        conn.commit()
+        return existing, False
+
+    version_row = cursor.execute(
+        "SELECT COALESCE(MAX(analysis_version), 0) + 1 FROM qc_study_analyses WHERE study_uid = ?",
+        (study_uid,),
+    ).fetchone()
+    analysis_version = int(version_row[0])
+    cursor.execute(
+        """
+        INSERT INTO qc_study_analyses (
+            analysis_id, study_uid, case_id, analysis_version, fingerprint,
+            schema_version, policy_signature, status, qc_resolution_json,
+            pipeline_version, created_at
+        ) VALUES (?, ?, ?, ?, ?, 1, ?, 'inventory_pending', ?, ?, ?)
+        """,
+        (
+            analysis_id,
+            study_uid,
+            case_id,
+            analysis_version,
+            fingerprint,
+            policy_signature,
+            json.dumps(qc_resolution, sort_keys=True),
+            pipeline_version,
+            _now_local_timestamp(),
+        ),
+    )
+    conn.commit()
+    row = conn.execute(
+        "SELECT * FROM qc_study_analyses WHERE analysis_id = ?",
+        (analysis_id,),
+    ).fetchone()
+    return row, True
+
+
+def persist_qc_inventory(
+    conn: sqlite3.Connection,
+    *,
+    analysis_id: str,
+    series: list[dict[str, Any]],
+    acquisitions: list[dict[str, Any]],
+) -> None:
+    ensure_schema(conn)
+    conn.execute("DELETE FROM qc_series WHERE analysis_id = ?", (analysis_id,))
+    conn.execute("DELETE FROM qc_acquisitions WHERE analysis_id = ?", (analysis_id,))
+    for item in acquisitions:
+        conn.execute(
+            """
+            INSERT INTO qc_acquisitions (
+                analysis_id, acquisition_id, representative_series_uid,
+                segmentation_status, payload_json
+            ) VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                analysis_id,
+                item["acquisition_id"],
+                item.get("representative_series_uid"),
+                item.get("segmentation_status", "not_segmented"),
+                json.dumps(item, sort_keys=True),
+            ),
+        )
+    for item in series:
+        conn.execute(
+            """
+            INSERT INTO qc_series (
+                analysis_id, series_uid, acquisition_id, segmentation_status, payload_json
+            ) VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                analysis_id,
+                item["series_uid"],
+                item.get("acquisition_id"),
+                item.get("segmentation_status", "not_segmented"),
+                json.dumps(item, sort_keys=True),
+            ),
+        )
+    conn.execute(
+        "UPDATE qc_study_analyses SET status = 'segmentation_pending', error = NULL WHERE analysis_id = ?",
+        (analysis_id,),
+    )
+    conn.commit()
+
+
+def enqueue_qc_segmentation(
+    conn: sqlite3.Connection,
+    *,
+    analysis_id: str,
+    acquisition_id: str,
+    case_id: str,
+    series_uid: str,
+    input_path: str,
+    output_path: str,
+) -> None:
+    ensure_schema(conn)
+    now = _now_local_timestamp()
+    conn.execute(
+        """
+        INSERT INTO qc_segmentation_queue (
+            analysis_id, acquisition_id, case_id, series_uid, input_path,
+            output_path, status, attempts, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, 'pending', 0, ?)
+        ON CONFLICT(analysis_id, acquisition_id) DO UPDATE SET
+            case_id = excluded.case_id,
+            series_uid = excluded.series_uid,
+            input_path = excluded.input_path,
+            output_path = excluded.output_path,
+            status = CASE
+                WHEN qc_segmentation_queue.status = 'done' THEN 'done'
+                ELSE 'pending'
+            END,
+            created_at = CASE
+                WHEN qc_segmentation_queue.status = 'done' THEN qc_segmentation_queue.created_at
+                ELSE excluded.created_at
+            END,
+            claimed_at = NULL,
+            claim_heartbeat_at = NULL,
+            finished_at = CASE
+                WHEN qc_segmentation_queue.status = 'done' THEN qc_segmentation_queue.finished_at
+                ELSE NULL
+            END,
+            error = CASE
+                WHEN qc_segmentation_queue.status = 'done' THEN qc_segmentation_queue.error
+                ELSE NULL
+            END
+        """,
+        (analysis_id, acquisition_id, case_id, series_uid, input_path, output_path, now),
+    )
+    conn.execute(
+        """
+        UPDATE qc_acquisitions SET segmentation_status = 'segmentation_pending', error = NULL
+        WHERE analysis_id = ? AND acquisition_id = ?
+        """,
+        (analysis_id, acquisition_id),
+    )
+    conn.commit()
+
+
+def claim_next_pending_qc_segmentation(conn: sqlite3.Connection) -> sqlite3.Row | None:
+    ensure_schema(conn)
+    rows = conn.execute(
+        "SELECT id, claimed_at, claim_heartbeat_at FROM qc_segmentation_queue WHERE status = 'claimed'"
+    ).fetchall()
+    stale = [
+        int(row["id"])
+        for row in rows
+        if _is_stale_claimed_at(
+            row["claimed_at"],
+            heartbeat_at=row["claim_heartbeat_at"],
+            ttl_seconds=settings.SEGMENTATION_CLAIM_TTL_SECONDS,
+        )
+    ]
+    if stale:
+        conn.executemany(
+            """
+            UPDATE qc_segmentation_queue
+            SET status = 'pending', claimed_at = NULL, claim_heartbeat_at = NULL, error = NULL
+            WHERE id = ?
+            """,
+            [(item,) for item in stale],
+        )
+        conn.commit()
+
+    now = _now_local_timestamp()
+    cursor = conn.cursor()
+    cursor.execute("BEGIN IMMEDIATE")
+    row = cursor.execute(
+        """
+        SELECT * FROM qc_segmentation_queue
+        WHERE status = 'pending'
+        ORDER BY created_at ASC, id ASC LIMIT 1
+        """
+    ).fetchone()
+    if not row:
+        conn.commit()
+        return None
+    cursor.execute(
+        """
+        UPDATE qc_segmentation_queue
+        SET status = 'claimed', claimed_at = ?, claim_heartbeat_at = ?,
+            attempts = attempts + 1, error = NULL
+        WHERE id = ? AND status = 'pending'
+        """,
+        (now, now, row["id"]),
+    )
+    if cursor.rowcount != 1:
+        conn.rollback()
+        return None
+    conn.commit()
+    return conn.execute("SELECT * FROM qc_segmentation_queue WHERE id = ?", (row["id"],)).fetchone()
+
+
+def touch_qc_segmentation_claim(conn: sqlite3.Connection, queue_id: int) -> bool:
+    ensure_schema(conn)
+    cursor = conn.execute(
+        """
+        UPDATE qc_segmentation_queue SET claim_heartbeat_at = ?
+        WHERE id = ? AND status = 'claimed'
+        """,
+        (_now_local_timestamp(), queue_id),
+    )
+    conn.commit()
+    return cursor.rowcount == 1
+
+
+def complete_qc_segmentation(
+    conn: sqlite3.Connection,
+    *,
+    queue_id: int,
+    anatomy: list[dict[str, Any]],
+    model_versions: dict[str, Any],
+) -> str:
+    ensure_schema(conn)
+    row = conn.execute("SELECT * FROM qc_segmentation_queue WHERE id = ?", (queue_id,)).fetchone()
+    if not row:
+        raise RuntimeError(f"QC segmentation queue item {queue_id} not found")
+    conn.execute(
+        """
+        UPDATE qc_segmentation_queue
+        SET status = 'done', finished_at = ?, claim_heartbeat_at = NULL, error = NULL
+        WHERE id = ?
+        """,
+        (_now_local_timestamp(), queue_id),
+    )
+    conn.execute(
+        """
+        UPDATE qc_acquisitions
+        SET segmentation_status = 'done', error = NULL
+        WHERE analysis_id = ? AND acquisition_id = ?
+        """,
+        (row["analysis_id"], row["acquisition_id"]),
+    )
+    conn.execute(
+        """
+        UPDATE qc_series SET segmentation_status = 'done'
+        WHERE analysis_id = ? AND series_uid = ?
+        """,
+        (row["analysis_id"], row["series_uid"]),
+    )
+    conn.execute(
+        "DELETE FROM qc_anatomy_evidence WHERE analysis_id = ? AND acquisition_id = ?",
+        (row["analysis_id"], row["acquisition_id"]),
+    )
+    for item in anatomy:
+        conn.execute(
+            """
+            INSERT INTO qc_anatomy_evidence (
+                analysis_id, acquisition_id, anatomy_key, state, payload_json
+            ) VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                row["analysis_id"],
+                row["acquisition_id"],
+                item["anatomy_key"],
+                item["state"],
+                json.dumps(item, sort_keys=True),
+            ),
+        )
+    conn.execute(
+        "UPDATE qc_study_analyses SET model_versions_json = ? WHERE analysis_id = ?",
+        (json.dumps(model_versions, sort_keys=True), row["analysis_id"]),
+    )
+    conn.commit()
+    return str(row["analysis_id"])
+
+
+def fail_qc_segmentation(
+    conn: sqlite3.Connection,
+    *,
+    queue_id: int,
+    error: Any,
+    max_attempts: int,
+) -> tuple[str, bool]:
+    ensure_schema(conn)
+    row = conn.execute("SELECT * FROM qc_segmentation_queue WHERE id = ?", (queue_id,)).fetchone()
+    if not row:
+        raise RuntimeError(f"QC segmentation queue item {queue_id} not found")
+    retry = int(row["attempts"] or 0) < max(int(max_attempts), 1)
+    status = "pending" if retry else "error"
+    conn.execute(
+        """
+        UPDATE qc_segmentation_queue
+        SET status = ?, claimed_at = NULL, claim_heartbeat_at = NULL,
+            finished_at = ?, error = ?
+        WHERE id = ?
+        """,
+        (
+            status,
+            None if retry else _now_local_timestamp(),
+            str(error)[:2000],
+            queue_id,
+        ),
+    )
+    if not retry:
+        conn.execute(
+            """
+            UPDATE qc_acquisitions
+            SET segmentation_status = 'segmentation_failed', error = ?
+            WHERE analysis_id = ? AND acquisition_id = ?
+            """,
+            (str(error)[:2000], row["analysis_id"], row["acquisition_id"]),
+        )
+        conn.execute(
+            """
+            UPDATE qc_series SET segmentation_status = 'segmentation_failed'
+            WHERE analysis_id = ? AND series_uid = ?
+            """,
+            (row["analysis_id"], row["series_uid"]),
+        )
+    conn.commit()
+    return str(row["analysis_id"]), retry
+
+
+def update_qc_analysis_summary(
+    conn: sqlite3.Connection,
+    *,
+    analysis_id: str,
+    coverage: dict[str, Any],
+) -> str:
+    ensure_schema(conn)
+    statuses = [
+        str(row[0])
+        for row in conn.execute(
+            "SELECT segmentation_status FROM qc_acquisitions WHERE analysis_id = ?",
+            (analysis_id,),
+        ).fetchall()
+    ]
+    active = {"segmentation_pending"}
+    failures = [status for status in statuses if status == "segmentation_failed"]
+    completed = [status for status in statuses if status == "done"]
+    if any(status in active for status in statuses):
+        status = "segmentation_pending"
+        completed_at = None
+    elif failures and completed:
+        status = "partial"
+        completed_at = _now_local_timestamp()
+    elif failures:
+        status = "failed"
+        completed_at = _now_local_timestamp()
+    else:
+        status = "complete"
+        completed_at = _now_local_timestamp()
+    conn.execute(
+        "DELETE FROM qc_consolidated_provenance WHERE analysis_id = ?",
+        (analysis_id,),
+    )
+    for anatomy_key, payload in sorted(coverage.get("anatomies", {}).items()):
+        conn.execute(
+            """
+            INSERT INTO qc_consolidated_provenance (
+                analysis_id, anatomy_key, state, payload_json, updated_at
+            ) VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                analysis_id,
+                anatomy_key,
+                str(payload.get("state") or "unknown"),
+                json.dumps(payload, sort_keys=True),
+                _now_local_timestamp(),
+            ),
+        )
+    conn.execute(
+        """
+        UPDATE qc_study_analyses
+        SET status = ?, coverage_json = ?, completed_at = ?
+        WHERE analysis_id = ?
+        """,
+        (status, json.dumps(coverage, sort_keys=True), completed_at, analysis_id),
+    )
+    conn.commit()
+    return status
+
+
+def fail_qc_analysis(conn: sqlite3.Connection, analysis_id: str, error: Any) -> None:
+    ensure_schema(conn)
+    conn.execute(
+        """
+        UPDATE qc_study_analyses
+        SET status = 'failed', error = ?, completed_at = ?
+        WHERE analysis_id = ?
+        """,
+        (str(error)[:2000], _now_local_timestamp(), analysis_id),
+    )
+    conn.commit()
+
+
+def list_qc_analyses(conn: sqlite3.Connection, study_uid: str) -> list[sqlite3.Row]:
+    ensure_schema(conn)
+    return list(
+        conn.execute(
+            """
+            SELECT * FROM qc_study_analyses
+            WHERE study_uid = ? ORDER BY analysis_version DESC
+            """,
+            (study_uid,),
+        ).fetchall()
+    )
+
+
+def get_qc_analysis(
+    conn: sqlite3.Connection,
+    study_uid: str,
+    analysis_id: str | None = None,
+) -> sqlite3.Row | None:
+    ensure_schema(conn)
+    if analysis_id:
+        return conn.execute(
+            "SELECT * FROM qc_study_analyses WHERE study_uid = ? AND analysis_id = ?",
+            (study_uid, analysis_id),
+        ).fetchone()
+    row = conn.execute(
+        """
+        SELECT * FROM qc_study_analyses
+        WHERE study_uid = ? AND status = 'complete'
+        ORDER BY analysis_version DESC LIMIT 1
+        """,
+        (study_uid,),
+    ).fetchone()
+    if row:
+        return row
+    return conn.execute(
+        """
+        SELECT * FROM qc_study_analyses
+        WHERE study_uid = ? ORDER BY analysis_version DESC LIMIT 1
+        """,
+        (study_uid,),
+    ).fetchone()
+
+
+def list_qc_series(conn: sqlite3.Connection, analysis_id: str) -> list[sqlite3.Row]:
+    ensure_schema(conn)
+    return list(
+        conn.execute(
+            "SELECT * FROM qc_series WHERE analysis_id = ? ORDER BY series_uid",
+            (analysis_id,),
+        ).fetchall()
+    )
+
+
+def get_qc_series(conn: sqlite3.Connection, analysis_id: str, series_uid: str) -> sqlite3.Row | None:
+    ensure_schema(conn)
+    return conn.execute(
+        "SELECT * FROM qc_series WHERE analysis_id = ? AND series_uid = ?",
+        (analysis_id, series_uid),
+    ).fetchone()
+
+
+def mark_qc_selected_series(conn: sqlite3.Connection, study_uid: str, series_uid: str) -> None:
+    ensure_schema(conn)
+    analysis = conn.execute(
+        """
+        SELECT * FROM qc_study_analyses
+        WHERE study_uid = ? ORDER BY analysis_version DESC LIMIT 1
+        """,
+        (study_uid,),
+    ).fetchone()
+    if not analysis:
+        return
+    rows = list_qc_series(conn, str(analysis["analysis_id"]))
+    for row in rows:
+        payload = json.loads(row["payload_json"])
+        payload["selected_for_metrics"] = str(row["series_uid"]) == str(series_uid)
+        conn.execute(
+            "UPDATE qc_series SET payload_json = ? WHERE analysis_id = ? AND series_uid = ?",
+            (json.dumps(payload, sort_keys=True), row["analysis_id"], row["series_uid"]),
+        )
+    conn.commit()
+
+
+def list_qc_acquisitions(conn: sqlite3.Connection, analysis_id: str) -> list[sqlite3.Row]:
+    ensure_schema(conn)
+    return list(
+        conn.execute(
+            "SELECT * FROM qc_acquisitions WHERE analysis_id = ? ORDER BY acquisition_id",
+            (analysis_id,),
+        ).fetchall()
+    )
+
+
+def list_qc_anatomy(conn: sqlite3.Connection, analysis_id: str) -> list[sqlite3.Row]:
+    ensure_schema(conn)
+    return list(
+        conn.execute(
+            """
+            SELECT * FROM qc_anatomy_evidence
+            WHERE analysis_id = ? ORDER BY anatomy_key, acquisition_id
+            """,
+            (analysis_id,),
+        ).fetchall()
+    )
+
+
 def purge_case_records(conn: sqlite3.Connection, case_id: str) -> str | None:
     """Delete queue rows and mark the metadata row as purged for a case."""
     ensure_schema(conn)
@@ -2561,6 +3209,15 @@ def purge_case_records(conn: sqlite3.Connection, case_id: str) -> str | None:
     conn.execute("DELETE FROM segmentation_queue WHERE case_id = ?", (case_id,))
     conn.execute("DELETE FROM metrics_queue WHERE case_id = ?", (case_id,))
     conn.execute("DELETE FROM dicom_egress_queue WHERE case_id = ?", (case_id,))
+    conn.execute("DELETE FROM qc_segmentation_queue WHERE case_id = ?", (case_id,))
+    conn.execute(
+        """
+        UPDATE qc_study_analyses
+        SET artifacts_purged = 1
+        WHERE case_id = ?
+        """,
+        (case_id,),
+    )
     if study_uid:
         conn.execute(
             """

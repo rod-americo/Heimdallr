@@ -9,6 +9,7 @@ from ..shared import settings
 from .routers.dashboard import router as dashboard_router
 from .routers.ops import router as ops_router
 from .routers.patients import router as patients_router
+from .routers.studies import router as studies_router
 from .routers.upload import router as upload_router
 
 
@@ -21,6 +22,7 @@ def create_app() -> FastAPI:
     app.include_router(ops_router)
     app.include_router(upload_router)
     app.include_router(patients_router)
+    app.include_router(studies_router)
 
     if settings.STATIC_DIR.exists():
         app.mount("/static", StaticFiles(directory=settings.STATIC_DIR), name="static")

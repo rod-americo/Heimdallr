@@ -10,19 +10,41 @@ from ...shared import settings
 from ...integration.status import external_job_status
 from ...integration.submissions import (
     build_external_submission_payload,
+    delete_upload_options_sidecar,
     new_external_job_id,
     normalize_artifact_dicom_policy,
     normalize_requested_metrics_modules,
+    resolve_qc_evidence,
     normalize_series_selection_policy,
     write_external_submission_sidecar,
+    write_upload_options_sidecar,
 )
 from ...shared.spool import atomic_copy_stream
 
 router = APIRouter(tags=["upload"])
 
 
+def _strict_optional_bool(value: str | bool | None, *, field_name: str) -> bool | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        return value
+    normalized = str(value).strip().lower()
+    if normalized == "true":
+        return True
+    if normalized == "false":
+        return False
+    raise HTTPException(
+        status_code=422,
+        detail=f"{field_name} must be true, false, or omitted.",
+    )
+
+
 @router.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(
+    file: UploadFile = File(...),
+    qc_evidence: str | None = Form(None),
+):
     if not file.filename.lower().endswith(".zip"):
         raise HTTPException(status_code=400, detail="Only .zip files are allowed.")
 
@@ -32,9 +54,27 @@ async def upload_file(file: UploadFile = File(...)):
         upload_name = f"study_{settings.local_timestamp('%Y%m%d%H%M%S_%f')}.zip"
         file_path = settings.UPLOAD_EXTERNAL_DIR / upload_name
 
+    requested_qc_evidence = _strict_optional_bool(qc_evidence, field_name="qc_evidence")
     try:
         atomic_copy_stream(file_path, file.file)
+        qc_resolution = resolve_qc_evidence(
+            requested_qc_evidence,
+            host_enabled=settings.QC_EVIDENCE_ENABLED,
+        )
+        qc_resolution["source"] = "upload"
+        write_upload_options_sidecar(
+            file_path,
+            {
+                "schema_version": 1,
+                "submission_kind": "upload",
+                "qc_evidence": qc_resolution,
+                "received_at": settings.local_now().isoformat(),
+            },
+        )
     except Exception as exc:
+        if file_path.exists():
+            file_path.unlink()
+        delete_upload_options_sidecar(file_path)
         raise HTTPException(status_code=500, detail=f"Failed to save file: {exc}") from exc
 
     return {
@@ -42,6 +82,8 @@ async def upload_file(file: UploadFile = File(...)):
         "message": "File upload accepted. Study queued for prepare watchdog.",
         "original_file": file.filename,
         "stored_file": upload_name,
+        "qc_evidence_requested": qc_resolution["requested"],
+        "qc_evidence_effective": qc_resolution["effective"],
     }
 
 
@@ -56,10 +98,12 @@ async def submit_job(
     artifact_locale: str | None = Form(None),
     series_selection_policy: str | None = Form(None),
     artifact_dicom_policy: str | None = Form(None),
+    qc_evidence: str | None = Form(None),
 ):
     if not study_file.filename.lower().endswith(".zip"):
         raise HTTPException(status_code=400, detail="Only .zip files are allowed.")
 
+    requested_qc_evidence = _strict_optional_bool(qc_evidence, field_name="qc_evidence")
     normalized_client_case_id = str(client_case_id or "").strip()
     normalized_callback_url = str(callback_url or "").strip()
     if not normalized_client_case_id:
@@ -132,6 +176,7 @@ async def submit_job(
         artifact_locale=artifact_locale,
         series_selection_policy=parsed_series_selection_policy,
         artifact_dicom_policy=parsed_artifact_dicom_policy,
+        qc_evidence=requested_qc_evidence,
     )
 
     try:
@@ -153,6 +198,8 @@ async def submit_job(
         "artifact_locale": submission_payload["artifact_locale"],
         "series_selection_policy": submission_payload["series_selection_policy"],
         "artifact_dicom_policy": submission_payload["artifact_dicom_policy"],
+        "qc_evidence_requested": submission_payload["qc_evidence"]["requested"],
+        "qc_evidence_effective": submission_payload["qc_evidence"]["effective"],
     }
 
 

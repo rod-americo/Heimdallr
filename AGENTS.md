@@ -87,6 +87,7 @@ runtime supervisor, or environment.
   - `config/presentation.json`
   - `config/space_manager.json`
   - `config/resource_monitor.json`
+  - `config/qc_evidence.json`
   - `config/host_stack/*.json`
 - `config/metrics_pipeline.json` is host-local. When adding a production
 metrics module, update `config/metrics_pipeline.example.json` in the same change.

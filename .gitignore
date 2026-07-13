@@ -60,6 +60,7 @@ config/integration_dispatch.json
 config/metrics_pipeline.json
 config/presentation.json
 config/resource_monitor.json
+config/qc_evidence.json
 config/segmentation_pipeline.json
 config/space_manager.json
 config/host_stack/*.json

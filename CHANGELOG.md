@@ -6,6 +6,11 @@ This file records notable behavior, architecture, documentation, and operation c
 
 ### Added
 
+- Added opt-in, versioned multi-acquisition CT anatomy evidence with
+host-default/API-override resolution, independent queueing, immutable analysis
+history, and `/api/v1/studies` read endpoints. MR studies receive inventory and
+classification without a configured segmenter.
+
 - Added `series_selection_policy` to external `/jobs` submissions so callers
 can override series selection for a submitted study without changing the host
 global profile.

@@ -47,8 +47,12 @@ from heimdallr.integration.dispatch import enqueue_dispatches
 from heimdallr.integration.delivery import enqueue_case_failed_delivery
 from heimdallr.integration.submissions import (
     delete_external_submission_sidecar,
+    delete_upload_options_sidecar,
     load_external_submission_sidecar,
+    load_upload_options_sidecar,
     move_external_submission_sidecar,
+    move_upload_options_sidecar,
+    resolve_qc_evidence,
     update_external_submission_sidecar,
 )
 from heimdallr.shared.patient_names import normalize_patient_name_display
@@ -64,6 +68,14 @@ from heimdallr.shared.paths import (
 )
 from heimdallr.shared.spool import CLAIM_SUFFIX, claim_path, unclaim_path
 from heimdallr.shared.study_manifest import build_study_manifest_digest
+from heimdallr.shared.qc_evidence import (
+    build_inventory as build_qc_inventory,
+    canonical_signature,
+    heimdallr_version,
+    new_analysis_id,
+    study_content_fingerprint,
+    totalsegmentator_version,
+)
 from heimdallr.shared.sqlite import connect as db_connect
 
 settings.configure_service_stdio()
@@ -241,6 +253,14 @@ def compute_series_geometry_summary(series_data: dict) -> dict:
         "GeometryConfidence": "none",
         "GeometryWarnings": [],
     }
+    patient_positions = series_data.get("GeometryPatientPositions", [])
+    if patient_positions:
+        position_array = np.asarray(patient_positions, dtype=float)
+        if position_array.ndim == 2 and position_array.shape[1] == 3:
+            summary["PatientBoundsMm"] = {
+                "min": [_round_mm(value) for value in position_array.min(axis=0)],
+                "max": [_round_mm(value) for value in position_array.max(axis=0)],
+            }
 
     if len(positions) >= 2:
         diffs = [
@@ -254,6 +274,8 @@ def compute_series_geometry_summary(series_data: dict) -> dict:
             {
                 "ZSpacingMm": z_spacing_mm,
                 "CoverageMm": coverage_mm,
+                "GeometryMinPositionMm": _round_mm(min(positions)),
+                "GeometryMaxPositionMm": _round_mm(max(positions)),
                 "GeometrySlicePositions": len(positions),
                 "GeometryConfidence": "position",
             }
@@ -485,6 +507,7 @@ def _delete_spooled_zip(zip_path: Path) -> None:
             zip_path.unlink()
             print(f"  Deleted input ZIP: {zip_path}")
         delete_external_submission_sidecar(zip_path)
+        delete_upload_options_sidecar(zip_path)
     except Exception as exc:
         print(f"  Warning: Could not delete input ZIP: {exc}")
 
@@ -744,6 +767,7 @@ def move_failed_upload(zip_path: Path) -> Path:
         destination = settings.UPLOAD_FAILED_DIR / f"{destination.stem}_{int(time.time())}{destination.suffix}"
     zip_path.replace(destination)
     move_external_submission_sidecar(zip_path, destination)
+    move_upload_options_sidecar(zip_path, destination)
     return destination
 
 def extract_full_dicom_metadata(ds):
@@ -798,16 +822,29 @@ def split_series_by_image_count(series_map, min_images):
     for uid, series_data in series_map.items():
         image_count = len(series_data.get("files", []))
         if image_count < min_images:
-            discarded.append(
+            discarded_item = {
+                key: value
+                for key, value in series_data.items()
+                if key not in {
+                    "files",
+                    "GeometryPositions",
+                    "GeometryPatientPositions",
+                    "SliceThicknessValues",
+                    "SpacingBetweenSlicesValues",
+                }
+            }
+            discarded_item.update(
                 {
-                    "SeriesInstanceUID": uid,
+                    "SeriesInstanceUID": str(uid),
                     "SeriesNumber": series_data.get("SeriesNumber", ""),
                     "Modality": series_data.get("Modality", ""),
                     "SeriesDescription": series_data.get("SeriesDescriptionOriginal", ""),
                     "ImageCount": image_count,
+                    "SliceCount": image_count,
                     "DiscardReason": f"below_min_images_{min_images}",
                 }
             )
+            discarded.append(discarded_item)
             continue
         eligible[uid] = series_data
     return eligible, discarded
@@ -820,6 +857,162 @@ def _attach_source_dicom_info(series_info: dict, persisted_source_series: dict, 
         series_info["SourceDicomSeriesPath"] = str(source_path.relative_to(study_dir(case_id)))
         series_info["SourceDicomInstanceCount"] = int(source_info.get("count") or 0)
     return series_info
+
+
+def _active_total_task_signature() -> dict:
+    config = settings.SEGMENTATION_PIPELINE_CONFIG
+    profile_name = settings.SEGMENTATION_PIPELINE_PROFILE or config.get("default_profile")
+    profile = config.get("profiles", {}).get(profile_name, {}) if profile_name else {}
+    total_task = next(
+        (
+            task
+            for task in profile.get("tasks", [])
+            if isinstance(task, dict) and task.get("name") == "total" and task.get("enabled", True)
+        ),
+        {},
+    )
+    return {
+        "profile": profile_name,
+        "task": total_task,
+        "totalsegmentator_version": totalsegmentator_version(),
+    }
+
+
+def prepare_qc_analysis(
+    *,
+    case_id: str,
+    study_uid: str,
+    detected_series_map: dict,
+    available_series: list[dict],
+    derived_dir: Path,
+    qc_resolution: dict,
+) -> dict:
+    """Create an isolated, idempotent QC analysis when resolved on for this input."""
+    context = {"schema_version": 1, **qc_resolution, "status": "disabled"}
+    if not qc_resolution.get("effective"):
+        return context
+
+    fingerprint = study_content_fingerprint(detected_series_map)
+    policy = dict(settings.QC_EVIDENCE_CONFIG.get("policy", {}))
+    policy.setdefault("acquisition_time_tolerance_seconds", 30)
+    policy.setdefault("orientation_tolerance_degrees", 5)
+    policy.setdefault("minimum_spatial_overlap_ratio", 0.8)
+    task_signature = _active_total_task_signature()
+    policy_signature = canonical_signature(
+        {"schema_version": 1, "policy": policy, "total_task": task_signature}
+    )
+    analysis_id = new_analysis_id()
+    conn = db_connect()
+    try:
+        row, created = store.register_qc_analysis(
+            conn,
+            analysis_id=analysis_id,
+            study_uid=study_uid,
+            case_id=case_id,
+            fingerprint=fingerprint,
+            policy_signature=policy_signature,
+            qc_resolution=qc_resolution,
+            pipeline_version=heimdallr_version(),
+        )
+        analysis_id = str(row["analysis_id"])
+        context.update(
+            {
+                "analysis_id": analysis_id,
+                "analysis_version": int(row["analysis_version"]),
+                "fingerprint": fingerprint,
+                "policy_signature": policy_signature,
+                "status": str(row["status"]),
+                "reused": not created,
+            }
+        )
+        if not created:
+            return context
+
+        raw_series: list[dict] = []
+        for uid, raw in detected_series_map.items():
+            payload = {
+                key: value
+                for key, value in raw.items()
+                if key not in {
+                    "files",
+                    "GeometryPositions",
+                    "GeometryPatientPositions",
+                    "SliceThicknessValues",
+                    "SpacingBetweenSlicesValues",
+                    "SOPInstanceUIDs",
+                }
+            }
+            payload["SeriesInstanceUID"] = str(uid)
+            payload["SliceCount"] = len(raw.get("files", []))
+            raw_series.append(payload)
+
+        series, acquisitions = build_qc_inventory(raw_series, available_series, policy=policy)
+        store.persist_qc_inventory(
+            conn,
+            analysis_id=analysis_id,
+            series=series,
+            acquisitions=acquisitions,
+        )
+        series_by_uid = {item["series_uid"]: item for item in series}
+        queued = 0
+        for acquisition in acquisitions:
+            representative_uid = acquisition.get("representative_series_uid")
+            if not representative_uid:
+                continue
+            representative = series_by_uid[representative_uid]
+            relative_input = representative.get("derived_nifti_path")
+            if not relative_input:
+                continue
+            output_path = (
+                study_dir(case_id)
+                / "evidence"
+                / analysis_id
+                / "acquisitions"
+                / acquisition["acquisition_id"]
+            )
+            output_path.mkdir(parents=True, exist_ok=True)
+            source_input = derived_dir / relative_input
+            immutable_input = output_path / "input.nii.gz"
+            if not immutable_input.exists():
+                try:
+                    os.link(source_input, immutable_input)
+                except OSError:
+                    shutil.copy2(source_input, immutable_input)
+            store.enqueue_qc_segmentation(
+                conn,
+                analysis_id=analysis_id,
+                acquisition_id=acquisition["acquisition_id"],
+                case_id=case_id,
+                series_uid=representative_uid,
+                input_path=str(immutable_input),
+                output_path=str(output_path),
+            )
+            queued += 1
+        context["queued_acquisitions"] = queued
+        if queued == 0:
+            context["status"] = store.update_qc_analysis_summary(
+                conn,
+                analysis_id=analysis_id,
+                coverage={
+                    "schema_version": 1,
+                    "anatomies": {},
+                    "available_phases": [],
+                    "gaps": [],
+                    "conflicts": [],
+                },
+            )
+        else:
+            context["status"] = "segmentation_pending"
+        return context
+    except Exception as exc:
+        try:
+            store.fail_qc_analysis(conn, analysis_id, exc)
+        except Exception:
+            pass
+        context.update({"analysis_id": analysis_id, "status": "failed", "error": str(exc)[:2000]})
+        return context
+    finally:
+        conn.close()
 
 def process_ct_series_concurrency(uid, s_data, case_output_dir, temp_dir):
     """
@@ -1188,6 +1381,15 @@ def process_zip(zip_path):
         intake_manifest = {}
         intake_manifest_path = extract_dir / INTAKE_MANIFEST_NAME
         external_submission = load_external_submission_sidecar(zip_path)
+        upload_options = load_upload_options_sidecar(zip_path)
+        persisted_qc = external_submission.get("qc_evidence") if external_submission else None
+        if not isinstance(persisted_qc, dict):
+            persisted_qc = upload_options.get("qc_evidence") if upload_options else None
+        qc_resolution = (
+            dict(persisted_qc)
+            if isinstance(persisted_qc, dict)
+            else resolve_qc_evidence(None, host_enabled=settings.QC_EVIDENCE_ENABLED)
+        )
         if intake_manifest_path.exists():
             try:
                 with open(intake_manifest_path, "r", encoding="utf-8") as manifest_file:
@@ -1240,6 +1442,34 @@ def process_zip(zip_path):
                                 "SliceThicknessValues": [],
                                 "SpacingBetweenSlicesValues": [],
                                 "GeometryPositions": [],
+                                "GeometryPatientPositions": [],
+                                "SOPInstanceUIDs": [],
+                                "FrameOfReferenceUID": _serialize_dicom_selection_value(
+                                    get_tag_value(ds, "FrameOfReferenceUID", None)
+                                ),
+                                "AcquisitionNumber": _serialize_dicom_selection_value(
+                                    get_tag_value(ds, "AcquisitionNumber", None)
+                                ),
+                                "TemporalPositionIdentifier": _serialize_dicom_selection_value(
+                                    get_tag_value(ds, "TemporalPositionIdentifier", None)
+                                ),
+                                "AcquisitionDateTime": _serialize_dicom_selection_value(
+                                    get_tag_value(ds, "AcquisitionDateTime", None)
+                                )
+                                or (
+                                    str(get_tag_value(ds, "AcquisitionDate", "") or "")
+                                    + str(get_tag_value(ds, "AcquisitionTime", "") or "")
+                                ),
+                                "ImageOrientationPatient": _serialize_dicom_selection_value(
+                                    get_tag_value(ds, "ImageOrientationPatient", None)
+                                ),
+                                "ImageType": _serialize_dicom_selection_value(
+                                    get_tag_value(ds, "ImageType", None)
+                                )
+                                or [],
+                                "SequenceName": _serialize_dicom_selection_value(
+                                    get_tag_value(ds, "SequenceName", None)
+                                ),
                                 **selection_context,
                             }
                             # Global Metadata (first encounter)
@@ -1260,6 +1490,9 @@ def process_zip(zip_path):
                             update_global_biometrics_from_dataset(global_meta, ds)
 
                         series_map[uid]["files"].append(fpath)
+                        series_map[uid]["SOPInstanceUIDs"].append(
+                            str(get_tag_value(ds, "SOPInstanceUID", "") or "")
+                        )
                         slice_thickness = parse_optional_float(get_tag_value(ds, "SliceThickness", None))
                         if slice_thickness is not None:
                             series_map[uid]["SliceThicknessValues"].append(slice_thickness)
@@ -1269,6 +1502,12 @@ def process_zip(zip_path):
                         slice_position = _project_slice_position_mm(ds)
                         if slice_position is not None:
                             series_map[uid]["GeometryPositions"].append(slice_position)
+                        patient_position = _parse_float_sequence(
+                            get_tag_value(ds, "ImagePositionPatient", None),
+                            expected_len=3,
+                        )
+                        if patient_position:
+                            series_map[uid]["GeometryPatientPositions"].append(patient_position)
                         if modality == "CT": found_ct = True
                         
                 except Exception:
@@ -1279,6 +1518,8 @@ def process_zip(zip_path):
             # sys.exit(1) # Don't exit, let's see what happens
 
         detected_series_map = series_map
+        for detected_series in detected_series_map.values():
+            detected_series.update(compute_series_geometry_summary(detected_series))
         series_map, discarded_series = split_series_by_image_count(detected_series_map, min_series_images)
         stage_timings["scan_dicoms_seconds"] = round(time.perf_counter() - scan_started, 3)
         prepare_stats["min_series_images"] = min_series_images
@@ -1330,7 +1571,7 @@ def process_zip(zip_path):
             )
             intake_manifest["manifest_digest"] = manifest_digest
         if manifest_study_uid and manifest_digest:
-            if _should_skip_duplicate_prepare_manifest(
+            if not qc_resolution.get("effective") and _should_skip_duplicate_prepare_manifest(
                 study_uid=manifest_study_uid,
                 manifest_digest=manifest_digest,
                 case_id=case_id,
@@ -1425,6 +1666,13 @@ def process_zip(zip_path):
             json.dump(metadata_data, f, indent=2)
 
         available_series = []
+        conversion_series_map = series_map
+        if qc_resolution.get("effective"):
+            conversion_series_map = {
+                uid: item
+                for uid, item in detected_series_map.items()
+                if len(item.get("files", [])) >= 2
+            }
         phase_detection_available = Path(TOTALSEG_GET_PHASE_BIN).exists() or shutil.which(TOTALSEG_GET_PHASE_BIN) is not None
         prepare_stats["phase_detection_available"] = phase_detection_available
         
@@ -1434,7 +1682,7 @@ def process_zip(zip_path):
             print("  [MR Mode] Converting and preserving all MR series...")
             mr_candidates = []
             
-            for uid, s_data in series_map.items():
+            for uid, s_data in conversion_series_map.items():
                 # Filter out obvious non-MR or small stuff if deemed necessary
                 # if s_data["Modality"] != "MR": continue 
 
@@ -1532,7 +1780,7 @@ def process_zip(zip_path):
             
             with concurrent.futures.ThreadPoolExecutor(max_workers=series_workers) as executor:
                 futures = []
-                for uid, s_data in series_map.items():
+                for uid, s_data in conversion_series_map.items():
                     futures.append(
                         executor.submit(process_ct_series_concurrency, uid, s_data, derived_series_dir, temp_dir)
                     )
@@ -1589,7 +1837,7 @@ def process_zip(zip_path):
             # --- Update full metadata from a representative CT instance ---
             try:
                 w_uid = candidates[0]['uid']
-                w_files = series_map[w_uid]['files']
+                w_files = detected_series_map[w_uid]['files']
                 if w_files:
                     first_dcm = w_files[0]
                     ds_full = pydicom.dcmread(str(first_dcm), stop_before_pixels=True)
@@ -1601,6 +1849,21 @@ def process_zip(zip_path):
 
         # 5. Final Handover & Metadata Enrichment
         if available_series:
+            qc_available_series = list(available_series)
+            primary_series_uids = set(series_map)
+            available_series = [
+                item
+                for item in available_series
+                if str(item.get("SeriesInstanceUID") or "") in primary_series_uids
+            ]
+            qc_context = prepare_qc_analysis(
+                case_id=case_id,
+                study_uid=str(global_meta.get("StudyInstanceUID") or ""),
+                detected_series_map=detected_series_map,
+                available_series=qc_available_series,
+                derived_dir=derived_dir,
+                qc_resolution=qc_resolution,
+            )
             duplicate_skip_context = _completed_case_skip_context(
                 case_id,
                 {
@@ -1620,6 +1883,7 @@ def process_zip(zip_path):
                 "prepare_stage_timings_seconds": stage_timings,
                 "prepare_stats": prepare_stats,
                 "prepare_input_origin": upload_origin,
+                "qc_evidence": qc_context,
             }
             if external_submission:
                 prepare_pipeline_updates["external_job_id"] = external_submission.get("job_id")
@@ -1667,10 +1931,13 @@ def process_zip(zip_path):
                     "artifact_locale": external_submission.get("artifact_locale"),
                     "series_selection_policy": external_submission.get("series_selection_policy", {}),
                     "artifact_dicom_policy": external_submission.get("artifact_dicom_policy", {}),
+                    "qc_evidence": qc_context,
                     "received_at": external_submission.get("received_at"),
                 }
                 output_meta["ExternalDelivery"] = external_delivery_payload
                 output_metadata["ExternalDelivery"] = external_delivery_payload
+            output_meta["QcEvidence"] = qc_context
+            output_metadata["QcEvidence"] = qc_context
             
             # Save updated id.json
             with open(study_id_json(case_id), "w") as f:

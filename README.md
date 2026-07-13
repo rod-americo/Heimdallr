@@ -111,11 +111,16 @@ cp config/dicom_egress.example.json config/dicom_egress.json
 cp config/presentation.example.json config/presentation.json
 cp config/space_manager.example.json config/space_manager.json
 cp config/resource_monitor.example.json config/resource_monitor.json
+cp config/qc_evidence.example.json config/qc_evidence.json
 ```
 
 Only example files are versioned. The concrete host-local files above are
 ignored by Git. Secrets and host-specific values must be injected by the host
 environment, not by `.env` files.
+
+The copied QC evidence example remains disabled. Leave the file absent or keep
+`enabled=false` unless the host should analyze normal intake by default;
+`/upload` and `/jobs` can still override the boolean per submission.
 
 For licensed TotalSegmentator tasks:
 
@@ -170,6 +175,7 @@ Configuration is centralized in `heimdallr/shared/settings.py` plus JSON files u
 | `HEIMDALLR_DICOM_PORT` | env | no | host | `11114` |
 | `HEIMDALLR_INTAKE_PIPELINE_CONFIG` | env/file | no | repo or host | `config/intake_pipeline.json` |
 | `HEIMDALLR_SEGMENTATION_PIPELINE_CONFIG` | env/file | yes for segmentation | host-local | `config/segmentation_pipeline.json` |
+| `HEIMDALLR_QC_EVIDENCE_CONFIG` | env/file | no | host-local | `config/qc_evidence.json`; missing means default disabled |
 | `HEIMDALLR_METRICS_PIPELINE_CONFIG` | env/file | yes for metrics | host-local | `config/metrics_pipeline.json` |
 | `HEIMDALLR_PREPARE_MAX_PARALLEL_CASES` | env/config | no | host | `1` |
 | `HEIMDALLR_SEGMENTATION_MAX_PARALLEL_CASES` | env/config | no | host | `1` |

@@ -34,3 +34,8 @@ Record independent host ceilings in `limits.prepare_max_parallel_cases`,
 `limits.segmentation_max_parallel_cases`, `limits.metrics_max_parallel_cases`,
 and `limits.metrics_max_parallel_jobs`. Runtime JSON may select any value up to
 those ceilings; omitted case limits are treated as `1` for compatibility.
+
+The optional `config_paths.qc_evidence` entry may point to the ignored
+host-local QC config. Missing `config/qc_evidence.json` means normal intake does
+not schedule multi-acquisition QC; `/upload` and `/jobs` can still request it
+explicitly and will reuse the active segmentation profile's `total` task.

@@ -10,6 +10,7 @@ These contracts describe the current implementation under `heimdallr.integration
 | --- | --- | --- | --- |
 | External job submission | external app to Heimdallr | `POST /jobs` multipart upload | implemented |
 | External job status | external app to Heimdallr | `GET /jobs/{job_id}` JSON | implemented |
+| Study QC evidence | external app to Heimdallr | `GET /api/v1/studies/...` JSON | implemented when QC was requested/enabled |
 | Terminal job delivery | Heimdallr to external app | multipart HTTP `POST` callback | implemented when configured |
 | Event dispatch | Heimdallr to configured destinations | JSON HTTP `POST` | implemented when configured |
 
@@ -18,6 +19,8 @@ controls what Heimdallr returns for `case.completed`; omitted outputs are not
 delivered. `artifact_locale` controls the presentation locale for generated
 burned-in artifacts where supported. Failed jobs emit `case.failed` with a
 manifest and no package.
+`qc_evidence` lets `/jobs` explicitly enable or disable independent
+multi-acquisition anatomy evidence; omission inherits the host default.
 
 ## Contract Files
 
@@ -29,7 +32,7 @@ such as `patient_identified`.
 ## Compatibility and Versioning
 
 - The current external contract line is `event_version: 1`.
-- API paths are not versioned yet.
+- Operational job paths are unversioned; study evidence is versioned under `/api/v1`.
 - Additive fields may appear in JSON payloads.
 - Consumers must ignore unknown JSON fields.
 - Breaking changes require updates to this directory, `docs/API.md`, and

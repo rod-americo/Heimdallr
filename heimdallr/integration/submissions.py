@@ -14,6 +14,7 @@ from heimdallr.shared.spool import atomic_write_bytes
 
 
 EXTERNAL_SUBMISSION_SIDECAR_SUFFIX = ".submission.json"
+UPLOAD_OPTIONS_SIDECAR_SUFFIX = ".options.json"
 
 DEFAULT_REQUESTED_OUTPUTS = {
     "id_json": True,
@@ -106,6 +107,32 @@ def normalize_requested_metrics_modules(raw: Any) -> list[str]:
     return normalized
 
 
+def resolve_qc_evidence(
+    requested: bool | None,
+    *,
+    host_enabled: bool,
+) -> dict[str, Any]:
+    """Resolve the tri-state QC request without losing its provenance."""
+    if requested is True:
+        effective = True
+        reason = "api_override_enabled"
+    elif requested is False:
+        effective = False
+        reason = "api_override_disabled"
+    elif host_enabled:
+        effective = True
+        reason = "host_default_enabled"
+    else:
+        effective = False
+        reason = "host_default_disabled"
+    return {
+        "requested": requested,
+        "host_default": bool(host_enabled),
+        "effective": effective,
+        "reason": reason,
+    }
+
+
 def normalize_series_selection_policy(raw: Any) -> dict[str, Any]:
     if raw in (None, ""):
         return {}
@@ -176,6 +203,41 @@ def external_submission_sidecar_path(zip_path: Path) -> Path:
     return logical_zip_path.with_name(f"{logical_zip_path.name}{EXTERNAL_SUBMISSION_SIDECAR_SUFFIX}")
 
 
+def upload_options_sidecar_path(zip_path: Path) -> Path:
+    logical_zip_path = unclaim_path(zip_path)
+    return logical_zip_path.with_name(f"{logical_zip_path.name}{UPLOAD_OPTIONS_SIDECAR_SUFFIX}")
+
+
+def write_upload_options_sidecar(zip_path: Path, payload: dict[str, Any]) -> Path:
+    path = upload_options_sidecar_path(zip_path)
+    atomic_write_bytes(path, json.dumps(payload, indent=2, ensure_ascii=False).encode("utf-8"))
+    return path
+
+
+def load_upload_options_sidecar(zip_path: Path) -> dict[str, Any]:
+    path = upload_options_sidecar_path(zip_path)
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def delete_upload_options_sidecar(zip_path: Path) -> None:
+    path = upload_options_sidecar_path(zip_path)
+    if path.exists():
+        path.unlink()
+
+
+def move_upload_options_sidecar(source_zip_path: Path, destination_zip_path: Path) -> None:
+    source = upload_options_sidecar_path(source_zip_path)
+    if not source.exists():
+        return
+    destination = upload_options_sidecar_path(destination_zip_path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    source.replace(destination)
+
+
 def write_external_submission_sidecar(zip_path: Path, payload: dict[str, Any]) -> Path:
     sidecar_path = external_submission_sidecar_path(zip_path)
     atomic_write_bytes(
@@ -228,7 +290,13 @@ def build_external_submission_payload(
     artifact_locale: Any = None,
     series_selection_policy: Any = None,
     artifact_dicom_policy: Any = None,
+    qc_evidence: bool | None = None,
 ) -> dict[str, Any]:
+    qc_resolution = resolve_qc_evidence(
+        qc_evidence,
+        host_enabled=settings.QC_EVIDENCE_ENABLED,
+    )
+    qc_resolution["source"] = "job"
     return {
         "job_id": str(job_id),
         "client_case_id": str(client_case_id),
@@ -239,5 +307,6 @@ def build_external_submission_payload(
         "artifact_locale": normalize_artifact_locale(artifact_locale),
         "series_selection_policy": normalize_series_selection_policy(series_selection_policy),
         "artifact_dicom_policy": normalize_artifact_dicom_policy(artifact_dicom_policy),
+        "qc_evidence": qc_resolution,
         "received_at": settings.local_now().isoformat(),
     }

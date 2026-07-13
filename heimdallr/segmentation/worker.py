@@ -36,6 +36,7 @@ import re
 import unicodedata
 from pathlib import Path
 import datetime
+from importlib import metadata as importlib_metadata
 from zoneinfo import ZoneInfo
 
 import nibabel as nib
@@ -66,6 +67,7 @@ from heimdallr.shared.segmentation_inventory import (
 )
 from heimdallr.shared.segmentation_coverage import classify_segmentation_coverage
 from heimdallr.shared.segmentation_coverage import mask_complete as mask_complete_along_z
+from heimdallr.shared.qc_evidence import consolidate_coverage, inventory_total_masks
 from heimdallr.shared.sqlite import connect as db_connect
 
 settings.configure_service_stdio()
@@ -243,7 +245,9 @@ def recover_claimed_segmentation_queue_items() -> int:
     """Recover claimed queue rows after a worker restart."""
     conn = db_connect()
     try:
-        return store.reset_claimed_segmentation_queue_items(conn)
+        primary = store.reset_claimed_segmentation_queue_items(conn)
+        qc = store.reset_claimed_qc_segmentation_queue_items(conn)
+        return primary + qc
     finally:
         conn.close()
 
@@ -266,6 +270,23 @@ def touch_segmentation_queue_item_claim(queue_id: int) -> bool:
     conn = db_connect()
     try:
         return store.touch_segmentation_queue_item_claim(conn, queue_id)
+    finally:
+        conn.close()
+
+
+def claim_next_pending_qc_segmentation():
+    conn = db_connect()
+    try:
+        row = store.claim_next_pending_qc_segmentation(conn)
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def touch_qc_segmentation_claim(queue_id: int) -> bool:
+    conn = db_connect()
+    try:
+        return store.touch_qc_segmentation_claim(conn, queue_id)
     finally:
         conn.close()
 
@@ -1872,6 +1893,16 @@ def segment_case(case_input, queue_id: int | None = None):
                 requested_metrics_modules = _requested_metrics_modules_from_metadata(meta)
                 if selection_info is not None:
                     selected_phase = selection_info.get("SelectedPhase", "unknown")
+                    if study_uid:
+                        conn = db_connect()
+                        try:
+                            store.mark_qc_selected_series(
+                                conn,
+                                study_uid,
+                                str(selection_info.get("SelectedSeriesInstanceUID") or ""),
+                            )
+                        finally:
+                            conn.close()
 
                 pipeline_data = meta.get("Pipeline", {})
                 pipeline_data["start_time"] = segmentation_start_dt.isoformat()
@@ -2170,6 +2201,25 @@ def main():
         future.add_done_callback(
             lambda fut, p=case_path, qid=queue_id: on_complete(fut, p, qid)
         )
+
+    def _submit_qc(queue_item: dict) -> None:
+        future = executor.submit(segment_qc_queue_item, queue_item)
+        with lock:
+            active_futures.add(future)
+        future.add_done_callback(
+            lambda fut, item=queue_item: on_qc_complete(fut, item)
+        )
+
+    def on_qc_complete(fut, queue_item):
+        with lock:
+            active_futures.discard(fut)
+        try:
+            fut.result()
+        except Exception as exc:
+            print(
+                f"[QC] Unhandled worker error for analysis={queue_item['analysis_id']} "
+                f"acquisition={queue_item['acquisition_id']}: {exc}"
+            )
     
     def on_complete(fut, f_path, queue_id=None):
         """Callback when a case finishes segmentation."""
@@ -2266,6 +2316,17 @@ def main():
 
                     print(f"[Segmentation] Claimed input file: {claimed_input.name}")
                     _submit_case(claimed_input)
+
+                # QC is lower priority and only fills capacity left by every primary path.
+                while _active_case_count() < max_cases and not _SHUTDOWN_EVENT.is_set():
+                    qc_item = claim_next_pending_qc_segmentation()
+                    if not qc_item:
+                        break
+                    print(
+                        f"[QC] Claimed analysis={qc_item['analysis_id']} "
+                        f"acquisition={qc_item['acquisition_id']}"
+                    )
+                    _submit_qc(qc_item)
             
                 time.sleep(settings.SEGMENTATION_SCAN_INTERVAL)
                 
@@ -2289,6 +2350,137 @@ def _segment_case_with_heartbeat(case_input: Path, queue_id: int) -> bool:
     finally:
         stop_event.set()
         heartbeat_thread.join(timeout=5)
+
+
+def _qc_total_task() -> tuple[str, dict]:
+    profile_name, profile = load_segmentation_pipeline_profile()
+    for task in profile.get("tasks", []):
+        if isinstance(task, dict) and task.get("name") == "total" and task.get("enabled", True):
+            return profile_name, task
+    raise RuntimeError(f"Segmentation profile '{profile_name}' has no enabled total task for QC")
+
+
+def _qc_model_versions(profile_name: str, task: dict) -> dict:
+    version = None
+    for package_name in ("TotalSegmentator", "totalsegmentator"):
+        try:
+            version = importlib_metadata.version(package_name)
+            break
+        except importlib_metadata.PackageNotFoundError:
+            continue
+    return {
+        "total": {
+            "implementation": "TotalSegmentator",
+            "version": version,
+            "profile": profile_name,
+            "extra_args": [str(item) for item in task.get("extra_args", [])],
+        }
+    }
+
+
+def _refresh_qc_analysis_summary(conn, analysis_id: str) -> str:
+    acquisitions = []
+    for row in store.list_qc_acquisitions(conn, analysis_id):
+        payload = json.loads(row["payload_json"])
+        payload["segmentation_status"] = row["segmentation_status"]
+        payload["error"] = row["error"]
+        acquisitions.append(payload)
+    anatomy = []
+    for row in store.list_qc_anatomy(conn, analysis_id):
+        payload = json.loads(row["payload_json"])
+        payload["acquisition_id"] = row["acquisition_id"]
+        anatomy.append(payload)
+    coverage = consolidate_coverage(acquisitions, anatomy)
+    return store.update_qc_analysis_summary(conn, analysis_id=analysis_id, coverage=coverage)
+
+
+def segment_qc_queue_item(queue_item: dict) -> bool:
+    """Run only the total task for one acquisition and persist evidence independently."""
+    queue_id = int(queue_item["id"])
+    input_path = Path(queue_item["input_path"])
+    output_root = Path(queue_item["output_path"])
+    stop_event = threading.Event()
+
+    def _heartbeat() -> None:
+        while not stop_event.wait(settings.SEGMENTATION_CLAIM_HEARTBEAT_SECONDS):
+            if not touch_qc_segmentation_claim(queue_id):
+                return
+
+    heartbeat = threading.Thread(
+        target=_heartbeat,
+        name=f"qc-segmentation-heartbeat-{queue_id}",
+        daemon=True,
+    )
+    heartbeat.start()
+    analysis_id = str(queue_item["analysis_id"])
+    try:
+        if not input_path.exists():
+            raise FileNotFoundError(f"QC input NIfTI not found: {input_path}")
+        profile_name, task = _qc_total_task()
+        total_dir = output_root / "total"
+        if total_dir.exists():
+            shutil.rmtree(total_dir)
+        total_dir.mkdir(parents=True, exist_ok=True)
+        log_dir = output_root / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = None if settings.VERBOSE_CONSOLE else log_dir / "total.log"
+        run_task(
+            "total",
+            input_path,
+            total_dir,
+            extra_args=[str(item) for item in task.get("extra_args", [])],
+            log_file=log_file,
+        )
+        evidence = inventory_total_masks(total_dir, input_path)
+        if not evidence:
+            raise RuntimeError("QC total task completed without anatomy masks")
+        model_versions = _qc_model_versions(profile_name, task)
+        for item in evidence:
+            item["acquisition_id"] = queue_item["acquisition_id"]
+            item["series_uid"] = queue_item["series_uid"]
+            item["model"] = model_versions["total"]
+        inventory_path = output_root / "anatomy_inventory.json"
+        inventory_path.write_text(json.dumps(evidence, indent=2), encoding="utf-8")
+        conn = db_connect()
+        try:
+            store.complete_qc_segmentation(
+                conn,
+                queue_id=queue_id,
+                anatomy=evidence,
+                model_versions=model_versions,
+            )
+            status = _refresh_qc_analysis_summary(conn, analysis_id)
+        finally:
+            conn.close()
+        print(
+            f"[QC] Done analysis={analysis_id} acquisition={queue_item['acquisition_id']} "
+            f"status={status}"
+        )
+        return True
+    except Exception as exc:
+        conn = db_connect()
+        try:
+            max_attempts = int(
+                settings.QC_EVIDENCE_CONFIG.get("execution", {}).get("max_attempts", 2)
+            )
+            analysis_id, retry = store.fail_qc_segmentation(
+                conn,
+                queue_id=queue_id,
+                error=exc,
+                max_attempts=max_attempts,
+            )
+            if not retry:
+                _refresh_qc_analysis_summary(conn, analysis_id)
+        finally:
+            conn.close()
+        print(
+            f"[QC] {'Requeued' if retry else 'Failed'} analysis={analysis_id} "
+            f"acquisition={queue_item['acquisition_id']}: {exc}"
+        )
+        return False
+    finally:
+        stop_event.set()
+        heartbeat.join(timeout=5)
 
 if __name__ == "__main__":
     main()

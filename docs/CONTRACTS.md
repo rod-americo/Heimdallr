@@ -22,6 +22,7 @@ Heimdallr transforms incoming radiological imaging studies into traceable runtim
 | Integration delivery config | host-local | JSON | no | Controls final package callback retries and timeouts. |
 | Presentation config | host-local | JSON | no | Controls patient-name and artifact locale behavior. |
 | Host stack manifest | host-local | JSON | no | `config/host_stack/*.json` records host accelerator type, allowed TotalSegmentator device, and worker limits; concrete manifests stay ignored. |
+| QC evidence config | host-local | JSON | no | `config/qc_evidence.json` controls the host default and policy overrides; missing means disabled. `/upload` and `/jobs` may explicitly override the boolean per submission. |
 
 ## 3. Canonical Outputs
 
@@ -33,6 +34,7 @@ Heimdallr transforms incoming radiological imaging studies into traceable runtim
 | Source DICOM series | `source/dicom/series/<series-stem>/` | DICOM files grouped by series | Preserves the scanned study instances after ZIP extraction for reprocessing and audit until the case workspace is purged. |
 | Canonical NIfTI | `derived/<case_id>.nii.gz` | NIfTI | Produced or materialized by segmentation for the selected series. |
 | Segmentation artifacts | `artifacts/<task>/` | files | TotalSegmentator task outputs according to active profile. |
+| QC evidence artifacts | `evidence/<analysis_id>/acquisitions/<acquisition_id>/` | NIfTI-derived masks, logs, and JSON | Created only when QC resolves enabled. They are independent from metrics and DICOM egress artifacts. |
 | Head normalization artifact | `artifacts/metrics/head_complete_qc/normalized_axial_head_ct.nii.gz` | NIfTI | Produced by `head_complete_qc` only after the automatic complete-head gate passes. The required mask is `total/brain.nii.gz`; `total/skull.nii.gz` is optional diagnostic/crop context and may be truncated. Required `cerebral_bleed` and `brain_structures` outputs must also be task-complete and geometry-compatible before derived artifacts are emitted. |
 | Head RAS 2 mm artifact | `artifacts/metrics/head_complete_qc/normalized_ras_head_ct_2mm.nii.gz` | NIfTI | Canonical RAS isotropic 2 mm volume. Anatomical orbitomeatal and midline alignment is reported as `landmarks_required` until validated landmarks are available. |
 | Head brain-geometry 2 mm artifact | `artifacts/metrics/head_complete_qc/normalized_brain_geometry_head_ct_2mm.nii.gz` | NIfTI | Volume resampled so the `total/brain.nii.gz` mask PCA axes define the output plane. It uses `brain_structures/septum_pellucidum.nii.gz` as an in-plane midline guide when available, preserves source in-plane spacing by default, and uses 1 mm slice spacing. Does not require the orbitomeatal line. |
@@ -81,6 +83,7 @@ overlay products at overlapping anatomy from being interleaved.
 | External caller case | `client_case_id` | Caller-owned identifier echoed back in final delivery. |
 | Series selected for segmentation | `SeriesInstanceUID` plus slice count and geometry summary | Used for selection audit and reuse decisions. Geometry fields may include measured `CoverageMm`, `ZSpacingMm`, `SliceThicknessMm`, and selection thresholds when available. |
 | Queue item | queue table `id` | Internal claim/retry identity, not an external contract. |
+| QC analysis | `analysis_id` plus `analysis_version` | Immutable evidence version; idempotence also includes study fingerprint and policy signature. |
 | Artifact digest | `artifact_digest` | Used to preserve or reset DICOM egress queue state when artifacts change. |
 | Handoff duplicate state | `study_uid` + `manifest_digest` | Used to suppress repeated intake handoffs while prepare is pending or complete. |
 
@@ -91,6 +94,7 @@ overlay products at overlapping anatomy from being interleaved.
 | `intake` | inbound DICOM instances | ZIP payload and intake manifest | invalid DICOM, association failure, idle flush timing, upload/local handoff failure |
 | `prepare` | claimable ZIP payload | study directory, metadata, queue rows | bad ZIP, no valid DICOM series, conversion failure, insufficient series images |
 | `segmentation` | prepared case queue item | segmentation artifacts and metrics queue item | TotalSegmentator failure, missing license, resource exhaustion, stale claim |
+| `qc_segmentation` | one representative acquisition | anatomy evidence and consolidated coverage | Isolated from primary case success; retries and terminal errors stay in the QC tables. |
 | `metrics` | metrics queue item | results JSON, overlays, PDFs, DICOM artifacts, delivery queues | missing masks, incomplete masks, unsupported profile, job dependency errors, artifact generation failure |
 | `integration.dispatch` | dispatch queue item | HTTP event delivery state | unreachable endpoint, non-2xx response, config error |
 | `integration.delivery` | delivery queue item | final callback delivery state | missing case outputs, callback failure, package build failure |
@@ -103,6 +107,8 @@ overlay products at overlapping anatomy from being interleaved.
 ### HTTP Uploads
 
 `POST /upload` accepts only `.zip` uploads and returns acceptance after the file is stored in the external spool. Acceptance does not mean processing completed.
+Both `/upload` and `/jobs` accept optional strict `qc_evidence=true|false`.
+Omission inherits the host default. Listener-created handoffs have no override.
 
 `POST /jobs` requires:
 

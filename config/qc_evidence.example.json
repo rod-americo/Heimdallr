@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "enabled": false,
+  "policy": {
+    "acquisition_time_tolerance_seconds": 30,
+    "orientation_tolerance_degrees": 5,
+    "minimum_spatial_overlap_ratio": 0.8
+  },
+  "execution": {
+    "max_attempts": 2
+  }
+}

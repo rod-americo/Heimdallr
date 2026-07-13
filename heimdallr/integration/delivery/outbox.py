@@ -74,6 +74,7 @@ def enqueue_case_failed_delivery(
         "error": str(error_message or "")[:2000],
         "received_at": external_delivery.get("received_at"),
         "failed_at": settings.local_now().isoformat(),
+        "qc_evidence": external_delivery.get("qc_evidence"),
     }
     conn = db_connect()
     try:

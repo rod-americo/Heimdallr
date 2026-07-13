@@ -45,6 +45,31 @@ def _delivery_summary(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
     }
 
 
+def qc_evidence_status(study_uid: str | None, analysis_id: str | None = None) -> dict[str, Any] | None:
+    normalized_uid = str(study_uid or "").strip()
+    if not normalized_uid:
+        return None
+    conn = db_connect()
+    try:
+        row = store.get_qc_analysis(conn, normalized_uid, analysis_id)
+        if not row:
+            return None
+        try:
+            resolution = json.loads(row["qc_resolution_json"] or "{}")
+        except (TypeError, json.JSONDecodeError):
+            resolution = {}
+        return {
+            **(resolution if isinstance(resolution, dict) else {}),
+            "analysis_id": row["analysis_id"],
+            "analysis_version": int(row["analysis_version"]),
+            "status": row["status"],
+            "error": row["error"],
+            "artifacts_purged": bool(row["artifacts_purged"]),
+        }
+    finally:
+        conn.close()
+
+
 def _status_from_delivery(rows: list[dict[str, Any]]) -> str | None:
     if not rows:
         return None
@@ -98,6 +123,7 @@ def _find_sidecar(job_id: str) -> dict[str, Any] | None:
                 "received_at": payload.get("received_at"),
                 "error": failure.get("error"),
                 "delivery": _delivery_summary(_delivery_rows(job_id)),
+                "qc_evidence": payload.get("qc_evidence"),
             }
     return None
 
@@ -154,6 +180,13 @@ def _find_study_job(job_id: str) -> dict[str, Any] | None:
             "error": pipeline.get("metrics_error") or pipeline.get("segmentation_error"),
             "pipeline": pipeline,
             "delivery": _delivery_summary(delivery_rows),
+            "qc_evidence": qc_evidence_status(
+                id_data.get("StudyInstanceUID"),
+                (id_data.get("QcEvidence") or {}).get("analysis_id")
+                if isinstance(id_data.get("QcEvidence"), dict)
+                else None,
+            )
+            or id_data.get("QcEvidence"),
         }
     return None
 
@@ -179,6 +212,7 @@ def _find_delivery_only(job_id: str) -> dict[str, Any] | None:
         "received_at": payload.get("received_at"),
         "error": payload.get("error") or row.get("error"),
         "delivery": _delivery_summary(rows),
+        "qc_evidence": qc_evidence_status(row.get("study_uid")) or payload.get("qc_evidence"),
     }
 
 

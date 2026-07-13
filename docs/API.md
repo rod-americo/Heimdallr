@@ -9,7 +9,7 @@ This document summarizes high-value API contracts used in Heimdallr workflows.
 
 ## Versioning and Compatibility
 
-- Current contract line: `v1` (path is unversioned today).
+- Existing operational endpoints remain unversioned. The study-evidence contract is explicitly versioned under `/api/v1`.
 - Backward-compatible changes may be shipped in-place.
 - Breaking changes should be documented in the affected API and operations docs before release.
 
@@ -30,6 +30,8 @@ This document summarizes high-value API contracts used in Heimdallr workflows.
 - `GET /api/tools/uploader`
 
 `POST /upload` accepts a `.zip` payload and hands it off asynchronously to the `heimdallr.prepare` flow.
+It also accepts optional multipart `qc_evidence=true|false`. Omission inherits the
+host default; invalid boolean strings return `422`.
 
 `POST /jobs` accepts `multipart/form-data` with:
 - `study_file`
@@ -47,8 +49,34 @@ overlays and case-report DICOM metadata
 series-selection profile for this submitted job only
 - optional `artifact_dicom_policy` JSON object, which overrides generated DICOM
 artifact encoding for this submitted job only
+- optional `qc_evidence=true|false`; an explicit value overrides the host
+  default for this submission
 
 It returns an immediate acceptance payload with `job_id` and `status=queued`. `GET /jobs/{job_id}` returns the best available asynchronous status for that external job. When processing finishes, `heimdallr.integration.delivery` performs an outbound multipart callback. Successful jobs emit `case.completed` with `manifest.json` plus `package.zip`; terminal failed jobs emit `case.failed` with `manifest.json` and no package. The consumer-facing callback contract is documented in `heimdallr/integration/docs/JOB_SUBMISSION.md`.
+
+QC resolution uses `explicit API value > host default`. DICOM listener handoffs
+cannot carry an override. QC segmentation is independent from the primary
+metrics pipeline and callback completion; job status and callback manifests
+expose the associated analysis state when available.
+
+### Versioned Study Evidence
+
+- `GET /api/v1/studies/{study_uid}/analyses`
+- `GET /api/v1/studies/{study_uid}/analysis`
+- `GET /api/v1/studies/{study_uid}/series`
+- `GET /api/v1/studies/{study_uid}/series/{series_uid}`
+- `GET /api/v1/studies/{study_uid}/coverage`
+
+The endpoints accept optional `analysis_id` for immutable historical lookup
+(`analyses` returns the matching singleton list). Without it, Heimdallr returns the latest complete analysis, falling
+back to the latest created analysis when none has completed. A study processed
+without QC returns `404` with `detail.code=qc_analysis_not_available`.
+
+Execution states distinguish `not_segmented`, `not_segmentable`,
+`segmentation_pending`, and `segmentation_failed`. Anatomy states distinguish
+`anatomy_not_detected`, `anatomy_present`, `anatomy_complete`,
+`anatomy_truncated`, and `unknown`; missing or pending inference is never
+reported as anatomy absence.
 
 When `requested_outputs` is omitted or when keys are omitted inside it, those
 outputs are treated as `false`. Consumers must request every file type they

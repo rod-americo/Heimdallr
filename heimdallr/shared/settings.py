@@ -25,6 +25,19 @@ def _load_json_config(path: Path) -> dict:
     return data if isinstance(data, dict) else {}
 
 
+def _load_optional_strict_json_config(path: Path, *, label: str) -> dict:
+    """Load an optional host config, rejecting malformed files when present."""
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"Invalid {label} config at {path}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise RuntimeError(f"Invalid {label} config at {path}: root must be an object")
+    return data
+
+
 def _get_nested_config(config: dict, *keys: str):
     current = config
     for key in keys:
@@ -313,6 +326,50 @@ SEGMENTATION_PIPELINE_CONFIG_PATH = Path(
 )
 SEGMENTATION_PIPELINE_CONFIG = _load_json_config(SEGMENTATION_PIPELINE_CONFIG_PATH)
 SEGMENTATION_PIPELINE_PROFILE = os.getenv("HEIMDALLR_SEGMENTATION_PIPELINE_PROFILE")
+QC_EVIDENCE_CONFIG_PATH = Path(
+    os.getenv(
+        "HEIMDALLR_QC_EVIDENCE_CONFIG",
+        str(CONFIG_DIR / "qc_evidence.json"),
+    )
+)
+QC_EVIDENCE_CONFIG = _load_optional_strict_json_config(
+    QC_EVIDENCE_CONFIG_PATH,
+    label="QC evidence",
+)
+if QC_EVIDENCE_CONFIG_PATH.exists():
+    if QC_EVIDENCE_CONFIG.get("schema_version") != 1:
+        raise RuntimeError(
+            f"Invalid QC evidence config at {QC_EVIDENCE_CONFIG_PATH}: schema_version must be 1"
+        )
+    if not isinstance(QC_EVIDENCE_CONFIG.get("enabled"), bool):
+        raise RuntimeError(
+            f"Invalid QC evidence config at {QC_EVIDENCE_CONFIG_PATH}: enabled must be boolean"
+        )
+    qc_policy = QC_EVIDENCE_CONFIG.get("policy", {})
+    qc_execution = QC_EVIDENCE_CONFIG.get("execution", {})
+    if not isinstance(qc_policy, dict) or not isinstance(qc_execution, dict):
+        raise RuntimeError(
+            f"Invalid QC evidence config at {QC_EVIDENCE_CONFIG_PATH}: "
+            "policy and execution must be objects"
+        )
+    try:
+        time_tolerance = float(qc_policy.get("acquisition_time_tolerance_seconds", 30))
+        orientation_tolerance = float(qc_policy.get("orientation_tolerance_degrees", 5))
+        overlap_ratio = float(qc_policy.get("minimum_spatial_overlap_ratio", 0.8))
+        max_attempts = int(qc_execution.get("max_attempts", 2))
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError(
+            f"Invalid QC evidence config at {QC_EVIDENCE_CONFIG_PATH}: numeric policy value is invalid"
+        ) from exc
+    if time_tolerance < 0 or not 0 <= orientation_tolerance <= 90 or not 0 <= overlap_ratio <= 1:
+        raise RuntimeError(
+            f"Invalid QC evidence config at {QC_EVIDENCE_CONFIG_PATH}: policy threshold out of range"
+        )
+    if max_attempts < 1:
+        raise RuntimeError(
+            f"Invalid QC evidence config at {QC_EVIDENCE_CONFIG_PATH}: max_attempts must be >= 1"
+        )
+QC_EVIDENCE_ENABLED = bool(QC_EVIDENCE_CONFIG.get("enabled", False))
 _legacy_segmentation_parallel_cases = os.getenv("HEIMDALLR_MAX_PARALLEL_CASES")
 SEGMENTATION_MAX_PARALLEL_CASES = _config_int(
     "HEIMDALLR_SEGMENTATION_MAX_PARALLEL_CASES",

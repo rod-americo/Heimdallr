@@ -25,6 +25,7 @@ Optional fields:
 | `artifact_locale` | string | Presentation locale for generated presentation artifacts where supported, for example `pt_BR` or `en_US`. |
 | `series_selection_policy` | JSON object string | Overrides the active series-selection profile for this submitted job only. |
 | `artifact_dicom_policy` | JSON object string | Overrides generated DICOM artifact encoding for this submitted job only. |
+| `qc_evidence` | boolean string | `true` or `false`; explicit value overrides the host default. Omission inherits it. |
 
 `requested_metrics_modules` and `requested_outputs` are intentionally separate:
 
@@ -51,6 +52,7 @@ curl -X POST "http://localhost:8001/jobs" \
   -F 'requested_outputs={"metrics_json":true,"overlays_dicom":true,"artifacts_tree":false}' \
   -F 'requested_metrics_modules=["l3_muscle_area","bone_health_l1_hu","lung_nodules"]' \
   -F 'artifact_locale=pt_BR' \
+  -F 'qc_evidence=true' \
   -F 'artifact_dicom_policy={"secondary_capture_transfer_syntax":"jpeg_ls_lossless","secondary_capture_series_mode":"single_series"}' \
   -F 'series_selection_policy={"name":"orchestrum_ct_opportunistic_v1","required":{"modality":"CT","min_slices":60},"phase_priority":["native","portal_venous"]}'
 ```
@@ -61,7 +63,7 @@ Heimdallr returns after the file and sidecar metadata are stored in the external
 
 Example response:
 
-```json { "accepted": true, "job_id": "9d3fdaf7-82df-4ee8-a0c0-fb927bc8c3d1", "client_case_id": "external-123", "status": "queued", "received_at": "2026-05-01T14:30:00-03:00", "stored_file": "study_20260501143000.zip", "requested_metrics_modules": [ "l3_muscle_area", "bone_health_l1_hu" ], "artifact_locale": "pt_BR", "series_selection_policy": { "name": "orchestrum_ct_opportunistic_v1", "required": { "modality": "CT", "min_slices": 60 }, "phase_priority": [ "native", "portal_venous" ] } }
+```json { "accepted": true, "job_id": "9d3fdaf7-82df-4ee8-a0c0-fb927bc8c3d1", "client_case_id": "external-123", "status": "queued", "received_at": "2026-05-01T14:30:00-03:00", "stored_file": "study_20260501143000.zip", "qc_evidence_requested": true, "qc_evidence_effective": true, "requested_metrics_modules": [ "l3_muscle_area", "bone_health_l1_hu" ], "artifact_locale": "pt_BR" }
 ```
 
 External applications should persist `job_id` and `client_case_id`. Heimdallr
@@ -84,6 +86,11 @@ Example response while processing:
 The endpoint is operational status, not a replacement for the terminal callback.
 Consumers should still treat callback delivery as the handoff that completes or
 fails a job.
+
+The optional `qc_evidence` object in status and callback manifests reports the
+analysis ID, version, state, and error. QC is independent and may still be
+pending when the primary `case.completed` callback is delivered; consumers can
+then query the versioned study-evidence API.
 
 ## Requested Outputs
 

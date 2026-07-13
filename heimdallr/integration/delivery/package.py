@@ -12,6 +12,7 @@ from typing import Any
 
 from heimdallr.control_plane.case_pdf_report import build_case_report
 from heimdallr.integration.submissions import normalize_requested_outputs
+from heimdallr.integration.status import qc_evidence_status
 from heimdallr.metrics.jobs._dicom_encapsulated_pdf import create_encapsulated_pdf_dicom
 from heimdallr.shared.i18n import normalize_locale, translate
 from heimdallr.shared.paths import (
@@ -144,6 +145,11 @@ def build_delivery_package(
         raise FileNotFoundError(f"Missing id.json for case {case_id}")
 
     metadata = _load_json(id_json_path)
+    qc_pointer = metadata.get("QcEvidence") if isinstance(metadata.get("QcEvidence"), dict) else {}
+    qc_status = qc_evidence_status(
+        metadata.get("StudyInstanceUID"),
+        qc_pointer.get("analysis_id"),
+    ) or qc_pointer
     external_delivery = metadata.get("ExternalDelivery", {})
     artifact_locale = (
         str(external_delivery.get("artifact_locale") or "").strip()
@@ -242,6 +248,7 @@ def build_delivery_package(
             "delivered_outputs": delivered_outputs,
             "missing_outputs": missing_outputs,
             "contents": contents,
+            "qc_evidence": qc_status,
         }
         _write_manifest(zip_handle, manifest_in_zip)
 
@@ -266,6 +273,7 @@ def build_delivery_package(
         "requested_outputs": requested,
         "delivered_outputs": manifest_in_zip["delivered_outputs"],
         "missing_outputs": manifest_in_zip["missing_outputs"],
+        "qc_evidence": qc_status,
     }
     return callback_manifest, package_path
 
@@ -303,4 +311,5 @@ def build_failed_delivery_manifest(
         "requested_outputs": {},
         "delivered_outputs": {},
         "missing_outputs": [],
+        "qc_evidence": failure.get("qc_evidence"),
     }

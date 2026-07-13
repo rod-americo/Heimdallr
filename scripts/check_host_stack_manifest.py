@@ -228,6 +228,7 @@ def validate_runtime_configs(
     intake_config_path: Path | None = None,
     segmentation_config_path: Path | None,
     metrics_config_path: Path | None,
+    qc_evidence_config_path: Path | None = None,
 ) -> ValidationResult:
     result = ValidationResult()
     accelerator = manifest.get("accelerator", {})
@@ -259,6 +260,19 @@ def validate_runtime_configs(
         "limits.metrics_max_parallel_cases",
         result,
     ) or 1
+
+    if qc_evidence_config_path is not None and qc_evidence_config_path.exists():
+        try:
+            qc_config = load_json(qc_evidence_config_path)
+        except RuntimeError as exc:
+            result.error(str(exc))
+        else:
+            if qc_config.get("schema_version") != 1:
+                result.error("qc_evidence.schema_version must be 1")
+            if not isinstance(qc_config.get("enabled"), bool):
+                result.error("qc_evidence.enabled must be boolean")
+            max_attempts = qc_config.get("execution", {}).get("max_attempts", 2)
+            positive_int(max_attempts, "qc_evidence.execution.max_attempts", result)
 
     if intake_config_path is not None:
         try:
@@ -432,6 +446,12 @@ def parse_args() -> argparse.Namespace:
         help="override metrics pipeline JSON path",
     )
     parser.add_argument(
+        "--qc-evidence-config",
+        type=Path,
+        default=None,
+        help="override optional QC evidence host JSON path",
+    )
+    parser.add_argument(
         "--manifest-only",
         action="store_true",
         help="validate only the manifest shape and host accelerator policy",
@@ -484,12 +504,16 @@ def main() -> int:
         metrics_config = args.metrics_config or resolve_repo_path(
             config_paths.get("metrics_pipeline", "config/metrics_pipeline.json")
         )
+        qc_evidence_config = args.qc_evidence_config or resolve_repo_path(
+            config_paths.get("qc_evidence", "config/qc_evidence.json")
+        )
         results.append(
             validate_runtime_configs(
                 manifest,
                 intake_config_path=intake_config,
                 segmentation_config_path=segmentation_config,
                 metrics_config_path=metrics_config,
+                qc_evidence_config_path=qc_evidence_config,
             )
         )
 

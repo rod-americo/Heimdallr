@@ -125,6 +125,27 @@ class TestHostStackManifest(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertTrue(any("metrics max_parallel_jobs=4" in error for error in result.errors))
 
+    def test_qc_evidence_config_requires_boolean_enabled(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            segmentation_path = write_json(
+                tmp_path / "segmentation.json",
+                self.segmentation_config(device="cpu"),
+            )
+            metrics_path = write_json(tmp_path / "metrics.json", self.metrics_config())
+            qc_path = write_json(
+                tmp_path / "qc.json",
+                {"schema_version": 1, "enabled": "yes", "execution": {"max_attempts": 2}},
+            )
+            result = check_host_stack_manifest.validate_runtime_configs(
+                self.base_manifest(kind="cpu", allowed_devices=["cpu"]),
+                segmentation_config_path=segmentation_path,
+                metrics_config_path=metrics_path,
+                qc_evidence_config_path=qc_path,
+            )
+        self.assertFalse(result.ok)
+        self.assertIn("qc_evidence.enabled must be boolean", result.errors)
+
 
 if __name__ == "__main__":
     unittest.main()

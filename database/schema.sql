@@ -170,6 +170,86 @@ CREATE TABLE IF NOT EXISTS integration_delivery_queue (
 );
 
 -- ============================================================
+-- Optional multi-acquisition QC evidence
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS qc_study_analyses (
+    analysis_id TEXT PRIMARY KEY,
+    study_uid TEXT NOT NULL,
+    case_id TEXT NOT NULL,
+    analysis_version INTEGER NOT NULL,
+    fingerprint TEXT NOT NULL,
+    schema_version INTEGER NOT NULL DEFAULT 1,
+    policy_signature TEXT NOT NULL,
+    status TEXT NOT NULL,
+    qc_resolution_json TEXT NOT NULL,
+    pipeline_version TEXT,
+    model_versions_json TEXT,
+    coverage_json TEXT,
+    error TEXT,
+    artifacts_purged INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL,
+    completed_at TIMESTAMP,
+    UNIQUE(study_uid, fingerprint, policy_signature),
+    UNIQUE(study_uid, analysis_version)
+);
+
+CREATE TABLE IF NOT EXISTS qc_series (
+    analysis_id TEXT NOT NULL,
+    series_uid TEXT NOT NULL,
+    acquisition_id TEXT,
+    segmentation_status TEXT NOT NULL DEFAULT 'not_segmented',
+    payload_json TEXT NOT NULL,
+    PRIMARY KEY(analysis_id, series_uid)
+);
+
+CREATE TABLE IF NOT EXISTS qc_acquisitions (
+    analysis_id TEXT NOT NULL,
+    acquisition_id TEXT NOT NULL,
+    representative_series_uid TEXT,
+    segmentation_status TEXT NOT NULL DEFAULT 'not_segmented',
+    payload_json TEXT NOT NULL,
+    error TEXT,
+    PRIMARY KEY(analysis_id, acquisition_id)
+);
+
+CREATE TABLE IF NOT EXISTS qc_anatomy_evidence (
+    analysis_id TEXT NOT NULL,
+    acquisition_id TEXT NOT NULL,
+    anatomy_key TEXT NOT NULL,
+    state TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    PRIMARY KEY(analysis_id, acquisition_id, anatomy_key)
+);
+
+CREATE TABLE IF NOT EXISTS qc_consolidated_provenance (
+    analysis_id TEXT NOT NULL,
+    anatomy_key TEXT NOT NULL,
+    state TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    PRIMARY KEY(analysis_id, anatomy_key)
+);
+
+CREATE TABLE IF NOT EXISTS qc_segmentation_queue (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    analysis_id TEXT NOT NULL,
+    acquisition_id TEXT NOT NULL,
+    case_id TEXT NOT NULL,
+    series_uid TEXT NOT NULL,
+    input_path TEXT NOT NULL,
+    output_path TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    attempts INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP,
+    claimed_at TIMESTAMP,
+    claim_heartbeat_at TIMESTAMP,
+    finished_at TIMESTAMP,
+    error TEXT,
+    UNIQUE(analysis_id, acquisition_id)
+);
+
+-- ============================================================
 -- Resource Monitor Samples: resident memory telemetry snapshots
 -- ============================================================
 
@@ -228,6 +308,8 @@ CREATE INDEX IF NOT EXISTS idx_metrics_queue_status_created ON metrics_queue(sta
 CREATE INDEX IF NOT EXISTS idx_dicom_egress_queue_status_next_attempt ON dicom_egress_queue(status, next_attempt_at, created_at);
 CREATE INDEX IF NOT EXISTS idx_integration_dispatch_queue_status_next_attempt ON integration_dispatch_queue(status, next_attempt_at, created_at);
 CREATE INDEX IF NOT EXISTS idx_integration_delivery_queue_status_next_attempt ON integration_delivery_queue(status, next_attempt_at, created_at);
+CREATE INDEX IF NOT EXISTS idx_qc_study_analyses_study_version ON qc_study_analyses(study_uid, analysis_version DESC);
+CREATE INDEX IF NOT EXISTS idx_qc_segmentation_queue_status_created ON qc_segmentation_queue(status, created_at, id);
 CREATE INDEX IF NOT EXISTS idx_resource_monitor_samples_service_time ON resource_monitor_samples(service_slug, sampled_at);
 CREATE INDEX IF NOT EXISTS idx_resource_monitor_samples_time ON resource_monitor_samples(sampled_at);
 CREATE INDEX IF NOT EXISTS idx_resource_monitor_case_peaks_case_stage ON resource_monitor_case_peaks(case_id, stage);

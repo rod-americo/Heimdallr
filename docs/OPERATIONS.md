@@ -38,6 +38,7 @@ cp config/dicom_egress.example.json config/dicom_egress.json
 cp config/presentation.example.json config/presentation.json
 cp config/space_manager.example.json config/space_manager.json
 cp config/resource_monitor.example.json config/resource_monitor.json
+cp config/qc_evidence.example.json config/qc_evidence.json
 ```
 
 ### Primary Boot
@@ -180,7 +181,28 @@ Ignored host-local config:
 - `config/presentation.json`
 - `config/space_manager.json`
 - `config/resource_monitor.json`
+- `config/qc_evidence.json`
 - `config/host_stack/*.json`
+
+### Optional QC evidence mode
+
+QC evidence is disabled when `config/qc_evidence.json` is missing. To set a
+host default, copy `config/qc_evidence.example.json`, keep it host-local, and
+set `enabled` explicitly. `/upload` and `/jobs` may override that default with
+multipart `qc_evidence=true` or `qc_evidence=false`; listener DICOM handoffs
+always inherit the host default.
+
+An API override of `true` on a host without this file reuses the enabled
+`total` task and device arguments from the active segmentation profile. QC work
+is lower priority than primary segmentation and does not run metrics or DICOM
+egress. Protect these HTTP endpoints at the gateway/network boundary because
+the control plane has no built-in authentication and the override can consume
+accelerator capacity.
+
+Restart `prepare`, `segmentation`, and `control_plane` after changing QC code
+or configuration. Restart `space_manager` when deploying the QC purge changes.
+Do not enable the default or restart services on `ms-heimdallr` during routine
+synchronization. On `thor`, retain the GPU segmentation profile for QC smoke.
 
 When `resource_monitor` samples services installed as user-scoped systemd units, prefix the unit name with `user:` in `config/resource_monitor.json`, for example `user:heimdallr-segmentation.service`. Unprefixed names are read from the system systemd manager.
 
@@ -193,7 +215,7 @@ oldest purge-eligible study directories until all enabled limits are satisfied:
 - `max_resident_studies`: maximum resident study directories; set `0` to disable.
 - `max_case_age_days`: maximum study directory age by mtime; set `0` to disable.
 
-Active queue items in segmentation, metrics, or DICOM egress remain protected
+Active queue items in primary/QC segmentation, metrics, or DICOM egress remain protected
 from purge while their queue status is `pending` or `claimed`.
 
 Project presentation default:
@@ -455,7 +477,8 @@ manifest-only validation:
   --manifest-only
 ```
 
-The guardrail fails when the active segmentation profile uses a device outside
+The guardrail reports and validates the optional QC config in addition to the
+active profiles. It fails when the active segmentation profile uses a device outside
 the host policy, when segmentation concurrency exceeds the host limit, or when
 metrics parallelism exceeds the host limit.
 

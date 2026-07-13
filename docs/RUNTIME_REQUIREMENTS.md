@@ -62,6 +62,12 @@ cp config/segmentation_pipeline.gpu.example.json config/segmentation_pipeline.js
 
 `config/segmentation_pipeline.json` is ignored because it is operational host state. Restart the segmentation worker after changing it. The CPU-first `config/segmentation_pipeline.example.json` remains a conservative portable example and should not be used for large Thor smoke runs.
 
+Optional multi-acquisition QC uses ignored `config/qc_evidence.json`, created
+from `config/qc_evidence.example.json`. Missing means the host default is
+disabled. API submissions may override the boolean, in which case the active
+segmentation profile must expose an enabled `total` task on a host-allowed
+device.
+
 ## 3. Git Parity Rule: Local and Thor
 
 Before using `thor` for code tests, local and `thor` must point at the same branch and commit, with no unexpected worktree changes.

@@ -15,6 +15,7 @@ router = APIRouter(prefix="/ops", tags=["ops"])
 
 QUEUE_TABLES = {
     "segmentation": "segmentation_queue",
+    "qc_segmentation": "qc_segmentation_queue",
     "metrics": "metrics_queue",
     "integration_delivery": "integration_delivery_queue",
     "dicom_egress": "dicom_egress_queue",
@@ -85,6 +86,8 @@ async def queue_capacity(db=Depends(get_db)):
             "segmentation_active": int(segmentation["active"]),
             "segmentation_pending": int(segmentation["pending"]),
             "segmentation_claimed": int(segmentation["claimed"]),
+            "qc_evidence_host_default_enabled": bool(settings.QC_EVIDENCE_ENABLED),
+            "qc_segmentation_active": int(queues["qc_segmentation"]["active"]),
         },
         "queues": queues,
     }

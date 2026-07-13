@@ -18,6 +18,7 @@ Includes:
 - DICOM egress, HTTP integration dispatch, and final package delivery.
 - FastAPI dashboard/API and Textual operations dashboard.
 - Non-identifying queue capacity API for external feeders.
+- Opt-in, versioned multi-acquisition anatomy evidence for external QC consumers.
 - Runtime storage guard and resource monitor services.
 
 Does not include:
@@ -97,7 +98,7 @@ geometry summary, conversion, metadata persistence, `id.json` creation,
 source DICOM series preservation, dispatch enqueue, segmentation enqueue.
 - `heimdallr/segmentation/worker.py`: queue claiming, coverage/thickness-aware
 selected-series reuse, TotalSegmentator tasks, canonical NIfTI materialization,
-metrics enqueue.
+metrics enqueue, and lower-priority QC acquisition segmentation.
 - `heimdallr/metrics/worker.py`: metrics profile loading, job dependency graph,
 deterministic job execution, artifacts, DICOM egress enqueue, final delivery enqueue.
 - `heimdallr/dicom_egress/worker.py`: outbound C-STORE retry worker pool.
@@ -186,6 +187,14 @@ state to operators.
 8. `space_manager` and `resource_monitor` provide operational guardrails around
 storage and memory.
 
+When QC evidence resolves enabled, `prepare` additionally fingerprints the
+complete DICOM inventory, versions a study analysis, classifies every series,
+groups CT reconstructions into acquisitions, and enqueues one representative
+per segmentable acquisition. The segmentation service drains those items only
+after the primary queue and runs the `total` task without metrics or egress.
+The public `/api/v1/studies` routes read normalized QC tables. `/upload` and
+`/jobs` can override the host boolean; listener handoffs cannot.
+
 ## 6. Contracts and Invariants
 
 - canonical input: DICOM study instances or ZIP study payload.
@@ -227,6 +236,11 @@ SQLite queue tables include:
 - `integration_dispatch_queue`
 - `integration_delivery_queue`
 - `dicom_egress_queue`
+- `qc_segmentation_queue` (optional per-acquisition evidence work)
+
+Versioned QC state is normalized across `qc_study_analyses`, `qc_series`,
+`qc_acquisitions`, and `qc_anatomy_evidence`. Its files live below
+`runtime/studies/<case_id>/evidence/<analysis_id>/`.
 
 ## 8. Configuration
 
@@ -245,6 +259,7 @@ Configuration sources:
   - `config/presentation.json`
   - `config/space_manager.json`
   - `config/resource_monitor.json`
+  - `config/qc_evidence.json`
   - `config/host_stack/*.json`
 
 `.env` files and `python-dotenv` are not part of the architecture.

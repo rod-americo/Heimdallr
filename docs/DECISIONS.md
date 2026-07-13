@@ -15,6 +15,36 @@ Each decision should include:
 
 ## Decisions
 
+### 2026-07-13 - Keep multi-acquisition QC opt-in and independent
+
+**Context**
+
+Whole-study anatomy evidence can require several additional TotalSegmentator
+runs. Enabling it implicitly on every intake would unexpectedly multiply GPU
+or CPU use, especially on `ms-heimdallr`, while external API consumers need a
+way to request the evidence for a specific submission.
+
+**Decision**
+
+Use a host-local disabled-by-default QC setting with tri-state overrides on
+`/upload` and `/jobs`. An explicit API boolean takes precedence; omission and
+listener handoffs inherit the host default. Run only `total` on one CT
+representative per acquisition in a separate lower-priority queue. Keep the
+primary selected-series metrics, artifact, and callback pipeline unchanged.
+
+**Impact**
+
+- Routine DICOM intake does not acquire new compute cost unless its host opts in.
+- API callers can force or suppress QC per submission and receive analysis provenance.
+- QC failures do not fail the primary case, and `case.completed` may precede QC completion.
+
+**Tradeoff**
+
+Consumers that need a terminal QC result must poll the versioned evidence API;
+the primary callback intentionally does not wait for independent acquisition work.
+
+---
+
 ### 2026-07-13 - Exclude sub-4 mm hepatic lesion components
 
 **Context**
