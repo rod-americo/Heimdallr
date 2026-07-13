@@ -15,6 +15,39 @@ Each decision should include:
 
 ## Decisions
 
+### 2026-07-13 - Exclude sub-4 mm hepatic lesion components
+
+**Context**
+
+The task-specific hepatic lesion mask can contain very small connected
+components that are not useful as positive findings. The final liver mask can
+also undersegment a true subcapsular lesion, so the existing one-voxel overlap
+criterion remains preferable to containment or overlap-fraction thresholds.
+
+**Decision**
+
+Keep a component when at least one voxel intersects `total/liver.nii.gz`, then
+require a maximum boundary-to-boundary axial Feret diameter of at least 4 mm.
+Measure the diameter from physical pixel spacing across every axial contour.
+Record it in `measurement.anatomical_qc` for audit, but do not display it in the
+overlay or add it to the public eligible-component measurements.
+
+**Impact**
+
+- Components below 4 mm do not affect positive status, aggregates, overlays,
+  or DICOM exports; a component measuring exactly 4 mm remains eligible.
+- A partially extrahepatic component remains eligible when any voxel overlaps
+  the liver and the size criterion passes.
+- Metrics workers must restart before resident processing uses the filter.
+
+**Tradeoff**
+
+Axial Feret diameter matches the intended QC and is inexpensive, but it can be
+smaller than an oblique three-dimensional diameter. Boundary measurements also
+remain limited by source voxel resolution.
+
+---
+
 ### 2026-07-12 - Exclude pulmonary nodule components outside final lung masks
 
 **Context**

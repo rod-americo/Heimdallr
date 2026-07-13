@@ -102,14 +102,15 @@ class TestLiverLesionsJob(unittest.TestCase):
     def test_positive_components_generate_spatial_secondary_capture_series(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             case_dir = Path(tmpdir) / "CaseLiverPositive"
-            shape = (16, 16, 10)
+            shape = (20, 20, 10)
             ct = np.full(shape, 60.0, dtype=np.float32)
             liver = np.zeros(shape)
             liver[2:14, 2:14, 1:9] = 1
             lesions = np.zeros(shape)
             lesions[0:1, 0:1, 8:9] = 1
-            lesions[4:6, 4:6, 2:3] = 1
-            lesions[9:12, 9:12, 6:8] = 1
+            lesions[4:8, 4:8, 2:3] = 1
+            lesions[3:4, 10:11, 5:6] = 1
+            lesions[11:16, 9:14, 6:8] = 1
             write_nifti(case_dir / "derived" / "CaseLiverPositive.nii.gz", ct)
             write_nifti(case_dir / "artifacts" / "total" / "liver.nii.gz", liver)
             write_nifti(
@@ -129,17 +130,30 @@ class TestLiverLesionsJob(unittest.TestCase):
             measurement = payload["measurement"]
             self.assertTrue(measurement["has_hepatic_lesion"])
             self.assertEqual(measurement["lesion_component_count"], 2)
-            self.assertEqual(measurement["lesion_voxel_count"], 22)
+            self.assertEqual(measurement["lesion_voxel_count"], 66)
             qc = measurement["anatomical_qc"]
-            self.assertEqual(qc["raw_component_count"], 3)
+            self.assertEqual(qc["method"], "liver_intersection_and_axial_feret_diameter")
+            self.assertEqual(qc["diameter_method"], "maximum_axial_feret_boundary_to_boundary")
+            self.assertEqual(qc["minimum_axial_diameter_mm"], 4.0)
+            self.assertEqual(qc["raw_component_count"], 4)
             self.assertEqual(qc["eligible_component_count"], 2)
-            self.assertEqual(qc["excluded_component_count"], 1)
-            self.assertEqual(qc["raw_voxel_count"], 23)
-            self.assertEqual(qc["eligible_voxel_count"], 22)
-            self.assertEqual(qc["excluded_voxel_count"], 1)
+            self.assertEqual(qc["excluded_component_count"], 2)
+            self.assertEqual(qc["raw_voxel_count"], 68)
+            self.assertEqual(qc["eligible_voxel_count"], 66)
+            self.assertEqual(qc["excluded_voxel_count"], 2)
             excluded = [component for component in qc["components"] if not component["eligible"]]
-            self.assertEqual(len(excluded), 1)
-            self.assertEqual(excluded[0]["reason"], "outside_total_liver")
+            self.assertEqual(
+                {component["reason"] for component in excluded},
+                {"outside_total_liver", "below_minimum_axial_diameter"},
+            )
+            partial_overlap = [
+                component
+                for component in qc["components"]
+                if component["eligible"] and component["liver_overlap_fraction"] < 1.0
+            ]
+            self.assertEqual(len(partial_overlap), 1)
+            self.assertGreaterEqual(partial_overlap[0]["maximum_axial_diameter_mm"], 4.0)
+            self.assertNotIn("maximum_axial_diameter_mm", measurement["components"][0])
             self.assertEqual([item["slice_index"] for item in payload["dicom_exports"]], [2, 6])
             datasets = [pydicom.dcmread(case_dir / item["path"]) for item in payload["dicom_exports"]]
             self.assertEqual(len({str(dataset.SeriesInstanceUID) for dataset in datasets}), 1)
@@ -182,6 +196,35 @@ class TestLiverLesionsJob(unittest.TestCase):
             self.assertEqual(measurement["anatomical_qc"]["excluded_component_count"], 1)
             self.assertNotIn("dicom_exports", payload)
             self.assertNotIn("component_overlays", payload["artifacts"])
+
+    def test_four_mm_axial_diameter_is_eligible_but_smaller_is_excluded(self):
+        labeled = np.zeros((5, 5, 2), dtype=np.uint8)
+        labeled[1:3, 1:3, 0] = 1
+        liver = labeled.astype(bool)
+        components = [{"component_id": 1, "voxel_count": 4}]
+
+        with patch.object(liver_lesions, "_maximum_axial_diameter_mm", return_value=4.0):
+            eligible, audit = liver_lesions._apply_liver_overlap_qc(
+                labeled,
+                components,
+                liver,
+                (1.0, 1.0, 1.0),
+            )
+        self.assertEqual(len(eligible), 1)
+        self.assertTrue(audit["components"][0]["eligible"])
+
+        with patch.object(liver_lesions, "_maximum_axial_diameter_mm", return_value=3.999):
+            eligible, audit = liver_lesions._apply_liver_overlap_qc(
+                labeled,
+                components,
+                liver,
+                (1.0, 1.0, 1.0),
+            )
+        self.assertEqual(eligible, [])
+        self.assertEqual(
+            audit["components"][0]["reason"],
+            "below_minimum_axial_diameter",
+        )
 
 
 if __name__ == "__main__":

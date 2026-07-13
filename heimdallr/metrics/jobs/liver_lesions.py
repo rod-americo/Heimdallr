@@ -17,6 +17,8 @@ import numpy as np
 from PIL import Image
 from pydicom.uid import generate_uid
 from scipy.ndimage import label as ndlabel
+from scipy.spatial import ConvexHull, QhullError, distance
+from skimage.measure import find_contours
 
 from heimdallr.metrics.jobs._bone_job_common import (
     display_aspect_from_spacing_mm,
@@ -55,6 +57,7 @@ SERIES_NUMBER = 9132
 SOFT_TISSUE_WINDOW_LEVEL_HU = 60.0
 SOFT_TISSUE_WINDOW_WIDTH_HU = 400.0
 SOFT_TISSUE_WINDOW_LIMITS_HU = (-140.0, 260.0)
+MINIMUM_AXIAL_DIAMETER_MM = 4.0
 
 
 def _relpath(case_dir: Path, path: Path) -> str:
@@ -124,10 +127,36 @@ def _label_components(mask: np.ndarray, voxel_volume_cm3: float) -> tuple[np.nda
     return labeled, components
 
 
+def _maximum_axial_diameter_mm(
+    component_mask: np.ndarray,
+    spacing_xy_mm: tuple[float, float],
+) -> float:
+    maximum_diameter_mm = 0.0
+    spacing = np.asarray(spacing_xy_mm, dtype=float)
+    for slice_index in np.flatnonzero(np.any(component_mask, axis=(0, 1))):
+        axial_mask = np.asarray(component_mask[:, :, int(slice_index)], dtype=np.uint8)
+        contours = find_contours(np.pad(axial_mask, 1), level=0.5)
+        if not contours:
+            continue
+        points_mm = np.concatenate(contours, axis=0)
+        points_mm = (points_mm - 1.0) * spacing
+        if points_mm.shape[0] < 2:
+            continue
+        if points_mm.shape[0] > 2:
+            try:
+                points_mm = points_mm[ConvexHull(points_mm).vertices]
+            except QhullError:
+                pass
+        diameter_mm = float(np.max(distance.pdist(points_mm)))
+        maximum_diameter_mm = max(maximum_diameter_mm, diameter_mm)
+    return maximum_diameter_mm
+
+
 def _apply_liver_overlap_qc(
     labeled: np.ndarray,
     components: list[dict[str, Any]],
     liver_mask: np.ndarray,
+    spacing_xyz_mm: tuple[float, float, float],
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     eligible_components: list[dict[str, Any]] = []
     component_audit: list[dict[str, Any]] = []
@@ -137,15 +166,28 @@ def _apply_liver_overlap_qc(
         voxel_count = int(component["voxel_count"])
         overlap_voxel_count = int(np.count_nonzero(component_mask & liver_mask))
         overlap_fraction = float(overlap_voxel_count / voxel_count) if voxel_count else 0.0
-        eligible = bool(overlap_voxel_count)
+        maximum_axial_diameter_mm = _maximum_axial_diameter_mm(
+            component_mask,
+            spacing_xyz_mm[:2],
+        )
+        eligible = bool(overlap_voxel_count) and (
+            maximum_axial_diameter_mm >= MINIMUM_AXIAL_DIAMETER_MM
+        )
+        if not overlap_voxel_count:
+            reason = "outside_total_liver"
+        elif maximum_axial_diameter_mm < MINIMUM_AXIAL_DIAMETER_MM:
+            reason = "below_minimum_axial_diameter"
+        else:
+            reason = "meets_liver_overlap_and_size_qc"
         component_audit.append(
             {
                 "component_id": component_id,
                 "voxel_count": voxel_count,
                 "liver_overlap_voxel_count": overlap_voxel_count,
                 "liver_overlap_fraction": overlap_fraction,
+                "maximum_axial_diameter_mm": maximum_axial_diameter_mm,
                 "eligible": eligible,
-                "reason": "intersects_total_liver" if eligible else "outside_total_liver",
+                "reason": reason,
             }
         )
         if eligible:
@@ -160,9 +202,11 @@ def _apply_liver_overlap_qc(
         for component in eligible_components
     )
     return eligible_components, {
-        "method": "connected_component_intersection_with_total_liver",
+        "method": "liver_intersection_and_axial_feret_diameter",
         "source_mask": "artifacts/total/liver.nii.gz",
         "minimum_overlap_voxels": 1,
+        "diameter_method": "maximum_axial_feret_boundary_to_boundary",
+        "minimum_axial_diameter_mm": MINIMUM_AXIAL_DIAMETER_MM,
         "raw_component_count": len(components),
         "eligible_component_count": len(eligible_components),
         "excluded_component_count": len(components) - len(eligible_components),
@@ -296,6 +340,7 @@ def main() -> int:
             labeled,
             raw_components,
             liver_mask,
+            spacing_xyz,
         )
         voxel_count = sum(int(component["voxel_count"]) for component in components)
         has_lesion = bool(voxel_count)
