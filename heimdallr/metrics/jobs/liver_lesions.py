@@ -58,6 +58,7 @@ SOFT_TISSUE_WINDOW_LEVEL_HU = 60.0
 SOFT_TISSUE_WINDOW_WIDTH_HU = 400.0
 SOFT_TISSUE_WINDOW_LIMITS_HU = (-140.0, 260.0)
 MINIMUM_AXIAL_DIAMETER_MM = 4.0
+MINIMUM_LIVER_OVERLAP_FRACTION = 0.5
 
 
 def _relpath(case_dir: Path, path: Path) -> str:
@@ -170,11 +171,13 @@ def _apply_liver_overlap_qc(
             component_mask,
             spacing_xyz_mm[:2],
         )
-        eligible = bool(overlap_voxel_count) and (
+        eligible = overlap_fraction >= MINIMUM_LIVER_OVERLAP_FRACTION and (
             maximum_axial_diameter_mm >= MINIMUM_AXIAL_DIAMETER_MM
         )
         if not overlap_voxel_count:
             reason = "outside_total_liver"
+        elif overlap_fraction < MINIMUM_LIVER_OVERLAP_FRACTION:
+            reason = "below_minimum_liver_overlap_fraction"
         elif maximum_axial_diameter_mm < MINIMUM_AXIAL_DIAMETER_MM:
             reason = "below_minimum_axial_diameter"
         else:
@@ -202,9 +205,9 @@ def _apply_liver_overlap_qc(
         for component in eligible_components
     )
     return eligible_components, {
-        "method": "liver_intersection_and_axial_feret_diameter",
+        "method": "liver_overlap_fraction_and_axial_feret_diameter",
         "source_mask": "artifacts/total/liver.nii.gz",
-        "minimum_overlap_voxels": 1,
+        "minimum_liver_overlap_fraction": MINIMUM_LIVER_OVERLAP_FRACTION,
         "diameter_method": "maximum_axial_feret_boundary_to_boundary",
         "minimum_axial_diameter_mm": MINIMUM_AXIAL_DIAMETER_MM,
         "raw_component_count": len(components),

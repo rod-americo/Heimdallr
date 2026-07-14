@@ -15,6 +15,42 @@ Each decision should include:
 
 ## Decisions
 
+### 2026-07-14 - Require half-mask liver overlap for hepatic lesions
+
+**Context**
+
+The previous anatomical gate accepted a hepatic lesion component when a single
+voxel intersected the final liver mask. That protected subcapsular findings
+from liver undersegmentation, but it also allowed a predominantly extrahepatic
+prediction to affect the public result and presentation artifacts.
+
+**Decision**
+
+Require at least 50% of each connected lesion component's voxels to intersect
+`total/liver.nii.gz`; exactly 50% remains eligible. Apply this anatomical gate
+before the existing 4 mm maximum axial Feret diameter gate. When a component
+passes both gates, retain its complete predicted extent rather than clipping it
+to the liver mask. Record the threshold, measured overlap fraction, diameter,
+and exclusion reason in `measurement.anatomical_qc`.
+
+**Impact**
+
+- Predominantly extrahepatic components no longer affect positive status,
+  aggregates, overlays, or DICOM exports.
+- Components with at least half of their voxels in the liver continue through
+  the existing size QC with their full extent.
+- Metrics workers on hosts where `liver_lesions` is enabled must restart before
+  resident processing uses the filter. The module remains disabled on
+  `ms-heimdallr`.
+
+**Tradeoff**
+
+A true subcapsular lesion can be excluded if the final liver segmentation
+misses more than half of its predicted extent. The explicit threshold is more
+selective and auditable than the former one-voxel intersection rule.
+
+---
+
 ### 2026-07-13 - Pipeline CT preparation with shared accelerator admission
 
 **Context**
@@ -163,6 +199,9 @@ the primary callback intentionally does not wait for independent acquisition wor
 
 ### 2026-07-13 - Exclude sub-4 mm hepatic lesion components
 
+_The overlap rule in this decision was superseded on 2026-07-14 by the minimum
+50% liver-overlap requirement; the 4 mm axial size gate remains active._
+
 **Context**
 
 The task-specific hepatic lesion mask can contain very small connected
@@ -227,6 +266,8 @@ subpleural nodules and require separate validation.
 ---
 
 ### 2026-07-12 - Exclude hepatic lesion components outside the final liver mask
+
+_Superseded on 2026-07-14 by the minimum 50% liver-overlap requirement._
 
 **Context**
 

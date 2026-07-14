@@ -255,6 +255,9 @@ Host-scoped hepatic lesion processing:
 - In automatic CT mode, a positive `total/liver.nii.gz` inventory entry selects
   the `liver_lesions` task and metrics job. An absent or empty liver mask skips
   the additional model.
+- Hepatic lesion QC keeps a connected component only when at least 50% of its
+  voxels overlap `total/liver.nii.gz` and its maximum axial Feret diameter is
+  at least 4 mm. The complete component is retained after it passes both gates.
 - Restart segmentation and metrics after changing either host-local profile.
 
 ## 5. Minimum Validation

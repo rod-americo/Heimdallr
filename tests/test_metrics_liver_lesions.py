@@ -109,6 +109,7 @@ class TestLiverLesionsJob(unittest.TestCase):
             lesions = np.zeros(shape)
             lesions[0:1, 0:1, 8:9] = 1
             lesions[4:8, 4:8, 2:3] = 1
+            lesions[12:17, 4:9, 4:5] = 1
             lesions[3:4, 10:11, 5:6] = 1
             lesions[11:16, 9:14, 6:8] = 1
             write_nifti(case_dir / "derived" / "CaseLiverPositive.nii.gz", ct)
@@ -132,19 +133,27 @@ class TestLiverLesionsJob(unittest.TestCase):
             self.assertEqual(measurement["lesion_component_count"], 2)
             self.assertEqual(measurement["lesion_voxel_count"], 66)
             qc = measurement["anatomical_qc"]
-            self.assertEqual(qc["method"], "liver_intersection_and_axial_feret_diameter")
+            self.assertEqual(
+                qc["method"],
+                "liver_overlap_fraction_and_axial_feret_diameter",
+            )
+            self.assertEqual(qc["minimum_liver_overlap_fraction"], 0.5)
             self.assertEqual(qc["diameter_method"], "maximum_axial_feret_boundary_to_boundary")
             self.assertEqual(qc["minimum_axial_diameter_mm"], 4.0)
-            self.assertEqual(qc["raw_component_count"], 4)
+            self.assertEqual(qc["raw_component_count"], 5)
             self.assertEqual(qc["eligible_component_count"], 2)
-            self.assertEqual(qc["excluded_component_count"], 2)
-            self.assertEqual(qc["raw_voxel_count"], 68)
+            self.assertEqual(qc["excluded_component_count"], 3)
+            self.assertEqual(qc["raw_voxel_count"], 93)
             self.assertEqual(qc["eligible_voxel_count"], 66)
-            self.assertEqual(qc["excluded_voxel_count"], 2)
+            self.assertEqual(qc["excluded_voxel_count"], 27)
             excluded = [component for component in qc["components"] if not component["eligible"]]
             self.assertEqual(
                 {component["reason"] for component in excluded},
-                {"outside_total_liver", "below_minimum_axial_diameter"},
+                {
+                    "outside_total_liver",
+                    "below_minimum_liver_overlap_fraction",
+                    "below_minimum_axial_diameter",
+                },
             )
             partial_overlap = [
                 component
@@ -224,6 +233,37 @@ class TestLiverLesionsJob(unittest.TestCase):
         self.assertEqual(
             audit["components"][0]["reason"],
             "below_minimum_axial_diameter",
+        )
+
+    def test_fifty_percent_liver_overlap_is_eligible_but_smaller_fraction_is_excluded(self):
+        labeled = np.zeros((5, 5, 2), dtype=np.uint8)
+        labeled[1:3, 1:3, 0] = 1
+        components = [{"component_id": 1, "voxel_count": 4}]
+
+        liver = np.zeros_like(labeled, dtype=bool)
+        liver[1, 1:3, 0] = True
+        with patch.object(liver_lesions, "_maximum_axial_diameter_mm", return_value=4.0):
+            eligible, audit = liver_lesions._apply_liver_overlap_qc(
+                labeled,
+                components,
+                liver,
+                (1.0, 1.0, 1.0),
+            )
+        self.assertEqual(len(eligible), 1)
+        self.assertEqual(audit["components"][0]["liver_overlap_fraction"], 0.5)
+
+        liver[1, 2, 0] = False
+        with patch.object(liver_lesions, "_maximum_axial_diameter_mm", return_value=4.0):
+            eligible, audit = liver_lesions._apply_liver_overlap_qc(
+                labeled,
+                components,
+                liver,
+                (1.0, 1.0, 1.0),
+            )
+        self.assertEqual(eligible, [])
+        self.assertEqual(
+            audit["components"][0]["reason"],
+            "below_minimum_liver_overlap_fraction",
         )
 
 
