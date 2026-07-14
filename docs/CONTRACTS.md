@@ -187,7 +187,8 @@ Resident services own concurrency independently:
 
 - `prepare_watchdog.max_parallel_cases` controls studies prepared concurrently;
   `series_conversion_workers` and `phase_detection.max_parallel` control work
-  inside those studies.
+  inside those studies. Conversion and phase use separate executors; the phase
+  ceiling remains global within the prepare service.
 - `segmentation_pipeline.execution.max_parallel_cases` controls studies being
   segmented concurrently.
 - `metrics_pipeline.execution.max_parallel_cases` controls studies executing
@@ -196,6 +197,10 @@ Resident services own concurrency independently:
 
 All case-concurrency defaults are `1`. API submission concurrency does not
 override resident worker capacity.
+
+When `HEIMDALLR_ACCELERATOR_TASK_SLOTS` is positive, every GPU
+`totalseg_get_phase` and TotalSegmentator task must acquire one host-wide slot.
+All participating resident services must use the same value and runtime root.
 
 ## 7. Invariants
 
@@ -284,6 +289,11 @@ artifact and is deleted after successful prepare.
 score, auxiliary window class, and applied manufacturer hint names. Historical
 entries without these fields remain eligible through the existing phase,
 geometry, description, and kernel rules.
+- Prepared CT series may expose `PhaseDetectionSeconds` for the legacy total,
+  plus `PhaseWaitSeconds`, `PhaseExecutorWaitSeconds`,
+  `PhaseCapacityWaitSeconds`, `PhaseAcceleratorWaitSeconds`, and
+  `PhaseInferenceSeconds`. The wait fields are scheduling evidence and must not
+  be interpreted as model execution time.
 - Organ volumes should not be published when every candidate organ is missing,
 empty, or incomplete. The parenchymal overlay may still be emitted as an
 `attenuation_only` artifact when an incomplete liver provides at least 100 cm³

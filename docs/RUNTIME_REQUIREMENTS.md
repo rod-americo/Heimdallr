@@ -68,6 +68,16 @@ disabled. API submissions may override the boolean, in which case the active
 segmentation profile must expose an enabled `total` task on a host-allowed
 device.
 
+The controlled 2026-07-13 `thor` preparation benchmark selected three
+concurrent GPU phase subprocesses. Configure the prepare unit with
+`HEIMDALLR_TOTALSEG_GET_PHASE_DEVICE=gpu` and
+`HEIMDALLR_TOTALSEG_GET_PHASE_MAX_PARALLEL=3`. Configure both prepare and
+segmentation with `HEIMDALLR_ACCELERATOR_TASK_SLOTS=4`; this is a shared
+host-wide admission ceiling, not four slots per service. All participating
+services must run from the same checkout/runtime root so they contend on the
+same lock files. These values are specific to the RTX 3090 POC and must not be
+copied to CPU or MPS hosts.
+
 ## 3. Git Parity Rule: Local and Thor
 
 Before using `thor` for code tests, local and `thor` must point at the same branch and commit, with no unexpected worktree changes.
@@ -190,7 +200,8 @@ before using MPS for segmentation experiments.
   `HEIMDALLR_TOTALSEG_GET_PHASE_THREAD_LIMIT=1`, and should scale throughput
   with bounded independent subprocesses through
   `HEIMDALLR_TOTALSEG_GET_PHASE_MAX_PARALLEL`. CUDA hosts such as `thor` should
-  use `gpu`.
+  use `gpu`. Parallel phase subprocesses isolate mutable TotalSegmentator home
+  state while sharing the installed model weights.
 - TUI support requires `textual==8.1.1` in the selected venv.
 - Default presentation locale is `en_US`; use `pt_BR` only through an explicit
 host-local override or targeted i18n tests.

@@ -135,6 +135,7 @@ Critical environment variables:
 - `HEIMDALLR_TOTALSEG_GET_PHASE_TIMEOUT_SECONDS`
 - `HEIMDALLR_TOTALSEG_GET_PHASE_THREAD_LIMIT`
 - `HEIMDALLR_TOTALSEG_GET_PHASE_MAX_PARALLEL`
+- `HEIMDALLR_ACCELERATOR_TASK_SLOTS`
 - `HEIMDALLR_PREPARE_MAX_PARALLEL_CASES`
 - `HEIMDALLR_PREPARE_SERIES_CONVERSION_WORKERS`
 - `HEIMDALLR_SEGMENTATION_MAX_PARALLEL_CASES`
@@ -308,6 +309,22 @@ independent one-thread subprocesses through
 macOS remains CPU with one phase subprocess until a host explicitly selects
 MPS and its capacity.
 
+On the 32-logical-CPU, RTX 3090 `thor` POC, the controlled 2026-07-13 study
+benchmark selected GPU phase detection with three phase subprocesses. Five
+original CT series completed conversion plus phase in 41.4 seconds; a fourth
+phase subprocess did not improve wall time. Configure the `prepare` unit with
+`HEIMDALLR_TOTALSEG_GET_PHASE_DEVICE=gpu` and
+`HEIMDALLR_TOTALSEG_GET_PHASE_MAX_PARALLEL=3`. Configure both `prepare` and
+`segmentation` with `HEIMDALLR_ACCELERATOR_TASK_SLOTS=4` so phase detection and
+segmentation never exceed four combined GPU subprocesses. Do not apply these
+Thor-specific values to CPU or MPS hosts.
+
+Parallel phase subprocesses use isolated mutable TotalSegmentator homes with a
+shared read-only weights path. On Linux, Heimdallr partitions physical cores
+and SMT siblings across active phase slots to avoid PyTorch oversubscription.
+Derived/localizer series skipped from extra QC conversion remain in the full
+QC inventory.
+
 Worker capacity is configured independently. `prepare_watchdog.max_parallel_cases`
 and `series_conversion_workers` live in `config/intake_pipeline.json`;
 `segmentation_pipeline.execution.max_parallel_cases` lives in the host-local
@@ -317,7 +334,10 @@ in the host-local metrics config. Metrics profiles separately control
 names listed above. The legacy `HEIMDALLR_MAX_PARALLEL_CASES` remains a
 segmentation-only fallback; new deployments should use
 `HEIMDALLR_SEGMENTATION_MAX_PARALLEL_CASES`. Changing a worker's capacity
-requires restarting only that resident service.
+requires restarting only that resident service, except for
+`HEIMDALLR_ACCELERATOR_TASK_SLOTS`: because it is a shared host-wide ceiling,
+restart `prepare` and `segmentation` together with the same value and runtime
+root.
 
 ### Repository synchronization
 

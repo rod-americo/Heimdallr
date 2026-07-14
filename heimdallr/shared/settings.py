@@ -379,6 +379,9 @@ SEGMENTATION_MAX_PARALLEL_CASES = _config_int(
 )
 # Compatibility alias for integrations that still read the old settings symbol.
 MAX_PARALLEL_CASES = SEGMENTATION_MAX_PARALLEL_CASES
+ACCELERATOR_TASK_SLOTS = int(os.getenv("HEIMDALLR_ACCELERATOR_TASK_SLOTS", "0"))
+if ACCELERATOR_TASK_SLOTS < 0:
+    raise RuntimeError("HEIMDALLR_ACCELERATOR_TASK_SLOTS must be >= 0")
 PRESENTATION_CONFIG_PATH = Path(
     os.getenv(
         "HEIMDALLR_PRESENTATION_CONFIG",

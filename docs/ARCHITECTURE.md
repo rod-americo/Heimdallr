@@ -163,9 +163,14 @@ Future extraction should be behavior-driven and tested, not directory-first.
 3. `prepare` claims a stable ZIP, extracts it, scans DICOM metadata, persists
 the scanned instances grouped by DICOM series inside the case workspace, records
 candidate-series geometry, converts DICOM to NIfTI, writes study metadata, and
-enqueues segmentation. Its case concurrency, per-case series conversion pool,
-and phase-detector concurrency are independent prepare settings. The upload ZIP
-remains a spool transport artifact and is deleted after successful prepare.
+enqueues segmentation. CT conversion and phase detection are separate bounded
+pools: completed conversions feed the phase pool without phase capacity
+blocking remaining conversions. When QC is enabled, deterministic derived and
+localizer series remain inventoried but avoid additional conversion and phase
+work unless the primary pipeline already requires them. Its case concurrency,
+per-case series conversion pool, and phase-detector concurrency are independent
+prepare settings. The upload ZIP remains a spool transport artifact and is
+deleted after successful prepare.
 4. `segmentation` claims the case, resolves the active segmentation profile,
 deep-merges any external per-job series-selection policy, selects the target
 series, narrows TotalSegmentator tasks when an external submission requested

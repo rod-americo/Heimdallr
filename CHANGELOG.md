@@ -17,6 +17,11 @@ global profile.
 
 ### Changed
 
+- CT preparation now pipelines conversion and phase detection through separate
+  bounded pools, skips deterministic derived/localizer series from additional
+  QC conversion while retaining them in the inventory, and reports phase wait
+  separately from inference. GPU phase detection and segmentation can share an
+  optional host-wide accelerator-slot admission limit.
 - QC acquisition segmentation now enforces TotalSegmentator `total --ml` and
   stores one multilabel image per acquisition. Evidence extraction records only
   anatomy state, boundary contact, label identity, provenance, and execution

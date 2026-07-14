@@ -45,6 +45,7 @@ import numpy as np
 from heimdallr.metrics.head import HEAD_COMPONENT_MASKS, collect_mask_statuses, compute_mask_status
 from heimdallr.shared import settings
 from heimdallr.shared import store
+from heimdallr.shared.accelerator_slots import accelerator_slot
 from heimdallr.integration.delivery import enqueue_case_failed_delivery
 from heimdallr.shared.paths import (
     study_artifacts_dir,
@@ -1586,6 +1587,19 @@ def should_reuse_existing_segmentation(
         return False, None
     return True, str(row["SegmentationElapsedTime"] or "") or None
 
+def _extra_args_use_gpu(extra_args: list[str]) -> bool:
+    detected = None
+    for index, raw_value in enumerate(extra_args):
+        value = str(raw_value).strip().lower()
+        if value in {"--device", "-d"} and index + 1 < len(extra_args):
+            detected = str(extra_args[index + 1]).strip().lower().startswith("gpu")
+        elif value.startswith("--device="):
+            detected = value.partition("=")[2].startswith("gpu")
+    if detected is not None:
+        return detected
+    return sys.platform == "linux"
+
+
 def run_task(task_name, input_file, output_folder, extra_args=None, max_retries=3, log_file=None):
     """
     Execute a TotalSegmentator task with retry logic and optional log file redirection.
@@ -1634,6 +1648,8 @@ def run_task(task_name, input_file, output_folder, extra_args=None, max_retries=
             log_handle.flush()
         print(message)
 
+    slot_context = accelerator_slot(enabled=_extra_args_use_gpu(extra_args))
+    slot_context.__enter__()
     try:
         # Retry loop to handle transient race conditions on TotalSegmentator config.json
         # We don't recreate the file as it contains important state (prediction_counter, license, etc.)
@@ -1758,6 +1774,7 @@ def run_task(task_name, input_file, output_folder, extra_args=None, max_retries=
                 time.sleep(2 ** attempt)
 
     finally:
+        slot_context.__exit__(*sys.exc_info())
         if log_handle:
             log_handle.close()
 

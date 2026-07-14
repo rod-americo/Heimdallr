@@ -20,6 +20,7 @@ import datetime
 import importlib
 import json
 import os
+import queue
 import re
 import shutil
 import signal
@@ -42,6 +43,7 @@ from zoneinfo import ZoneInfo
 
 from heimdallr.shared import settings
 from heimdallr.shared import store
+from heimdallr.shared.accelerator_slots import accelerator_slot
 from heimdallr.integration.dispatch.events import build_patient_identified_event
 from heimdallr.integration.dispatch import enqueue_dispatches
 from heimdallr.integration.delivery import enqueue_case_failed_delivery
@@ -73,6 +75,8 @@ from heimdallr.shared.qc_evidence import (
     canonical_signature,
     heimdallr_version,
     new_analysis_id,
+    QC_INVENTORY_POLICY_VERSION,
+    series_kind_flags,
     study_content_fingerprint,
     totalsegmentator_version,
 )
@@ -88,6 +92,13 @@ JPEG_LOSSLESS_TRANSFER_SYNTAXES = {str(JPEGLossless), str(JPEGLosslessSV1)}
 _TOTALSEG_PHASE_SEMAPHORE = threading.BoundedSemaphore(
     max(1, int(getattr(settings, "TOTALSEG_GET_PHASE_MAX_PARALLEL", 0) or 1))
 )
+_TOTALSEG_PHASE_SLOT_COUNT = max(
+    1,
+    int(getattr(settings, "TOTALSEG_GET_PHASE_MAX_PARALLEL", 0) or 1),
+)
+_TOTALSEG_PHASE_SLOTS: queue.Queue[int] = queue.Queue()
+for _phase_slot in range(_TOTALSEG_PHASE_SLOT_COUNT):
+    _TOTALSEG_PHASE_SLOTS.put(_phase_slot)
 
 path_entries = [str(settings.TOTALSEG_BIN_DIR), str(Path(sys.executable).parent)]
 os.environ["PATH"] = os.pathsep.join(path_entries + [os.environ["PATH"]])
@@ -876,6 +887,7 @@ def _active_total_task_signature() -> dict:
         "task": total_task,
         "totalsegmentator_version": totalsegmentator_version(),
         "qc_output_contract": "total_multilabel_anatomy_states_v1",
+        "qc_inventory_policy_version": QC_INVENTORY_POLICY_VERSION,
     }
 
 
@@ -1015,11 +1027,8 @@ def prepare_qc_analysis(
     finally:
         conn.close()
 
-def process_ct_series_concurrency(uid, s_data, case_output_dir, temp_dir):
-    """
-    Helper function to process a single CT series in a thread.
-    Returns candidate dict or None if failed.
-    """
+def _convert_ct_series(uid, s_data, case_output_dir, temp_dir):
+    """Convert one CT series without occupying phase-detection capacity."""
     try:
         series_started = time.perf_counter()
         s_num = s_data["SeriesNumber"]
@@ -1049,25 +1058,11 @@ def process_ct_series_concurrency(uid, s_data, case_output_dir, temp_dir):
             return None
         convert_seconds = round(time.perf_counter() - convert_started, 3)
             
-        # Phase Detection
-        phase = "unknown"
-        phase_seconds = 0.0
-        phase_detected = False
-        if s_data["Modality"] == "CT":
-            json_path = case_output_dir / f"{storage_stem}.phase.json"
-            phase_started = time.perf_counter()
-            phase_data = run_totalseg_phase(nii_path, json_path)
-            phase_seconds = round(time.perf_counter() - phase_started, 3)
-            if phase_data:
-                phase = phase_data.get("phase", "unknown")
-                phase_detected = True
-        
-        # Return result dict
         return {
             "uid": uid,
             "series_number": s_num,
             "path": nii_path,
-            "phase_json_path": json_path if s_data["Modality"] == "CT" else None,
+            "phase_json_path": case_output_dir / f"{storage_stem}.phase.json",
             "num_slices": len(files),
             "kernel": s_data["ConvolutionKernel"].lower(),
             "kernel_raw": s_data["ConvolutionKernel"],
@@ -1085,20 +1080,158 @@ def process_ct_series_concurrency(uid, s_data, case_output_dir, temp_dir):
                     "ReconstructionAlgorithm",
                 )
             },
-            "phase": phase,
+            "phase": "unknown",
             "convert_method": conversion["method"],
             "convert_seconds": convert_seconds,
-            "phase_seconds": phase_seconds,
-            "phase_detected": phase_detected,
+            "phase_seconds": 0.0,
+            "phase_wait_seconds": 0.0,
+            "phase_executor_wait_seconds": 0.0,
+            "phase_capacity_wait_seconds": 0.0,
+            "phase_accelerator_wait_seconds": 0.0,
+            "phase_inference_seconds": 0.0,
+            "phase_detected": False,
             "geometry_summary": compute_series_geometry_summary(s_data),
-            "series_total_seconds": round(time.perf_counter() - series_started, 3),
+            "series_total_seconds": 0.0,
+            "_series_started": series_started,
         }
     except Exception as e:
         print(f"  [Error] Failed to process series {s_data.get('SeriesNumber')}: {e}")
         return None
 
 
-def _totalseg_phase_subprocess_env() -> dict[str, str]:
+def _detect_ct_series_phase(candidate, *, submitted_at=None):
+    """Characterize one converted CT series and retain explicit queue timings."""
+    executor_started = time.perf_counter()
+    executor_wait = max(0.0, executor_started - float(submitted_at or executor_started))
+    if str(candidate.get("modality") or "").upper() != "CT":
+        candidate["phase_seconds"] = 0.0
+        candidate["phase_wait_seconds"] = 0.0
+        candidate["phase_executor_wait_seconds"] = round(executor_wait, 3)
+        candidate["phase_capacity_wait_seconds"] = 0.0
+        candidate["phase_accelerator_wait_seconds"] = 0.0
+        candidate["phase_inference_seconds"] = 0.0
+        candidate["series_total_seconds"] = round(
+            time.perf_counter() - float(candidate.pop("_series_started", executor_started)),
+            3,
+        )
+        return candidate
+    timing: dict[str, float] = {}
+    phase_data = run_totalseg_phase(
+        candidate["path"],
+        candidate["phase_json_path"],
+        timing=timing,
+    )
+    capacity_wait = float(timing.get("capacity_wait_seconds", 0.0) or 0.0)
+    accelerator_wait = float(timing.get("accelerator_wait_seconds", 0.0) or 0.0)
+    inference = float(timing.get("inference_seconds", 0.0) or 0.0)
+    candidate["phase_executor_wait_seconds"] = round(executor_wait, 3)
+    candidate["phase_capacity_wait_seconds"] = round(capacity_wait, 3)
+    candidate["phase_accelerator_wait_seconds"] = round(accelerator_wait, 3)
+    candidate["phase_wait_seconds"] = round(
+        executor_wait + capacity_wait + accelerator_wait,
+        3,
+    )
+    candidate["phase_inference_seconds"] = round(inference, 3)
+    candidate["phase_seconds"] = round(
+        executor_wait + capacity_wait + accelerator_wait + inference,
+        3,
+    )
+    if phase_data:
+        candidate["phase"] = phase_data.get("phase", "unknown")
+        candidate["phase_detected"] = True
+    candidate["series_total_seconds"] = round(
+        time.perf_counter() - float(candidate.pop("_series_started", executor_started)),
+        3,
+    )
+    return candidate
+
+
+def process_ct_series_concurrency(uid, s_data, case_output_dir, temp_dir):
+    """Backward-compatible one-series conversion and phase wrapper."""
+    candidate = _convert_ct_series(uid, s_data, case_output_dir, temp_dir)
+    if candidate is None:
+        return None
+    return _detect_ct_series_phase(candidate, submitted_at=time.perf_counter())
+
+
+def process_ct_series_batch(conversion_series_map, case_output_dir, temp_dir):
+    """Pipeline CT conversion and phase detection through independent pools."""
+    conversion_workers = max(1, int(settings.PREPARE_SERIES_CONVERSION_WORKERS))
+    phase_workers = max(1, int(settings.TOTALSEG_GET_PHASE_MAX_PARALLEL or 1))
+    candidates = []
+    with (
+        concurrent.futures.ThreadPoolExecutor(max_workers=conversion_workers) as conversion_executor,
+        concurrent.futures.ThreadPoolExecutor(max_workers=phase_workers) as phase_executor,
+    ):
+        conversion_futures = [
+            conversion_executor.submit(
+                _convert_ct_series,
+                uid,
+                series_data,
+                case_output_dir,
+                temp_dir,
+            )
+            for uid, series_data in conversion_series_map.items()
+        ]
+        phase_futures = []
+        for future in concurrent.futures.as_completed(conversion_futures):
+            candidate = future.result()
+            if candidate is None:
+                continue
+            submitted_at = time.perf_counter()
+            phase_futures.append(
+                phase_executor.submit(
+                    _detect_ct_series_phase,
+                    candidate,
+                    submitted_at=submitted_at,
+                )
+            )
+        for future in concurrent.futures.as_completed(phase_futures):
+            candidate = future.result()
+            if candidate is not None:
+                candidates.append(candidate)
+    return sorted(candidates, key=lambda item: (str(item["series_number"]), str(item["uid"])))
+
+
+def should_convert_qc_series(uid, series_data, *, primary_series_uids, exam_modality):
+    """Keep primary inputs and skip deterministic non-source QC reconstructions."""
+    if len(series_data.get("files", [])) < 2:
+        return False
+    if uid in primary_series_uids or str(exam_modality).upper() != "CT":
+        return True
+    derived, localizer = series_kind_flags(series_data)
+    return not derived and not localizer
+
+
+def _phase_cpu_partitions(count: int) -> list[list[int]]:
+    """Partition physical cores and their SMT siblings across phase slots."""
+    if sys.platform != "linux":
+        return [[] for _ in range(max(1, count))]
+    try:
+        allowed_cpus = set(os.sched_getaffinity(0))
+    except AttributeError:
+        allowed_cpus = None
+    cores: dict[tuple[int, int], list[int]] = {}
+    for cpu_path in sorted(Path("/sys/devices/system/cpu").glob("cpu[0-9]*")):
+        try:
+            cpu = int(cpu_path.name[3:])
+            if allowed_cpus is not None and cpu not in allowed_cpus:
+                continue
+            core = int((cpu_path / "topology" / "core_id").read_text())
+            package = int((cpu_path / "topology" / "physical_package_id").read_text())
+        except (FileNotFoundError, ValueError):
+            continue
+        cores.setdefault((package, core), []).append(cpu)
+    partitions = [[] for _ in range(max(1, count))]
+    for index, siblings in enumerate(sorted(cores.values(), key=lambda values: min(values))):
+        partitions[index % len(partitions)].extend(sorted(siblings))
+    return [sorted(values) for values in partitions]
+
+
+_TOTALSEG_PHASE_CPU_PARTITIONS = _phase_cpu_partitions(_TOTALSEG_PHASE_SLOT_COUNT)
+
+
+def _totalseg_phase_subprocess_env(*, isolated_home: Path | None = None) -> dict[str, str]:
     env = os.environ.copy()
     device = str(settings.TOTALSEG_GET_PHASE_DEVICE or "").strip().lower()
     thread_limit = int(getattr(settings, "TOTALSEG_GET_PHASE_THREAD_LIMIT", 0) or 0)
@@ -1112,7 +1245,34 @@ def _totalseg_phase_subprocess_env() -> dict[str, str]:
             "NUMEXPR_NUM_THREADS",
         ):
             env[name] = limit
+    if isolated_home is not None:
+        env["TOTALSEG_HOME_DIR"] = str(isolated_home)
+        env["TOTALSEG_WEIGHTS_PATH"] = str(
+            os.getenv("TOTALSEG_WEIGHTS_PATH")
+            or (
+                Path(os.getenv("TOTALSEG_HOME_DIR"))
+                if os.getenv("TOTALSEG_HOME_DIR")
+                else Path.home() / ".totalsegmentator"
+            ) / "nnunet" / "results"
+        )
     return env
+
+
+def _prepare_isolated_totalseg_home(path: Path) -> None:
+    """Copy host credentials but isolate TotalSegmentator's mutable counters."""
+    path.mkdir(parents=True, exist_ok=True)
+    source_root = Path(os.getenv("TOTALSEG_HOME_DIR") or (Path.home() / ".totalsegmentator"))
+    source = source_root / "config.json"
+    payload = {}
+    if source.exists():
+        try:
+            payload = json.loads(source.read_text(encoding="utf-8"))
+        except Exception:
+            payload = {}
+    payload.setdefault("totalseg_id", "heimdallr_phase")
+    payload["send_usage_stats"] = False
+    payload["prediction_counter"] = 0
+    (path / "config.json").write_text(json.dumps(payload), encoding="utf-8")
 
 
 def _terminate_phase_process_group(pgid: int, *, kill_after_seconds: float = 2.0) -> None:
@@ -1139,14 +1299,18 @@ def _terminate_phase_process_group(pgid: int, *, kill_after_seconds: float = 2.0
         return
 
 
-def _run_totalseg_phase_subprocess(cmd: list[str]) -> subprocess.CompletedProcess[str]:
+def _run_totalseg_phase_subprocess(
+    cmd: list[str],
+    *,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     process = subprocess.Popen(
         cmd,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
         text=True,
         start_new_session=True,
-        env=_totalseg_phase_subprocess_env(),
+        env=env or _totalseg_phase_subprocess_env(),
     )
     pgid = process.pid
     try:
@@ -1175,22 +1339,61 @@ def _run_totalseg_phase_subprocess(cmd: list[str]) -> subprocess.CompletedProces
         _terminate_phase_process_group(pgid)
 
 
-def run_totalseg_phase(input_nifti, output_json):
+def run_totalseg_phase(input_nifti, output_json, *, timing=None):
     """Runs totalseg_get_phase to detect CT contrast phase."""
     try:
-        cmd = [
+        base_cmd = [
             TOTALSEG_GET_PHASE_BIN,
             "-i", str(input_nifti),
             "-o", str(output_json),
             "-q"
         ]
         if settings.TOTALSEG_GET_PHASE_DEVICE:
-            cmd.extend(["--device", settings.TOTALSEG_GET_PHASE_DEVICE])
+            base_cmd.extend(["--device", settings.TOTALSEG_GET_PHASE_DEVICE])
+        capacity_started = time.perf_counter()
         with _TOTALSEG_PHASE_SEMAPHORE:
-            result = _run_totalseg_phase_subprocess(cmd)
-        if output_json.exists():
-            with open(output_json, 'r') as f:
-                return json.load(f)
+            capacity_wait_seconds = time.perf_counter() - capacity_started
+            slot = _TOTALSEG_PHASE_SLOTS.get()
+            try:
+                cmd = list(base_cmd)
+                partition = _TOTALSEG_PHASE_CPU_PARTITIONS[slot]
+                if _TOTALSEG_PHASE_SLOT_COUNT > 1 and partition and shutil.which("taskset"):
+                    cmd = [
+                        "taskset",
+                        "--cpu-list",
+                        ",".join(str(cpu) for cpu in partition),
+                        *cmd,
+                    ]
+                with tempfile.TemporaryDirectory(prefix="heimdallr_phase_") as phase_home_raw:
+                    phase_home = Path(phase_home_raw)
+                    _prepare_isolated_totalseg_home(phase_home)
+                    env = _totalseg_phase_subprocess_env(isolated_home=phase_home)
+                    accelerator_started = time.perf_counter()
+                    configured_device = str(settings.TOTALSEG_GET_PHASE_DEVICE or "").strip().lower()
+                    uses_gpu = configured_device.startswith("gpu") or (
+                        not configured_device and sys.platform == "linux"
+                    )
+                    with accelerator_slot(enabled=uses_gpu):
+                        accelerator_wait_seconds = time.perf_counter() - accelerator_started
+                        inference_started = time.perf_counter()
+                        try:
+                            _run_totalseg_phase_subprocess(cmd, env=env)
+                            if output_json.exists():
+                                with open(output_json, 'r') as f:
+                                    return json.load(f)
+                        finally:
+                            if timing is not None:
+                                timing["capacity_wait_seconds"] = round(capacity_wait_seconds, 6)
+                                timing["accelerator_wait_seconds"] = round(
+                                    accelerator_wait_seconds,
+                                    6,
+                                )
+                                timing["inference_seconds"] = round(
+                                    time.perf_counter() - inference_started,
+                                    6,
+                                )
+            finally:
+                _TOTALSEG_PHASE_SLOTS.put(slot)
     except subprocess.TimeoutExpired:
         print(
             f"  Warning: Phase detection timed out for {input_nifti.name} "
@@ -1298,12 +1501,18 @@ def convert_series(series_id, files_list, output_nii_path, temp_dir, *, modality
     """
     Converts a specific list of DICOM files to NIfTI.
     """
-    dcm_in = temp_dir / f"dcm_{series_id}"
+    workspace_signature = canonical_signature([str(output_nii_path.resolve()), str(series_id)])[:12]
+    dcm_in = temp_dir / f"dcm_{clean_filename(series_id)}_{workspace_signature}"
     dcm_in.mkdir(exist_ok=True)
-    for f in files_list:
-        shutil.copy(f, dcm_in)
+    for index, source in enumerate(files_list, start=1):
+        suffix = Path(source).suffix or ".dcm"
+        destination = dcm_in / f"instance_{index:06d}{suffix}"
+        try:
+            os.link(source, destination)
+        except OSError:
+            shutil.copy2(source, destination)
         
-    dcm_out = temp_dir / f"nii_{series_id}"
+    dcm_out = temp_dir / f"nii_{clean_filename(series_id)}_{workspace_signature}"
     dcm_out.mkdir(exist_ok=True)
 
     transfer_syntax_uid = _detect_series_transfer_syntax_uid(files_list)
@@ -1669,11 +1878,20 @@ def process_zip(zip_path):
         available_series = []
         conversion_series_map = series_map
         if qc_resolution.get("effective"):
+            primary_series_uids = set(series_map)
             conversion_series_map = {
                 uid: item
                 for uid, item in detected_series_map.items()
-                if len(item.get("files", [])) >= 2
+                if should_convert_qc_series(
+                    uid,
+                    item,
+                    primary_series_uids=primary_series_uids,
+                    exam_modality=exam_modality,
+                )
             }
+            prepare_stats["qc_series_skipped_before_conversion"] = (
+                len(detected_series_map) - len(conversion_series_map)
+            )
         phase_detection_available = Path(TOTALSEG_GET_PHASE_BIN).exists() or shutil.which(TOTALSEG_GET_PHASE_BIN) is not None
         prepare_stats["phase_detection_available"] = phase_detection_available
         
@@ -1777,20 +1995,16 @@ def process_zip(zip_path):
                 "  [CT Mode] Converting, preserving and characterizing all CT series "
                 f"(parallel workers: {series_workers})..."
             )
-            candidates = []
-            
-            with concurrent.futures.ThreadPoolExecutor(max_workers=series_workers) as executor:
-                futures = []
-                for uid, s_data in conversion_series_map.items():
-                    futures.append(
-                        executor.submit(process_ct_series_concurrency, uid, s_data, derived_series_dir, temp_dir)
-                    )
-                
-                for future in concurrent.futures.as_completed(futures):
-                    result = future.result()
-                    if result:
-                        candidates.append(result)
-                        print(f"    Series {result['series_number']}: {result['num_slices']} slices, Phase: {result['phase']}, Kernel: {result['kernel']}")
+            candidates = process_ct_series_batch(
+                conversion_series_map,
+                derived_series_dir,
+                temp_dir,
+            )
+            for result in candidates:
+                print(
+                    f"    Series {result['series_number']}: {result['num_slices']} slices, "
+                    f"Phase: {result['phase']}, Kernel: {result['kernel']}"
+                )
             
             if not candidates:
                  raise PrepareError("No valid CT series converted.")
@@ -1801,6 +2015,14 @@ def process_zip(zip_path):
             prepare_stats["phase_detection_successes"] = sum(1 for c in candidates if c.get("phase_detected"))
             stage_timings["convert_series_total_seconds"] = round(sum(float(c.get("convert_seconds", 0.0) or 0.0) for c in candidates), 3)
             stage_timings["phase_detection_total_seconds"] = round(sum(float(c.get("phase_seconds", 0.0) or 0.0) for c in candidates), 3)
+            stage_timings["phase_detection_wait_total_seconds"] = round(
+                sum(float(c.get("phase_wait_seconds", 0.0) or 0.0) for c in candidates),
+                3,
+            )
+            stage_timings["phase_detection_inference_total_seconds"] = round(
+                sum(float(c.get("phase_inference_seconds", 0.0) or 0.0) for c in candidates),
+                3,
+            )
             stage_timings["candidate_series_total_seconds"] = round(sum(float(c.get("series_total_seconds", 0.0) or 0.0) for c in candidates), 3)
             prepare_stats["converted_series"] = len(candidates)
             prepare_stats["fallback_converted_series"] = sum(
@@ -1826,6 +2048,11 @@ def process_zip(zip_path):
                     "DetectedPhase": candidate["phase"],
                     "PhaseDetected": candidate["phase_detected"],
                     "PhaseDetectionSeconds": candidate.get("phase_seconds", 0.0),
+                    "PhaseWaitSeconds": candidate.get("phase_wait_seconds", 0.0),
+                    "PhaseExecutorWaitSeconds": candidate.get("phase_executor_wait_seconds", 0.0),
+                    "PhaseCapacityWaitSeconds": candidate.get("phase_capacity_wait_seconds", 0.0),
+                    "PhaseAcceleratorWaitSeconds": candidate.get("phase_accelerator_wait_seconds", 0.0),
+                    "PhaseInferenceSeconds": candidate.get("phase_inference_seconds", 0.0),
                     "PhaseData": phase_data,
                     "DerivedNiftiPath": str(candidate["path"].relative_to(derived_dir)),
                     "PhaseJsonPath": str(phase_json_path.relative_to(derived_dir)) if phase_json_path and phase_json_path.exists() else None,

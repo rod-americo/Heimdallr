@@ -15,6 +15,55 @@ Each decision should include:
 
 ## Decisions
 
+### 2026-07-13 - Pipeline CT preparation with shared accelerator admission
+
+**Context**
+
+On the `thor` RTX 3090 POC, phase characterization dominated preparation when
+all CT reconstructions ran serially on CPU. A controlled study took about 271
+seconds for conversion plus phase across nine series. Five original axial
+series took 41.4 seconds with three GPU phase subprocesses; four subprocesses
+did not reduce wall time. Conversion, phase, primary segmentation, and QC
+segmentation can overlap and otherwise compete for the same GPU and memory.
+
+**Decision**
+
+Pipeline CT conversion and phase characterization through separate bounded
+executors. Keep all series in the QC inventory, but avoid additional conversion
+and phase work for deterministic derived/localizer series unless the primary
+pipeline already requires them. Isolate mutable TotalSegmentator phase state,
+partition Linux CPU affinity among concurrent phase subprocesses, and provide a
+host-wide file-lock admission ceiling shared by GPU phase and segmentation
+tasks. Keep this ceiling disabled unless a host explicitly configures it.
+
+**Impact**
+
+- A completed conversion can enter phase inference while other series continue
+  converting.
+- Legacy phase elapsed time remains available, with executor, capacity,
+  accelerator, and inference time reported independently.
+- Existing CPU and MPS hosts retain their current behavior when the shared slot
+  setting is absent.
+- Thor can use three phase subprocesses while bounding mixed phase and
+  segmentation load to four GPU processes.
+
+**Tradeoff**
+
+Host supervisors must apply the same positive slot count and runtime root to
+every participating service. The deterministic derived/localizer filter saves
+work but intentionally does not infer that those reconstructions are absent
+from the study.
+
+**Alternatives rejected**
+
+- Run every reconstruction through phase inference, which adds no independent
+  acquisition evidence for derived MPR/localizer series.
+- Use independent per-service GPU limits, which cannot bound mixed workloads.
+- Increase phase parallelism to four on Thor despite the measured lack of
+  throughput improvement.
+
+---
+
 ### 2026-07-13 - Keep aggregated L3 and VAT DICOM overlays axial-only
 
 **Context**

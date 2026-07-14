@@ -12,6 +12,7 @@ import numpy as np
 
 from heimdallr.segmentation.worker import (
     PipelineLogger,
+    _extra_args_use_gpu,
     _record_segmentation_pipeline_state,
     WorkerShutdownRequestedError,
     run_segmentation_pipeline,
@@ -19,6 +20,7 @@ from heimdallr.segmentation.worker import (
     segment_case,
     should_reuse_existing_segmentation,
 )
+from heimdallr.segmentation import worker as segmentation_worker
 from heimdallr.shared import store
 from heimdallr.shared.segmentation_inventory import build_segmentation_inventory
 
@@ -30,6 +32,15 @@ def write_nifti(path: Path, data: np.ndarray, spacing=(1.0, 1.0, 1.0)) -> None:
 
 
 class TestSegmentationReuse(unittest.TestCase):
+    def test_gpu_device_argument_detection_covers_supported_cli_forms(self):
+        self.assertTrue(_extra_args_use_gpu(["--device", "gpu"]))
+        self.assertTrue(_extra_args_use_gpu(["-d", "gpu:0"]))
+        self.assertTrue(_extra_args_use_gpu(["--device=gpu:1"]))
+        self.assertFalse(_extra_args_use_gpu(["--device", "cpu"]))
+        self.assertFalse(_extra_args_use_gpu(["--device", "cpu", "--fast"]))
+        with patch.object(segmentation_worker.sys, "platform", "linux"):
+            self.assertTrue(_extra_args_use_gpu([]))
+
     def test_build_segmentation_inventory_uses_brain_l3_and_organ_presence(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

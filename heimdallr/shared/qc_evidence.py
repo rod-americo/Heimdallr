@@ -17,6 +17,7 @@ from totalsegmentator.nifti_ext_header import load_multilabel_nifti
 
 
 SCHEMA_VERSION = 1
+QC_INVENTORY_POLICY_VERSION = 2
 ANATOMY_STATES = {
     "anatomy_not_detected",
     "anatomy_present",
@@ -183,8 +184,8 @@ def _series_equivalent(left: dict[str, Any], right: dict[str, Any], policy: dict
     return True, reasons
 
 
-def _classification(raw: dict[str, Any], converted: dict[str, Any] | None) -> dict[str, Any]:
-    modality = str(raw.get("Modality") or "OT").upper()
+def series_kind_flags(raw: dict[str, Any]) -> tuple[bool, bool]:
+    """Return deterministic derived/localizer flags from DICOM series metadata."""
     description = str(raw.get("SeriesDescriptionOriginal") or raw.get("SeriesDescription") or "")
     raw_image_type = raw.get("ImageType", [])
     if isinstance(raw_image_type, str):
@@ -193,6 +194,17 @@ def _classification(raw: dict[str, Any], converted: dict[str, Any] | None) -> di
     text = " ".join([description.upper(), *image_type])
     derived = "DERIVED" in image_type or any(token in text for token in (" MIP", "MPR", "REFORMAT"))
     localizer = any(token in text for token in ("LOCALIZER", "SCOUT", "TOPOGRAM", "SURVIEW"))
+    return derived, localizer
+
+
+def _classification(raw: dict[str, Any], converted: dict[str, Any] | None) -> dict[str, Any]:
+    modality = str(raw.get("Modality") or "OT").upper()
+    description = str(raw.get("SeriesDescriptionOriginal") or raw.get("SeriesDescription") or "")
+    raw_image_type = raw.get("ImageType", [])
+    if isinstance(raw_image_type, str):
+        raw_image_type = raw_image_type.replace("\\", ",").split(",")
+    image_type = [str(item).upper() for item in raw_image_type]
+    derived, localizer = series_kind_flags(raw)
     geometry = {
         "slice_thickness_mm": raw.get("SliceThicknessMm"),
         "spacing_between_slices_mm": raw.get("SpacingBetweenSlicesMm"),

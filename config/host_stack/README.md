@@ -39,3 +39,9 @@ The optional `config_paths.qc_evidence` entry may point to the ignored
 host-local QC config. Missing `config/qc_evidence.json` means normal intake does
 not schedule multi-acquisition QC; `/upload` and `/jobs` can still request it
 explicitly and will reuse the active segmentation profile's `total` task.
+
+The manifest validator does not inspect supervisor drop-in environments. When
+a host-wide accelerator slot ceiling is operationally enforced, verify that
+`prepare` and `segmentation` expose the same `HEIMDALLR_ACCELERATOR_TASK_SLOTS`
+value and checkout runtime root before restart; this cross-service invariant is
+owned by the host supervisor.
