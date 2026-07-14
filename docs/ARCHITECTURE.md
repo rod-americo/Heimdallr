@@ -191,7 +191,11 @@ When QC evidence resolves enabled, `prepare` additionally fingerprints the
 complete DICOM inventory, versions a study analysis, classifies every series,
 groups CT reconstructions into acquisitions, and enqueues one representative
 per segmentable acquisition. The segmentation service drains those items only
-after the primary queue and runs the `total` task without metrics or egress.
+after the primary queue and runs `total --ml` into one acquisition-local
+multilabel image without metrics or egress. Evidence extraction reads that
+image once and retains anatomy state, boundary-contact audit, label identity,
+provenance, and execution timing; quantitative mask metrics are intentionally
+outside this QC contract.
 The public `/api/v1/studies` routes read normalized QC tables. `/upload` and
 `/jobs` can override the host boolean; listener handoffs cannot.
 

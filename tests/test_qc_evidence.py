@@ -9,6 +9,7 @@ from unittest.mock import patch
 import nibabel as nib
 import numpy as np
 from fastapi.testclient import TestClient
+from totalsegmentator.nifti_ext_header import add_label_map_to_nifti
 
 from heimdallr.control_plane.app import create_app
 from heimdallr.integration.submissions import (
@@ -23,7 +24,7 @@ from heimdallr.shared.dependencies import get_db
 from heimdallr.shared.qc_evidence import (
     build_inventory,
     consolidate_coverage,
-    inventory_total_masks,
+    inventory_total_multilabel,
     study_content_fingerprint,
 )
 
@@ -192,25 +193,30 @@ class TestQcDomain(unittest.TestCase):
         self.assertIn("no_configured_mr_segmenter", series[0]["classification_reasons"])
         self.assertEqual(acquisitions[0]["segmentation_status"], "not_segmentable")
 
-    def test_mask_inventory_distinguishes_complete_truncated_and_absent(self):
+    def test_multilabel_inventory_distinguishes_complete_truncated_and_absent(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             reference_path = root / "reference.nii.gz"
-            total_dir = root / "total"
-            total_dir.mkdir()
+            multilabel_path = root / "total_multilabel.nii.gz"
             affine = np.eye(4)
             nib.save(nib.Nifti1Image(np.zeros((8, 8, 8)), affine), reference_path)
-            complete = np.zeros((8, 8, 8))
-            complete[2:6, 2:6, 2:6] = 1
-            truncated = np.zeros((8, 8, 8))
-            truncated[0:3, 2:6, 2:6] = 1
-            nib.save(nib.Nifti1Image(complete, affine), total_dir / "liver.nii.gz")
-            nib.save(nib.Nifti1Image(truncated, affine), total_dir / "spleen.nii.gz")
-            nib.save(nib.Nifti1Image(np.zeros((8, 8, 8)), affine), total_dir / "pancreas.nii.gz")
-            evidence = {item["anatomy_key"]: item for item in inventory_total_masks(total_dir, reference_path)}
+            labels = np.zeros((8, 8, 8), dtype=np.uint8)
+            labels[2:6, 2:6, 2:6] = 1
+            labels[0:2, 2:6, 2:6] = 2
+            multilabel = add_label_map_to_nifti(
+                nib.Nifti1Image(labels, affine),
+                {1: "liver", 2: "spleen", 3: "pancreas"},
+            )
+            nib.save(multilabel, multilabel_path)
+            evidence = {
+                item["anatomy_key"]: item
+                for item in inventory_total_multilabel(multilabel_path, reference_path)
+            }
         self.assertEqual(evidence["liver"]["state"], "anatomy_complete")
         self.assertEqual(evidence["spleen"]["state"], "anatomy_truncated")
         self.assertEqual(evidence["pancreas"]["state"], "anatomy_not_detected")
+        self.assertNotIn("voxel_count", evidence["liver"])
+        self.assertNotIn("volume_ml", evidence["liver"])
 
     def test_consolidation_never_turns_pending_into_absence(self):
         coverage = consolidate_coverage(
@@ -373,9 +379,13 @@ class TestQcPersistenceAndApi(unittest.TestCase):
 
             def fake_run_task(task_name, input_file, output_folder, **kwargs):
                 calls.append((task_name, kwargs["extra_args"]))
-                mask = np.zeros((8, 8, 8))
-                mask[2:6, 2:6, 2:6] = 1
-                nib.save(nib.Nifti1Image(mask, np.eye(4)), Path(output_folder) / "liver.nii.gz")
+                labels = np.zeros((8, 8, 8), dtype=np.uint8)
+                labels[2:6, 2:6, 2:6] = 1
+                multilabel = add_label_map_to_nifti(
+                    nib.Nifti1Image(labels, np.eye(4)),
+                    {1: "liver", 2: "spleen"},
+                )
+                nib.save(multilabel, Path(output_folder))
 
             with (
                 patch.object(segmentation_worker, "db_connect", side_effect=connect),
@@ -389,7 +399,7 @@ class TestQcPersistenceAndApi(unittest.TestCase):
             ):
                 self.assertTrue(segmentation_worker.segment_qc_queue_item(queue_item))
 
-            self.assertEqual(calls, [("total", ["--fast", "--device", "cpu"])])
+            self.assertEqual(calls, [("total", ["--fast", "--device", "cpu", "--ml"])])
             conn = connect()
             analysis = store.get_qc_analysis(conn, "1.2.worker", "analysis-worker")
             evidence = store.list_qc_anatomy(conn, "analysis-worker")
@@ -397,11 +407,15 @@ class TestQcPersistenceAndApi(unittest.TestCase):
                 "SELECT * FROM qc_consolidated_provenance WHERE analysis_id = ?",
                 ("analysis-worker",),
             ).fetchall()
+            acquisition = store.list_qc_acquisitions(conn, "analysis-worker")[0]
             conn.close()
             self.assertEqual(analysis["status"], "complete")
             self.assertEqual(evidence[0]["state"], "anatomy_complete")
             self.assertEqual(json.loads(evidence[0]["payload_json"])["model"]["version"], "test")
             self.assertEqual(consolidated[0]["state"], "anatomy_complete")
+            acquisition_payload = json.loads(acquisition["payload_json"])
+            self.assertEqual(acquisition_payload["output_format"], "total_multilabel")
+            self.assertEqual(acquisition_payload["execution_metrics"]["anatomy_count"], 2)
 
 
 if __name__ == "__main__":

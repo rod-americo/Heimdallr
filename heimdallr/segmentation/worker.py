@@ -67,7 +67,7 @@ from heimdallr.shared.segmentation_inventory import (
 )
 from heimdallr.shared.segmentation_coverage import classify_segmentation_coverage
 from heimdallr.shared.segmentation_coverage import mask_complete as mask_complete_along_z
-from heimdallr.shared.qc_evidence import consolidate_coverage, inventory_total_masks
+from heimdallr.shared.qc_evidence import consolidate_coverage, inventory_total_multilabel
 from heimdallr.shared.sqlite import connect as db_connect
 
 settings.configure_service_stdio()
@@ -346,6 +346,8 @@ def _latest_output_activity_timestamp(output_folder: Path) -> float:
     if not output_folder.exists():
         return 0.0
     latest = output_folder.stat().st_mtime
+    if output_folder.is_file():
+        return latest
     for path in output_folder.iterdir():
         try:
             latest = max(latest, path.stat().st_mtime)
@@ -2360,7 +2362,7 @@ def _qc_total_task() -> tuple[str, dict]:
     raise RuntimeError(f"Segmentation profile '{profile_name}' has no enabled total task for QC")
 
 
-def _qc_model_versions(profile_name: str, task: dict) -> dict:
+def _qc_model_versions(profile_name: str, effective_args: list[str]) -> dict:
     version = None
     for package_name in ("TotalSegmentator", "totalsegmentator"):
         try:
@@ -2373,7 +2375,8 @@ def _qc_model_versions(profile_name: str, task: dict) -> dict:
             "implementation": "TotalSegmentator",
             "version": version,
             "profile": profile_name,
-            "extra_args": [str(item) for item in task.get("extra_args", [])],
+            "extra_args": effective_args,
+            "output_format": "total_multilabel",
         }
     }
 
@@ -2413,34 +2416,71 @@ def segment_qc_queue_item(queue_item: dict) -> bool:
     )
     heartbeat.start()
     analysis_id = str(queue_item["analysis_id"])
+    started = time.perf_counter()
     try:
         if not input_path.exists():
             raise FileNotFoundError(f"QC input NIfTI not found: {input_path}")
         profile_name, task = _qc_total_task()
-        total_dir = output_root / "total"
-        if total_dir.exists():
-            shutil.rmtree(total_dir)
-        total_dir.mkdir(parents=True, exist_ok=True)
+        output_root.mkdir(parents=True, exist_ok=True)
+        legacy_total_dir = output_root / "total"
+        if legacy_total_dir.exists():
+            shutil.rmtree(legacy_total_dir)
+        multilabel_path = output_root / "total_multilabel.nii.gz"
+        multilabel_path.unlink(missing_ok=True)
         log_dir = output_root / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
         log_file = None if settings.VERBOSE_CONSOLE else log_dir / "total.log"
+        effective_args = [
+            str(item)
+            for item in task.get("extra_args", [])
+            if str(item) not in {"--ml", "-ml"}
+        ] + ["--ml"]
+        segmentation_started = time.perf_counter()
         run_task(
             "total",
             input_path,
-            total_dir,
-            extra_args=[str(item) for item in task.get("extra_args", [])],
+            multilabel_path,
+            extra_args=effective_args,
             log_file=log_file,
         )
-        evidence = inventory_total_masks(total_dir, input_path)
+        segmentation_seconds = time.perf_counter() - segmentation_started
+        if not multilabel_path.exists():
+            raise RuntimeError("QC total task completed without a multilabel output")
+        evidence_started = time.perf_counter()
+        evidence = inventory_total_multilabel(multilabel_path, input_path)
+        evidence_seconds = time.perf_counter() - evidence_started
         if not evidence:
-            raise RuntimeError("QC total task completed without anatomy masks")
-        model_versions = _qc_model_versions(profile_name, task)
+            raise RuntimeError("QC total task completed without anatomy labels")
+        model_versions = _qc_model_versions(profile_name, effective_args)
         for item in evidence:
             item["acquisition_id"] = queue_item["acquisition_id"]
             item["series_uid"] = queue_item["series_uid"]
             item["model"] = model_versions["total"]
+        state_counts = {
+            state: sum(item["state"] == state for item in evidence)
+            for state in sorted({item["state"] for item in evidence})
+        }
+        execution_metrics = {
+            "segmentation_seconds": round(segmentation_seconds, 3),
+            "evidence_extraction_seconds": round(evidence_seconds, 3),
+            "total_seconds": round(time.perf_counter() - started, 3),
+            "multilabel_size_bytes": multilabel_path.stat().st_size,
+            "anatomy_count": len(evidence),
+            "anatomy_state_counts": state_counts,
+        }
         inventory_path = output_root / "anatomy_inventory.json"
-        inventory_path.write_text(json.dumps(evidence, indent=2), encoding="utf-8")
+        inventory_path.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "output_format": "total_multilabel",
+                    "execution_metrics": execution_metrics,
+                    "anatomies": evidence,
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
         conn = db_connect()
         try:
             store.complete_qc_segmentation(
@@ -2448,13 +2488,14 @@ def segment_qc_queue_item(queue_item: dict) -> bool:
                 queue_id=queue_id,
                 anatomy=evidence,
                 model_versions=model_versions,
+                execution_metrics=execution_metrics,
             )
             status = _refresh_qc_analysis_summary(conn, analysis_id)
         finally:
             conn.close()
         print(
             f"[QC] Done analysis={analysis_id} acquisition={queue_item['acquisition_id']} "
-            f"status={status}"
+            f"status={status} metrics={json.dumps(execution_metrics, sort_keys=True)}"
         )
         return True
     except Exception as exc:

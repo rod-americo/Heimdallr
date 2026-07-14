@@ -41,7 +41,7 @@ Operational dispatch is tracked in the primary queues plus the optional QC queue
 | `integration_dispatch_queue` | Prepared-study events waiting for outbound HTTP delivery |
 | `integration_delivery_queue` | Terminal externally submitted job callbacks waiting for outbound HTTP delivery |
 | `dicom_egress_queue` | Generated DICOM artifacts waiting for outbound C-STORE delivery |
-| `qc_segmentation_queue` | Per-acquisition `total` tasks for opt-in QC evidence; lower priority than the primary segmentation queue |
+| `qc_segmentation_queue` | Per-acquisition `total --ml` tasks for opt-in QC evidence; lower priority than the primary segmentation queue |
 
 ### QC Evidence Tables
 
@@ -50,7 +50,7 @@ Operational dispatch is tracked in the primary queues plus the optional QC queue
 | `qc_study_analyses` | Immutable analysis versions, fingerprint, policy/model signature, terminal state, and consolidated coverage |
 | `qc_series` | All inventoried series, including rejected/localizer/derived series and classification reasons |
 | `qc_acquisitions` | Auditable acquisition groups and representative series |
-| `qc_anatomy_evidence` | Per-acquisition anatomy state, volume, bounds, and provenance |
+| `qc_anatomy_evidence` | Per-acquisition anatomy state, multilabel identity, boundary-contact audit, and provenance |
 | `qc_consolidated_provenance` | Consolidated anatomy state and contributing acquisition provenance |
 
 The latest complete analysis is the default public version. Purging a case

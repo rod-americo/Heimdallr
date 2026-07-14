@@ -17,6 +17,10 @@ global profile.
 
 ### Changed
 
+- QC acquisition segmentation now enforces TotalSegmentator `total --ml` and
+  stores one multilabel image per acquisition. Evidence extraction records only
+  anatomy state, boundary contact, label identity, provenance, and execution
+  timing; it no longer creates or repeatedly reads 117 binary masks.
 - `vat_sat_ratio` now emits a burned-in Secondary Capture DICOM overlay when
   `emit_secondary_capture_dicom` is enabled, and the tracked metrics profile
   example enables that DICOM output for the production-facing VAT/SAT metric.

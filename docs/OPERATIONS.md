@@ -193,11 +193,14 @@ multipart `qc_evidence=true` or `qc_evidence=false`; listener DICOM handoffs
 always inherit the host default.
 
 An API override of `true` on a host without this file reuses the enabled
-`total` task and device arguments from the active segmentation profile. QC work
-is lower priority than primary segmentation and does not run metrics or DICOM
-egress. Protect these HTTP endpoints at the gateway/network boundary because
-the control plane has no built-in authentication and the override can consume
-accelerator capacity.
+`total` task and device arguments from the active segmentation profile. The QC
+worker always adds `--ml` and writes a single multilabel image per acquisition;
+this does not change or reuse the primary pipeline's binary-mask output. It
+derives only anatomy states, boundary contact, label provenance, and execution
+timing. QC work is lower priority than primary segmentation and does not run
+metrics or DICOM egress. Protect these HTTP endpoints at the gateway/network
+boundary because the control plane has no built-in authentication and the
+override can consume accelerator capacity.
 
 Restart `prepare`, `segmentation`, and `control_plane` after changing QC code
 or configuration. Restart `space_manager` when deploying the QC purge changes.

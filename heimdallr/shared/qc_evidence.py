@@ -13,6 +13,7 @@ import uuid
 
 import nibabel as nib
 import numpy as np
+from totalsegmentator.nifti_ext_header import load_multilabel_nifti
 
 
 SCHEMA_VERSION = 1
@@ -342,89 +343,58 @@ def build_inventory(
     return series, acquisitions
 
 
-def inventory_total_masks(total_dir: Path, reference_path: Path) -> list[dict[str, Any]]:
+def inventory_total_multilabel(
+    multilabel_path: Path,
+    reference_path: Path,
+) -> list[dict[str, Any]]:
+    """Extract anatomy states from one TotalSegmentator multilabel volume."""
     reference = nib.load(str(reference_path))
     reference_shape = tuple(int(value) for value in reference.shape[:3])
-    spacing = tuple(float(value) for value in reference.header.get_zooms()[:3])
-    voxel_volume_ml = float(np.prod(spacing)) / 1000.0
-    evidence: list[dict[str, Any]] = []
-    for mask_path in sorted(total_dir.glob("*.nii.gz")):
-        anatomy_key = mask_path.name[:-7]
-        payload: dict[str, Any] = {
-            "anatomy_key": anatomy_key,
-            "mask_path": str(mask_path),
-            "confidence": None,
-        }
-        try:
-            mask_image = nib.load(str(mask_path))
-            mask = np.asarray(mask_image.get_fdata(dtype=np.float32)) > 0
-        except Exception as exc:
-            payload.update({"state": "unknown", "reason": "mask_read_error", "error": str(exc)})
-            evidence.append(payload)
-            continue
-        if tuple(mask.shape[:3]) != reference_shape:
-            payload.update(
-                {
-                    "state": "unknown",
-                    "reason": "geometry_mismatch",
-                    "shape": list(mask.shape[:3]),
-                    "reference_shape": list(reference_shape),
-                }
-            )
-            evidence.append(payload)
-            continue
-        if not np.allclose(mask_image.affine, reference.affine, rtol=1e-5, atol=1e-4):
-            payload.update({"state": "unknown", "reason": "affine_mismatch"})
-            evidence.append(payload)
-            continue
-        coordinates = np.argwhere(mask)
-        voxel_count = int(coordinates.shape[0])
-        if voxel_count == 0:
-            payload.update(
-                {
-                    "state": "anatomy_not_detected",
-                    "voxel_count": 0,
-                    "volume_ml": 0.0,
-                    "bounds_voxel": None,
-                    "bounds_world_mm": None,
-                    "boundary_contacts": [],
-                }
-            )
-            evidence.append(payload)
-            continue
-        minimum = coordinates.min(axis=0)
-        maximum = coordinates.max(axis=0)
-        contacts = []
-        labels = ((0, "x_min", "x_max"), (1, "y_min", "y_max"), (2, "z_min", "z_max"))
-        for axis, low_label, high_label in labels:
-            if int(minimum[axis]) == 0:
-                contacts.append(low_label)
-            if int(maximum[axis]) == reference_shape[axis] - 1:
-                contacts.append(high_label)
-        voxel_corners = np.asarray(
-            [
-                [x, y, z, 1]
-                for x in (minimum[0], maximum[0])
-                for y in (minimum[1], maximum[1])
-                for z in (minimum[2], maximum[2])
-            ],
-            dtype=float,
+    multilabel_image, label_map = load_multilabel_nifti(multilabel_path)
+    if tuple(int(value) for value in multilabel_image.shape[:3]) != reference_shape:
+        raise ValueError(
+            "QC multilabel geometry mismatch: "
+            f"{multilabel_image.shape[:3]} != {reference_shape}"
         )
-        world = (reference.affine @ voxel_corners.T).T[:, :3]
-        payload.update(
+    if not np.allclose(multilabel_image.affine, reference.affine, rtol=1e-5, atol=1e-4):
+        raise ValueError("QC multilabel affine does not match the acquisition input")
+
+    labels = np.asanyarray(multilabel_image.dataobj)
+    if labels.ndim != 3 or not np.issubdtype(labels.dtype, np.integer):
+        raise ValueError("QC multilabel output must be a three-dimensional integer labelmap")
+    counts = np.bincount(labels.reshape(-1), minlength=max(label_map, default=0) + 1)
+    boundary_sets = {
+        "x_min": set(int(value) for value in np.unique(labels[0, :, :])),
+        "x_max": set(int(value) for value in np.unique(labels[-1, :, :])),
+        "y_min": set(int(value) for value in np.unique(labels[:, 0, :])),
+        "y_max": set(int(value) for value in np.unique(labels[:, -1, :])),
+        "z_min": set(int(value) for value in np.unique(labels[:, :, 0])),
+        "z_max": set(int(value) for value in np.unique(labels[:, :, -1])),
+    }
+
+    evidence: list[dict[str, Any]] = []
+    for label_id, anatomy_key in sorted(label_map.items()):
+        detected = label_id < len(counts) and int(counts[label_id]) > 0
+        contacts = [
+            boundary_name
+            for boundary_name, boundary_labels in boundary_sets.items()
+            if detected and label_id in boundary_labels
+        ]
+        evidence.append(
             {
-                "state": "anatomy_truncated" if contacts else "anatomy_complete",
-                "voxel_count": voxel_count,
-                "volume_ml": round(voxel_count * voxel_volume_ml, 6),
-                "bounds_voxel": {"min": minimum.tolist(), "max": maximum.tolist()},
-                "bounds_world_mm": {
-                    "min": world.min(axis=0).tolist(),
-                    "max": world.max(axis=0).tolist(),
-                },
+                "anatomy_key": str(anatomy_key),
+                "label_id": int(label_id),
+                "state": (
+                    "anatomy_not_detected"
+                    if not detected
+                    else "anatomy_truncated"
+                    if contacts
+                    else "anatomy_complete"
+                ),
                 "boundary_contacts": contacts,
+                "source_format": "total_multilabel",
             }
         )
-        evidence.append(payload)
     return evidence
 
 

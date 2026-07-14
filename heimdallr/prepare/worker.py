@@ -875,6 +875,7 @@ def _active_total_task_signature() -> dict:
         "profile": profile_name,
         "task": total_task,
         "totalsegmentator_version": totalsegmentator_version(),
+        "qc_output_contract": "total_multilabel_anatomy_states_v1",
     }
 
 

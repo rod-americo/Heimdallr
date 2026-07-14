@@ -47,6 +47,41 @@ and in the VAT PNG.
 
 ---
 
+### 2026-07-13 - Isolate QC inference as a multilabel anatomy-state pass
+
+**Context**
+
+The initial multi-acquisition QC path emitted 117 compressed binary masks per
+acquisition and reopened every mask to compute voxel count, volume, bounds, and
+boundary contact. Those quantitative fields do not contribute to the required
+anatomy-state answer, and repeated decompression added substantial time and
+storage after inference.
+
+**Decision**
+
+Run QC acquisition inference as a separate TotalSegmentator `total --ml` pass.
+Read the resulting integer labelmap once and retain only anatomy state,
+boundary contact, label identity, provenance, and execution timing. Continue
+sharing prepared inputs, phase detection, and host device/task arguments, but
+do not change or reuse the primary pipeline's binary-mask artifacts.
+
+**Impact**
+
+- Each segmented QC acquisition produces one compressed NIfTI labelmap instead
+  of 117 binary masks.
+- Evidence extraction avoids floating-point image expansion and repeated mask
+  decompression.
+- Primary metrics, artifacts, callbacks, and segmentation output remain
+  unchanged.
+
+**Tradeoff**
+
+QC evidence no longer provides volume, voxel-count, or per-anatomy bounds
+measurements. Those measurements require a separately defined quantitative
+contract if needed later.
+
+---
+
 ### 2026-07-13 - Keep multi-acquisition QC opt-in and independent
 
 **Context**

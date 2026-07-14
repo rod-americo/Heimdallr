@@ -76,7 +76,10 @@ Execution states distinguish `not_segmented`, `not_segmentable`,
 `segmentation_pending`, and `segmentation_failed`. Anatomy states distinguish
 `anatomy_not_detected`, `anatomy_present`, `anatomy_complete`,
 `anatomy_truncated`, and `unknown`; missing or pending inference is never
-reported as anatomy absence.
+reported as anatomy absence. QC acquisition inference uses a single
+TotalSegmentator `total --ml` labelmap. Per-anatomy evidence includes label
+identity, boundary-contact audit, and provenance; voxel counts, volumes, and
+anatomy bounds are intentionally not exposed as QC measurements.
 
 When `requested_outputs` is omitted or when keys are omitted inside it, those
 outputs are treated as `false`. Consumers must request every file type they

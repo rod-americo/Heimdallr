@@ -2909,6 +2909,7 @@ def complete_qc_segmentation(
     queue_id: int,
     anatomy: list[dict[str, Any]],
     model_versions: dict[str, Any],
+    execution_metrics: dict[str, Any] | None = None,
 ) -> str:
     ensure_schema(conn)
     row = conn.execute("SELECT * FROM qc_segmentation_queue WHERE id = ?", (queue_id,)).fetchone()
@@ -2922,13 +2923,28 @@ def complete_qc_segmentation(
         """,
         (_now_local_timestamp(), queue_id),
     )
-    conn.execute(
+    acquisition = conn.execute(
         """
-        UPDATE qc_acquisitions
-        SET segmentation_status = 'done', error = NULL
+        SELECT payload_json FROM qc_acquisitions
         WHERE analysis_id = ? AND acquisition_id = ?
         """,
         (row["analysis_id"], row["acquisition_id"]),
+    ).fetchone()
+    acquisition_payload = json.loads(acquisition["payload_json"]) if acquisition else {}
+    acquisition_payload["output_format"] = "total_multilabel"
+    if execution_metrics:
+        acquisition_payload["execution_metrics"] = execution_metrics
+    conn.execute(
+        """
+        UPDATE qc_acquisitions
+        SET segmentation_status = 'done', payload_json = ?, error = NULL
+        WHERE analysis_id = ? AND acquisition_id = ?
+        """,
+        (
+            json.dumps(acquisition_payload, sort_keys=True),
+            row["analysis_id"],
+            row["acquisition_id"],
+        ),
     )
     conn.execute(
         """
