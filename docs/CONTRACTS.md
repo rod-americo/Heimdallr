@@ -341,6 +341,10 @@ share one `SeriesInstanceUID`, `SeriesNumber`, and `SeriesDescription`, with
 unique sequential `InstanceNumber` values. Original artifact series form
 contiguous blocks in export order, with anatomic ordering applied within each
 block. Derived CT and Encapsulated PDF DICOM artifacts are not grouped.
+- In `single_series`, the `l3_muscle_area` and `vat_sat_ratio` Secondary
+Captures contain only their axial measurement panel. The VAT PNG remains the
+existing axial-plus-sagittal composite, and `separate` mode preserves the
+existing composite DICOM presentation for both jobs.
 - The effective artifact DICOM policy is recorded in
 `metadata/id.json` under `Pipeline.metrics_pipeline.artifact_dicom_policy`.
 When `single_series` rewrites at least one Secondary Capture file, the same

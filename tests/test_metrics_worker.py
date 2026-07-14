@@ -474,12 +474,34 @@ class TestMetricsWorker(unittest.TestCase):
 
         configured = _apply_artifact_dicom_policy(
             jobs,
-            {"secondary_capture_transfer_syntax": "rle_lossless"},
+            {
+                "secondary_capture_transfer_syntax": "rle_lossless",
+                "secondary_capture_series_mode": "single_series",
+            },
         )
 
         self.assertEqual(configured[0]["secondary_capture_transfer_syntax"], "rle_lossless")
         self.assertEqual(configured[1]["secondary_capture_transfer_syntax"], "rle_lossless")
+        self.assertEqual(configured[0]["secondary_capture_series_mode"], "single_series")
+        self.assertEqual(configured[1]["secondary_capture_series_mode"], "single_series")
         self.assertNotIn("secondary_capture_transfer_syntax", jobs[0])
+        self.assertNotIn("secondary_capture_series_mode", jobs[0])
+
+    def test_apply_artifact_dicom_policy_propagates_series_mode_without_transfer_syntax(self):
+        jobs = [{"name": "l3_muscle_area"}, {"name": "vat_sat_ratio"}]
+
+        configured = _apply_artifact_dicom_policy(
+            jobs,
+            {"secondary_capture_series_mode": "single_series"},
+        )
+
+        self.assertEqual(
+            [job["secondary_capture_series_mode"] for job in configured],
+            ["single_series", "single_series"],
+        )
+        self.assertTrue(
+            all("secondary_capture_transfer_syntax" not in job for job in configured)
+        )
 
     def test_harmonize_secondary_capture_series_rewrites_only_secondary_capture(self):
         with tempfile.TemporaryDirectory() as tmpdir:

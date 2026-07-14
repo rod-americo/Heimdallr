@@ -191,51 +191,90 @@ def render_overlay_rgb(
     sagittal_level_text: str,
     spacing_mm: tuple[float, float, float],
     sagittal_slab_thickness_mm: float = 3.0,
+    include_sagittal_panel: bool = True,
 ) -> np.ndarray:
     ct_slice = np.asarray(image_data[:, :, slice_idx], dtype=np.float32)
     sat_slice = np.asarray(sat_mask[:, :, slice_idx], dtype=bool)
     vat_slice = np.asarray(vat_mask[:, :, slice_idx], dtype=bool)
     l3_slice = np.asarray(l3_mask[:, :, slice_idx], dtype=bool)
-    _, sagittal_index, sagittal_axis = sagittal_plane_from_mask(l3_mask)
-    sagittal_ct, sagittal_l3, _, lateral_spacing = sagittal_slab_from_mask(
-        image_data=image_data,
-        mask=l3_mask,
-        plane_index=sagittal_index,
-        axis=sagittal_axis,
-        spacing_mm=spacing_mm,
-        slab_thickness_mm=sagittal_slab_thickness_mm,
-    )
-
     ct_slice = np.clip(ct_slice, -160.0, 240.0)
-    sagittal_ct = np.clip(sagittal_ct, -160.0, 240.0)
     axial_source_axis_codes = plane_source_axis_codes(ct_affine, "z")
     rotated_ct = reorient_display_array(ct_slice, source_axis_codes=axial_source_axis_codes, desired_row_code="P", desired_col_code="L")
     rotated_sat = reorient_display_array(sat_slice.astype(np.uint8), source_axis_codes=axial_source_axis_codes, desired_row_code="P", desired_col_code="L")
     rotated_vat = reorient_display_array(vat_slice.astype(np.uint8), source_axis_codes=axial_source_axis_codes, desired_row_code="P", desired_col_code="L")
     rotated_l3 = reorient_display_array(l3_slice.astype(np.uint8), source_axis_codes=axial_source_axis_codes, desired_row_code="P", desired_col_code="L")
 
-    sagittal_source_axis_codes = plane_source_axis_codes(ct_affine, sagittal_axis)
-    sagittal_row_code, sagittal_col_code = _overlay_display_directions(sagittal_source_axis_codes)
-    rotated_sagittal_ct = reorient_display_array(rotated_sagittal_ct := sagittal_ct, source_axis_codes=sagittal_source_axis_codes, desired_row_code=sagittal_row_code, desired_col_code=sagittal_col_code)
-    rotated_sagittal_l3 = reorient_display_array(sagittal_l3.astype(np.uint8), source_axis_codes=sagittal_source_axis_codes, desired_row_code=sagittal_row_code, desired_col_code=sagittal_col_code)
-    sagittal_level_source = np.zeros_like(sagittal_l3, dtype=bool)
-    sagittal_level_source[:, slice_idx] = True
-    rotated_sagittal_level = reorient_display_array(sagittal_level_source, source_axis_codes=sagittal_source_axis_codes, desired_row_code=sagittal_row_code, desired_col_code=sagittal_col_code)
-
     spacing_x, spacing_y, spacing_z = (float(value) for value in spacing_mm)
     axial_spacing = reorient_display_spacing_mm((spacing_x, spacing_y), source_axis_codes=axial_source_axis_codes, desired_row_code="P", desired_col_code="L")
     axial_aspect = display_aspect_from_spacing_mm(axial_spacing)
-    sagittal_spacing = reorient_display_spacing_mm((lateral_spacing, spacing_z), source_axis_codes=sagittal_source_axis_codes, desired_row_code=sagittal_row_code, desired_col_code=sagittal_col_code)
-    sagittal_aspect = display_aspect_from_spacing_mm(sagittal_spacing)
-    slice_row_candidates = np.where(rotated_sagittal_level.any(axis=1))[0]
-    slice_row = int(slice_row_candidates[len(slice_row_candidates) // 2]) if slice_row_candidates.size else int(np.clip(rotated_sagittal_ct.shape[0] // 2, 0, rotated_sagittal_ct.shape[0] - 1))
 
-    fig, (ax_axial, ax_sagittal) = plt.subplots(
-        1, 2, figsize=(12.6, 8), facecolor="black", gridspec_kw={"wspace": 0.02}
-    )
+    if include_sagittal_panel:
+        _, sagittal_index, sagittal_axis = sagittal_plane_from_mask(l3_mask)
+        sagittal_ct, sagittal_l3, _, lateral_spacing = sagittal_slab_from_mask(
+            image_data=image_data,
+            mask=l3_mask,
+            plane_index=sagittal_index,
+            axis=sagittal_axis,
+            spacing_mm=spacing_mm,
+            slab_thickness_mm=sagittal_slab_thickness_mm,
+        )
+        sagittal_ct = np.clip(sagittal_ct, -160.0, 240.0)
+        sagittal_source_axis_codes = plane_source_axis_codes(ct_affine, sagittal_axis)
+        sagittal_row_code, sagittal_col_code = _overlay_display_directions(
+            sagittal_source_axis_codes
+        )
+        rotated_sagittal_ct = reorient_display_array(
+            sagittal_ct,
+            source_axis_codes=sagittal_source_axis_codes,
+            desired_row_code=sagittal_row_code,
+            desired_col_code=sagittal_col_code,
+        )
+        rotated_sagittal_l3 = reorient_display_array(
+            sagittal_l3.astype(np.uint8),
+            source_axis_codes=sagittal_source_axis_codes,
+            desired_row_code=sagittal_row_code,
+            desired_col_code=sagittal_col_code,
+        )
+        sagittal_level_source = np.zeros_like(sagittal_l3, dtype=bool)
+        sagittal_level_source[:, slice_idx] = True
+        rotated_sagittal_level = reorient_display_array(
+            sagittal_level_source,
+            source_axis_codes=sagittal_source_axis_codes,
+            desired_row_code=sagittal_row_code,
+            desired_col_code=sagittal_col_code,
+        )
+        sagittal_spacing = reorient_display_spacing_mm(
+            (lateral_spacing, spacing_z),
+            source_axis_codes=sagittal_source_axis_codes,
+            desired_row_code=sagittal_row_code,
+            desired_col_code=sagittal_col_code,
+        )
+        sagittal_aspect = display_aspect_from_spacing_mm(sagittal_spacing)
+        slice_row_candidates = np.where(rotated_sagittal_level.any(axis=1))[0]
+        slice_row = (
+            int(slice_row_candidates[len(slice_row_candidates) // 2])
+            if slice_row_candidates.size
+            else int(
+                np.clip(
+                    rotated_sagittal_ct.shape[0] // 2,
+                    0,
+                    rotated_sagittal_ct.shape[0] - 1,
+                )
+            )
+        )
+        fig, (ax_axial, ax_sagittal) = plt.subplots(
+            1,
+            2,
+            figsize=(12.6, 8),
+            facecolor="black",
+            gridspec_kw={"wspace": 0.02},
+        )
+        ax_sagittal.set_facecolor("black")
+    else:
+        fig, ax_axial = plt.subplots(figsize=(8, 8), facecolor="black")
+        ax_sagittal = None
     fig.patch.set_facecolor("black")
     ax_axial.set_facecolor("black")
-    ax_sagittal.set_facecolor("black")
     fig.suptitle(title, fontsize=15, color="white")
 
     ax_axial.imshow(rotated_ct, cmap="gray", interpolation="nearest", aspect=axial_aspect)
@@ -257,17 +296,39 @@ def render_overlay_rgb(
     )
     ax_axial.axis("off")
 
-    ax_sagittal.imshow(rotated_sagittal_ct, cmap="gray", interpolation="nearest", aspect=sagittal_aspect)
-    if rotated_sagittal_l3.any():
-        ax_sagittal.contour(rotated_sagittal_l3, levels=[0.5], colors=["#ffb000"], linewidths=1.1)
-    ax_sagittal.axhline(slice_row, color="#00d5ff", linewidth=1.3, linestyle="--")
-    ax_sagittal.text(
-        0.03, 0.03, sagittal_level_text,
-        transform=ax_sagittal.transAxes, ha="left", va="bottom", fontsize=9, color="white",
-        bbox={"boxstyle": "round,pad=0.3", "facecolor": "black", "alpha": 0.45, "edgecolor": "none"},
-    )
-    ax_sagittal.set_title(panel_titles[1], fontsize=12, color="white")
-    ax_sagittal.axis("off")
+    if ax_sagittal is not None:
+        ax_sagittal.imshow(
+            rotated_sagittal_ct,
+            cmap="gray",
+            interpolation="nearest",
+            aspect=sagittal_aspect,
+        )
+        if rotated_sagittal_l3.any():
+            ax_sagittal.contour(
+                rotated_sagittal_l3,
+                levels=[0.5],
+                colors=["#ffb000"],
+                linewidths=1.1,
+            )
+        ax_sagittal.axhline(slice_row, color="#00d5ff", linewidth=1.3, linestyle="--")
+        ax_sagittal.text(
+            0.03,
+            0.03,
+            sagittal_level_text,
+            transform=ax_sagittal.transAxes,
+            ha="left",
+            va="bottom",
+            fontsize=9,
+            color="white",
+            bbox={
+                "boxstyle": "round,pad=0.3",
+                "facecolor": "black",
+                "alpha": 0.45,
+                "edgecolor": "none",
+            },
+        )
+        ax_sagittal.set_title(panel_titles[1], fontsize=12, color="white")
+        ax_sagittal.axis("off")
 
     fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.965), w_pad=0.15)
     fig.canvas.draw()
@@ -404,34 +465,51 @@ def main() -> int:
         generate_overlay = bool(job_config.get("generate_overlay", True))
         emit_dicom = bool(job_config.get("emit_secondary_capture_dicom", generate_overlay))
         if generate_overlay or emit_dicom:
-            rgb = render_overlay_rgb(
-                image_data=image_data,
-                ct_affine=ct_img.affine,
-                l3_mask=l3_mask,
-                sat_mask=np.where(
+            render_kwargs = {
+                "image_data": image_data,
+                "ct_affine": ct_img.affine,
+                "l3_mask": l3_mask,
+                "sat_mask": np.where(
                     np.arange(sat_mask.shape[2])[None, None, :] == slice_idx,
                     clean_sat_slice[:, :, None],
                     sat_mask,
                 ),
-                vat_mask=np.where(
+                "vat_mask": np.where(
                     np.arange(vat_mask.shape[2])[None, None, :] == slice_idx,
                     clean_vat_slice[:, :, None],
                     vat_mask,
                 ),
-                slice_idx=slice_idx,
-                title=title,
-                panel_titles=panel_titles,
-                summary_lines=summary_lines,
-                legend_text=legend_text,
-                sagittal_level_text=sagittal_level_text,
-                spacing_mm=spacing_mm,
-            )
+                "slice_idx": slice_idx,
+                "title": title,
+                "panel_titles": panel_titles,
+                "summary_lines": summary_lines,
+                "legend_text": legend_text,
+                "sagittal_level_text": sagittal_level_text,
+                "spacing_mm": spacing_mm,
+            }
+            composite_rgb = None
             if generate_overlay:
-                plt.imsave(overlay_path, rgb)
+                composite_rgb = render_overlay_rgb(
+                    **render_kwargs,
+                    include_sagittal_panel=True,
+                )
+                plt.imsave(overlay_path, composite_rgb)
                 artifacts["overlay_png"] = str(overlay_path.relative_to(case_dir))
             if emit_dicom:
+                single_series = (
+                    str(job_config.get("secondary_capture_series_mode") or "separate")
+                    == "single_series"
+                )
+                dicom_rgb = (
+                    render_overlay_rgb(
+                        **render_kwargs,
+                        include_sagittal_panel=not single_series,
+                    )
+                    if composite_rgb is None or single_series
+                    else composite_rgb
+                )
                 create_secondary_capture_from_rgb(
-                    rgb,
+                    dicom_rgb,
                     overlay_sc_path,
                     case_metadata,
                     series_description=series_description(artifact_locale),

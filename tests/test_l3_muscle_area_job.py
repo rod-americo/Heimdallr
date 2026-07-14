@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import nibabel as nib
 import numpy as np
+import pydicom
 
 from heimdallr.metrics.jobs import l3_muscle_area
 from heimdallr.metrics.jobs.l3_muscle_area import (
@@ -205,6 +206,42 @@ class TestL3MuscleAreaJob(unittest.TestCase):
             self.assertEqual(measurement["excluded_appendicular_muscle_pixels"], 9)
             self.assertTrue(measurement["appendicular_muscle_filter"]["applied"])
 
+            with patch.object(settings, "STUDIES_DIR", tmp_path), patch.object(
+                l3_muscle_area,
+                "sagittal_plane_from_mask",
+                side_effect=AssertionError("single-series DICOM must not render sagittal data"),
+            ):
+                with patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "l3_muscle_area",
+                        "--case-id",
+                        case_id,
+                        "--job-config-json",
+                        json.dumps(
+                            {
+                                "emit_secondary_capture_dicom": True,
+                                "secondary_capture_series_mode": "single_series",
+                                "secondary_capture_transfer_syntax": "original",
+                            }
+                        ),
+                    ],
+                ):
+                    self.assertEqual(l3_muscle_area.main(), 0)
+
+            result = json.loads(
+                (
+                    case_dir
+                    / "artifacts"
+                    / "metrics"
+                    / "l3_muscle_area"
+                    / "result.json"
+                ).read_text(encoding="utf-8")
+            )
+            dataset = pydicom.dcmread(case_dir / result["artifacts"]["overlay_sc_dcm"])
+            self.assertEqual(int(dataset.Rows), int(dataset.Columns))
+
     def test_render_overlay_rgb_returns_combined_axial_and_sagittal_image(self):
         image = np.linspace(-200.0, 250.0, num=24 * 20 * 16, dtype=np.float32).reshape((24, 20, 16))
         l3_mask = np.zeros_like(image, dtype=bool)
@@ -229,6 +266,28 @@ class TestL3MuscleAreaJob(unittest.TestCase):
         self.assertEqual(rendered.shape[2], 3)
         self.assertGreater(rendered.shape[1], rendered.shape[0])
         self.assertGreater(int(rendered.max()), int(rendered.min()))
+
+        with patch.object(
+            l3_muscle_area,
+            "sagittal_plane_from_mask",
+            side_effect=AssertionError("axial renderer must not load sagittal data"),
+        ):
+            axial_rendered = render_overlay_rgb(
+                image_data=image,
+                ct_affine=np.diag([1.0, 1.0, 2.5, 1.0]),
+                l3_mask=l3_mask,
+                muscle_mask=muscle_mask,
+                slice_idx=8,
+                title="L3 Center Slice",
+                summary_lines=["SMA: 42.0 cm2", "Slice: 8"],
+                panel_titles=("Axial", "Sagittal Reference"),
+                sagittal_level_text="Axial level z=8 | slab 3 mm",
+                spacing_mm=(1.0, 1.0, 2.5),
+                include_sagittal_panel=False,
+            )
+
+        self.assertEqual(axial_rendered.shape[0], axial_rendered.shape[1])
+        self.assertGreater(int(axial_rendered.max()), int(axial_rendered.min()))
 
     def test_overlay_display_directions_supports_ap_and_lr_planes(self):
         self.assertEqual(_overlay_display_directions(("A", "S")), ("I", "P"))

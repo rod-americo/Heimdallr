@@ -234,6 +234,9 @@ Metrics DICOM artifact policy:
   case into one artifact series. Original artifact series remain contiguous in
   export order, with anatomic ordering inside each block. Derived CT and
   Encapsulated PDF artifacts keep their own series.
+- Before grouping, `l3_muscle_area` and `vat_sat_ratio` render axial-only DICOM
+  images in `single_series`; `separate` keeps their composite axial/sagittal
+  DICOM presentation, and the VAT PNG remains composite in both modes.
 - External `/jobs` submissions may override this field through
   `artifact_dicom_policy`; omitted fields fall back to the active metrics
   profile.

@@ -15,6 +15,38 @@ Each decision should include:
 
 ## Decisions
 
+### 2026-07-13 - Keep aggregated L3 and VAT DICOM overlays axial-only
+
+**Context**
+
+The L3 muscle-area and VAT/SAT overlays combine axial measurement and sagittal
+reference panels in one Secondary Capture image. That reference is useful when
+each metric keeps its own series, but it adds a non-axial panel to the combined
+artifact series used for position-oriented review.
+
+**Decision**
+
+Pass the effective Secondary Capture series mode into metrics jobs. In
+`single_series`, render only the axial panel in the L3 muscle-area and VAT/SAT
+DICOM artifacts before grouping. Preserve their composite DICOM presentation
+in `separate`, and preserve the composite VAT PNG in every mode.
+
+**Impact**
+
+- Aggregated L3 and VAT instances contain only the image positioned at the
+  analyzed axial level.
+- Measurements, payloads, DICOM geometry, grouping, and instance ordering do
+  not change.
+- Metrics workers must restart before resident processing uses the behavior.
+
+**Tradeoff**
+
+The aggregated DICOM series no longer carries the sagittal level-reference
+panel for these two metrics; that context remains available in separate mode
+and in the VAT PNG.
+
+---
+
 ### 2026-07-13 - Keep multi-acquisition QC opt-in and independent
 
 **Context**

@@ -8,6 +8,7 @@ from unittest.mock import patch
 import nibabel as nib
 import numpy as np
 import pydicom
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -114,6 +115,103 @@ class TestVatSatRatioJob(unittest.TestCase):
             self.assertEqual(ds.SeriesDescription, "Heimdallr VAT/SAT Ratio Overlay")
             self.assertEqual(str(ds.SeriesNumber), "9102")
             self.assertLessEqual(max(int(ds.Rows), int(ds.Columns)), 1024)
+            self.assertGreater(int(ds.Columns), int(ds.Rows))
+            with Image.open(case_dir / result["artifacts"]["overlay_png"]) as png:
+                self.assertGreater(png.width, png.height)
+
+            with patch.object(settings, "STUDIES_DIR", tmp_path):
+                with patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "vat_sat_ratio",
+                        "--case-id",
+                        case_id,
+                        "--job-config-json",
+                        json.dumps(
+                            {
+                                "generate_overlay": True,
+                                "emit_secondary_capture_dicom": True,
+                                "secondary_capture_series_mode": "single_series",
+                                "secondary_capture_transfer_syntax": "original",
+                            }
+                        ),
+                    ],
+                ):
+                    self.assertEqual(vat_sat_ratio.main(), 0)
+
+            result = json.loads(
+                (
+                    case_dir / "artifacts" / "metrics" / "vat_sat_ratio" / "result.json"
+                ).read_text(encoding="utf-8")
+            )
+            with Image.open(case_dir / result["artifacts"]["overlay_png"]) as png:
+                self.assertGreater(png.width, png.height)
+            ds = pydicom.dcmread(case_dir / result["artifacts"]["overlay_sc_dcm"])
+            self.assertEqual(int(ds.Rows), int(ds.Columns))
+
+            with patch.object(settings, "STUDIES_DIR", tmp_path), patch.object(
+                vat_sat_ratio,
+                "sagittal_plane_from_mask",
+                side_effect=AssertionError("single-series DICOM must not render sagittal data"),
+            ):
+                with patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "vat_sat_ratio",
+                        "--case-id",
+                        case_id,
+                        "--job-config-json",
+                        json.dumps(
+                            {
+                                "generate_overlay": False,
+                                "emit_secondary_capture_dicom": True,
+                                "secondary_capture_series_mode": "single_series",
+                                "secondary_capture_transfer_syntax": "original",
+                            }
+                        ),
+                    ],
+                ):
+                    self.assertEqual(vat_sat_ratio.main(), 0)
+
+            result = json.loads(
+                (
+                    case_dir / "artifacts" / "metrics" / "vat_sat_ratio" / "result.json"
+                ).read_text(encoding="utf-8")
+            )
+            self.assertNotIn("overlay_png", result["artifacts"])
+            ds = pydicom.dcmread(case_dir / result["artifacts"]["overlay_sc_dcm"])
+            self.assertEqual(int(ds.Rows), int(ds.Columns))
+
+            with patch.object(settings, "STUDIES_DIR", tmp_path):
+                with patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "vat_sat_ratio",
+                        "--case-id",
+                        case_id,
+                        "--job-config-json",
+                        json.dumps(
+                            {
+                                "generate_overlay": True,
+                                "emit_secondary_capture_dicom": False,
+                                "secondary_capture_series_mode": "single_series",
+                            }
+                        ),
+                    ],
+                ):
+                    self.assertEqual(vat_sat_ratio.main(), 0)
+
+            result = json.loads(
+                (
+                    case_dir / "artifacts" / "metrics" / "vat_sat_ratio" / "result.json"
+                ).read_text(encoding="utf-8")
+            )
+            self.assertIn("overlay_png", result["artifacts"])
+            self.assertNotIn("overlay_sc_dcm", result["artifacts"])
+            self.assertEqual(result["dicom_exports"], [])
 
 
 if __name__ == "__main__":

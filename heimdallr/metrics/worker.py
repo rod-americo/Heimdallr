@@ -338,13 +338,17 @@ def _apply_artifact_dicom_policy(jobs: list[dict], policy: dict | None) -> list[
     if not policy:
         return jobs
     transfer_syntax = str(policy.get("secondary_capture_transfer_syntax") or "").strip()
-    if not transfer_syntax:
+    series_mode = str(policy.get("secondary_capture_series_mode") or "").strip()
+    if not transfer_syntax and not series_mode:
         return jobs
 
     configured_jobs: list[dict] = []
     for job in jobs:
         configured = dict(job)
-        configured["secondary_capture_transfer_syntax"] = transfer_syntax
+        if transfer_syntax:
+            configured["secondary_capture_transfer_syntax"] = transfer_syntax
+        if series_mode:
+            configured["secondary_capture_series_mode"] = series_mode
         configured_jobs.append(configured)
     return configured_jobs
 
