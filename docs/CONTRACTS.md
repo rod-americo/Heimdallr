@@ -187,7 +187,9 @@ Resident services own concurrency independently:
 
 - `prepare_watchdog.max_parallel_cases` controls studies prepared concurrently;
   `series_conversion_workers` and `phase_detection.max_parallel` control work
-  inside those studies. Conversion and phase use separate executors; the phase
+  inside those studies. `phase_detection.enabled` defaults to `true`; when
+  disabled, converted candidates preserve `phase=unknown` and phase timing
+  counters remain zero. Conversion and phase use separate executors; the phase
   ceiling remains global within the prepare service.
 - `segmentation_pipeline.execution.max_parallel_cases` controls studies being
   segmented concurrently.

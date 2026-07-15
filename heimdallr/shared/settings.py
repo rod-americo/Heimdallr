@@ -486,6 +486,12 @@ TOTALSEG_GET_PHASE_DEVICE = _config_str(
     ("prepare_watchdog", "phase_detection", "device"),
     _default_totalseg_get_phase_device() or "",
 )
+TOTALSEG_GET_PHASE_ENABLED = _config_bool(
+    "HEIMDALLR_TOTALSEG_GET_PHASE_ENABLED",
+    INTAKE_PIPELINE_CONFIG,
+    ("prepare_watchdog", "phase_detection", "enabled"),
+    True,
+)
 TOTALSEG_GET_PHASE_TIMEOUT_SECONDS = _config_int(
     "HEIMDALLR_TOTALSEG_GET_PHASE_TIMEOUT_SECONDS",
     INTAKE_PIPELINE_CONFIG,

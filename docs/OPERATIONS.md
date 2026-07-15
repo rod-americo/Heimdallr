@@ -132,6 +132,7 @@ Critical environment variables:
 - `HEIMDALLR_DCM2NIIX_BIN`
 - `HEIMDALLR_DCMCJPEG_BIN`
 - `HEIMDALLR_TOTALSEG_GET_PHASE_DEVICE`
+- `HEIMDALLR_TOTALSEG_GET_PHASE_ENABLED`
 - `HEIMDALLR_TOTALSEG_GET_PHASE_TIMEOUT_SECONDS`
 - `HEIMDALLR_TOTALSEG_GET_PHASE_THREAD_LIMIT`
 - `HEIMDALLR_TOTALSEG_GET_PHASE_MAX_PARALLEL`
@@ -296,7 +297,13 @@ input archive after processing. ZIPs claimed from
 the legacy `runtime/intake/uploads/` root remain pipeline transport artifacts
 and are deleted after successful prepare.
 
-`prepare` runs `totalseg_get_phase` once per converted CT series. Set
+`prepare` runs `totalseg_get_phase` once per converted CT series by default.
+Set `prepare_watchdog.phase_detection.enabled=false` in the intake pipeline
+config, or `HEIMDALLR_TOTALSEG_GET_PHASE_ENABLED=false`, to skip phase
+detection while preserving DICOM-to-NIfTI conversion. Skipped candidates keep
+`phase=unknown`, all phase timing counters remain zero, and
+`Pipeline.prepare_stats.phase_detection_enabled` records the effective policy.
+The default is `true` for compatibility. Set
 `HEIMDALLR_TOTALSEG_GET_PHASE_DEVICE` explicitly per host:
 
 - `thor`: `gpu`

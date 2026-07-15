@@ -126,6 +126,51 @@ class TestPrepareConversion(unittest.TestCase):
 
         self.assertEqual(len(phase_calls), 1)
 
+    def test_disabled_phase_detection_keeps_converted_candidates_unknown(self):
+        started = time.perf_counter()
+        converted = [
+            {
+                "uid": "2",
+                "series_number": "2",
+                "modality": "CT",
+                "phase": "native",
+                "phase_detected": True,
+                "phase_seconds": 9.0,
+                "_series_started": started,
+            },
+            {
+                "uid": "1",
+                "series_number": "1",
+                "modality": "CT",
+                "phase": "portal_venous",
+                "phase_detected": True,
+                "phase_seconds": 9.0,
+                "_series_started": started,
+            },
+        ]
+
+        with (
+            patch.object(worker.settings, "TOTALSEG_GET_PHASE_ENABLED", False),
+            patch.object(worker.settings, "PREPARE_SERIES_CONVERSION_WORKERS", 2),
+            patch.object(worker, "_convert_ct_series", side_effect=converted),
+            patch.object(worker, "_detect_ct_series_phase") as detect_mock,
+        ):
+            candidates = worker.process_ct_series_batch(
+                {"2": {}, "1": {}},
+                Path("unused"),
+                Path("unused"),
+            )
+
+        self.assertEqual([candidate["uid"] for candidate in candidates], ["1", "2"])
+        detect_mock.assert_not_called()
+        for candidate in candidates:
+            self.assertEqual(candidate["phase"], "unknown")
+            self.assertFalse(candidate["phase_detected"])
+            self.assertEqual(candidate["phase_seconds"], 0.0)
+            self.assertEqual(candidate["phase_wait_seconds"], 0.0)
+            self.assertEqual(candidate["phase_inference_seconds"], 0.0)
+            self.assertNotIn("_series_started", candidate)
+
     def test_qc_conversion_skips_nonprimary_derived_series(self):
         derived = {"files": ["a", "b"], "ImageType": ["DERIVED", "PRIMARY", "MPR"]}
         original = {"files": ["a", "b"], "ImageType": ["ORIGINAL", "PRIMARY", "AXIAL"]}

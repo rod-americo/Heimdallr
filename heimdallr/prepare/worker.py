@@ -1146,23 +1146,39 @@ def _detect_ct_series_phase(candidate, *, submitted_at=None):
     return candidate
 
 
+def _complete_candidate_without_phase(candidate):
+    """Finalize a converted candidate without scheduling phase detection."""
+    completed_at = time.perf_counter()
+    candidate["phase"] = "unknown"
+    candidate["phase_detected"] = False
+    candidate["phase_seconds"] = 0.0
+    candidate["phase_wait_seconds"] = 0.0
+    candidate["phase_executor_wait_seconds"] = 0.0
+    candidate["phase_capacity_wait_seconds"] = 0.0
+    candidate["phase_accelerator_wait_seconds"] = 0.0
+    candidate["phase_inference_seconds"] = 0.0
+    candidate["series_total_seconds"] = round(
+        completed_at - float(candidate.pop("_series_started", completed_at)),
+        3,
+    )
+    return candidate
+
+
 def process_ct_series_concurrency(uid, s_data, case_output_dir, temp_dir):
     """Backward-compatible one-series conversion and phase wrapper."""
     candidate = _convert_ct_series(uid, s_data, case_output_dir, temp_dir)
     if candidate is None:
         return None
+    if not settings.TOTALSEG_GET_PHASE_ENABLED:
+        return _complete_candidate_without_phase(candidate)
     return _detect_ct_series_phase(candidate, submitted_at=time.perf_counter())
 
 
 def process_ct_series_batch(conversion_series_map, case_output_dir, temp_dir):
     """Pipeline CT conversion and phase detection through independent pools."""
     conversion_workers = max(1, int(settings.PREPARE_SERIES_CONVERSION_WORKERS))
-    phase_workers = max(1, int(settings.TOTALSEG_GET_PHASE_MAX_PARALLEL or 1))
     candidates = []
-    with (
-        concurrent.futures.ThreadPoolExecutor(max_workers=conversion_workers) as conversion_executor,
-        concurrent.futures.ThreadPoolExecutor(max_workers=phase_workers) as phase_executor,
-    ):
+    with concurrent.futures.ThreadPoolExecutor(max_workers=conversion_workers) as conversion_executor:
         conversion_futures = [
             conversion_executor.submit(
                 _convert_ct_series,
@@ -1173,23 +1189,35 @@ def process_ct_series_batch(conversion_series_map, case_output_dir, temp_dir):
             )
             for uid, series_data in conversion_series_map.items()
         ]
-        phase_futures = []
-        for future in concurrent.futures.as_completed(conversion_futures):
-            candidate = future.result()
-            if candidate is None:
-                continue
-            submitted_at = time.perf_counter()
-            phase_futures.append(
-                phase_executor.submit(
-                    _detect_ct_series_phase,
-                    candidate,
-                    submitted_at=submitted_at,
-                )
+        if not settings.TOTALSEG_GET_PHASE_ENABLED:
+            for future in concurrent.futures.as_completed(conversion_futures):
+                candidate = future.result()
+                if candidate is not None:
+                    candidates.append(_complete_candidate_without_phase(candidate))
+            return sorted(
+                candidates,
+                key=lambda item: (str(item["series_number"]), str(item["uid"])),
             )
-        for future in concurrent.futures.as_completed(phase_futures):
-            candidate = future.result()
-            if candidate is not None:
-                candidates.append(candidate)
+
+        phase_workers = max(1, int(settings.TOTALSEG_GET_PHASE_MAX_PARALLEL or 1))
+        phase_futures = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=phase_workers) as phase_executor:
+            for future in concurrent.futures.as_completed(conversion_futures):
+                candidate = future.result()
+                if candidate is None:
+                    continue
+                submitted_at = time.perf_counter()
+                phase_futures.append(
+                    phase_executor.submit(
+                        _detect_ct_series_phase,
+                        candidate,
+                        submitted_at=submitted_at,
+                    )
+                )
+            for future in concurrent.futures.as_completed(phase_futures):
+                candidate = future.result()
+                if candidate is not None:
+                    candidates.append(candidate)
     return sorted(candidates, key=lambda item: (str(item["series_number"]), str(item["uid"])))
 
 
@@ -1892,7 +1920,9 @@ def process_zip(zip_path):
             prepare_stats["qc_series_skipped_before_conversion"] = (
                 len(detected_series_map) - len(conversion_series_map)
             )
+        phase_detection_enabled = bool(settings.TOTALSEG_GET_PHASE_ENABLED)
         phase_detection_available = Path(TOTALSEG_GET_PHASE_BIN).exists() or shutil.which(TOTALSEG_GET_PHASE_BIN) is not None
+        prepare_stats["phase_detection_enabled"] = phase_detection_enabled
         prepare_stats["phase_detection_available"] = phase_detection_available
         
         if exam_modality == "MR":

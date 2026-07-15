@@ -165,7 +165,9 @@ the scanned instances grouped by DICOM series inside the case workspace, records
 candidate-series geometry, converts DICOM to NIfTI, writes study metadata, and
 enqueues segmentation. CT conversion and phase detection are separate bounded
 pools: completed conversions feed the phase pool without phase capacity
-blocking remaining conversions. When QC is enabled, deterministic derived and
+blocking remaining conversions. Hosts may disable phase detection independently;
+converted CT candidates then retain `phase=unknown` without entering the phase
+executor. When QC is enabled, deterministic derived and
 localizer series remain inventoried but avoid additional conversion and phase
 work unless the primary pipeline already requires them. Its case concurrency,
 per-case series conversion pool, and phase-detector concurrency are independent

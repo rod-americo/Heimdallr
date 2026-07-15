@@ -9,6 +9,7 @@
     "max_parallel_cases": 1,
     "series_conversion_workers": 5,
     "phase_detection": {
+      "enabled": true,
       "device": "cpu",
       "timeout_seconds": 120,
       "thread_limit": 1,
