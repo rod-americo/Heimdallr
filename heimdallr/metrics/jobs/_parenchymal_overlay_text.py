@@ -34,6 +34,7 @@ def build_overlay_text(
     organ_measurements: dict[str, dict],
     locale: str,
     hepatic_steatosis: dict | None = None,
+    renal_anatomy_qc: dict | None = None,
 ) -> list[str]:
     """Build localized summary lines for the parenchymal organ overlay."""
     return [
@@ -42,6 +43,7 @@ def build_overlay_text(
             organ_measurements=organ_measurements,
             locale=locale,
             hepatic_steatosis=hepatic_steatosis,
+            renal_anatomy_qc=renal_anatomy_qc,
         )
     ]
 
@@ -93,6 +95,7 @@ def build_overlay_lines(
     organ_measurements: dict[str, dict],
     locale: str,
     hepatic_steatosis: dict | None = None,
+    renal_anatomy_qc: dict | None = None,
 ) -> list[OverlayTextLine]:
     """Build localized overlay lines and preserve volume alert spans."""
     summary_lines = [OverlayTextLine(translate("parenchymal.overlay.title", locale=locale))]
@@ -111,6 +114,26 @@ def build_overlay_lines(
                 steatosis_line = _steatosis_line(hepatic_steatosis, locale=locale)
                 if steatosis_line is not None:
                     summary_lines.append(steatosis_line)
+            elif organ_key in {"kidney_right", "kidney_left"} and status in {
+                "ambiguous_multiple_components",
+                "suspected_allograft_without_native",
+                "anatomy_unresolved",
+                "native_with_unclassified_components",
+            }:
+                if status == "ambiguous_multiple_components":
+                    suffix = "multiple_components"
+                elif status == "suspected_allograft_without_native":
+                    suffix = "native_not_identified"
+                else:
+                    suffix = "anatomy_unresolved"
+                summary_lines.append(
+                    OverlayTextLine(
+                        translate(
+                            f"parenchymal.overlay.organ.{organ_key}.{suffix}",
+                            locale=locale,
+                        )
+                    )
+                )
             continue
 
         if hu_mean is None:
@@ -148,6 +171,21 @@ def build_overlay_lines(
             steatosis_line = _steatosis_line(hepatic_steatosis, locale=locale)
             if steatosis_line is not None:
                 summary_lines.append(steatosis_line)
+
+    for allograft in (renal_anatomy_qc or {}).get("suspected_renal_allografts", []):
+        volume_cm3 = allograft.get("volume_cm3")
+        if volume_cm3 is None:
+            continue
+        side = "right" if str(allograft.get("source_mask") or "").endswith("right") else "left"
+        summary_lines.append(
+            OverlayTextLine(
+                translate(
+                    f"parenchymal.overlay.suspected_allograft.{side}",
+                    locale=locale,
+                    volume=format_integer(volume_cm3, locale=locale),
+                )
+            )
+        )
     return summary_lines
 
 

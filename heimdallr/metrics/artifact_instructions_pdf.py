@@ -620,7 +620,12 @@ def _build_l1_module(payload: dict[str, Any]) -> InstructionModule:
     return InstructionModule("bone_health_l1_hu", _t("module.bone.title", locale=locale), rows)
 
 
-def _format_parenchymal_organs_summary(organs: dict[str, Any], *, locale: str | None = None) -> str:
+def _format_parenchymal_organs_summary(
+    organs: dict[str, Any],
+    *,
+    renal_anatomy_qc: dict[str, Any] | None = None,
+    locale: str | None = None,
+) -> str:
     order = [
         ("liver", _t("parenchymal.organ.liver", locale=locale)),
         ("spleen", _t("parenchymal.organ.spleen", locale=locale)),
@@ -635,7 +640,20 @@ def _format_parenchymal_organs_summary(organs: dict[str, Any], *, locale: str | 
             continue
         status = str(organ.get("analysis_status", "") or "")
         if status != "complete":
-            lines.append(_t("parenchymal.organs.incomplete", locale=locale, label=label))
+            if key in {"kidney_right", "kidney_left"} and status in {
+                "ambiguous_multiple_components",
+                "suspected_allograft_without_native",
+                "anatomy_unresolved",
+            }:
+                lines.append(
+                    _t(
+                        "parenchymal.organs.renal_anatomy_unresolved",
+                        locale=locale,
+                        label=label,
+                    )
+                )
+            else:
+                lines.append(_t("parenchymal.organs.incomplete", locale=locale, label=label))
             continue
         volume = _format_number(organ.get("volume_cm3"), 0, "cm³")
         attenuation = _format_number(organ.get("hu_mean"), 0, "UH")
@@ -643,6 +661,18 @@ def _format_parenchymal_organs_summary(organs: dict[str, Any], *, locale: str | 
             lines.append(_t("parenchymal.organs.volume_only", locale=locale, label=label, volume=volume))
         else:
             lines.append(_t("parenchymal.organs.volume_density", locale=locale, label=label, volume=volume, attenuation=attenuation))
+    for allograft in (renal_anatomy_qc or {}).get("suspected_renal_allografts", []):
+        volume_cm3 = allograft.get("volume_cm3")
+        if volume_cm3 is None:
+            continue
+        side = "right" if str(allograft.get("source_mask") or "").endswith("right") else "left"
+        lines.append(
+            _t(
+                f"parenchymal.organs.suspected_allograft.{side}",
+                locale=locale,
+                volume=_format_number(volume_cm3, 0, "cm³"),
+            )
+        )
     return "\n".join(lines) if lines else _t("parenchymal.organs.none", locale=locale)
 
 
@@ -737,7 +767,15 @@ def _build_parenchymal_module(payload: dict[str, Any]) -> InstructionModule:
         ),
         (
             _t("parenchymal.row.organs", locale=locale),
-            _format_parenchymal_organs_summary(organs, locale=locale),
+            _format_parenchymal_organs_summary(
+                organs,
+                renal_anatomy_qc=(
+                    measurement.get("renal_anatomy_qc")
+                    if isinstance(measurement.get("renal_anatomy_qc"), dict)
+                    else None
+                ),
+                locale=locale,
+            ),
         ),
         (
             _t("parenchymal.row.expected_values", locale=locale),

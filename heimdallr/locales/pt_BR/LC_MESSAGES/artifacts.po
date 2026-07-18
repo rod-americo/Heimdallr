@@ -112,6 +112,26 @@ msgstr "Rim esquerdo: {volume} cm³ | {hu} {attenuation_unit}"
 msgid "parenchymal.overlay.organ.kidney_left.volume_only"
 msgstr "Rim esquerdo: {volume} cm³"
 
+msgid "parenchymal.overlay.organ.kidney_right.multiple_components"
+msgstr "Rim direito: agregado omitido (múltiplos componentes)"
+msgid "parenchymal.overlay.organ.kidney_left.multiple_components"
+msgstr "Rim esquerdo: agregado omitido (múltiplos componentes)"
+
+msgid "parenchymal.overlay.organ.kidney_right.native_not_identified"
+msgstr "Rim nativo direito: não identificado com confiança"
+msgid "parenchymal.overlay.organ.kidney_left.native_not_identified"
+msgstr "Rim nativo esquerdo: não identificado com confiança"
+
+msgid "parenchymal.overlay.organ.kidney_right.anatomy_unresolved"
+msgstr "Rim direito: volume omitido pelo QC anatômico"
+msgid "parenchymal.overlay.organ.kidney_left.anatomy_unresolved"
+msgstr "Rim esquerdo: volume omitido pelo QC anatômico"
+
+msgid "parenchymal.overlay.suspected_allograft.right"
+msgstr "Provável enxerto renal direito: {volume} cm³"
+msgid "parenchymal.overlay.suspected_allograft.left"
+msgstr "Provável enxerto renal esquerdo: {volume} cm³"
+
 msgid "parenchymal.overlay.steatosis.kvp_out_of_range"
 msgstr "Esteatose: exame fora da faixa de KVp"
 
@@ -137,7 +157,7 @@ msgid "parenchymal.overlay.series_description"
 msgstr "Heimdallr Overlay de Órgãos Parenquimatosos 5 mm"
 
 msgid "parenchymal.overlay.derivation_description"
-msgstr "Reconstrução axial de 5 mm com overlays de órgãos parenquimatosos (fígado, baço, pâncreas, rim direito, rim esquerdo)"
+msgstr "Reconstrução axial de 5 mm com overlays de órgãos parenquimatosos e QC anatômico renal por componentes"
 
 msgid "brain_volumetry.overlay.title"
 msgstr "Volumetria cerebral:"

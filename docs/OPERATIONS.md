@@ -443,6 +443,17 @@ TotalSegmentator `pleural_pericard_effusion`, and
 mask. The `total/skull.nii.gz` mask is
 optional crop and diagnostic context; skull truncation is reported but does not
 block the head workflow.
+
+Parenchymal organ volumetry performs component-aware renal anatomy QC. It uses
+complete `total/vertebrae_L3.nii.gz` and `total/vertebrae_L4.nii.gz` masks as
+topographic references when available, preserves components below 5 cm³ only
+for audit, publishes a unique superior component as the native kidney, and
+reports an inferior pelvic component separately as a suspected renal allograft.
+It never treats topography alone as transplant confirmation. If more than one
+significant component remains anatomically ambiguous, the combined kidney
+volume is withheld. Restart the metrics worker after deploying this behavior;
+restart the control plane as well for the dashboard's separate allograft card.
+
 The `pleural_pericard_effusion` task does not support TotalSegmentator `--fast`.
 Configure its accelerator independently as `--device mps` on local Apple
 Silicon and `--device gpu` on `thor`. Its metrics job publishes results and

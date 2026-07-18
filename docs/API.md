@@ -101,6 +101,13 @@ The automatic CT pipeline passes the active segmentation profile's
 one parenchymal organ mask is present, and runs `cerebral_bleed` plus
 `brain_structures` only when the `total/brain.nii.gz` mask is present,
 geometry-compatible, non-empty, and does not touch scan bounds.
+Parenchymal-organ results expose component-aware renal decisions under
+`measurement.renal_anatomy_qc`. Existing `measurement.organs.kidney_right` and
+`kidney_left` fields represent a uniquely identified native component when L3/L4
+topographic QC is available; raw lateralized-mask aggregates remain in their
+`raw_mask_*` audit fields. Pelvic components are returned separately under
+`suspected_renal_allografts`, and ambiguous aggregates are not published as
+kidney volumes.
 For L3 muscle area and VAT/SAT, the L3 tissue masks are cleaned by removing
 components that touch dilated, near-slice projections of upper-appendicular
 `total` masks when available, and the raw and cleaned pixel/area values are

@@ -270,6 +270,15 @@ msgstr "left kidney"
 msgid "parenchymal.organs.incomplete"
 msgstr "– {label}: incomplete analysis."
 
+msgid "parenchymal.organs.renal_anatomy_unresolved"
+msgstr "– {label}: aggregate volume withheld by renal anatomy QC."
+
+msgid "parenchymal.organs.suspected_allograft.right"
+msgstr "– suspected right renal allograft: {volume}."
+
+msgid "parenchymal.organs.suspected_allograft.left"
+msgstr "– suspected left renal allograft: {volume}."
+
 msgid "parenchymal.organs.volume_only"
 msgstr "– {label}: {volume}."
 

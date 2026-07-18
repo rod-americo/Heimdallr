@@ -270,6 +270,15 @@ msgstr "rim esquerdo"
 msgid "parenchymal.organs.incomplete"
 msgstr "– {label}: análise incompleta."
 
+msgid "parenchymal.organs.renal_anatomy_unresolved"
+msgstr "– {label}: volume agregado omitido pelo QC anatômico renal."
+
+msgid "parenchymal.organs.suspected_allograft.right"
+msgstr "– provável enxerto renal direito: {volume}."
+
+msgid "parenchymal.organs.suspected_allograft.left"
+msgstr "– provável enxerto renal esquerdo: {volume}."
+
 msgid "parenchymal.organs.volume_only"
 msgstr "– {label}: {volume}."
 

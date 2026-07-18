@@ -16,6 +16,7 @@ from heimdallr.metrics.analysis.hepatic_steatosis import (
     assess_hepatic_steatosis,
     estimate_pdff_from_unenhanced_ct_hu,
 )
+from heimdallr.metrics.analysis.renal_anatomy import analyze_renal_anatomy
 from heimdallr.metrics.jobs._bone_job_common import (
     load_ct_volume,
     load_job_config,
@@ -59,6 +60,11 @@ ORGAN_DEFINITIONS = [
 OVERLAY_ONLY_DEFINITIONS = [
     ("vertebra_l1", "L1 vertebra", "vertebrae_L1.nii.gz", (255, 80, 80)),
 ]
+RENAL_QC_REFERENCE_DEFINITIONS = [
+    ("vertebra_l3", "vertebrae_L3.nii.gz"),
+    ("vertebra_l4", "vertebrae_L4.nii.gz"),
+]
+SUSPECTED_RENAL_ALLOGRAFT_COLOR = (255, 80, 180)
 
 
 def _load_overlay_font(size: int) -> ImageFont.ImageFont:
@@ -242,6 +248,102 @@ def _compute_overlay_mask_measurement(
     }
 
 
+def _apply_renal_anatomy_measurements(
+    organ_masks: dict[str, np.ndarray | None],
+    organ_measurements: dict[str, dict[str, Any]],
+    ct_data: np.ndarray,
+    affine: np.ndarray,
+    spacing_xyz: tuple[float, float, float],
+    reference_masks: dict[str, np.ndarray | None],
+    *,
+    suppress_density: bool,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    renal_anatomy_qc, selected_native_components, overlay_components = analyze_renal_anatomy(
+        {
+            "kidney_right": organ_masks.get("kidney_right"),
+            "kidney_left": organ_masks.get("kidney_left"),
+        },
+        ct_data,
+        affine,
+        spacing_xyz,
+        reference_masks,
+        suppress_density=suppress_density,
+    )
+    organ_labels = {
+        "kidney_right": "Right kidney",
+        "kidney_left": "Left kidney",
+    }
+    for organ_key, organ_label in organ_labels.items():
+        raw_measurement = dict(organ_measurements[organ_key])
+        native_component = selected_native_components.get(organ_key)
+        kidney_qc = renal_anatomy_qc["kidneys"][organ_key]
+        common_audit = {
+            "measurement_role": "native_kidney",
+            "native_component_identified": native_component is not None,
+            "source_mask_component_id": kidney_qc.get("native_component_id"),
+            "renal_anatomy_classification_status": kidney_qc.get("classification_status"),
+            "raw_mask_voxel_count": raw_measurement.get("voxel_count"),
+            "raw_mask_volume_cm3": raw_measurement.get("attenuation_sample_volume_cm3"),
+            "raw_mask_hu_mean": raw_measurement.get("hu_mean"),
+            "raw_mask_hu_std": raw_measurement.get("hu_std"),
+            "raw_mask_complete": raw_measurement.get("complete"),
+        }
+        if native_component is not None:
+            measurement = {
+                "organ_key": organ_key,
+                "organ_label": organ_label,
+                "analysis_status": (
+                    "complete" if native_component.get("complete") else "incomplete"
+                ),
+                "complete": bool(native_component.get("complete")),
+                "truncated_at_scan_bounds": bool(
+                    native_component.get("truncated_at_scan_bounds")
+                ),
+                "axial_slice_extent": native_component.get("axial_slice_extent"),
+                "voxel_count": int(native_component.get("voxel_count") or 0),
+                "attenuation_sample_volume_cm3": native_component.get(
+                    "attenuation_sample_volume_cm3"
+                ),
+                "attenuation_sample_slice_count": int(
+                    native_component.get("attenuation_sample_slice_count") or 0
+                ),
+                "attenuation_sample_axial_extent_mm": native_component.get(
+                    "attenuation_sample_axial_extent_mm"
+                ),
+                "observed_volume_cm3": native_component.get("observed_volume_cm3"),
+                "volume_cm3": native_component.get("volume_cm3"),
+                "hu_mean": native_component.get("hu_mean"),
+                "hu_std": native_component.get("hu_std"),
+                "estimated_pdff_percent": None,
+            }
+            measurement.update(common_audit)
+            organ_measurements[organ_key] = measurement
+            continue
+
+        if raw_measurement.get("analysis_status") in {"missing", "empty"}:
+            raw_measurement.update(common_audit)
+            organ_measurements[organ_key] = raw_measurement
+            continue
+
+        raw_measurement.update(
+            {
+                "analysis_status": str(kidney_qc.get("classification_status") or "anatomy_unresolved"),
+                "complete": False,
+                "voxel_count": 0,
+                "attenuation_sample_volume_cm3": None,
+                "attenuation_sample_slice_count": 0,
+                "attenuation_sample_axial_extent_mm": None,
+                "observed_volume_cm3": None,
+                "volume_cm3": None,
+                "hu_mean": None,
+                "hu_std": None,
+            }
+        )
+        raw_measurement.update(common_audit)
+        organ_measurements[organ_key] = raw_measurement
+    return renal_anatomy_qc, overlay_components
+
+
 def _ct_to_rgb(ct_slice: np.ndarray) -> np.ndarray:
     ct_clipped = np.clip(np.asarray(ct_slice, dtype=np.float32), WINDOW_MIN, WINDOW_MAX)
     scaled = ((ct_clipped - WINDOW_MIN) / (WINDOW_MAX - WINDOW_MIN) * 255.0).astype(np.uint8)
@@ -415,6 +517,10 @@ def main() -> int:
             mask_key: total_dir / filename
             for mask_key, _label, filename, _color in OVERLAY_ONLY_DEFINITIONS
         }
+        renal_qc_reference_paths = {
+            mask_key: total_dir / filename
+            for mask_key, filename in RENAL_QC_REFERENCE_DEFINITIONS
+        }
         payload["inputs"] = {
             "canonical_nifti": str(ct_path.relative_to(case_dir)) if ct_path and ct_path.exists() else None,
             "organ_masks": {
@@ -424,6 +530,10 @@ def main() -> int:
             "overlay_only_masks": {
                 mask_key: str(path.relative_to(case_dir)) if path.exists() else None
                 for mask_key, path in overlay_only_paths.items()
+            },
+            "renal_qc_reference_masks": {
+                mask_key: str(path.relative_to(case_dir)) if path.exists() else None
+                for mask_key, path in renal_qc_reference_paths.items()
             },
             "target_slice_thickness_mm": TARGET_SLICE_THICKNESS_MM,
         }
@@ -450,6 +560,7 @@ def main() -> int:
         overlay_only_masks: dict[str, np.ndarray | None] = {}
         organ_measurements: dict[str, dict[str, Any]] = {}
         overlay_only_measurements: dict[str, dict[str, Any]] = {}
+        renal_qc_reference_masks: dict[str, np.ndarray | None] = {}
 
         for organ_key, organ_label, _filename, _color in ORGAN_DEFINITIONS:
             mask_path = organ_paths[organ_key]
@@ -482,6 +593,25 @@ def main() -> int:
                 overlay_mask,
             )
 
+        for mask_key, _filename in RENAL_QC_REFERENCE_DEFINITIONS:
+            mask_path = renal_qc_reference_paths[mask_key]
+            reference_mask = None
+            if mask_path.exists():
+                _, loaded_mask = load_nifti_mask(mask_path)
+                if loaded_mask.shape == ct_data.shape:
+                    reference_mask = loaded_mask
+            renal_qc_reference_masks[mask_key] = reference_mask
+
+        renal_anatomy_qc, renal_overlay_components = _apply_renal_anatomy_measurements(
+            organ_masks,
+            organ_measurements,
+            ct_data,
+            ct_img.affine,
+            spacing_xyz,
+            renal_qc_reference_masks,
+            suppress_density=suppress_density,
+        )
+
         liver_measurement = organ_measurements.get("liver") or {}
         spleen_measurement = organ_measurements.get("spleen") or {}
         hepatic_steatosis = assess_hepatic_steatosis(
@@ -508,6 +638,7 @@ def main() -> int:
                 "job_status": "missing_organs",
                 "organs": organ_measurements,
                 "overlay_only_masks": overlay_only_measurements,
+                "renal_anatomy_qc": renal_anatomy_qc,
             }
             payload["artifacts"] = {"result_json": str(result_path.relative_to(case_dir))}
             write_payload(result_path, payload)
@@ -519,11 +650,21 @@ def main() -> int:
             for organ_key, measurement in organ_measurements.items()
             if measurement.get("volume_cm3") is not None
         ]
+        publishable_allografts = [
+            component
+            for component in renal_anatomy_qc.get("suspected_renal_allografts", [])
+            if component.get("volume_cm3") is not None
+        ]
         steatosis_sample_publishable = bool(
             hepatic_steatosis
             and (hepatic_steatosis.get("sample_qc") or {}).get("liver", {}).get("sufficient")
         )
-        if not publishable_organs and not complete_overlay_only_masks and not steatosis_sample_publishable:
+        if (
+            not publishable_organs
+            and not publishable_allografts
+            and not complete_overlay_only_masks
+            and not steatosis_sample_publishable
+        ):
             payload["status"] = "skipped"
             payload["measurement"] = {
                 "job_status": "no_complete_organ_volume",
@@ -532,6 +673,7 @@ def main() -> int:
                 "hepatic_steatosis": hepatic_steatosis,
                 "organs": organ_measurements,
                 "overlay_only_masks": overlay_only_measurements,
+                "renal_anatomy_qc": renal_anatomy_qc,
             }
             payload["artifacts"] = {"result_json": str(result_path.relative_to(case_dir))}
             payload["dicom_exports"] = []
@@ -558,6 +700,7 @@ def main() -> int:
             payload["measurement"] = {
                 "job_status": "empty_overlay",
                 "organs": organ_measurements,
+                "renal_anatomy_qc": renal_anatomy_qc,
             }
             payload["artifacts"] = {"result_json": str(result_path.relative_to(case_dir))}
             write_payload(result_path, payload)
@@ -577,16 +720,50 @@ def main() -> int:
             dicom_dir = metric_dir / "dicom"
             if emit_dicom:
                 dicom_dir.mkdir(parents=True, exist_ok=True)
+            renal_colors = {
+                "kidney_right": next(
+                    color
+                    for key, _label, _filename, color in ORGAN_DEFINITIONS
+                    if key == "kidney_right"
+                ),
+                "kidney_left": next(
+                    color
+                    for key, _label, _filename, color in ORGAN_DEFINITIONS
+                    if key == "kidney_left"
+                ),
+            }
             for output_idx, slab in enumerate(export_slabs, start=1):
                 source_indices = slab["source_indices"]
                 masks_for_slice = []
                 for organ_key, _organ_label, _filename, color in ORGAN_DEFINITIONS:
+                    if organ_key in {"kidney_right", "kidney_left"}:
+                        continue
                     mask = organ_masks[organ_key]
                     if mask is None:
                         continue
                     slice_mask = _mask_slab(mask, source_indices)
                     if slice_mask.any():
                         masks_for_slice.append((slice_mask, color))
+                allograft_slices: list[tuple[str, np.ndarray]] = []
+                for component in renal_overlay_components:
+                    slice_mask = _mask_slab(component["mask"], source_indices)
+                    if not slice_mask.any():
+                        continue
+                    allograft_slices.append((str(component["source_mask"]), slice_mask))
+                for organ_key in ("kidney_right", "kidney_left"):
+                    mask = organ_masks.get(organ_key)
+                    if mask is None:
+                        continue
+                    slice_mask = _mask_slab(mask, source_indices)
+                    for source_mask, allograft_slice in allograft_slices:
+                        if source_mask == organ_key:
+                            slice_mask &= ~allograft_slice
+                    if slice_mask.any():
+                        masks_for_slice.append((slice_mask, renal_colors[organ_key]))
+                for _source_mask, allograft_slice in allograft_slices:
+                    masks_for_slice.append(
+                        (allograft_slice, SUSPECTED_RENAL_ALLOGRAFT_COLOR)
+                    )
                 for mask_key, _mask_label, _filename, color in OVERLAY_ONLY_DEFINITIONS:
                     if mask_key not in complete_overlay_only_masks:
                         continue
@@ -601,6 +778,7 @@ def main() -> int:
                     organ_measurements=organ_measurements,
                     locale=artifact_locale,
                     hepatic_steatosis=hepatic_steatosis,
+                    renal_anatomy_qc=renal_anatomy_qc,
                 )
                 rgb = _render_slice_rgb(
                     _average_ct_slab(ct_data, source_indices),
@@ -645,7 +823,7 @@ def main() -> int:
             "measurement": {
                 "job_status": (
                     "complete"
-                    if publishable_organs
+                    if publishable_organs or publishable_allografts
                     else "attenuation_only"
                     if steatosis_sample_publishable
                     else "overlay_only"
@@ -660,6 +838,7 @@ def main() -> int:
                 "selected_phase": selected_phase or None,
                 "density_suppressed_due_to_contrast": bool(suppress_density),
                 "hepatic_steatosis": hepatic_steatosis,
+                "renal_anatomy_qc": renal_anatomy_qc,
                 "source_slice_count": int(ct_data.shape[2]),
                 "exported_slice_count": len(dicom_exports),
                 "exported_slabs": export_slabs,

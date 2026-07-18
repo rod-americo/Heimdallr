@@ -15,6 +15,54 @@ Each decision should include:
 
 ## Decisions
 
+### 2026-07-18 - Separate native kidneys from suspected pelvic allografts
+
+**Context**
+
+TotalSegmentator provides lateralized kidney masks but no renal-allograft
+class. In a transplant case, `kidney_right.nii.gz` contained a 30.15 cm³ native
+kidney and a disconnected 150.30 cm³ pelvic renal component. Publishing their
+180.45 cm³ sum as the right kidney concealed the native kidney's low-volume
+alert and assigned one anatomical meaning to two different structures.
+
+**Decision**
+
+Decompose each kidney mask with 26-connectivity. Preserve every component in an
+audit, but require 5 cm³ before a component influences multiple-component QC.
+When L3 and L4 references are available, classify a component centroid at or
+superior to L3 as native-region and one at or inferior to L4 as pelvic. Publish
+a unique native-region component through the existing lateralized kidney field
+and report pelvic components separately as suspected renal allografts. Preserve
+the raw source-mask aggregate only in audit fields. Withhold the combined kidney
+volume when no unique native candidate can be resolved. Apply the `<100 cm³`
+presentation alert only to native-kidney measurements, never to a suspected
+allograft.
+
+**Impact**
+
+- A renal transplant pattern no longer normalizes an atrophic native kidney by
+  adding the graft volume.
+- JSON, DICOM overlays, artifact instructions, and the dashboard distinguish
+  native measurements from suspected allografts.
+- Metrics workers must restart for calculation and DICOM changes; the control
+  plane must restart for the dashboard presentation change.
+
+**Tradeoff**
+
+Topography cannot distinguish an allograft from every ectopic native kidney, so
+the output deliberately says “suspected” and records the classification rule.
+The 5 cm³ engineering threshold prevents tiny segmentation islands from
+creating multiplicity but is not a clinically validated cutoff.
+
+**Alternatives rejected**
+
+- Keep the lateralized aggregate, which can conceal native-kidney atrophy.
+- Diagnose transplantation from pelvic position alone.
+- Discard small components from the audit, which would remove useful evidence
+  for threshold review.
+
+---
+
 ### 2026-07-14 - Require half-mask liver overlap for hepatic lesions
 
 **Context**

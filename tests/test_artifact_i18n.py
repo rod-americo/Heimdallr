@@ -309,6 +309,49 @@ class TestArtifactI18n(unittest.TestCase):
         }
         self.assertEqual(alert_text, {"1.801", "99"})
 
+    def test_parenchymal_overlay_separates_suspected_allograft_without_alert(self):
+        lines = build_parenchymal_overlay_lines(
+            organ_measurements={
+                "kidney_right": {
+                    "analysis_status": "complete",
+                    "volume_cm3": 30.15,
+                    "hu_mean": 18.0,
+                },
+                "kidney_left": {
+                    "analysis_status": "complete",
+                    "volume_cm3": 33.33,
+                    "hu_mean": 17.0,
+                },
+            },
+            locale="pt_BR",
+            renal_anatomy_qc={
+                "suspected_renal_allografts": [
+                    {
+                        "source_mask": "kidney_right",
+                        "volume_cm3": 150.3,
+                    }
+                ]
+            },
+        )
+
+        self.assertEqual(
+            [line.text for line in lines],
+            [
+                "Órgãos parenquimatosos:",
+                "Rim direito: 30 cm³ | 18 UH",
+                "Rim esquerdo: 33 cm³ | 17 UH",
+                "Provável enxerto renal direito: 150 cm³",
+            ],
+        )
+        self.assertEqual(
+            {
+                line.text[line.alert_span[0] : line.alert_span[1]]
+                for line in lines
+                if line.alert_span is not None
+            },
+            {"30", "33"},
+        )
+
     def test_parenchymal_overlay_adds_localized_steatosis_line_below_liver(self):
         lines = build_parenchymal_overlay_text(
             organ_measurements={

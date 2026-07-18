@@ -112,6 +112,26 @@ msgstr "Left kidney: {volume} cm³ | {hu} {attenuation_unit}"
 msgid "parenchymal.overlay.organ.kidney_left.volume_only"
 msgstr "Left kidney: {volume} cm³"
 
+msgid "parenchymal.overlay.organ.kidney_right.multiple_components"
+msgstr "Right kidney: aggregate withheld (multiple components)"
+msgid "parenchymal.overlay.organ.kidney_left.multiple_components"
+msgstr "Left kidney: aggregate withheld (multiple components)"
+
+msgid "parenchymal.overlay.organ.kidney_right.native_not_identified"
+msgstr "Right native kidney: not confidently identified"
+msgid "parenchymal.overlay.organ.kidney_left.native_not_identified"
+msgstr "Left native kidney: not confidently identified"
+
+msgid "parenchymal.overlay.organ.kidney_right.anatomy_unresolved"
+msgstr "Right kidney: volume withheld by anatomy QC"
+msgid "parenchymal.overlay.organ.kidney_left.anatomy_unresolved"
+msgstr "Left kidney: volume withheld by anatomy QC"
+
+msgid "parenchymal.overlay.suspected_allograft.right"
+msgstr "Suspected right renal allograft: {volume} cm³"
+msgid "parenchymal.overlay.suspected_allograft.left"
+msgstr "Suspected left renal allograft: {volume} cm³"
+
 msgid "parenchymal.overlay.steatosis.kvp_out_of_range"
 msgstr "Steatosis: exam outside kVp range"
 
@@ -137,7 +157,7 @@ msgid "parenchymal.overlay.series_description"
 msgstr "Heimdallr Parenchymal Organ Overlay 5 mm"
 
 msgid "parenchymal.overlay.derivation_description"
-msgstr "5 mm axial reconstruction with parenchymal-organ overlays (liver, spleen, pancreas, right kidney, left kidney)"
+msgstr "5 mm axial reconstruction with parenchymal-organ overlays and component-aware renal anatomy QC"
 
 msgid "brain_volumetry.overlay.title"
 msgstr "Brain volumetry:"

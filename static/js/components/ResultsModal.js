@@ -197,6 +197,7 @@ function renderResults(results, caseId, metadata = {}) {
     const parenchymalMetric = jobMetrics.parenchymal_organ_volumetry || null;
     const parenchymalMeasurement = parenchymalMetric?.measurement || null;
     const parenchymalOrgans = parenchymalMeasurement?.organs || null;
+    const renalAnatomyQc = parenchymalMeasurement?.renal_anatomy_qc || null;
     if (parenchymalMetric?.status === 'done' && parenchymalOrgans) {
         const organCards = [
             ['liver', 'Figado'],
@@ -208,17 +209,32 @@ function renderResults(results, caseId, metadata = {}) {
             const organ = parenchymalOrgans[key];
             if (!organ || organ.analysis_status === 'missing') return '';
             const status = organ.complete ? 'Completo' : 'Parcial';
-            const volume = organ.observed_volume_cm3;
+            const volume = organ.volume_cm3 ?? organ.observed_volume_cm3;
             const huMean = organ.hu_mean;
+            const anatomyWithheld = key.startsWith('kidney_') && volume === null;
             return `
                 <div class="result-card">
                     <div class="result-label">${label}</div>
-                    <div class="result-value">${formatFixed(volume, 0)} <span class="result-unit">cm³</span></div>
-                    <div class="organ-hu">${formatFixed(huMean, 0)} HU</div>
-                    <div class="organ-hu">${status}</div>
+                    <div class="result-value">${anatomyWithheld ? 'Omitido pelo QC anatômico' : `${formatFixed(volume, 0)} <span class="result-unit">cm³</span>`}</div>
+                    ${anatomyWithheld ? '' : `<div class="organ-hu">${formatFixed(huMean, 0)} HU</div>`}
+                    <div class="organ-hu">${anatomyWithheld ? 'Anatomia renal ambígua' : status}</div>
                 </div>
             `;
         }).filter(Boolean);
+
+        const allograftCards = (renalAnatomyQc?.suspected_renal_allografts || []).map((component) => {
+            const side = String(component.source_mask || '').endsWith('right') ? 'Direito' : 'Esquerdo';
+            const volume = component.volume_cm3;
+            if (volume === null || volume === undefined) return '';
+            return `
+                <div class="result-card">
+                    <div class="result-label">Provável Enxerto Renal ${side}</div>
+                    <div class="result-value">${formatFixed(volume, 0)} <span class="result-unit">cm³</span></div>
+                    <div class="organ-hu">Classificação topográfica de QC</div>
+                </div>
+            `;
+        }).filter(Boolean);
+        organCards.push(...allograftCards);
 
         if (organCards.length > 0) {
             sections.push(`

@@ -115,6 +115,55 @@ class TestParenchymalOrganVolumetryJob(unittest.TestCase):
         )
         self.assertEqual(lines, ["Parenchymal organs:"])
 
+    def test_ambiguous_multiple_kidney_components_withhold_aggregate_payload(self):
+        shape = (24, 24, 24)
+        spacing = (10.0, 10.0, 10.0)
+        affine = np.diag([10.0, 10.0, 10.0, 1.0])
+        ct = np.zeros(shape, dtype=np.float32)
+        kidney_right = np.zeros(shape, dtype=bool)
+        kidney_right[3:7, 14:18, 16:22] = True
+        kidney_right[14:19, 4:9, 3:9] = True
+        organ_masks = {
+            "kidney_right": kidney_right,
+            "kidney_left": None,
+        }
+        organ_measurements = {
+            "kidney_right": parenchymal_organ_volumetry._compute_mask_measurement(
+                "kidney_right",
+                "Right kidney",
+                kidney_right,
+                ct,
+                spacing,
+            ),
+            "kidney_left": parenchymal_organ_volumetry._compute_mask_measurement(
+                "kidney_left",
+                "Left kidney",
+                None,
+                ct,
+                spacing,
+            ),
+        }
+
+        renal_qc, _overlay_components = (
+            parenchymal_organ_volumetry._apply_renal_anatomy_measurements(
+                organ_masks,
+                organ_measurements,
+                ct,
+                affine,
+                spacing,
+                {},
+                suppress_density=False,
+            )
+        )
+
+        right = organ_measurements["kidney_right"]
+        self.assertEqual(right["analysis_status"], "ambiguous_multiple_components")
+        self.assertIsNone(right["volume_cm3"])
+        self.assertEqual(right["raw_mask_volume_cm3"], 246.0)
+        self.assertEqual(right["raw_mask_voxel_count"], 246)
+        self.assertFalse(right["native_component_identified"])
+        self.assertTrue(renal_qc["multiple_significant_components"])
+
     def test_partial_liver_sample_generates_attenuation_only_overlay(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -276,6 +325,137 @@ class TestParenchymalOrganVolumetryJob(unittest.TestCase):
             self.assertEqual(str(ds.Modality), "OT")
             self.assertLessEqual(max(int(ds.Rows), int(ds.Columns)), 64)
             self.assertEqual(ds.file_meta.TransferSyntaxUID, JPEGLSLossless)
+
+    def test_transplant_pattern_separates_native_and_pelvic_renal_components(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            case_id = "CaseParenchyma_RenalAllograft_20260718_001"
+            case_dir = tmp_path / case_id
+            (case_dir / "metadata").mkdir(parents=True)
+            (case_dir / "derived").mkdir(parents=True)
+            (case_dir / "artifacts" / "total").mkdir(parents=True)
+
+            id_payload = {
+                "CaseID": case_id,
+                "Modality": "CT",
+                "StudyInstanceUID": "1.2.826.0.1.3680043.8.498.18",
+                "PatientName": "Test^Patient",
+                "PatientID": "P018",
+                "Pipeline": {"series_selection": {"SelectedPhase": "native"}},
+            }
+            (case_dir / "metadata" / "id.json").write_text(
+                json.dumps(id_payload),
+                encoding="utf-8",
+            )
+            (case_dir / "metadata" / "metadata.json").write_text(
+                json.dumps(id_payload),
+                encoding="utf-8",
+            )
+            (case_dir / "metadata" / "resultados.json").write_text("{}", encoding="utf-8")
+
+            shape = (24, 24, 24)
+            spacing = (10.0, 10.0, 10.0)
+            ct = np.zeros(shape, dtype=np.float32)
+            kidney_right = np.zeros(shape, dtype=np.float32)
+            kidney_right[3:7, 14:18, 16:22] = 1.0
+            kidney_right[14:19, 4:9, 3:9] = 1.0
+            kidney_left = np.zeros(shape, dtype=np.float32)
+            kidney_left[16:20, 14:18, 15:22] = 1.0
+            vertebra_l3 = np.zeros(shape, dtype=np.float32)
+            vertebra_l3[9:15, 9:15, 13:16] = 1.0
+            vertebra_l4 = np.zeros(shape, dtype=np.float32)
+            vertebra_l4[9:15, 9:15, 9:12] = 1.0
+            ct[kidney_right.astype(bool)] = 40.0
+            ct[3:7, 14:18, 16:22] = 20.0
+            ct[kidney_left.astype(bool)] = 25.0
+
+            write_nifti(case_dir / "derived" / f"{case_id}.nii.gz", ct, spacing=spacing)
+            write_nifti(
+                case_dir / "artifacts" / "total" / "kidney_right.nii.gz",
+                kidney_right,
+                spacing=spacing,
+            )
+            write_nifti(
+                case_dir / "artifacts" / "total" / "kidney_left.nii.gz",
+                kidney_left,
+                spacing=spacing,
+            )
+            write_nifti(
+                case_dir / "artifacts" / "total" / "vertebrae_L3.nii.gz",
+                vertebra_l3,
+                spacing=spacing,
+            )
+            write_nifti(
+                case_dir / "artifacts" / "total" / "vertebrae_L4.nii.gz",
+                vertebra_l4,
+                spacing=spacing,
+            )
+
+            with patch.object(settings, "STUDIES_DIR", tmp_path):
+                with patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "parenchymal_organ_volumetry",
+                        "--case-id",
+                        case_id,
+                        "--job-config-json",
+                        (
+                            '{"generate_overlay": true, '
+                            '"emit_secondary_capture_dicom": true, '
+                            '"secondary_capture_max_dimension": 256, '
+                            '"locale": "pt_BR"}'
+                        ),
+                    ],
+                ):
+                    self.assertEqual(parenchymal_organ_volumetry.main(), 0)
+
+            result_path = (
+                case_dir
+                / "artifacts"
+                / "metrics"
+                / "parenchymal_organ_volumetry"
+                / "result.json"
+            )
+            result = json.loads(result_path.read_text(encoding="utf-8"))
+            measurement = result["measurement"]
+            right = measurement["organs"]["kidney_right"]
+            left = measurement["organs"]["kidney_left"]
+            renal_qc = measurement["renal_anatomy_qc"]
+
+            self.assertEqual(result["status"], "done")
+            self.assertEqual(right["volume_cm3"], 96.0)
+            self.assertEqual(right["raw_mask_volume_cm3"], 246.0)
+            self.assertEqual(right["hu_mean"], 20.0)
+            self.assertEqual(left["volume_cm3"], 112.0)
+            self.assertTrue(renal_qc["multiple_significant_components"])
+            self.assertTrue(renal_qc["suspected_allograft"])
+            self.assertEqual(
+                renal_qc["kidneys"]["kidney_right"]["classification_status"],
+                "native_and_suspected_allograft",
+            )
+            self.assertEqual(
+                renal_qc["suspected_renal_allografts"][0]["volume_cm3"],
+                150.0,
+            )
+            lines = build_overlay_lines(
+                organ_measurements=measurement["organs"],
+                locale="pt_BR",
+                renal_anatomy_qc=renal_qc,
+            )
+            self.assertIn("Rim direito: 96 cm³ | 20 UH", [line.text for line in lines])
+            self.assertIn(
+                "Provável enxerto renal direito: 150 cm³",
+                [line.text for line in lines],
+            )
+            alert_values = {
+                line.text[line.alert_span[0] : line.alert_span[1]]
+                for line in lines
+                if line.alert_span is not None
+            }
+            self.assertEqual(alert_values, {"96"})
+            self.assertGreater(len(result["dicom_exports"]), 0)
+            self.assertTrue(all((case_dir / item["path"]).exists() for item in result["dicom_exports"]))
 
     def test_job_skips_artifacts_when_no_organ_has_volume(self):
         with tempfile.TemporaryDirectory() as tmp:

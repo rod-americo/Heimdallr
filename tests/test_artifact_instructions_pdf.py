@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from heimdallr.metrics.artifact_instructions_pdf import (
+    _format_parenchymal_organs_summary,
     _parenchymal_steatosis_summary,
     build_artifact_instructions_pdf,
     build_artifact_instructions_secondary_capture,
@@ -13,6 +14,26 @@ from heimdallr.metrics.artifact_instructions_pdf import (
 
 
 class TestArtifactInstructionsPdf(unittest.TestCase):
+    def test_parenchymal_summary_includes_native_kidney_and_suspected_allograft(self):
+        summary = _format_parenchymal_organs_summary(
+            {
+                "kidney_right": {
+                    "analysis_status": "complete",
+                    "volume_cm3": 30.15,
+                    "hu_mean": 18.0,
+                }
+            },
+            renal_anatomy_qc={
+                "suspected_renal_allografts": [
+                    {"source_mask": "kidney_right", "volume_cm3": 150.3}
+                ]
+            },
+            locale="en_US",
+        )
+
+        self.assertIn("right kidney: 30 cm³", summary)
+        self.assertIn("suspected right renal allograft: 150 cm³", summary)
+
     def test_parenchymal_steatosis_summary_uses_current_pdff_relation(self):
         summary = _parenchymal_steatosis_summary(
             {

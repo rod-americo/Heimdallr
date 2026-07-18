@@ -220,8 +220,22 @@ production metrics module.
 segmentation tasks. It runs `tissue_types` only when `total/vertebrae_L3.nii.gz`
 is present, geometry-compatible, non-empty, and complete along the scan axis.
 Organ volumetry is compatible when at least one configured parenchymal organ
-mask is present. Pulmonary nodule screening is compatible when at least one
-configured lung lobe mask is present, even if the lung coverage is partial. The
+mask is present. Kidney masks are decomposed with 26-connectivity before their
+volumes are published. Components smaller than 5 cm³ remain in the audit but do
+not create a multiple-component anatomy signal. When complete L3 and L4 masks
+are available, the component centroid is classified topographically: a unique
+component at or superior to L3 becomes the native kidney measurement, while a
+component at or inferior to L4 is reported separately as a suspected renal
+allograft. The source-mask aggregate remains available only in raw audit fields
+and is not used for the native-kidney `<100 cm³` presentation alert. A suspected
+allograft is not assigned that native-kidney threshold, and topography is
+explicitly a suspicion rather than proof of transplantation. Multiple
+significant components without a unique native candidate suppress the aggregate
+kidney volume instead of publishing an anatomically ambiguous value. These
+decisions and per-component volumes, centroids, extents, attenuation, and roles
+are recorded under `measurement.renal_anatomy_qc`. Pulmonary nodule screening
+is compatible when at least one configured lung lobe mask is present, even if
+the lung coverage is partial. The
 complete-head workflow treats `total/brain.nii.gz` as the
 required gate mask and requires it to be present, non-empty, geometry matched,
 and not touching scan bounds. `total/skull.nii.gz` is optional crop and
