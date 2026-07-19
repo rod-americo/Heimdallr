@@ -49,6 +49,59 @@ class TestRenalAnatomyQc(unittest.TestCase):
             "suspected_renal_allograft_right",
         )
 
+    def test_single_pelvic_component_is_measured_without_allograft_label(self):
+        kidney_right = np.zeros(self.shape, dtype=bool)
+        kidney_right[14:18, 4:8, 3:9] = True
+        self.ct[kidney_right] = 28.0
+
+        audit, selected, overlay_components = analyze_renal_anatomy(
+            {"kidney_right": kidney_right, "kidney_left": None},
+            self.ct,
+            self.affine,
+            self.spacing,
+            {"vertebra_l3": self.l3, "vertebra_l4": self.l4},
+        )
+
+        right = audit["kidneys"]["kidney_right"]
+        component = right["components"][0]
+        self.assertEqual(
+            right["classification_status"],
+            "single_pelvic_component_anatomy_indeterminate",
+        )
+        self.assertEqual(selected["kidney_right"]["volume_cm3"], 96.0)
+        self.assertEqual(
+            component["anatomic_role"],
+            "indeterminate_pelvic_renal_component_right",
+        )
+        self.assertEqual(
+            component["classification_reason"],
+            "pelvic_position_without_identified_native_component",
+        )
+        self.assertFalse(audit["suspected_allograft"])
+        self.assertEqual(audit["suspected_renal_allografts"], [])
+        self.assertEqual(overlay_components, [])
+
+    def test_multiple_pelvic_components_without_native_are_ambiguous(self):
+        kidney_right = np.zeros(self.shape, dtype=bool)
+        kidney_right[2:5, 2:5, 3:9] = True
+        kidney_right[14:18, 4:8, 3:9] = True
+
+        audit, selected, overlay_components = analyze_renal_anatomy(
+            {"kidney_right": kidney_right, "kidney_left": None},
+            self.ct,
+            self.affine,
+            self.spacing,
+            {"vertebra_l3": self.l3, "vertebra_l4": self.l4},
+        )
+
+        self.assertEqual(
+            audit["kidneys"]["kidney_right"]["classification_status"],
+            "ambiguous_multiple_components",
+        )
+        self.assertIsNone(selected["kidney_right"])
+        self.assertFalse(audit["suspected_allograft"])
+        self.assertEqual(overlay_components, [])
+
     def test_multiple_components_without_reference_withhold_native_selection(self):
         kidney_right = np.zeros(self.shape, dtype=bool)
         kidney_right[3:7, 14:18, 16:22] = True

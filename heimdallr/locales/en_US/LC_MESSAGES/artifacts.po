@@ -122,6 +122,16 @@ msgstr "Left renal component (indeterminate position): {volume} cm³ | {hu} {att
 msgid "parenchymal.overlay.organ.kidney_left.indeterminate.volume_only"
 msgstr "Left renal component (indeterminate position): {volume} cm³"
 
+msgid "parenchymal.overlay.organ.kidney_right.pelvic_indeterminate"
+msgstr "Right renal component (indeterminate pelvic position): {volume} cm³ | {hu} {attenuation_unit}"
+msgid "parenchymal.overlay.organ.kidney_right.pelvic_indeterminate.volume_only"
+msgstr "Right renal component (indeterminate pelvic position): {volume} cm³"
+
+msgid "parenchymal.overlay.organ.kidney_left.pelvic_indeterminate"
+msgstr "Left renal component (indeterminate pelvic position): {volume} cm³ | {hu} {attenuation_unit}"
+msgid "parenchymal.overlay.organ.kidney_left.pelvic_indeterminate.volume_only"
+msgstr "Left renal component (indeterminate pelvic position): {volume} cm³"
+
 msgid "parenchymal.overlay.organ.kidney_right.multiple_components"
 msgstr "Right kidney: aggregate withheld (multiple components)"
 msgid "parenchymal.overlay.organ.kidney_left.multiple_components"

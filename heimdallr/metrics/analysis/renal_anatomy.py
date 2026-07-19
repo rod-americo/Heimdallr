@@ -298,7 +298,8 @@ def analyze_renal_anatomy(
         if (
             measurement_component is None
             and len(significant) == 1
-            and significant[0]["topographic_region"] == "indeterminate_between_L3_and_L4"
+            and significant[0]["topographic_region"]
+            in {"indeterminate_between_L3_and_L4", "pelvic_region"}
         ):
             measurement_component = significant[0]
 
@@ -311,9 +312,15 @@ def analyze_renal_anatomy(
             elif is_native:
                 anatomic_role = f"native_kidney_{side}"
                 reason = str(native_selection_reason)
-            elif component["topographic_region"] == "pelvic_region":
+            elif (
+                component["topographic_region"] == "pelvic_region"
+                and native_component is not None
+            ):
                 anatomic_role = f"suspected_renal_allograft_{side}"
-                reason = "renal_component_centroid_in_pelvic_region"
+                reason = "pelvic_component_separate_from_native_component"
+            elif component["topographic_region"] == "pelvic_region":
+                anatomic_role = f"indeterminate_pelvic_renal_component_{side}"
+                reason = "pelvic_position_without_identified_native_component"
             elif component["topographic_region"] == "native_renal_region":
                 anatomic_role = "unclassified_native_region_component"
                 reason = "multiple_native_region_components"
@@ -386,10 +393,13 @@ def analyze_renal_anatomy(
             classification_status = "native_only"
         elif native_component is not None:
             classification_status = "native_with_unclassified_components"
+        elif (
+            measurement_component is not None
+            and measurement_component["topographic_region"] == "pelvic_region"
+        ):
+            classification_status = "single_pelvic_component_anatomy_indeterminate"
         elif measurement_component is not None:
             classification_status = "single_component_anatomy_indeterminate"
-        elif pelvic_candidates and len(pelvic_candidates) == len(significant):
-            classification_status = "suspected_allograft_without_native"
         elif len(significant) > 1:
             classification_status = "ambiguous_multiple_components"
         else:

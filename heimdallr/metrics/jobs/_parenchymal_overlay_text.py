@@ -159,6 +159,14 @@ def build_overlay_lines(
                 == "renal_component_anatomy_indeterminate"
             ):
                 message_id = f"parenchymal.overlay.organ.{organ_key}.indeterminate.volume_only"
+                if (
+                    measurement.get("renal_anatomy_classification_status")
+                    == "single_pelvic_component_anatomy_indeterminate"
+                ):
+                    message_id = (
+                        f"parenchymal.overlay.organ.{organ_key}."
+                        "pelvic_indeterminate.volume_only"
+                    )
             rendered = translate(
                 message_id,
                 locale=locale,
@@ -188,6 +196,13 @@ def build_overlay_lines(
                 == "renal_component_anatomy_indeterminate"
             ):
                 message_id = f"parenchymal.overlay.organ.{organ_key}.indeterminate"
+                if (
+                    measurement.get("renal_anatomy_classification_status")
+                    == "single_pelvic_component_anatomy_indeterminate"
+                ):
+                    message_id = (
+                        f"parenchymal.overlay.organ.{organ_key}.pelvic_indeterminate"
+                    )
             rendered = translate(
                 message_id,
                 locale=locale,

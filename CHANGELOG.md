@@ -17,6 +17,10 @@ global profile.
 
 ### Changed
 
+- Renal anatomy QC now labels a pelvic component as a suspected allograft only
+  when a distinct ipsilateral native component is also identified; an isolated
+  pelvic component remains measurable with indeterminate anatomy and no native
+  low-volume alert.
 - The fixed native-kidney `<100 cm³` red alert is now suppressed for patients
   younger than 16 years at the study date, while renal volumes remain visible
   and the age-derived presentation decision is recorded in the metrics payload.

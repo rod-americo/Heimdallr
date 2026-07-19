@@ -78,7 +78,10 @@ audit, but require 5 cm³ before a component influences multiple-component QC.
 When L3 and L4 references are available, classify a component centroid at or
 superior to L3 as native-region and one at or inferior to L4 as pelvic. Publish
 a unique native-region component through the existing lateralized kidney field
-and report pelvic components separately as suspected renal allografts. Preserve
+and report a pelvic component as a suspected renal allograft only when a
+distinct native component is identified in that same lateralized mask. Publish
+a solitary pelvic component as an indeterminate-position renal measurement,
+without an allograft label or native low-volume alert. Preserve
 the raw source-mask aggregate only in audit fields. For a single component in
 the L3-L4 gray zone, use a single contralateral component as supporting native
 evidence when at least 25% of the candidate's craniocaudal extent overlaps it.
@@ -97,13 +100,16 @@ never to a suspected allograft or indeterminate component.
 - Low-position solitary native kidneys can be recovered using contralateral
   overlap, while a valid solitary measurement no longer disappears solely
   because its centroid lies between L3 and L4.
+- An isolated pelvic kidney no longer becomes a suspected allograft solely
+  because the native renal fossa is empty.
 - Metrics workers must restart for calculation and DICOM changes; the control
   plane must restart for the dashboard presentation change.
 
 **Tradeoff**
 
 Topography cannot distinguish an allograft from every ectopic native kidney, so
-the output deliberately says “suspected” and records the classification rule.
+the output requires an additional ipsilateral native component before using
+“suspected allograft” and records the classification rule.
 The 5 cm³ engineering threshold prevents tiny segmentation islands from
 creating multiplicity but is not a clinically validated cutoff. The 25%
 craniocaudal-overlap threshold is a conservative engineering rule that also

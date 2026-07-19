@@ -448,7 +448,10 @@ Parenchymal organ volumetry performs component-aware renal anatomy QC. It uses
 complete `total/vertebrae_L3.nii.gz` and `total/vertebrae_L4.nii.gz` masks as
 topographic references when available, preserves components below 5 cm³ only
 for audit, publishes a unique superior component as the native kidney, and
-reports an inferior pelvic component separately as a suspected renal allograft.
+reports an inferior pelvic component separately as a suspected renal allograft
+only when a distinct ipsilateral native component is also identified. A
+solitary pelvic component is measured as indeterminate-position anatomy, not
+as an allograft, and receives no native low-volume alert.
 For one component between L3 and L4, at least 25% craniocaudal overlap with a
 single contralateral renal component promotes it to the native measurement. A
 solitary unresolved component is still measured with an indeterminate-anatomy

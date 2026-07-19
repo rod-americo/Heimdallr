@@ -226,16 +226,19 @@ not create a multiple-component anatomy signal. When complete L3 and L4 masks
 are available, the component centroid is classified topographically: a unique
 component at or superior to L3 becomes the native kidney measurement, while a
 component at or inferior to L4 is reported separately as a suspected renal
-allograft. A solitary component between L3 and L4 is promoted to a native
+allograft only when a distinct native component is identified in the same
+lateralized mask. A solitary pelvic component without an identified native
+kidney remains publishable as an indeterminate-position renal measurement; it
+does not populate `suspected_renal_allografts` and does not receive the native
+`<100 cm³` alert. A solitary component between L3 and L4 is promoted to a native
 measurement when the opposite kidney also has one significant component and
 at least 25% of the candidate's craniocaudal extent overlaps it. Without that
 contralateral evidence, the solitary component's volume and attenuation remain
 publishable with an indeterminate-anatomy role, but the native-kidney `<100 cm³`
 alert is not applied. The source-mask aggregate remains available only in raw
 audit fields and is not used for the native-kidney `<100 cm³` presentation
-alert. A suspected
-allograft is not assigned that native-kidney threshold, and topography is
-explicitly a suspicion rather than proof of transplantation. Multiple
+alert. A suspected allograft is not assigned that native-kidney threshold, and
+topography is explicitly a suspicion rather than proof of transplantation. Multiple
 significant components without a unique native candidate suppress the aggregate
 kidney volume instead of publishing an anatomically ambiguous sum. These
 decisions and per-component volumes, centroids, extents, attenuation, and roles
