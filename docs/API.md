@@ -126,9 +126,11 @@ blocking the whole head artifact package, and the result JSON records them under
 `measurement.omitted_brain_structures`. When the complete-head
 gate passes, it writes a normalized axial head CT NIfTI
 artifact, writes a canonical RAS 2 mm NIfTI artifact, writes a 1 mm
-slice-spacing brain-mask geometry NIfTI artifact whose output plane is defined
-by `total/brain.nii.gz` and whose in-plane midline is guided by
-`brain_structures/septum_pellucidum.nii.gz` when available, emits a derived
+slice-spacing brain-mask geometry NIfTI artifact that preserves the selected
+source acquisition's axial-plane normal and uses a two-dimensional PCA of
+`total/brain.nii.gz` projected into that plane to define only the in-plane
+right-left/anterior-posterior rotation. No `brain_structures` mask participates
+in this geometric frame. The job then emits a derived
 axial CT DICOM series from that geometry volume using the configured
 `derived_ct_transfer_syntax` while preserving source in-plane pixel spacing,
 advancing 1 mm between images, and tagging 2 mm nominal slice thickness.

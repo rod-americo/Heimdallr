@@ -55,10 +55,6 @@ WINDOW_MIN = 0.0
 WINDOW_MAX = 80.0
 OVERLAY_SLICE_THICKNESS_MM = 3.0
 BLEED_OVERLAY_SLICE_THICKNESS_MM = 5.0
-MIDLINE_GUIDE_STRUCTURE_MASKS = (
-    "septum_pellucidum",
-    "venous_sinuses",
-)
 STRUCTURE_COLORS = (
     (255, 99, 132),
     (54, 162, 235),
@@ -351,11 +347,6 @@ def _usable_structure_mask_names(brain_structures: dict[str, Any]) -> list[str]:
         for mask_name in BRAIN_STRUCTURE_MASKS
         if isinstance(masks.get(mask_name), dict) and masks[mask_name].get("complete")
     ]
-
-
-def _usable_midline_guide_mask_names(usable_structure_names: list[str]) -> tuple[str, ...]:
-    usable = set(usable_structure_names)
-    return tuple(mask_name for mask_name in MIDLINE_GUIDE_STRUCTURE_MASKS if mask_name in usable)
 
 
 def _omitted_structure_masks(brain_structures: dict[str, Any]) -> list[dict[str, Any]]:
@@ -870,8 +861,6 @@ def main() -> int:
             ct_path,
             brain_mask_path,
             normalized_brain_geometry_path,
-            brain_structures_dir=brain_structures_dir,
-            midline_guide_mask_names=_usable_midline_guide_mask_names(usable_structure_names),
             crop_mask_path=total_dir / "skull.nii.gz",
             crop_margin_mm=float(job_config.get("brain_geometry_crop_margin_mm", 25.0)),
             voxel_size_mm=float(job_config.get("brain_geometry_normalized_spacing_mm", 1.0)),

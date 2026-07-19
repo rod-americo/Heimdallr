@@ -497,9 +497,12 @@ omitted from the table and overlay, recorded in
 `measurement.omitted_brain_structures`, and do not suppress the whole head
 artifact package. The volume table includes the overlay color map. The
 brain-mask geometry artifact uses `total/brain.nii.gz`
-to define the output plane, uses complete midline guide masks from
-`brain_structures` when available, and does not require the
-orbitomeatal line. When the
+as its only segmentation input: it preserves the selected source acquisition's
+axial-plane normal, projects the brain mask into that plane, and applies a
+two-dimensional PCA only to the right-left/anterior-posterior rotation. It does
+not use `brain_structures` or the orbitomeatal line. `total/skull.nii.gz`
+continues to affect only the crop field of view. Changes to this behavior
+require restarting the metrics worker. When the
 cerebral-bleed mask is positive, the job also emits a 5 mm burned-in bleed
 overlay series on the brain-geometry normalized CT grid containing positive
 slabs plus adjacent slabs, without a text panel, using a red transparent

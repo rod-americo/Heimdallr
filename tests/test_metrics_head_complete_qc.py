@@ -14,7 +14,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from heimdallr.metrics.head import BRAIN_STRUCTURE_MASKS, compute_mask_status  # noqa: E402
+from heimdallr.metrics.head import (  # noqa: E402
+    BRAIN_STRUCTURE_MASKS,
+    compute_mask_status,
+    normalize_nifti_to_brain_mask_geometry_isotropic,
+)
 from heimdallr.metrics.jobs import head_complete_qc  # noqa: E402
 from heimdallr.shared import settings  # noqa: E402
 
@@ -26,6 +30,64 @@ def write_nifti(path: Path, data: np.ndarray, spacing=(1.0, 1.0, 1.0)) -> None:
 
 
 class TestHeadCompleteQcJob(unittest.TestCase):
+    def test_brain_geometry_preserves_source_plane_and_uses_in_plane_pca(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            shape = (80, 80, 40)
+            grid_x, grid_y, grid_z = np.indices(shape, dtype=np.float64)
+            yaw_radians = np.radians(24.0)
+            centered_x = grid_x - 39.5
+            centered_y = grid_y - 39.5
+            rotated_x = (np.cos(yaw_radians) * centered_x) + (
+                np.sin(yaw_radians) * centered_y
+            )
+            rotated_y = (-np.sin(yaw_radians) * centered_x) + (
+                np.cos(yaw_radians) * centered_y
+            )
+            brain = (
+                (rotated_x / 18.0) ** 2
+                + (rotated_y / 28.0) ** 2
+                + ((grid_z - 19.5) / 13.0) ** 2
+            ) <= 1.0
+            ct = np.where(brain, 35.0, -1000.0).astype(np.float32)
+
+            pitch_radians = np.radians(12.0)
+            rotation_x = np.asarray(
+                [
+                    [1.0, 0.0, 0.0],
+                    [0.0, np.cos(pitch_radians), -np.sin(pitch_radians)],
+                    [0.0, np.sin(pitch_radians), np.cos(pitch_radians)],
+                ],
+                dtype=np.float64,
+            )
+            affine = np.eye(4, dtype=np.float64)
+            affine[:3, :3] = rotation_x @ np.diag([0.6, 0.6, 1.25])
+            source_path = tmp_path / "source.nii.gz"
+            brain_path = tmp_path / "brain.nii.gz"
+            output_path = tmp_path / "normalized.nii.gz"
+            nib.save(nib.Nifti1Image(ct, affine), str(source_path))
+            nib.save(nib.Nifti1Image(brain.astype(np.float32), affine), str(brain_path))
+
+            result = normalize_nifti_to_brain_mask_geometry_isotropic(
+                source_path,
+                brain_path,
+                output_path,
+                crop_mask_path=None,
+                voxel_size_mm=1.0,
+            )
+
+            frame = result["brain_geometry_frame"]
+            expected_normal = affine[:3, 2] / np.linalg.norm(affine[:3, 2])
+            actual_normal = np.asarray(frame["axes"]["superior_inferior"])
+            self.assertGreater(float(np.dot(expected_normal, actual_normal)), 0.999999)
+            self.assertEqual(result["target_orientation"], "brain_mask_source_axial_plane_pca")
+            self.assertEqual(result["anatomic_alignment"]["status"], "brain_mask_in_plane")
+            self.assertEqual(len(frame["in_plane_pca_eigenvalues"]), 2)
+            self.assertAlmostEqual(abs(frame["in_plane_rotation_degrees"]), 24.0, delta=0.5)
+            self.assertNotIn("midline_guide", frame)
+            self.assertNotIn("pca_eigenvalues", frame)
+            self.assertTrue(output_path.exists())
+
     def test_example_profiles_define_automatic_and_manual_head_workflows(self):
         metrics_config_path = ROOT / "config" / "metrics_pipeline.example.json"
         config = json.loads(metrics_config_path.read_text(encoding="utf-8"))
@@ -189,7 +251,7 @@ class TestHeadCompleteQcJob(unittest.TestCase):
             )
             self.assertEqual(
                 result["measurement"]["normalization_brain_geometry_2mm"]["anatomic_alignment"]["status"],
-                "mask_based",
+                "brain_mask_in_plane",
             )
             self.assertEqual(
                 result["measurement"]["normalization_brain_geometry_2mm"]["brain_mask"],
@@ -199,6 +261,11 @@ class TestHeadCompleteQcJob(unittest.TestCase):
                 result["measurement"]["normalization_brain_geometry_2mm"]["normalized_spacing_mm"]["z"],
                 1.0,
             )
+            geometry_frame = result["measurement"]["normalization_brain_geometry_2mm"][
+                "brain_geometry_frame"
+            ]
+            self.assertEqual(len(geometry_frame["in_plane_pca_eigenvalues"]), 2)
+            self.assertNotIn("midline_guide", geometry_frame)
             volume_rows = result["measurement"]["brain_structure_volumes"]["rows"]
             self.assertEqual(len(volume_rows), 1 + len(BRAIN_STRUCTURE_MASKS))
             self.assertEqual(volume_rows[0]["key"], "brain_total")

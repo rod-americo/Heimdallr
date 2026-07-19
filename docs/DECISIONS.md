@@ -15,6 +15,50 @@ Each decision should include:
 
 ## Decisions
 
+### 2026-07-19 - Constrain brain geometry to the source axial plane
+
+**Context**
+
+The prototype brain-geometry reconstruction used a three-dimensional PCA of
+`total/brain.nii.gz` and then an optional `brain_structures` midline guide. In
+brain masks whose right-left and superior-inferior variances were similar, the
+3D principal axes could be anatomically ambiguous and rotate the derived axial
+stack severely. Removing the midline guide alone did not remove that ambiguity.
+
+**Decision**
+
+Preserve the selected source acquisition's axial-plane normal. Use the centroid
+of `total/brain.nii.gz` as the frame center, project all sampled brain-mask world
+coordinates into the preserved plane, and run PCA only in those two dimensions.
+Assign the two in-plane eigenvectors to the nearest source right-left and
+anterior-posterior directions, orient the image-row axis toward posterior, and
+derive the orthogonal in-plane axis by cross product. Do not use
+`brain_structures`, the septum pellucidum, or other encephalic structure masks
+to define this frame. Keep `total/skull.nii.gz` limited to crop/FOV selection.
+
+**Impact**
+
+- The reconstruction corrects in-plane head rotation without inventing a new
+  pitch or roll from the shape of the brain mask.
+- `brain_geometry_frame` records the preserved normal, posterior reference,
+  signed in-plane rotation, two PCA eigenvalues, centroid, axes, and crop source.
+- Metrics workers must restart before resident processing uses the new frame.
+
+**Tradeoff**
+
+- Acquisition pitch and roll are preserved even when an anatomic reformat could
+  improve them.
+- Future pitch/roll correction requires explicit landmarks or a separately
+  validated constrained rule; it cannot be inferred from this 2D PCA.
+
+**Alternatives rejected**
+
+- Continue unrestricted 3D brain-mask PCA.
+- Remove only the septum guide while retaining the ambiguous 3D axes.
+- Use skull or unvalidated encephalic structures as implicit landmarks.
+
+---
+
 ### 2026-07-18 - Suppress the fixed low renal-volume alert below age 16
 
 **Context**

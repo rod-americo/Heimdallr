@@ -46,12 +46,6 @@ HEAD_LANDMARK_ALIASES = {
     "right_eam": "right_porion",
 }
 
-MIDLINE_GUIDE_MASKS = (
-    "septum_pellucidum",
-    "venous_sinuses",
-)
-
-
 @dataclass(frozen=True)
 class HeadNormalizationSpec:
     """Target geometry for head CT downstream deterministic jobs."""
@@ -203,77 +197,69 @@ def _optional_canonical_mask_world_points(
     return (np.asarray(mask_image.affine, dtype=np.float64) @ hom.T).T[:, :3]
 
 
-def _assign_brain_axes(eigenvectors: np.ndarray) -> np.ndarray:
-    """Assign PCA eigenvectors to RAS-like x/y/z axes by global-axis affinity."""
-    global_axes = np.eye(3, dtype=np.float64)
-    assigned: dict[int, int] = {}
-    used_vectors: set[int] = set()
-    affinities = [
-        (float(abs(np.dot(eigenvectors[:, vector_idx], global_axes[:, axis_idx]))), axis_idx, vector_idx)
-        for axis_idx in range(3)
-        for vector_idx in range(3)
-    ]
-    for _score, axis_idx, vector_idx in sorted(affinities, reverse=True):
-        if axis_idx in assigned or vector_idx in used_vectors:
-            continue
-        assigned[axis_idx] = vector_idx
-        used_vectors.add(vector_idx)
-    axes = np.column_stack([eigenvectors[:, assigned[axis_idx]] for axis_idx in range(3)])
-    for axis_idx in range(3):
-        if float(np.dot(axes[:, axis_idx], global_axes[:, axis_idx])) < 0:
-            axes[:, axis_idx] *= -1.0
-    if np.linalg.det(axes) < 0:
-        axes[:, 1] *= -1.0
-    return axes
-
-
-def _orient_axes_for_axial_display(
-    x_axis: np.ndarray,
-    y_axis: np.ndarray,
-    z_axis: np.ndarray,
-) -> np.ndarray:
-    z = _unit_vector(z_axis, "brain geometry z axis")
-    superior_axis = np.asarray([0.0, 0.0, 1.0], dtype=np.float64)
-    if float(np.dot(z, superior_axis)) < 0:
-        z *= -1.0
-
-    y = _unit_vector(y_axis - (np.dot(y_axis, z) * z), "brain geometry y axis")
-    posterior_axis = np.asarray([0.0, -1.0, 0.0], dtype=np.float64)
-    if float(np.dot(y, posterior_axis)) < 0:
-        y *= -1.0
-    x = _unit_vector(np.cross(y, z), "brain geometry x axis")
-    return np.column_stack([x, y, z])
-
-
-def _axes_from_midline_guide(
-    axes: np.ndarray,
+def _brain_axes_in_source_axial_plane(
+    canonical_image: nib.Nifti1Image,
+    brain_points: np.ndarray,
     centroid: np.ndarray,
-    guide_points: np.ndarray,
-) -> np.ndarray | None:
-    centered = guide_points - centroid
-    projected = np.column_stack([centered @ axes[:, 0], centered @ axes[:, 1]])
-    projected = projected[np.all(np.isfinite(projected), axis=1)]
-    if projected.shape[0] < 10:
-        return None
+) -> tuple[np.ndarray, np.ndarray, float, np.ndarray]:
+    """Keep the acquisition plane normal and estimate only in-plane brain axes."""
+    source_x = _unit_vector(
+        np.asarray(canonical_image.affine[:3, 0], dtype=np.float64),
+        "source axial x axis",
+    )
+    source_y = _unit_vector(
+        np.asarray(canonical_image.affine[:3, 1], dtype=np.float64),
+        "source axial y axis",
+    )
+    z_axis = _unit_vector(
+        np.asarray(canonical_image.affine[:3, 2], dtype=np.float64),
+        "source axial plane normal",
+    )
+    if float(np.dot(z_axis, np.asarray([0.0, 0.0, 1.0], dtype=np.float64))) < 0:
+        z_axis *= -1.0
 
-    projected -= projected.mean(axis=0)
+    plane_x = _unit_vector(
+        source_x - (np.dot(source_x, z_axis) * z_axis),
+        "source x axis projected into axial plane",
+    )
+    plane_y = _unit_vector(np.cross(z_axis, plane_x), "source axial plane y axis")
+    if float(np.dot(plane_y, source_y)) < 0:
+        plane_x *= -1.0
+        plane_y *= -1.0
+
+    centered = brain_points - centroid
+    projected = np.column_stack([centered @ plane_x, centered @ plane_y])
     covariance = np.cov(projected, rowvar=False)
     eigenvalues, eigenvectors = np.linalg.eigh(covariance)
     order = np.argsort(eigenvalues)[::-1]
     eigenvalues = eigenvalues[order]
     eigenvectors = eigenvectors[:, order]
     if float(eigenvalues[0]) <= 1e-6:
-        return None
-    if float(eigenvalues[0] / max(eigenvalues[1], 1e-6)) < 1.2:
-        return None
+        raise RuntimeError("brain mask has insufficient in-plane variance")
 
-    y_axis = _unit_vector(
-        axes[:, 0] * eigenvectors[0, 0] + axes[:, 1] * eigenvectors[1, 0],
-        "midline guide axis",
+    posterior_reference = -plane_y
+    candidates = [
+        _unit_vector(
+            (plane_x * eigenvectors[0, idx]) + (plane_y * eigenvectors[1, idx]),
+            f"brain in-plane PCA axis {idx}",
+        )
+        for idx in range(2)
+    ]
+    anterior_posterior_index = max(
+        range(2),
+        key=lambda idx: float(abs(np.dot(candidates[idx], posterior_reference))),
     )
-    z_axis = axes[:, 2]
-    x_axis = _unit_vector(np.cross(y_axis, z_axis), "midline guide right-left axis")
-    return _orient_axes_for_axial_display(x_axis, y_axis, z_axis)
+    y_axis = candidates[anterior_posterior_index]
+    if float(np.dot(y_axis, posterior_reference)) < 0:
+        y_axis *= -1.0
+    x_axis = _unit_vector(np.cross(y_axis, z_axis), "brain in-plane right-left axis")
+
+    signed_rotation_radians = np.arctan2(
+        float(np.dot(z_axis, np.cross(posterior_reference, y_axis))),
+        float(np.dot(posterior_reference, y_axis)),
+    )
+    axes = np.column_stack([x_axis, y_axis, z_axis])
+    return axes, eigenvalues, float(np.degrees(signed_rotation_radians)), posterior_reference
 
 
 def _anatomic_frame_from_landmarks(
@@ -695,8 +681,6 @@ def normalize_nifti_to_brain_mask_geometry_isotropic(
     brain_mask_path: Path,
     output_path: Path,
     *,
-    brain_structures_dir: Path | None = None,
-    midline_guide_mask_names: tuple[str, ...] = MIDLINE_GUIDE_MASKS,
     crop_mask_path: Path | None = None,
     crop_margin_mm: float = 25.0,
     voxel_size_mm: float = 2.0,
@@ -704,12 +688,12 @@ def normalize_nifti_to_brain_mask_geometry_isotropic(
     write_normalized_nifti: bool = True,
     interpolation_order: int = 3,
 ) -> dict[str, Any]:
-    """Create a head CT volume aligned to the `total/brain` mask axes."""
+    """Create a brain-aligned head CT while preserving the acquisition plane."""
 
     slice_spacing = _positive_float(voxel_size_mm, "voxel_size_mm")
     if not brain_mask_path.exists():
         return {
-            "target_orientation": "brain_mask_pca_ras",
+            "target_orientation": "brain_mask_source_axial_plane_pca",
             "target_spacing_mm": {"x": None, "y": None, "z": slice_spacing},
             "normalized_nifti": None,
             "anatomic_alignment": {
@@ -736,30 +720,9 @@ def normalize_nifti_to_brain_mask_geometry_isotropic(
 
     brain_points, brain_mask_shape = _canonical_mask_world_points(brain_mask_path)
     centroid = brain_points.mean(axis=0)
-    centered = brain_points - centroid
-    covariance = np.cov(centered, rowvar=False)
-    eigenvalues, eigenvectors = np.linalg.eigh(covariance)
-    order = np.argsort(eigenvalues)[::-1]
-    eigenvalues = eigenvalues[order]
-    eigenvectors = eigenvectors[:, order]
-    axes = _assign_brain_axes(eigenvectors)
-    axes = _orient_axes_for_axial_display(axes[:, 0], axes[:, 1], axes[:, 2])
-    guide_source = "brain_mask_symmetry"
-    guide_points_used = 0
-    if brain_structures_dir is not None:
-        for guide_name in midline_guide_mask_names:
-            guide_points = _optional_canonical_mask_world_points(
-                Path(brain_structures_dir) / f"{guide_name}.nii.gz"
-            )
-            if guide_points is None:
-                continue
-            guided_axes = _axes_from_midline_guide(axes, centroid, guide_points)
-            if guided_axes is None:
-                continue
-            axes = guided_axes
-            guide_source = f"brain_structures/{guide_name}.nii.gz"
-            guide_points_used = int(guide_points.shape[0])
-            break
+    axes, eigenvalues, in_plane_rotation_degrees, posterior_reference = (
+        _brain_axes_in_source_axial_plane(canonical, brain_points, centroid)
+    )
 
     crop_points = None
     crop_source = "source_volume_corners"
@@ -803,7 +766,7 @@ def normalize_nifti_to_brain_mask_geometry_isotropic(
 
     axis_labels = ["right_left", "anterior_posterior", "superior_inferior"]
     return {
-        "target_orientation": "brain_mask_pca_ras",
+        "target_orientation": "brain_mask_source_axial_plane_pca",
         "target_spacing_mm": {
             "x": target_spacing[0],
             "y": target_spacing[1],
@@ -832,26 +795,31 @@ def normalize_nifti_to_brain_mask_geometry_isotropic(
                 axis_labels[idx]: [float(value) for value in axes[:, idx].tolist()]
                 for idx in range(3)
             },
-            "midline_guide": guide_source,
-            "midline_guide_sampled_points": guide_points_used,
+            "source_axial_normal_ras": [float(value) for value in axes[:, 2].tolist()],
+            "source_posterior_reference_ras": [
+                float(value) for value in posterior_reference.tolist()
+            ],
+            "in_plane_rotation_degrees": in_plane_rotation_degrees,
             "crop_source": crop_source,
             "crop_margin_mm": margin,
             "crop_sampled_points": int(crop_points.shape[0]),
-            "pca_eigenvalues": [float(value) for value in eigenvalues.tolist()],
+            "in_plane_pca_eigenvalues": [float(value) for value in eigenvalues.tolist()],
             "method": (
-                "PCA of total/brain mask world coordinates, assigned to nearest RAS axes; "
-                "midline guide projected in-plane when available; posterior image-row direction "
-                "forced for conventional axial DICOM display"
+                "Source acquisition axial-plane normal preserved; total/brain mask world "
+                "coordinates projected into that plane; 2D PCA assigned to the nearest source "
+                "right-left and anterior-posterior axes; posterior image-row direction forced "
+                "for conventional axial DICOM display"
             ),
         },
         "anatomic_alignment": {
-            "status": "mask_based",
+            "status": "brain_mask_in_plane",
             "midline_perpendicular": True,
             "orbitomeatal_line_perpendicular": False,
             "orbitomeatal_line_required": False,
             "reason": (
-                "Head geometry was standardized from the total/brain mask axes. "
-                "The orbitomeatal line was not used."
+                "The source acquisition axial-plane normal was preserved and only the in-plane "
+                "right-left/anterior-posterior rotation was estimated from total/brain. The "
+                "orbitomeatal line and brain-structure masks were not used."
             ),
         },
     }
