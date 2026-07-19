@@ -33,10 +33,14 @@ When L3 and L4 references are available, classify a component centroid at or
 superior to L3 as native-region and one at or inferior to L4 as pelvic. Publish
 a unique native-region component through the existing lateralized kidney field
 and report pelvic components separately as suspected renal allografts. Preserve
-the raw source-mask aggregate only in audit fields. Withhold the combined kidney
-volume when no unique native candidate can be resolved. Apply the `<100 cm³`
-presentation alert only to native-kidney measurements, never to a suspected
-allograft.
+the raw source-mask aggregate only in audit fields. For a single component in
+the L3-L4 gray zone, use a single contralateral component as supporting native
+evidence when at least 25% of the candidate's craniocaudal extent overlaps it.
+If that evidence is absent, publish the solitary component as anatomically
+indeterminate without the native low-volume alert. Withhold a kidney aggregate
+only when multiple significant components lack a unique native candidate.
+Apply the `<100 cm³` presentation alert only to native-kidney measurements,
+never to a suspected allograft or indeterminate component.
 
 **Impact**
 
@@ -44,6 +48,9 @@ allograft.
   adding the graft volume.
 - JSON, DICOM overlays, artifact instructions, and the dashboard distinguish
   native measurements from suspected allografts.
+- Low-position solitary native kidneys can be recovered using contralateral
+  overlap, while a valid solitary measurement no longer disappears solely
+  because its centroid lies between L3 and L4.
 - Metrics workers must restart for calculation and DICOM changes; the control
   plane must restart for the dashboard presentation change.
 
@@ -52,7 +59,9 @@ allograft.
 Topography cannot distinguish an allograft from every ectopic native kidney, so
 the output deliberately says “suspected” and records the classification rule.
 The 5 cm³ engineering threshold prevents tiny segmentation islands from
-creating multiplicity but is not a clinically validated cutoff.
+creating multiplicity but is not a clinically validated cutoff. The 25%
+craniocaudal-overlap threshold is a conservative engineering rule that also
+remains subject to case-based validation.
 
 **Alternatives rejected**
 

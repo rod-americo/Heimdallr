@@ -112,6 +112,16 @@ msgstr "Rim esquerdo: {volume} cm³ | {hu} {attenuation_unit}"
 msgid "parenchymal.overlay.organ.kidney_left.volume_only"
 msgstr "Rim esquerdo: {volume} cm³"
 
+msgid "parenchymal.overlay.organ.kidney_right.indeterminate"
+msgstr "Componente renal direito (posição indeterminada): {volume} cm³ | {hu} {attenuation_unit}"
+msgid "parenchymal.overlay.organ.kidney_right.indeterminate.volume_only"
+msgstr "Componente renal direito (posição indeterminada): {volume} cm³"
+
+msgid "parenchymal.overlay.organ.kidney_left.indeterminate"
+msgstr "Componente renal esquerdo (posição indeterminada): {volume} cm³ | {hu} {attenuation_unit}"
+msgid "parenchymal.overlay.organ.kidney_left.indeterminate.volume_only"
+msgstr "Componente renal esquerdo (posição indeterminada): {volume} cm³"
+
 msgid "parenchymal.overlay.organ.kidney_right.multiple_components"
 msgstr "Rim direito: agregado omitido (múltiplos componentes)"
 msgid "parenchymal.overlay.organ.kidney_left.multiple_components"

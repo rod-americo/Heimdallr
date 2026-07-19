@@ -226,12 +226,18 @@ not create a multiple-component anatomy signal. When complete L3 and L4 masks
 are available, the component centroid is classified topographically: a unique
 component at or superior to L3 becomes the native kidney measurement, while a
 component at or inferior to L4 is reported separately as a suspected renal
-allograft. The source-mask aggregate remains available only in raw audit fields
-and is not used for the native-kidney `<100 cm³` presentation alert. A suspected
+allograft. A solitary component between L3 and L4 is promoted to a native
+measurement when the opposite kidney also has one significant component and
+at least 25% of the candidate's craniocaudal extent overlaps it. Without that
+contralateral evidence, the solitary component's volume and attenuation remain
+publishable with an indeterminate-anatomy role, but the native-kidney `<100 cm³`
+alert is not applied. The source-mask aggregate remains available only in raw
+audit fields and is not used for the native-kidney `<100 cm³` presentation
+alert. A suspected
 allograft is not assigned that native-kidney threshold, and topography is
 explicitly a suspicion rather than proof of transplantation. Multiple
 significant components without a unique native candidate suppress the aggregate
-kidney volume instead of publishing an anatomically ambiguous value. These
+kidney volume instead of publishing an anatomically ambiguous sum. These
 decisions and per-component volumes, centroids, extents, attenuation, and roles
 are recorded under `measurement.renal_anatomy_qc`. Pulmonary nodule screening
 is compatible when at least one configured lung lobe mask is present, even if

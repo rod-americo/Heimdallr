@@ -449,7 +449,11 @@ complete `total/vertebrae_L3.nii.gz` and `total/vertebrae_L4.nii.gz` masks as
 topographic references when available, preserves components below 5 cm³ only
 for audit, publishes a unique superior component as the native kidney, and
 reports an inferior pelvic component separately as a suspected renal allograft.
-It never treats topography alone as transplant confirmation. If more than one
+For one component between L3 and L4, at least 25% craniocaudal overlap with a
+single contralateral renal component promotes it to the native measurement. A
+solitary unresolved component is still measured with an indeterminate-anatomy
+role and no native low-volume alert. It never treats topography alone as
+transplant confirmation. If more than one
 significant component remains anatomically ambiguous, the combined kidney
 volume is withheld. Restart the metrics worker after deploying this behavior;
 restart the control plane as well for the dashboard's separate allograft card.

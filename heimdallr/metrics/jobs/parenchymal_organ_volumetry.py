@@ -258,16 +258,18 @@ def _apply_renal_anatomy_measurements(
     *,
     suppress_density: bool,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    renal_anatomy_qc, selected_native_components, overlay_components = analyze_renal_anatomy(
-        {
-            "kidney_right": organ_masks.get("kidney_right"),
-            "kidney_left": organ_masks.get("kidney_left"),
-        },
-        ct_data,
-        affine,
-        spacing_xyz,
-        reference_masks,
-        suppress_density=suppress_density,
+    renal_anatomy_qc, selected_measurement_components, overlay_components = (
+        analyze_renal_anatomy(
+            {
+                "kidney_right": organ_masks.get("kidney_right"),
+                "kidney_left": organ_masks.get("kidney_left"),
+            },
+            ct_data,
+            affine,
+            spacing_xyz,
+            reference_masks,
+            suppress_density=suppress_density,
+        )
     )
     organ_labels = {
         "kidney_right": "Right kidney",
@@ -275,12 +277,23 @@ def _apply_renal_anatomy_measurements(
     }
     for organ_key, organ_label in organ_labels.items():
         raw_measurement = dict(organ_measurements[organ_key])
-        native_component = selected_native_components.get(organ_key)
+        measurement_component = selected_measurement_components.get(organ_key)
         kidney_qc = renal_anatomy_qc["kidneys"][organ_key]
+        native_component_identified = bool(
+            measurement_component is not None
+            and kidney_qc.get("native_component_id")
+            == measurement_component.get("component_id")
+        )
+        if native_component_identified:
+            measurement_role = "native_kidney"
+        elif measurement_component is not None:
+            measurement_role = "renal_component_anatomy_indeterminate"
+        else:
+            measurement_role = "native_kidney"
         common_audit = {
-            "measurement_role": "native_kidney",
-            "native_component_identified": native_component is not None,
-            "source_mask_component_id": kidney_qc.get("native_component_id"),
+            "measurement_role": measurement_role,
+            "native_component_identified": native_component_identified,
+            "source_mask_component_id": kidney_qc.get("measurement_component_id"),
             "renal_anatomy_classification_status": kidney_qc.get("classification_status"),
             "raw_mask_voxel_count": raw_measurement.get("voxel_count"),
             "raw_mask_volume_cm3": raw_measurement.get("attenuation_sample_volume_cm3"),
@@ -288,32 +301,32 @@ def _apply_renal_anatomy_measurements(
             "raw_mask_hu_std": raw_measurement.get("hu_std"),
             "raw_mask_complete": raw_measurement.get("complete"),
         }
-        if native_component is not None:
+        if measurement_component is not None:
             measurement = {
                 "organ_key": organ_key,
                 "organ_label": organ_label,
                 "analysis_status": (
-                    "complete" if native_component.get("complete") else "incomplete"
+                    "complete" if measurement_component.get("complete") else "incomplete"
                 ),
-                "complete": bool(native_component.get("complete")),
+                "complete": bool(measurement_component.get("complete")),
                 "truncated_at_scan_bounds": bool(
-                    native_component.get("truncated_at_scan_bounds")
+                    measurement_component.get("truncated_at_scan_bounds")
                 ),
-                "axial_slice_extent": native_component.get("axial_slice_extent"),
-                "voxel_count": int(native_component.get("voxel_count") or 0),
-                "attenuation_sample_volume_cm3": native_component.get(
+                "axial_slice_extent": measurement_component.get("axial_slice_extent"),
+                "voxel_count": int(measurement_component.get("voxel_count") or 0),
+                "attenuation_sample_volume_cm3": measurement_component.get(
                     "attenuation_sample_volume_cm3"
                 ),
                 "attenuation_sample_slice_count": int(
-                    native_component.get("attenuation_sample_slice_count") or 0
+                    measurement_component.get("attenuation_sample_slice_count") or 0
                 ),
-                "attenuation_sample_axial_extent_mm": native_component.get(
+                "attenuation_sample_axial_extent_mm": measurement_component.get(
                     "attenuation_sample_axial_extent_mm"
                 ),
-                "observed_volume_cm3": native_component.get("observed_volume_cm3"),
-                "volume_cm3": native_component.get("volume_cm3"),
-                "hu_mean": native_component.get("hu_mean"),
-                "hu_std": native_component.get("hu_std"),
+                "observed_volume_cm3": measurement_component.get("observed_volume_cm3"),
+                "volume_cm3": measurement_component.get("volume_cm3"),
+                "hu_mean": measurement_component.get("hu_mean"),
+                "hu_std": measurement_component.get("hu_std"),
                 "estimated_pdff_percent": None,
             }
             measurement.update(common_audit)

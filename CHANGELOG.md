@@ -17,6 +17,10 @@ global profile.
 
 ### Changed
 
+- Renal anatomy QC now recovers solitary L3-L4 components as native when they
+  overlap a single contralateral kidney, publishes otherwise indeterminate
+  solitary components without a native-volume alert, and continues to withhold
+  unresolved multiple-component aggregates.
 - CT preparation now pipelines conversion and phase detection through separate
   bounded pools, skips deterministic derived/localizer series from additional
   QC conversion while retaining them in the inventory, and reports phase wait

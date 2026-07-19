@@ -164,6 +164,131 @@ class TestParenchymalOrganVolumetryJob(unittest.TestCase):
         self.assertFalse(right["native_component_identified"])
         self.assertTrue(renal_qc["multiple_significant_components"])
 
+    def test_single_gray_zone_component_with_contralateral_overlap_is_native(self):
+        shape = (24, 24, 24)
+        spacing = (10.0, 10.0, 10.0)
+        affine = np.diag([10.0, 10.0, 10.0, 1.0])
+        ct = np.zeros(shape, dtype=np.float32)
+        kidney_right = np.zeros(shape, dtype=bool)
+        kidney_right[4:8, 14:18, 11:14] = True
+        kidney_left = np.zeros(shape, dtype=bool)
+        kidney_left[15:19, 14:18, 12:18] = True
+        vertebra_l3 = np.zeros(shape, dtype=bool)
+        vertebra_l3[9:15, 9:15, 13:16] = True
+        vertebra_l4 = np.zeros(shape, dtype=bool)
+        vertebra_l4[9:15, 9:15, 9:12] = True
+        ct[kidney_right] = 36.0
+        ct[kidney_left] = 30.0
+        organ_masks = {"kidney_right": kidney_right, "kidney_left": kidney_left}
+        organ_measurements = {
+            organ_key: parenchymal_organ_volumetry._compute_mask_measurement(
+                organ_key,
+                organ_label,
+                organ_masks[organ_key],
+                ct,
+                spacing,
+            )
+            for organ_key, organ_label in (
+                ("kidney_right", "Right kidney"),
+                ("kidney_left", "Left kidney"),
+            )
+        }
+
+        renal_qc, _overlay_components = (
+            parenchymal_organ_volumetry._apply_renal_anatomy_measurements(
+                organ_masks,
+                organ_measurements,
+                ct,
+                affine,
+                spacing,
+                {"vertebra_l3": vertebra_l3, "vertebra_l4": vertebra_l4},
+                suppress_density=False,
+            )
+        )
+
+        right = organ_measurements["kidney_right"]
+        right_qc = renal_qc["kidneys"]["kidney_right"]
+        self.assertEqual(right["analysis_status"], "complete")
+        self.assertEqual(right["volume_cm3"], 48.0)
+        self.assertEqual(right["hu_mean"], 36.0)
+        self.assertEqual(right["measurement_role"], "native_kidney")
+        self.assertTrue(right["native_component_identified"])
+        self.assertEqual(right_qc["classification_status"], "native_only")
+        self.assertEqual(
+            right_qc["components"][0]["classification_reason"],
+            "contralateral_superior_extent_overlap",
+        )
+        self.assertEqual(
+            right_qc["components"][0]["contralateral_superior_overlap_fraction"],
+            0.5,
+        )
+        lines = build_overlay_lines(
+            organ_measurements=organ_measurements,
+            locale="en_US",
+            renal_anatomy_qc=renal_qc,
+        )
+        right_line = next(line for line in lines if line.text.startswith("Right kidney:"))
+        self.assertEqual(right_line.text, "Right kidney: 48 cm³ | 36 HU")
+        self.assertIsNotNone(right_line.alert_span)
+        self.assertEqual(right_line.text[slice(*right_line.alert_span)], "48")
+
+    def test_single_gray_zone_component_is_measured_without_native_alert(self):
+        shape = (24, 24, 24)
+        spacing = (10.0, 10.0, 10.0)
+        affine = np.diag([10.0, 10.0, 10.0, 1.0])
+        ct = np.zeros(shape, dtype=np.float32)
+        kidney_right = np.zeros(shape, dtype=bool)
+        kidney_right[4:8, 14:18, 11:14] = True
+        vertebra_l3 = np.zeros(shape, dtype=bool)
+        vertebra_l3[9:15, 9:15, 13:16] = True
+        vertebra_l4 = np.zeros(shape, dtype=bool)
+        vertebra_l4[9:15, 9:15, 9:12] = True
+        ct[kidney_right] = 36.0
+        organ_masks = {"kidney_right": kidney_right, "kidney_left": None}
+        organ_measurements = {
+            "kidney_right": parenchymal_organ_volumetry._compute_mask_measurement(
+                "kidney_right", "Right kidney", kidney_right, ct, spacing
+            ),
+            "kidney_left": parenchymal_organ_volumetry._compute_mask_measurement(
+                "kidney_left", "Left kidney", None, ct, spacing
+            ),
+        }
+
+        renal_qc, _overlay_components = (
+            parenchymal_organ_volumetry._apply_renal_anatomy_measurements(
+                organ_masks,
+                organ_measurements,
+                ct,
+                affine,
+                spacing,
+                {"vertebra_l3": vertebra_l3, "vertebra_l4": vertebra_l4},
+                suppress_density=False,
+            )
+        )
+
+        right = organ_measurements["kidney_right"]
+        self.assertEqual(right["analysis_status"], "complete")
+        self.assertEqual(right["volume_cm3"], 48.0)
+        self.assertEqual(right["measurement_role"], "renal_component_anatomy_indeterminate")
+        self.assertFalse(right["native_component_identified"])
+        self.assertEqual(
+            renal_qc["kidneys"]["kidney_right"]["classification_status"],
+            "single_component_anatomy_indeterminate",
+        )
+        lines = build_overlay_lines(
+            organ_measurements=organ_measurements,
+            locale="en_US",
+            renal_anatomy_qc=renal_qc,
+        )
+        right_line = next(
+            line for line in lines if line.text.startswith("Right renal component")
+        )
+        self.assertEqual(
+            right_line.text,
+            "Right renal component (indeterminate position): 48 cm³ | 36 HU",
+        )
+        self.assertIsNone(right_line.alert_span)
+
     def test_partial_liver_sample_generates_attenuation_only_overlay(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)

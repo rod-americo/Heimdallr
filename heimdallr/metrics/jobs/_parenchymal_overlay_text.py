@@ -48,7 +48,16 @@ def build_overlay_text(
     ]
 
 
-def _volume_is_alert(organ_key: str, volume_cm3: float) -> bool:
+def _volume_is_alert(
+    organ_key: str,
+    volume_cm3: float,
+    *,
+    measurement_role: str | None = None,
+) -> bool:
+    if organ_key in {"kidney_right", "kidney_left"} and measurement_role == (
+        "renal_component_anatomy_indeterminate"
+    ):
+        return False
     threshold = VOLUME_ALERT_THRESHOLDS.get(organ_key)
     if threshold is None:
         return False
@@ -138,12 +147,26 @@ def build_overlay_lines(
 
         if hu_mean is None:
             volume_text = format_integer(volume_cm3, locale=locale)
+            message_id = f"parenchymal.overlay.organ.{organ_key}.volume_only"
+            if (
+                measurement.get("measurement_role")
+                == "renal_component_anatomy_indeterminate"
+            ):
+                message_id = f"parenchymal.overlay.organ.{organ_key}.indeterminate.volume_only"
             rendered = translate(
-                f"parenchymal.overlay.organ.{organ_key}.volume_only",
+                message_id,
                 locale=locale,
                 volume=volume_text,
             )
-            alert_start = rendered.find(volume_text) if _volume_is_alert(organ_key, volume_cm3) else -1
+            alert_start = (
+                rendered.find(volume_text)
+                if _volume_is_alert(
+                    organ_key,
+                    volume_cm3,
+                    measurement_role=measurement.get("measurement_role"),
+                )
+                else -1
+            )
             summary_lines.append(
                 OverlayTextLine(
                     rendered,
@@ -152,14 +175,28 @@ def build_overlay_lines(
             )
         else:
             volume_text = format_integer(volume_cm3, locale=locale)
+            message_id = f"parenchymal.overlay.organ.{organ_key}"
+            if (
+                measurement.get("measurement_role")
+                == "renal_component_anatomy_indeterminate"
+            ):
+                message_id = f"parenchymal.overlay.organ.{organ_key}.indeterminate"
             rendered = translate(
-                f"parenchymal.overlay.organ.{organ_key}",
+                message_id,
                 locale=locale,
                 volume=volume_text,
                 hu=format_integer(hu_mean, locale=locale),
                 attenuation_unit=translate("parenchymal.overlay.attenuation_unit", locale=locale),
             )
-            alert_start = rendered.find(volume_text) if _volume_is_alert(organ_key, volume_cm3) else -1
+            alert_start = (
+                rendered.find(volume_text)
+                if _volume_is_alert(
+                    organ_key,
+                    volume_cm3,
+                    measurement_role=measurement.get("measurement_role"),
+                )
+                else -1
+            )
             summary_lines.append(
                 OverlayTextLine(
                     rendered,
