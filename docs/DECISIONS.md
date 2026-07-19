@@ -15,6 +15,52 @@ Each decision should include:
 
 ## Decisions
 
+### 2026-07-18 - Suppress the fixed low renal-volume alert below age 16
+
+**Context**
+
+The `<100 cm³` renal presentation alert was introduced as one fixed threshold.
+In a seven-year-old patient, valid bilateral volumes near 70 cm³ were rendered
+red solely because the adult-oriented absolute threshold did not account for
+pediatric renal growth. Pediatric renal volume depends strongly on body size
+and age, and the current payload does not consistently include height and
+weight for a body-surface-area reference.
+
+**Decision**
+
+Calculate completed years at the study date from valid DICOM
+`PatientBirthDate` and `StudyDate` values. For patients younger than 16 years,
+keep both renal volumes visible but suppress the fixed `<100 cm³` red alert.
+Record the age, cutoff, threshold, source fields, and application decision in
+the metrics payload. At exactly 16 years, retain the threshold. When age cannot
+be calculated, preserve the prior alert behavior and explicitly audit the
+unavailable age rather than infer pediatric status.
+
+**Impact**
+
+- Pediatric renal volumes are no longer presented as abnormal solely by an
+  adult-oriented absolute cutoff.
+- Liver and spleen alerts, renal measurements, anatomy QC, and JSON volumes are
+  unchanged.
+- Metrics workers must restart to load the presentation policy.
+
+**Tradeoff**
+
+The age cutoff is a presentation safety rule, not a pediatric renal-volume
+reference model. It intentionally does not label a pediatric volume as normal.
+A later percentile model should use modality-appropriate evidence and body
+size when height and weight are reliably available.
+
+**Alternatives rejected**
+
+- Apply `<100 cm³` to every age, which creates predictable pediatric false
+  alerts.
+- Infer a pediatric percentile from age alone and present it as validated.
+- Suppress the alert whenever age is missing, which would silently remove the
+  established behavior for patients with incomplete metadata.
+
+---
+
 ### 2026-07-18 - Separate native kidneys from suspected pelvic allografts
 
 **Context**

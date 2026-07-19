@@ -17,6 +17,9 @@ global profile.
 
 ### Changed
 
+- The fixed native-kidney `<100 cm³` red alert is now suppressed for patients
+  younger than 16 years at the study date, while renal volumes remain visible
+  and the age-derived presentation decision is recorded in the metrics payload.
 - Renal anatomy QC now recovers solitary L3-L4 components as native when they
   overlap a single contralateral kidney, publishes otherwise indeterminate
   solitary components without a native-volume alert, and continues to withhold

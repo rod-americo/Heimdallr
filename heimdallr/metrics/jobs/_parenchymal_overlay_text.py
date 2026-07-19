@@ -53,7 +53,13 @@ def _volume_is_alert(
     volume_cm3: float,
     *,
     measurement_role: str | None = None,
+    volume_alert_eligible: bool | None = None,
 ) -> bool:
+    if (
+        organ_key in {"kidney_right", "kidney_left"}
+        and volume_alert_eligible is False
+    ):
+        return False
     if organ_key in {"kidney_right", "kidney_left"} and measurement_role == (
         "renal_component_anatomy_indeterminate"
     ):
@@ -164,6 +170,7 @@ def build_overlay_lines(
                     organ_key,
                     volume_cm3,
                     measurement_role=measurement.get("measurement_role"),
+                    volume_alert_eligible=measurement.get("volume_alert_eligible"),
                 )
                 else -1
             )
@@ -194,6 +201,7 @@ def build_overlay_lines(
                     organ_key,
                     volume_cm3,
                     measurement_role=measurement.get("measurement_role"),
+                    volume_alert_eligible=measurement.get("volume_alert_eligible"),
                 )
                 else -1
             )

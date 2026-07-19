@@ -324,9 +324,16 @@ volumes remain omitted. The metrics result JSON preserves the reason,
 per-organ status, physical attenuation sample size, and sample QC audit.
 - Parenchymal-organ overlays render the volume number in red when liver volume
 is greater than 1,800 cm³, spleen volume is greater than 400 cm³, or either
-kidney volume is less than 100 cm³. The liver row is followed by a steatosis
-line when liver attenuation is available. Examinations outside the inclusive
-115-125 kVp range are identified as outside range; within that range, liver
+kidney volume is less than 100 cm³. The fixed renal threshold is suppressed
+when `PatientBirthDate` and `StudyDate` establish that the patient was younger
+than 16 years on the study date; the volumes remain visible without a red
+alert. Missing or invalid age inputs retain the fixed threshold and are
+recorded as unavailable rather than silently changing presentation behavior.
+The result records the decision under `measurement.renal_volume_alert_qc` and
+the per-kidney presentation eligibility under `volume_alert_eligible`. The
+liver row is followed by a steatosis line when liver attenuation is available.
+Examinations outside the inclusive 115-125 kVp range are identified as outside
+range; within that range, liver
 attenuation of at least 50 HU or a liver-to-spleen attenuation ratio greater
 than 1 is reported as no steatosis, otherwise the displayed whole-number
 percentage is `-0.58 × liver HU + 38.2`. The result JSON records the assessment

@@ -457,6 +457,12 @@ transplant confirmation. If more than one
 significant component remains anatomically ambiguous, the combined kidney
 volume is withheld. Restart the metrics worker after deploying this behavior;
 restart the control plane as well for the dashboard's separate allograft card.
+The fixed `<100 cm³` native-kidney presentation alert is not applied when valid
+`PatientBirthDate` and `StudyDate` values place the patient below 16 years at
+the time of imaging. The volume remains displayed, and the payload records the
+age-derived decision. If age cannot be calculated, the existing threshold is
+retained and the unavailable-age state is audited. This presentation change
+requires restarting only the metrics worker.
 
 The `pleural_pericard_effusion` task does not support TotalSegmentator `--fast`.
 Configure its accelerator independently as `--device mps` on local Apple

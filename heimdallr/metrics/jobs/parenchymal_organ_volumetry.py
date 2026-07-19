@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -65,6 +66,8 @@ RENAL_QC_REFERENCE_DEFINITIONS = [
     ("vertebra_l4", "vertebrae_L4.nii.gz"),
 ]
 SUSPECTED_RENAL_ALLOGRAFT_COLOR = (255, 80, 180)
+PEDIATRIC_RENAL_ALERT_CUTOFF_YEARS = 16
+FIXED_LOW_RENAL_VOLUME_ALERT_CM3 = 100.0
 
 
 def _load_overlay_font(size: int) -> ImageFont.ImageFont:
@@ -106,6 +109,47 @@ def _selected_phase_from_metadata(case_metadata: dict[str, Any]) -> str:
         or case_metadata.get("SelectedPhase")
         or ""
     ).strip()
+
+
+def _parse_dicom_date(value: Any) -> date | None:
+    rendered = str(value or "").strip()
+    if len(rendered) != 8 or not rendered.isdigit():
+        return None
+    try:
+        return datetime.strptime(rendered, "%Y%m%d").date()
+    except ValueError:
+        return None
+
+
+def _renal_volume_alert_qc(case_metadata: dict[str, Any]) -> dict[str, Any]:
+    birth_date = _parse_dicom_date(case_metadata.get("PatientBirthDate"))
+    study_date = _parse_dicom_date(case_metadata.get("StudyDate"))
+    age_years = None
+    if birth_date is not None and study_date is not None and study_date >= birth_date:
+        age_years = study_date.year - birth_date.year - (
+            (study_date.month, study_date.day) < (birth_date.month, birth_date.day)
+        )
+
+    pediatric = (
+        age_years is not None
+        and age_years < PEDIATRIC_RENAL_ALERT_CUTOFF_YEARS
+    )
+    if pediatric:
+        status = "pediatric_fixed_threshold_suppressed"
+    elif age_years is None:
+        status = "age_unavailable_fixed_threshold_retained"
+    else:
+        status = "fixed_threshold_applied"
+    return {
+        "status": status,
+        "patient_age_years_at_study": age_years,
+        "age_source": (
+            "PatientBirthDate_and_StudyDate" if age_years is not None else None
+        ),
+        "pediatric_cutoff_years": PEDIATRIC_RENAL_ALERT_CUTOFF_YEARS,
+        "fixed_low_volume_threshold_cm3": FIXED_LOW_RENAL_VOLUME_ALERT_CM3,
+        "fixed_threshold_applied": not pediatric,
+    }
 
 
 def _compute_mask_measurement(
@@ -624,6 +668,11 @@ def main() -> int:
             renal_qc_reference_masks,
             suppress_density=suppress_density,
         )
+        renal_volume_alert_qc = _renal_volume_alert_qc(case_metadata)
+        for organ_key in ("kidney_right", "kidney_left"):
+            organ_measurements[organ_key]["volume_alert_eligible"] = bool(
+                renal_volume_alert_qc["fixed_threshold_applied"]
+            )
 
         liver_measurement = organ_measurements.get("liver") or {}
         spleen_measurement = organ_measurements.get("spleen") or {}
@@ -652,6 +701,7 @@ def main() -> int:
                 "organs": organ_measurements,
                 "overlay_only_masks": overlay_only_measurements,
                 "renal_anatomy_qc": renal_anatomy_qc,
+                "renal_volume_alert_qc": renal_volume_alert_qc,
             }
             payload["artifacts"] = {"result_json": str(result_path.relative_to(case_dir))}
             write_payload(result_path, payload)
@@ -687,6 +737,7 @@ def main() -> int:
                 "organs": organ_measurements,
                 "overlay_only_masks": overlay_only_measurements,
                 "renal_anatomy_qc": renal_anatomy_qc,
+                "renal_volume_alert_qc": renal_volume_alert_qc,
             }
             payload["artifacts"] = {"result_json": str(result_path.relative_to(case_dir))}
             payload["dicom_exports"] = []
@@ -714,6 +765,7 @@ def main() -> int:
                 "job_status": "empty_overlay",
                 "organs": organ_measurements,
                 "renal_anatomy_qc": renal_anatomy_qc,
+                "renal_volume_alert_qc": renal_volume_alert_qc,
             }
             payload["artifacts"] = {"result_json": str(result_path.relative_to(case_dir))}
             write_payload(result_path, payload)
@@ -852,6 +904,7 @@ def main() -> int:
                 "density_suppressed_due_to_contrast": bool(suppress_density),
                 "hepatic_steatosis": hepatic_steatosis,
                 "renal_anatomy_qc": renal_anatomy_qc,
+                "renal_volume_alert_qc": renal_volume_alert_qc,
                 "source_slice_count": int(ct_data.shape[2]),
                 "exported_slice_count": len(dicom_exports),
                 "exported_slabs": export_slabs,

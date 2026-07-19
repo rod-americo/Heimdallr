@@ -30,6 +30,127 @@ def write_nifti(path: Path, data: np.ndarray, spacing=(1.0, 1.0, 1.0)) -> None:
 
 
 class TestParenchymalOrganVolumetryJob(unittest.TestCase):
+    def test_renal_volume_alert_qc_uses_age_at_study_boundary(self):
+        pediatric = parenchymal_organ_volumetry._renal_volume_alert_qc(
+            {"PatientBirthDate": "20100102", "StudyDate": "20260101"}
+        )
+        boundary = parenchymal_organ_volumetry._renal_volume_alert_qc(
+            {"PatientBirthDate": "20100101", "StudyDate": "20260101"}
+        )
+        unavailable = parenchymal_organ_volumetry._renal_volume_alert_qc(
+            {"PatientBirthDate": "invalid", "StudyDate": "20260101"}
+        )
+
+        self.assertEqual(pediatric["patient_age_years_at_study"], 15)
+        self.assertEqual(pediatric["status"], "pediatric_fixed_threshold_suppressed")
+        self.assertFalse(pediatric["fixed_threshold_applied"])
+        self.assertEqual(boundary["patient_age_years_at_study"], 16)
+        self.assertEqual(boundary["status"], "fixed_threshold_applied")
+        self.assertTrue(boundary["fixed_threshold_applied"])
+        self.assertIsNone(unavailable["patient_age_years_at_study"])
+        self.assertEqual(
+            unavailable["status"],
+            "age_unavailable_fixed_threshold_retained",
+        )
+        self.assertTrue(unavailable["fixed_threshold_applied"])
+
+    def test_pediatric_job_keeps_low_kidney_volumes_without_alert(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            case_id = "CaseParenchyma_Pediatric_20260718_001"
+            case_dir = tmp_path / case_id
+            (case_dir / "metadata").mkdir(parents=True)
+            (case_dir / "derived").mkdir(parents=True)
+            (case_dir / "artifacts" / "total").mkdir(parents=True)
+            metadata = {
+                "CaseID": case_id,
+                "Modality": "CT",
+                "StudyInstanceUID": "1.2.826.0.1.3680043.8.498.7",
+                "PatientBirthDate": "20181130",
+                "StudyDate": "20260718",
+                "Pipeline": {"series_selection": {"SelectedPhase": "native"}},
+            }
+            for filename in ("id.json", "metadata.json"):
+                (case_dir / "metadata" / filename).write_text(
+                    json.dumps(metadata),
+                    encoding="utf-8",
+                )
+            (case_dir / "metadata" / "resultados.json").write_text(
+                "{}",
+                encoding="utf-8",
+            )
+            shape = (12, 12, 12)
+            spacing = (10.0, 10.0, 10.0)
+            ct = np.zeros(shape, dtype=np.float32)
+            kidney_right = np.zeros(shape, dtype=np.float32)
+            kidney_left = np.zeros(shape, dtype=np.float32)
+            kidney_right[2:6, 2:6, 3:7] = 1.0
+            kidney_left[6:10, 2:6, 3:7] = 1.0
+            ct[kidney_right.astype(bool)] = 35.0
+            ct[kidney_left.astype(bool)] = 33.0
+            write_nifti(
+                case_dir / "derived" / f"{case_id}.nii.gz",
+                ct,
+                spacing=spacing,
+            )
+            write_nifti(
+                case_dir / "artifacts" / "total" / "kidney_right.nii.gz",
+                kidney_right,
+                spacing=spacing,
+            )
+            write_nifti(
+                case_dir / "artifacts" / "total" / "kidney_left.nii.gz",
+                kidney_left,
+                spacing=spacing,
+            )
+
+            with patch.object(settings, "STUDIES_DIR", tmp_path):
+                with patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "parenchymal_organ_volumetry",
+                        "--case-id",
+                        case_id,
+                        "--job-config-json",
+                        (
+                            '{"generate_overlay": false, '
+                            '"emit_secondary_capture_dicom": false}'
+                        ),
+                    ],
+                ):
+                    self.assertEqual(parenchymal_organ_volumetry.main(), 0)
+
+            result = json.loads(
+                (
+                    case_dir
+                    / "artifacts"
+                    / "metrics"
+                    / "parenchymal_organ_volumetry"
+                    / "result.json"
+                ).read_text(encoding="utf-8")
+            )
+            measurement = result["measurement"]
+            policy = measurement["renal_volume_alert_qc"]
+            self.assertEqual(policy["patient_age_years_at_study"], 7)
+            self.assertFalse(policy["fixed_threshold_applied"])
+            self.assertEqual(
+                measurement["organs"]["kidney_right"]["volume_cm3"],
+                64.0,
+            )
+            self.assertEqual(
+                measurement["organs"]["kidney_left"]["volume_cm3"],
+                64.0,
+            )
+            lines = build_overlay_lines(
+                organ_measurements=measurement["organs"],
+                locale="pt_BR",
+                renal_anatomy_qc=measurement["renal_anatomy_qc"],
+            )
+            kidney_lines = [line for line in lines if line.text.startswith("Rim ")]
+            self.assertEqual(len(kidney_lines), 2)
+            self.assertTrue(all(line.alert_span is None for line in kidney_lines))
+
     def test_renderer_uses_uniform_body_line_spacing(self):
         lines = [
             OverlayTextLine("Órgãos parenquimatosos:"),
