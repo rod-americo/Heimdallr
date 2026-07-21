@@ -823,10 +823,10 @@ class TestParenchymalOrganVolumetryJob(unittest.TestCase):
             self.assertIsNone(result["measurement"]["organs"]["liver"]["volume_cm3"])
             self.assertTrue(result["measurement"]["organs"]["liver"]["truncated_at_scan_bounds"])
 
-    def test_job_writes_l1_overlay_without_organ_volume(self):
+    def test_job_ignores_l1_when_defining_overlay_coverage(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
-            case_id = "CaseParenchyma_L1Overlay_20260404_001"
+            case_id = "CaseParenchyma_IgnoreL1_20260404_001"
             case_dir = tmp_path / case_id
             (case_dir / "metadata").mkdir(parents=True)
             (case_dir / "derived").mkdir(parents=True)
@@ -844,13 +844,18 @@ class TestParenchymalOrganVolumetryJob(unittest.TestCase):
             (case_dir / "metadata" / "metadata.json").write_text(json.dumps(id_payload), encoding="utf-8")
             (case_dir / "metadata" / "resultados.json").write_text("{}", encoding="utf-8")
 
-            shape = (12, 12, 8)
+            shape = (12, 12, 24)
             ct = np.zeros(shape, dtype=np.float32)
-            ct[4:8, 4:8, 2:6] = 300.0
+            ct[3:9, 3:9, 2:6] = 55.0
             write_nifti(case_dir / "derived" / f"{case_id}.nii.gz", ct, spacing=(1.0, 1.0, 1.0))
+
+            liver = np.zeros(shape, dtype=np.float32)
+            liver[3:9, 3:9, 2:6] = 1.0
+            write_nifti(case_dir / "artifacts" / "total" / "liver.nii.gz", liver)
 
             l1 = np.zeros(shape, dtype=np.float32)
             l1[4:8, 4:8, 2:6] = 1.0
+            l1[10, 10, 20] = 1.0
             write_nifti(case_dir / "artifacts" / "total" / "vertebrae_L1.nii.gz", l1)
 
             with patch.object(settings, "STUDIES_DIR", tmp_path):
@@ -875,13 +880,13 @@ class TestParenchymalOrganVolumetryJob(unittest.TestCase):
             result = json.loads(result_path.read_text(encoding="utf-8"))
 
             self.assertEqual(result["status"], "done")
-            self.assertEqual(result["measurement"]["job_status"], "overlay_only")
-            self.assertEqual(result["measurement"]["organs"]["liver"]["analysis_status"], "missing")
-            l1_measurement = result["measurement"]["overlay_only_masks"]["vertebra_l1"]
-            self.assertTrue(l1_measurement["complete"])
-            self.assertTrue(l1_measurement["included_in_overlay"])
-            self.assertEqual(l1_measurement["measurement_role"], "overlay_only")
-            self.assertGreater(result["measurement"]["exported_slice_count"], 0)
+            self.assertEqual(result["measurement"]["job_status"], "complete")
+            self.assertNotIn("overlay_only_masks", result["inputs"])
+            self.assertNotIn("overlay_only_masks", result["measurement"])
+            self.assertEqual(
+                [slab["center_mm"] for slab in result["measurement"]["exported_slabs"]],
+                [0.0, 5.0, 10.0],
+            )
             self.assertEqual(len(result["dicom_exports"]), result["measurement"]["exported_slice_count"])
             self.assertIn("overlay_series_dir", result["artifacts"])
 

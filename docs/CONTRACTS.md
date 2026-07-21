@@ -353,11 +353,9 @@ partial assessments are labeled `partial coverage`; insufficient liver samples
 are rejected, and insufficient spleen samples make a low-liver-HU assessment
 indeterminate. These are deterministic engineering QC thresholds and are not
 a clinical-validation claim.
-- The parenchymal-organ overlay series may include a complete
-`total/vertebrae_L1.nii.gz` mask as an overlay-only structure. L1 must not be
-reported as an organ volume or attenuation measurement by
-`parenchymal_organ_volumetry`; its measurement role is only to make the L1 mask
-visible in the generated 5 mm Secondary Capture series.
+- The parenchymal-organ overlay series contains only the organ and suspected
+renal-allograft masks used by that metric. Auxiliary vertebral masks do not
+affect its rendered structures or axial coverage.
 - L3 muscle area and VAT/SAT measurements use the `tissue_types` masks on the
 selected L3 slice, then exclude tissue components that touch dilated near-slice
 projections of upper appendicular `total` masks (`humerus`, `scapula`,
